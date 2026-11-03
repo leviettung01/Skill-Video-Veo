@@ -1,0 +1,77 @@
+{
+  "templates": [
+    {
+      "id": "sheet_6panel_studio",
+      "name": "Mẫu #01 • Chuẩn Studio 6 Góc",
+      "badge": "CHUẨN FLOW",
+      "sample_image": "mau_1_turnaround_6_goc.png",
+      "aspect_ratio": "3:2",
+      "use_case_guide": "🎯 Gợi ý ứng dụng: Chuẩn mực cho Nhân vật Tư vấn Nhà Xưởng (#001), Nhân viên Kiểm định QC & KOC Bán Hàng Gia Dụng / Tiêu Dùng phổ thông.",
+      "structure_breakdown": [
+        "Hàng trên (3 khung): Toàn thân đứng thẳng (Chính diện, Sau lưng, Nghiêng 90°)",
+        "Hàng dưới (3 khung): Chân dung cận mặt & vai (Chính diện, Góc 3/4, Góc nghiêng)"
+      ],
+      "description": "Bảng tham chiếu nhân vật 6 khung (2 hàng × 3 cột) trên nền xám studio trung tính: Hàng trên gồm 3 góc toàn thân (Chính diện, Sau lưng, Nghiêng 90 độ); Hàng dưới gồm 3 góc chân dung cận mặt (Chính diện, Góc 3/4, Góc nghiêng).",
+      "character_sheet_prompt": "Photorealistic 6-panel character reference turnaround sheet arranged in a clean 2x3 grid with thin white borders on a neutral light-grey studio background. Top row (3 panels): full-body standing views of the exact same young Vietnamese person ({character_description}) — Left: front view, Center: back view, Right: side profile view. Bottom row (3 panels): close-up head-and-shoulders portrait views of the exact same person — Left: front-facing portrait, Center: 3/4 angle portrait, Right: side profile portrait. Consistent studio lighting, ultra-sharp facial identity consistency across all 6 panels, 8k photorealistic quality.",
+      "product_with_character_prompt": "Photorealistic vertical 9:16 medium-wide standing photo (framed from head to hips, camera at 2 meters distance, NOT a close-up): the exact same person from the character reference ({character_description}), {outfit_en}, {setting_en}. Looking directly at the camera with a warm, friendly, confident smile while holding and presenting the exact product from the product reference image in hands at waist level facing the camera (true-to-life natural hand-held scale relative to hands and body, NOT oversized), with neat retail packaging boxes on the worktable beside. Keep the product 100% identical as shown in the product reference image (keep all original product details, prints, logos, and true size intact, do not redesign or alter the product in any way), and keep the face identical.",
+      "subtitle": "3 Toàn Thân + 3 Cận Mặt"
+    },
+    {
+      "id": "sheet_3d_pixar_story_15",
+      "name": "Mẫu #02 • Hoạt Hình 3D Pixar",
+      "badge": "3D ANIMATION",
+      "sample_image": "mau_2_3d_pixar_story_sheet_15.jpg",
+      "aspect_ratio": "3:4",
+      "use_case_guide": "🎯 Gợi ý ứng dụng: Chuyên làm Phim Hoạt Hình 3D (Pixar / Disney / DreamWorks), Truyện Cổ Tích, Phim Ngắn Phiêu Lưu, Kênh Kể Chuyện Thiếu Nhi & Linh Vật Thương Hiệu (Mascot).",
+      "structure_breakdown": [
+        "Góc trên trái: Hồ sơ nhân vật (Tên, Loài, Vai trò, Tính cách, Chiều cao) + Bảng 12 mã màu (Color Swatches)",
+        "Hàng 1: 4 góc xoay toàn thân đứng tự nhiên (FRONT, SIDE, BACK, 3/4 VIEW)",
+        "Hàng 2: 4 góc T-Pose chuẩn dựng khung xương 3D & giữ tỷ lệ trang phục/balo",
+        "Hàng 3: Khung NEUTRAL POSE + Khung ACTION POSE (chống gậy chỉ tay trên đá) + 4 biểu cảm khuôn mặt cận cảnh"
+      ],
+      "description": "3D Character Reference Sheet Prompt for your story #15 — Bảng thiết kế nhân vật hoạt hình 3D phong cách Pixar/Disney/DreamWorks đầy đủ nhất: Turnaround 4 góc (Front, Side, Back, 3/4), hàng T-Pose, Neutral Pose, Action Pose kịch tính, 4 biểu cảm gương mặt và bảng 12 ô màu (Color Palette Swatches).",
+      "default_character_example": "A bipedal goat mountain guide, rugged hiking gear, coiled rope over one shoulder, weathered confident face",
+      "raw_reference_prompt": "@Create image A bipedal goat mountain guide, rugged hiking gear, coiled rope over one shoulder, weathered confident face, turnaround reference sheet with action pose.\n\nCharacter reference sheet, full body turnaround (front, side, back, 3/4 views), T-pose and neutral pose, consistent proportions, clean white studio background, soft even lighting, color palette swatches in corner, Pixar/Disney/DreamWorks 3D animated feature film style, high detail, subsurface scattering skin, expressive large eyes, smooth stylized shading.",
+      "character_sheet_prompt": "A bipedal goat mountain guide, rugged hiking gear, coiled rope over one shoulder, weathered confident face, turnaround reference sheet with action pose ({character_description}). Character reference sheet, full body turnaround (front, side, back, 3/4 views), T-pose and neutral pose, consistent proportions, clean white studio background, soft even lighting, color palette swatches in corner, Pixar/Disney/DreamWorks 3D animated feature film style, high detail, subsurface scattering skin, expressive large eyes, smooth stylized shading.",
+      "product_with_character_prompt": "3D Pixar/Disney/DreamWorks animated feature film style vertical 9:16 medium-wide shot: the exact same 3D animated character from the character reference sheet ({character_description}), {outfit_en}, {setting_en}, holding and presenting the exact product from the product reference image with an expressive, enthusiastic smile. Soft cinematic rim lighting, subsurface scattering, ultra-detailed 8k 3D render, keep the product 100% identical to the reference image.",
+      "subtitle": "Turnaround + T-Pose + Action"
+    },
+    {
+      "id": "sheet_fullbody_5detail_zoom",
+      "name": "Mẫu #03 • Lookbook & 5 Macro Zoom",
+      "badge": "FASHION KOC",
+      "sample_image": "mau_3_full_body_and_5_detail_zoom_ai_demo.jpg",
+      "reference_image": "mau_3_full_body_and_5_detail_ref.jpg",
+      "aspect_ratio": "16:9",
+      "use_case_guide": "🎯 Gợi ý ứng dụng: Lý tưởng cho Nhân vật KOC Thời Trang, Cosplay, Đồng Phục Studio/Thương Hiệu & Video cần khóa chặt 100% chi tiết từ khuôn mặt, cổ áo, vòng eo, chất liệu tất đến giày cao gót.",
+      "structure_breakdown": [
+        "Góc trên trái: Thông số hình thể chi tiết (Tên, Chiều cao 165cm, Cân nặng 50kg, Kiểu tóc, Trang phục)",
+        "Khu vực chính (78% ngang): 4 góc đứng toàn thân từ đầu tới chân (FRONT VIEW, SIDE VIEW, BACK VIEW, 3/4 VIEW)",
+        "Cột dọc bên phải (5 ô Macro 1:1): Zoom cận cảnh theo trục dọc từ trên xuống: (1) Gương mặt & Băng đô, (2) Cổ áo & Choker, (3) Tạp dề & Chân váy, (4) Họa tiết tất/chân, (5) Giày cao gót"
+      ],
+      "description": "Bảng phân tích nhân vật siêu chi tiết từ Body đến Khuôn mặt (đã dùng AI render ảnh Demo 'Linh Chi — Studio Fashion KOC' từ ảnh Ref gốc): Kết hợp 4 góc toàn thân (Front, Side, Back, 3/4) với cột 5 ô Macro Zoom-in bóc tách từng chi tiết phụ kiện từ đỉnh đầu xuống gót chân.",
+      "default_character_example": "gorgeous young Vietnamese female model (23 years old, 165cm, 50kg, fair porcelain skin, symmetrical photogenic face, sleek shoulder-length black bob hair with a delicate black-and-white lace headband, wearing a fitted black-and-white lace-trimmed studio uniform dress with white waist apron, sheer floral-patterned stockings, and glossy black platform heels)",
+      "character_sheet_prompt": "Photorealistic 16:9 widescreen character reference sheet on a pure clean white studio background (#FFFFFF). Top-left corner: clean minimalist character specification text block ('Character Profile | Height: 165cm | Weight: 50kg | Body: Proportional | Hair & Outfit Specs'). Main center-left section (78% width): 4 full-body standing turnaround views side-by-side (labeled 'FRONT VIEW', 'SIDE VIEW', 'BACK VIEW', '3/4 VIEW') of the exact same person ({character_description}). Rightmost column (20% width): a vertical stack of 5 framed square macro zoom-in detail inset boxes from top to bottom with clean captions underneath: (1) 'DETAIL FACE & HEADBAND' close-up front beauty portrait, (2) 'DETAIL COLLAR & NECKLINE' close-up of ribbon choker and lace neckline, (3) 'DETAIL WAIST & SKIRT' close-up of waist apron and pleated skirt hem, (4) 'DETAIL LEGWEAR TEXTURE' close-up of stocking/garment weave texture, (5) 'DETAIL HIGH HEELS' close-up of glossy platform footwear. 100% identical face, body proportions, and outfit details across all views, commercial fashion catalog lighting, 8k ultra-detailed photorealistic.",
+      "product_with_character_prompt": "Photorealistic vertical 9:16 medium-wide standing shot (framed from head to mid-thigh, camera at 2 meters distance): the exact same female model from the character reference sheet ({character_description}), {outfit_en}, {setting_en}. She smiles charmingly at the camera while holding and showcasing the exact product from the product reference image at chest-to-waist level (natural true-to-life scale, 100% identical packaging and details). High-key studio fashion lighting, 8k photorealistic.",
+      "subtitle": "4 Toàn Thân + 5 Chi Tiết Phụ Kiện"
+    },
+    {
+      "id": "sheet_portrait_3body_menswear",
+      "name": "Mẫu #04 • Thời Trang & Phim AI",
+      "badge": "MENSWEAR & AI FILM",
+      "sample_image": "mau_4_menswear_portrait_3body_sheet.jpg",
+      "reference_image": "mau_4_portrait_3body_ref.jpg",
+      "aspect_ratio": "16:9",
+      "use_case_guide": "🎯 Gợi ý ứng dụng: Chuyên dùng cho Thời Trang Nam (Sơ mi, Quần Âu/Short Linen, Thắt lưng da, Đồng hồ, Giày Sneaker) & Tạo Nhân Vật Phim AI cố định khuôn mặt để thay đổi hàng loạt trang phục mà không bị lệch nét mặt.",
+      "structure_breakdown": [
+        "Khung Lớn Bên Trái (38% ngang): 1 Chân dung Cận Mặt & Ngực (Chest-Up Portrait) siêu nét khóa chặt 100% đường nét gương mặt, kiểu tóc, dây chuyền & cổ áo",
+        "Khu vực Bên Phải (62% ngang): 3 Dáng đứng Toàn Thân từ đầu đến chân (Chính diện tay đút túi quần khoe đồng hồ & thắt lưng • Góc nghiêng 90° • Góc sau lưng 180°)"
+      ],
+      "description": "Bố cục '1 Cận Mặt Lớn Bên Trái + 3 Toàn Thân Bên Phải' tối ưu nhất để giữ nguyên khuôn mặt nhân vật AI khi thay đổi trang phục hoặc review Thời Trang Nam / Phụ Kiện Nam cao cấp.",
+      "default_character_example": "handsome 25-year-old Asian/Vietnamese male fashion model with sharp masculine jawline, short textured black hair with neat modern fade and parted bangs, wearing a crisp white long-sleeve linen button-down shirt with sleeves rolled to forearms, thin gold chain necklace with small rectangular gold pendant, dark brown leather belt with silver buckle, beige pleated linen chino shorts, silver steel wristwatch, and clean white leather minimalist sneakers",
+      "character_sheet_prompt": "Photorealistic 16:9 widescreen character reference sheet on a seamless pure white studio background (#FFFFFF), no text or watermarks. Left side (38% width): one large, ultra-sharp chest-up front portrait of ({character_description}) looking directly at the camera with a confident, charismatic slight smile, clearly showcasing exact facial features, hairstyle, collar, and neck accessories. Right side (62% width): 3 full-body standing turnaround menswear fashion poses side-by-side from head to toe — (1) Front full-body view with natural confident menswear catalog posture (one hand casually in pocket showcasing wristwatch and belt), (2) 90-degree Side profile full-body view, (3) 180-degree Back full-body view. 100% identical face, hair, body proportions, and outfit across all 4 views, high-key commercial fashion lookbook studio lighting, 8k photorealistic.",
+      "product_with_character_prompt": "Photorealistic vertical 9:16 medium-wide menswear fashion & product review shot (framed from head to mid-thigh, camera at 2 meters distance): the exact same handsome male model from the character reference sheet ({character_description}), {outfit_en}, {setting_en}. He stands in a confident, stylish menswear pose looking at the camera while holding and presenting the exact product from the product reference image at chest-to-waist level (true-to-life natural scale, 100% identical product design, leather texture, buckle, and packaging). Crisp commercial lookbook lighting, 8k photorealistic.",
+      "subtitle": "1 Chân Dung Lớn + 3 Toàn Thân"
+    }
+  ]
+}

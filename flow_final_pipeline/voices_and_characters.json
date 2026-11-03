@@ -1,0 +1,309 @@
+{
+  "default_videos_per_character": 3,
+  "default_image_model": "nano_banana",
+  "default_sheet_template_id": "sheet_6panel_studio",
+  "voices": {
+    "nv1": {
+      "key": "nv1",
+      "name": "Nữ Bắc • Tư Vấn Xưởng & QC (NV1)",
+      "voice_id": "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
+      "flow_slug": "erinome",
+      "gender": "female",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "trustworthy_expert",
+      "tone_label": "🛡️ Uy tín • Tư vấn Xưởng & QC",
+      "speed_wpm": "42-46 từ / 10s (Tốc độ Chuẩn)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Erinome.wav",
+      "voice_prompt_en": "clear, trustworthy young Northern Vietnamese female voice (Hanoi accent), professional factory consultant tone, steady confident articulation, 4.4 words/sec",
+      "dialect_markers_vn": "các bác ơi, nhé, đấy ạ, chuẩn chỉnh tận xưởng, kiểm định kỹ càng",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Gia dụng",
+        "Đồ điện tử",
+        "Phụ kiện Nam",
+        "Dụng cụ nhà bếp",
+        "Sức khoẻ"
+      ],
+      "description": "Giọng nữ miền Bắc chuẩn Hà Nội, phát âm tròn vành rõ chữ, tạo độ tin cậy cao khi giới thiệu hàng xuất xưởng, báo giá bậc thang và kiểm định chất lượng.",
+      "sample_vn_file": "voice_samples/nv1_flow.mp3",
+      "sample_dialogue_vn": "30k miễn phí ship tới tận nhà cho nguyên một thắt lưng nam tặng thêm đồng hồ này. Ở đâu bán cái giá đó thì em cũng đến",
+      "flow_synced": true
+    },
+    "nv2": {
+      "key": "nv2",
+      "name": "Nữ Bắc • Chốt Sale Năng Lượng (NV2)",
+      "voice_id": "75a3d14a-ed10-4bdc-862c-44adb02a5562",
+      "flow_slug": "zephyr",
+      "gender": "female",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "energetic_sale",
+      "tone_label": "🔥 Năng lượng cao • Chốt Sale",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Zephyr.wav",
+      "voice_prompt_en": "high-energy, enthusiastic young Northern Vietnamese female voice (Hanoi accent), fast-paced livestream flash-sale tone, persuasive and bright delivery, 4.6 words/sec",
+      "dialect_markers_vn": "mọi người ơi, săn ngay nhé, xả kho sập sàn, mỗi tài khoản một giá, chốt liền tay",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Thời trang",
+        "Hàng tiêu dùng nhanh",
+        "Xả kho giá rẻ",
+        "Combo Mua 1 Tặng 1",
+        "Đồ gia dụng"
+      ],
+      "description": "Giọng nữ miền Bắc trẻ trung, tiết tấu nhanh, dồn dập tạo hiệu ứng FOMO cực mạnh cho các video xả kho, flash sale, báo giá bậc thang.",
+      "flow_synthesized_uuid": "4ec6bbcc-5c54-4953-b43c-cb355fa20dad",
+      "sample_vn_file": "voice_samples/nv2_flow.mp3",
+      "sample_dialogue_vn": "Mọi người ơi xả kho trực tiếp tại xưởng chỉ ba mươi cành miễn phí ship tới tận nhà! Săn ngay kẻo hết nhé!",
+      "flow_synced": true
+    },
+    "v3_nu_nam_foodie": {
+      "key": "v3_nu_nam_foodie",
+      "name": "Nữ Nam • Review Ẩm Thực & Mỹ Phẩm",
+      "voice_id": "6c15e209-a473-4f17-badc-56777aa6ff2a",
+      "flow_slug": "leda",
+      "gender": "female",
+      "region": "south",
+      "region_label": "Miền Nam (Sài Gòn)",
+      "tone_style": "sweet_foodie",
+      "tone_label": "🍲 Ngọt ngào • Review Đồ Ăn / Mỹ Phẩm",
+      "speed_wpm": "38-42 từ / 10s (Tốc độ Vừa)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Leda.wav",
+      "voice_prompt_en": "sweet, cheerful young Southern Vietnamese female voice (Saigon accent), warm appetizing food-reviewer and beauty vlogger tone, lively and friendly expression, 4.0 words/sec",
+      "dialect_markers_vn": "mấy bà ơi, nha, nghen, thiệt sự cuốn xỉu, thơm nức mũi luôn nè, bấm giỏ hàng liền nha",
+      "recommended_templates": [
+        "002",
+        "003"
+      ],
+      "recommended_categories": [
+        "Đồ ăn vặt",
+        "Đặc sản miền Nam",
+        "Kho quẹt / Cơm cháy",
+        "Mỹ phẩm",
+        "Nước hoa",
+        "Trà / Đồ uống"
+      ],
+      "description": "Giọng nữ miền Nam dễ thương, thân thiện, nhấn nhá cảm xúc vị giác cực hợp cho video quay POV Đồ Ăn Vặt (#002) và review mỹ phẩm.",
+      "sample_vn_file": "voice_samples/v3_nu_nam_foodie_flow.mp3",
+      "sample_dialogue_vn": "Mấy bà ơi mở nắp hũ kho quẹt nồi đất ra là thơm nức mũi luôn nha, chấm rau củ hay ăn cơm nóng là cuốn xỉu!",
+      "flow_synced": true
+    },
+    "v4_nu_nam_sale": {
+      "key": "v4_nu_nam_sale",
+      "name": "Nữ Nam • Livestream Chốt Đơn",
+      "voice_id": "d346e94f-810e-4031-9368-ca1740558bcd",
+      "flow_slug": "laomedeia",
+      "gender": "female",
+      "region": "south",
+      "region_label": "Miền Nam (Sài Gòn)",
+      "tone_style": "energetic_sale",
+      "tone_label": "🔥 Năng lượng cao • Chốt đơn Sài Gòn",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Laomedeia.wav",
+      "voice_prompt_en": "upbeat, energetic young Southern Vietnamese female voice (Saigon accent), fast-paced enthusiastic shopping host tone, bright and catchy delivery, 4.6 words/sec",
+      "dialect_markers_vn": "cả nhà ơi, hốt lẹ nha, deal hời chấn động luôn, chạm giỏ hàng góc trái liền tay nghen",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Thời trang nữ",
+        "Hóa mỹ phẩm",
+        "Đồ gia dụng",
+        "Combo tiết kiệm",
+        "Đồ ăn vặt"
+      ],
+      "description": "Giọng nữ Sài Gòn năng lượng cao, hoạt ngôn, tạo không khí săn sale sôi động cho tệp khách hàng miền Nam và toàn quốc.",
+      "sample_vn_file": "voice_samples/v4_nu_nam_sale_flow.mp3",
+      "sample_dialogue_vn": "Trời ơi cả nhà coi cái chất lượng của nó nè, xịn xò từng chi tiết mà hôm nay trợ giá sâu dữ lắm, hốt lẹ liền tay nghen",
+      "flow_synced": true
+    },
+    "v5_nam_bac_chuyen_gia": {
+      "key": "v5_nam_bac_chuyen_gia",
+      "name": "Nam Bắc • Chuyên Gia Đồ Nam & Kỹ Thuật",
+      "voice_id": "0bc0cb6a-81e7-437c-a790-66fc4c4a58b6",
+      "flow_slug": "orus",
+      "gender": "male",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "trustworthy_expert",
+      "tone_label": "👔 Trầm ấm • Chuyên gia Kỹ thuật / Đồ Nam",
+      "speed_wpm": "38-42 từ / 10s (Tốc độ Vừa)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Orus.wav",
+      "voice_prompt_en": "deep, authoritative, trustworthy Northern Vietnamese male voice (Hanoi accent), technical expert and luxury menswear reviewer tone, calm and firm delivery, 4.0 words/sec",
+      "dialect_markers_vn": "anh em nhé, các bác nhìn kỹ chi tiết này, hàng chuẩn đét, bền bỉ theo năm tháng",
+      "recommended_templates": [
+        "001"
+      ],
+      "recommended_categories": [
+        "Phụ kiện Nam (Thắt lưng, Ví, Đồng hồ)",
+        "Đồ cơ khí / Dụng cụ",
+        "Công nghệ",
+        "Ô tô - Xe máy"
+      ],
+      "description": "Giọng nam miền Bắc trầm ấm, đĩnh đạc, phân tích thông số kỹ thuật và chất liệu cực kỳ thuyết phục cho các sản phẩm dành cho phái mạnh.",
+      "sample_vn_file": "voice_samples/v5_nam_bac_chuyen_gia_flow.mp3",
+      "sample_dialogue_vn": "Anh em nhìn kỹ bề mặt da bò nguyên tấm và khoá hợp kim chống gỉ này nhé, độ bền cực cao, bảo hành mười hai tháng!",
+      "flow_synced": true
+    },
+    "v6_nam_nam_reviewer": {
+      "key": "v6_nam_nam_reviewer",
+      "name": "Nam Nam • Vlog Ẩm Thực & Đời Sống",
+      "voice_id": "d35052d3-703c-4a98-985d-35df63ed121e",
+      "flow_slug": "puck",
+      "gender": "male",
+      "region": "south",
+      "region_label": "Miền Nam (Sài Gòn)",
+      "tone_style": "sweet_foodie",
+      "tone_label": "🍔 Hào hứng • Vlogger Ẩm thực / Đời sống",
+      "speed_wpm": "40-44 từ / 10s (Tốc độ Chuẩn)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Puck.wav",
+      "voice_prompt_en": "upbeat, friendly young Southern Vietnamese male voice (Saigon accent), enthusiastic food and lifestyle reviewer tone, natural relatable cadence, 4.2 words/sec",
+      "dialect_markers_vn": "anh chị em ơi, ngon bá cháy luôn nha, ăn một miếng là ghiền liền, thử ngay nghen",
+      "recommended_templates": [
+        "002",
+        "001"
+      ],
+      "recommended_categories": [
+        "Đồ ăn vặt",
+        "Đồ nhắm / Khô bò / Khô gà",
+        "Gia dụng thông minh",
+        "Đồ thể thao"
+      ],
+      "description": "Giọng nam miền Nam trẻ trung, gần gũi như bạn bè rủ rê thưởng thức món ngon hoặc review đồ dùng tiện ích.",
+      "sample_vn_file": "voice_samples/v6_nam_nam_reviewer_flow.mp3",
+      "sample_dialogue_vn": "Anh chị em ơi món này ăn kèm cơm nóng hay lai rai cuối tuần là ngon bá cháy luôn nha, thử một miếng là ghiền liền nghe",
+      "flow_synced": true
+    },
+    "v7_nu_bac_genz_foodie": {
+      "key": "v7_nu_bac_genz_foodie",
+      "name": "Nữ Bắc • GenZ Review Ăn Vặt",
+      "voice_id": "29f2a669-6ea7-4486-939e-5cef9db7f211",
+      "flow_slug": "autonoe",
+      "gender": "female",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "sweet_foodie",
+      "tone_label": "🧋 GenZ Trẻ trung • Review Đồ Ăn Vặt",
+      "speed_wpm": "40-44 từ / 10s (Tốc độ Chuẩn)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Autonoe.wav",
+      "voice_prompt_en": "cheerful, expressive Gen-Z Northern Vietnamese female voice (Hanoi accent), appetizing food reviewer tone with mouth-watering inflection, 4.2 words/sec",
+      "dialect_markers_vn": "mọi người nha, nhìn phần sốt sánh kẹo mê chữ ê kéo dài, ăn kèm cơm nóng thì hết nước chấm",
+      "recommended_templates": [
+        "002",
+        "003"
+      ],
+      "recommended_categories": [
+        "Đồ ăn vặt",
+        "Trà / Kombucha / Đồ uống",
+        "Bánh kẹo",
+        "Góc bàn học GenZ"
+      ],
+      "description": "Giọng nữ GenZ Hà Nội tươi sáng, bắt trend, cực hợp với bối cảnh bàn học GenZ, tiệm ăn vặt Hà Nội và trà trái cây.",
+      "sample_vn_file": "voice_samples/v7_nu_bac_genz_foodie_flow.mp3",
+      "sample_dialogue_vn": "Mọi người nha, nhìn phần sốt sánh kẹo mê chữ ê kéo dài luôn, ăn kèm cơm nóng thì đúng là hết nước chấm nhé!",
+      "flow_synced": true
+    },
+    "v8_nu_trung_truyen_cam": {
+      "key": "v8_nu_trung_truyen_cam",
+      "name": "Nữ Trung • Kể Chuyện Đặc Sản",
+      "voice_id": "0a70e0a0-8d2c-4f7a-b649-a049096b3ed3",
+      "flow_slug": "sulafat",
+      "gender": "female",
+      "region": "central",
+      "region_label": "Miền Trung (Huế / Đà Nẵng)",
+      "tone_style": "chill_story",
+      "tone_label": "🌿 Dịu dàng • Đặc sản & Quà tặng",
+      "speed_wpm": "36-40 từ / 10s (Tốc độ Thư thả)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Sulafat.wav",
+      "voice_prompt_en": "warm, gentle Central Vietnamese female voice, sincere storytelling tone for traditional specialties and health gifts, smooth and clear articulation, 3.8 words/sec",
+      "dialect_markers_vn": "mọi người ơi, hương vị quê nhà đậm đà khó quên, làm quà biếu hay dùng trong gia đình đều quý",
+      "recommended_templates": [
+        "002",
+        "001"
+      ],
+      "recommended_categories": [
+        "Đặc sản truyền thống",
+        "Quà biếu sức khoẻ",
+        "Trà thảo mộc",
+        "Nhang / Trầm hương / Phong thuỷ"
+      ],
+      "description": "Giọng nữ nhẹ nhàng, sâu lắng, tạo cảm giác chân thật và trân quý cho các dòng sản phẩm truyền thống, sức khỏe, tâm linh.",
+      "sample_vn_file": "voice_samples/v8_nu_trung_truyen_cam_flow.mp3",
+      "sample_dialogue_vn": "Mọi người ơi, từng mẻ đặc sản quê hương đều được chế biến thủ công đậm đà hương vị truyền thống, làm quà biếu rất quý!",
+      "flow_synced": true
+    }
+  },
+  "characters": {
+    "nv1": {
+      "key": "nv1",
+      "name": "Nữ Tư Vấn Xưởng",
+      "enabled": true,
+      "videos_per_character": 3,
+      "character_id": "208606a7-a345-48b2-af32-9fd3c37d0c9a",
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "ref_image_file": "characters/nv1_ref.jpg",
+      "default_voice": "nv1",
+      "lock_voice_to_character": true,
+      "voice_id": "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
+      "voice_name": "Nữ Bắc • Tư Vấn Xưởng & QC (NV1)",
+      "voice_region": "north",
+      "voice_gender": "female",
+      "voice_tone": "trustworthy_expert",
+      "voice_prompt_en": "clear, trustworthy young Northern Vietnamese female voice (Hanoi accent), professional factory consultant tone, steady confident articulation, 4.4 words/sec",
+      "appearance_en": "shoulder-length layered black hair, black-framed glasses, identical face",
+      "preferred_image_model": "nano_banana",
+      "sheet_template_id": "sheet_6panel_studio",
+      "subtitle": "Tóc ngang vai • Kính đen"
+    },
+    "nv2": {
+      "key": "nv2",
+      "name": "Nữ Chốt Sale Năng Lượng",
+      "enabled": true,
+      "videos_per_character": 3,
+      "character_id": "562be2fe-3c7c-4fc9-b3f2-c9b87743ec30",
+      "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
+      "ref_image_file": "characters/nv2_ref.png",
+      "default_voice": "nv2",
+      "lock_voice_to_character": true,
+      "voice_id": "75a3d14a-ed10-4bdc-862c-44adb02a5562",
+      "voice_name": "Nữ Bắc • Chốt Sale Năng Lượng (NV2)",
+      "voice_region": "north",
+      "voice_gender": "female",
+      "voice_tone": "energetic_sale",
+      "voice_prompt_en": "high-energy, enthusiastic young Northern Vietnamese female voice (Hanoi accent), fast-paced livestream flash-sale tone, persuasive and bright delivery, 4.6 words/sec",
+      "appearance_en": "long wavy dark-brown hair in a high ponytail with colourful pastel hair clips, identical face, no glasses",
+      "preferred_image_model": "nano_banana",
+      "sheet_template_id": "sheet_6panel_studio",
+      "subtitle": "Tóc buộc cao • Kẹp màu"
+    },
+    "nv3": {
+      "key": "nv3",
+      "name": "Nam Mẫu Thời Trang",
+      "enabled": true,
+      "videos_per_character": 3,
+      "character_id": "",
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "ref_image_file": "characters/nv3_ref.jpg",
+      "default_voice": "v5_nam_bac_chuyen_gia",
+      "lock_voice_to_character": true,
+      "voice_id": "0bc0cb6a-81e7-437c-a790-66fc4c4a58b6",
+      "voice_name": "Nam Bắc • Chuyên Gia Đồ Nam & Kỹ Thuật",
+      "voice_region": "north",
+      "voice_gender": "male",
+      "voice_tone": "trustworthy_expert",
+      "voice_prompt_en": "deep, authoritative, trustworthy Northern Vietnamese male voice (Hanoi accent), technical expert and luxury menswear reviewer tone, calm and firm delivery, 4.0 words/sec",
+      "appearance_en": "handsome 25-year-old Vietnamese male fashion model with sharp jawline, short textured black hair with neat fade, crisp white linen shirt rolled sleeves, gold pendant necklace, dark brown leather belt, beige pleated linen shorts, silver steel wristwatch",
+      "preferred_image_model": "nano_banana",
+      "sheet_template_id": "sheet_portrait_3body_menswear",
+      "subtitle": "Sơ mi Linen • Đồ Nam cao cấp"
+    }
+  }
+}

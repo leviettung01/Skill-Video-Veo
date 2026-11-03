@@ -1,0 +1,92 @@
+{
+  "id": "do_an_vat_pov_voice",
+  "folder_name": "Đồ Ăn Vặt POV (Có Voice)",
+  "name": "Đồ Ăn Vặt POV (Có Voice Review • Timeline Sync • 60 FPS)",
+  "badge": "NEW • POV CÓ VOICE + 60FPS SUB",
+  "category": "Ẩm Thực / Đồ Ăn Vặt POV Có Voice",
+  "price_label": "349.000đ • Đã Kích Hoạt",
+  "tier_badge": "👑 PRO POV VOICE TEMPLATE",
+  "author": "Lê Việt Tùng - SkillAutoVeo",
+  "zalo": "0915967790",
+  "facebook": "https://www.facebook.com/tungbinh.38/",
+  "description": "Biến thể nâng cấp của Template Đồ Ăn Vặt: Quay góc nhìn thứ nhất (POV Tabletop) trực diện sản phẩm kết hợp Giọng Đọc Review (Voice ID chọn từ thư viện), đồng bộ kép cả Hình Ảnh/Camera lẫn Lời Thoại theo Timeline [0.0-3.5s] - [3.5-7.0s] - [7.0-10.0s]. Kế thừa phân cảnh mượt mà, giữ chuẩn 100% ngoại quan sản phẩm theo ảnh gốc (không tự bịa nhân bên trong), kiểm soát câu từ chuẩn Policy TikTok Shop, Random 8 Background Đồ Ăn Vặt và xuất Final 1080p 60 FPS có Karaoke Subtitles.",
+  "default_videos_per_character": 2,
+  "scenes_per_video": 3,
+  "scene_duration_sec": 10,
+  "video_aspect": "9:16",
+  "image_resolution": "2K (1536x2752)",
+  "video_resolution": "1080p • 60 FPS",
+  "image_model": "Nano Banana 2.1 (BELUGA 2K)",
+  "video_model": "Veo 3.1 (abra_r2v_10s + Voice ID + Upsampler 1080p 60FPS)",
+  "tags": [
+    "POV Có Voice Review",
+    "Timeline Hình + Voice",
+    "Chuẩn Policy TikTok",
+    "Khóa Sản Phẩm 100%",
+    "Random 8 Background",
+    "60 FPS Karaoke Sub"
+  ],
+  "highlights": [
+    "Đồng bộ Timeline kép [0.0-3.5s], [3.5-7.0s], [7.0-10.0s] cho cả Chuyển Động Hình Ảnh/Camera và Lời Thoại Voice Review",
+    "Kế thừa phân cảnh (Scene Inheritance) logic: Cảnh 1 (Hook POV) -> Cảnh 2 (Push-in cận cảnh độ ngon) -> Cảnh 3 (Pull-back Hero & chỉ giỏ hàng)",
+    "Khóa sản phẩm tuyệt đối (Strict Product Lock): Chuẩn 100% ảnh gốc, không tự ý xé bao bì hay sáng tạo nhân bên trong không có thật",
+    "Kịch bản Voice Review kiểm soát từ ngữ chuẩn Policy TikTok Shop, chọn Voice từ danh sách giọng đọc, xuất 1080p 60 FPS kèm Phụ Đề Karaoke"
+  ],
+  "workflow_steps": [
+    {
+      "step": 1,
+      "icon": "🛍️",
+      "title": "Bước 1: Tự Động Crawl Ảnh & Thông Tin Sản Phẩm Từ Link/ID",
+      "detail": "Tải toàn bộ ảnh gốc và mô tả sản phẩm từ Link/ID TikTok Shop về thư mục dự án, chọn ảnh bao bì chuẩn nhất làm khóa tham chiếu (prod_1.jpg)."
+    },
+    {
+      "step": 2,
+      "icon": "🎲",
+      "title": "Bước 2: Random 8 Background & Viết Kịch Bản Voice Chuẩn Policy",
+      "detail": "Random ngẫu nhiên 1 trong 8 bối cảnh Đồ Ăn Vặt (Quầy Tiệm Hà Nội, Bàn Học Gen Z, Đảo Bếp, Quán Cafe Sân Vườn...) và viết kịch bản Voice + Visual theo Timeline 3 mốc."
+    },
+    {
+      "step": 3,
+      "icon": "🖼️",
+      "title": "Bước 3: Tạo Ảnh POV Tham Chiếu 2K (Strict Product Lock)",
+      "detail": "Tạo ảnh tham chiếu góc POV 25 độ trên mặt bàn với đúng sản phẩm gốc 100% và nâng cấp lên độ phân giải 2K (1536x2752)."
+    },
+    {
+      "step": 4,
+      "icon": "🎬",
+      "title": "Bước 4: Render 3 Cảnh 10s Có Voice & Đốt Phụ Đề Karaoke 60 FPS",
+      "detail": "Render 3 phân cảnh 10s kế thừa nhau trên Google Flow kèm Voice ID, Upsample 1080p và chạy FFmpeg xuất Video Final 30s ở tốc độ 60 FPS kèm Karaoke Subtitles."
+    }
+  ],
+  "scene_breakdown": [
+    {
+      "scene": 1,
+      "title": "Cảnh 1 (0–10s): POV HOOK & GIỚI THIỆU SẢN PHẨM",
+      "purpose": "[0.0-3.5s] Hook bắt tai cho tín đồ ăn vặt -> [3.5-7.0s] Giới thiệu bao bì chỉn chu bắt mắt -> [7.0-10.0s] Nhấn mạnh mức giá ưu đãi hời.",
+      "camera": "Góc POV 25 độ trực diện mặt bàn, tay chạm nhẹ cạnh sản phẩm, camera slow push-in nhẹ."
+    },
+    {
+      "scene": 2,
+      "title": "Cảnh 2 (10–20s): KẾ THỪA CẢNH 1 — REVIEW HƯƠNG VỊ & ĐỘ NGON",
+      "purpose": "[0.0-3.5s] Miêu tả hương thơm & vị đậm đà -> [3.5-7.0s] Cảm nhận độ giòn/dẻo cuốn miệng -> [7.0-10.0s] Khen ngợi quy cách đóng gói sạch sẽ.",
+      "camera": "Kế thừa vị trí cuối Cảnh 1, push-in cận cảnh sản phẩm, tay nâng nhẹ 2cm đón nắng rồi đặt xuống."
+    },
+    {
+      "scene": 3,
+      "title": "Cảnh 3 (20–30s): KẾ THỪA CẢNH 2 — TIỆN LỢI & CTA GIỎ HÀNG",
+      "purpose": "[0.0-3.5s] Gợi ý dịp thưởng thức (học bài, làm việc, xem phim) -> [3.5-7.0s] Nhắc mã trợ giá trên kênh -> [7.0-10.0s] Mời bấm giỏ hàng góc trái.",
+      "camera": "Kế thừa vị trí cuối Cảnh 2, pull-back nhẹ khoe bố cục mặt bàn ấm cúng, tay chỉ nhẹ về góc dưới bên trái."
+    }
+  ],
+  "sample_products": [
+    {
+      "product_id": "1731391379899778653",
+      "name": "Sản phẩm Đồ Ăn Vặt TikTok Shop (ID: 1731391379899778653)",
+      "sub_type": "POV Có Voice Review • 60 FPS Karaoke Subtitles"
+    }
+  ],
+  "code": "002",
+  "demo_video_caption": "Demo #002: Kho Quẹt Nồi Đất Làng Chài Xưa — POV Bàn Ăn + Voice Review + Sub Karaoke (1080p 60FPS)",
+  "role_skill_file": "ROLE_SKILL.md",
+  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 002"
+}

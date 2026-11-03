@@ -1,0 +1,198 @@
+{
+  "id": "nha_xuong",
+  "folder_name": "Nhà Xưởng",
+  "name": "Nhà Xưởng (Xả Kho Tận Gốc & Kiểm Định QC)",
+  "badge": "HOT • XẢ KHO NHÀ MÁY",
+  "category": "Nhà Xưởng / Gia Dụng / Phụ Kiện",
+  "price_label": "299.000đ • Đã Kích Hoạt",
+  "tier_badge": "🔥 BÁN CHẠY NHẤT",
+  "author": "Lê Việt Tùng - SkillAutoVeo",
+  "zalo": "0915967790",
+  "facebook": "https://www.facebook.com/tungbinh.38/",
+  "description": "Template video affiliate đứng tại dây chuyền nhà máy, phòng kiểm định QC, tổng kho pallet, showroom trưng bày và khu đóng gói xuất xưởng. Kịch bản 3 cảnh × 10s (30s): Hook Trợ Giá / Giá Sốc -> Neo Giá 3 Tầng -> USP Sản Phẩm & Kêu Gọi Giỏ Hàng kèm Slide Ảnh Sản Phẩm + Phụ Đề Karaoke.",
+  "default_videos_per_character": 3,
+  "scenes_per_video": 3,
+  "scene_duration_sec": 10,
+  "video_aspect": "9:16",
+  "image_resolution": "2K (1536x2752)",
+  "video_resolution": "1080p • 60 FPS",
+  "image_model": "Nano Banana 2.1 (BELUGA)",
+  "video_model": "Veo 3.1 Omni Flash (r2V35c)",
+  "tags": [
+    "Xả Kho Nhà Máy",
+    "Nhân Vật Cầm Sản Phẩm",
+    "Báo Giá Neo 3 Tầng",
+    "Phụ Đề Karaoke",
+    "Slide 20s Cuối",
+    "Gia Dụng & Phụ Kiện"
+  ],
+  "highlights": [
+    "Ghép mặt Nhân Vật (NV1/NV2) cầm đúng sản phẩm thật ở tỉ lệ chuẩn xác tại 10 bối cảnh Nhà Máy / Tổng Kho / Phòng QC",
+    "Kịch bản 3 cảnh × 10s chốt đơn cực mạnh: Hook Trợ Giá Sàn -> Neo Giá 3 Tầng (200K - 150K - Dưới 70K) -> USP & Chốt Giỏ Hàng",
+    "Tự động lồng Giọng Đọc Nhân Vật đã lưu sẵn trên Google Flow không cần thu âm ngoài",
+    "Hậu kỳ FFmpeg tự động gắn Slide ảnh sản phẩm phóng to ở 20s cuối + Phụ đề Karaoke 2 dòng in hoa nổi bật"
+  ],
+  "workflow_steps": [
+    {
+      "step": 1,
+      "icon": "🛍️",
+      "title": "Bước 1: Crawl Sản Phẩm TikTok & Chọn Ảnh Đơn Chuẩn",
+      "detail": "Tự động tải bộ ảnh sản phẩm, tiêu đề, giá bán và mô tả từ Link/ID TikTok Shop; lọc ảnh đơn rõ nét nhất làm Product Reference."
+    },
+    {
+      "step": 2,
+      "icon": "🖼️",
+      "title": "Bước 2: Tạo Ảnh Reference 2K Nhân Vật Cầm Sản Phẩm Tại Xưởng",
+      "detail": "Kết hợp Character ID (NV1/NV2) + Ảnh Sản Phẩm gốc tạo ảnh dọc 9:16 2K đứng tại Dây Chuyền Lắp Ráp, Phòng QC, Tổng Kho Pallet..."
+    },
+    {
+      "step": 3,
+      "icon": "🎬",
+      "title": "Bước 3: Render 3 Cảnh Video 10s Kèm Voice Đọc Thoại Chuẩn Nhịp",
+      "detail": "Từ ảnh Ref 2K, Veo 3.1 render 3 cảnh 10s (Hook -> Neo Giá -> USP) khớp khẩu hình với Voice ID của nhân vật, kết thúc đúng giây thứ 10."
+    },
+    {
+      "step": 4,
+      "icon": "✨",
+      "title": "Bước 4: Ghép Nối FFmpeg + Slide Sản Phẩm 20s Cuối + Phụ Đề Karaoke",
+      "detail": "Nối 3 cảnh thành video 30s 1080p, chèn khung Slide ảnh sản phẩm ở Cảnh 2 & 3 và render phụ đề Karaoke vàng-trắng chuyển đổi theo nhịp nói."
+    }
+  ],
+  "scene_breakdown": [
+    {
+      "scene": 1,
+      "title": "Cảnh 1 (0s - 10s): HOOK TRỢ GIÁ SÀN / GIÁ SỐC TẬN XƯỞNG",
+      "purpose": "Giữ chân người xem trong 3 giây đầu bằng thông điệp xả kho tận gốc, không qua trung gian, nhân vật cầm sản phẩm đưa nhẹ về phía camera.",
+      "camera": "Medium shot 9:16 cố định, nhân vật nhìn thẳng camera nói tự nhiên, giơ sản phẩm ngang tầm eo."
+    },
+    {
+      "scene": 2,
+      "title": "Cảnh 2 (10s - 20s): NEO GIÁ 3 TẦNG & KÍCH THÍCH BẤM GIỎ HÀNG",
+      "purpose": "Neo giá từ cao xuống thấp ('Không phải 200, không phải 150, 70K cũng không luôn') và chỉ tay xuống giỏ hàng góc trái kèm Slide ảnh sản phẩm.",
+      "camera": "Medium shot 9:16 + bắt đầu hiển thị khung Slide ảnh sản phẩm phóng to bên dưới."
+    },
+    {
+      "scene": 3,
+      "title": "Cảnh 3 (20s - 30s): ĐIỂM MẠNH SẢN PHẨM (USP) & CHỐT ĐƠN KHẨN CẤP",
+      "purpose": "Nêu bật chất liệu, tính năng thực tế của sản phẩm, cam kết kiểm tra hàng tại xưởng và thúc giục đặt ngay trước khi về giá gốc.",
+      "camera": "Medium shot 9:16 + tiếp tục chạy Slide 5 ảnh chi tiết sản phẩm + Phụ đề Karaoke."
+    }
+  ],
+  "sample_products": [
+    {
+      "product_id": "1735109997221349342",
+      "name": "Thắt Lưng Nam Vải Dù Khóa Tự Động Không Lỗ Dây Canvas Bền Đẹp",
+      "sub_type": "Phụ Kiện Thời Trang Nam"
+    },
+    {
+      "product_id": "1738086213622335480",
+      "name": "Cân Tiểu Ly Điện Tử Nhà Bếp INOX 304 5KG 10KG Độ Chính Xác Cao",
+      "sub_type": "Gia Dụng Nhà Bếp Thông Minh"
+    }
+  ],
+  "character_presets": {
+    "nv1": [
+      {
+        "variant_index": 1,
+        "legacy_vkey": "v1",
+        "char_v": "nv1_v1",
+        "hook_title": "NV1 - Kịch bản 1: Trợ Giá Sàn",
+        "style": "Xưởng Dây Chuyền Lắp Ráp & Sản Xuất",
+        "outfit_en": "wearing a polite professional dark navy blazer over a crisp light blue collared shirt and black trousers",
+        "setting_en": "standing behind a display worktable in a reputable modern manufacturing and assembly factory floor with production lines, neatly stacked boxes, and factory technicians in blue uniforms softly blurred in the background"
+      },
+      {
+        "variant_index": 2,
+        "legacy_vkey": "v3",
+        "char_v": "nv1_v2",
+        "hook_title": "NV1 - Kịch bản 2: Báo Động Giá Xưởng",
+        "style": "Tổng Kho Pallet Xuất Xưởng",
+        "outfit_en": "wearing a polite charcoal-grey tailored waistcoat vest over a crisp white collared office shirt and dark trousers",
+        "setting_en": "standing behind a packing table in a spacious high-bay factory dispatch and logistics warehouse with towering orange-and-blue steel pallet racks stacked high with brown export shipping cartons, yellow warehouse aisle markings, and logistics staff softly blurred in the background"
+      },
+      {
+        "variant_index": 3,
+        "legacy_vkey": "v5",
+        "char_v": "nv1_v3",
+        "hook_title": "NV1 - Kịch bản 3: Xả Kho Lô Mới",
+        "style": "Phòng Thử Nghiệm & Hiệu Chuẩn Kỹ Thuật",
+        "outfit_en": "wearing a polite warm mocha-brown tailored blazer over a slate-blue collared shirt and black trousers",
+        "setting_en": "standing behind a stainless-steel workbench in a bright precision testing and finishing workshop with measurement instruments, organized storage shelves, and engineers softly blurred in the background"
+      },
+      {
+        "variant_index": 4,
+        "legacy_vkey": "v7",
+        "char_v": "nv1_v4",
+        "hook_title": "NV1 - Kịch bản 4: Xuất Kho Trực Tiếp",
+        "style": "Khu Đóng Thùng Xuất Khẩu",
+        "outfit_en": "wearing a polite navy-blue vest over a white collared shirt and dark trousers",
+        "setting_en": "standing behind a clean packing table in a modern export packaging warehouse with stacked master cartons, pallet jacks, and warehouse staff softly blurred in the background"
+      },
+      {
+        "variant_index": 5,
+        "legacy_vkey": "v9",
+        "char_v": "nv1_v5",
+        "hook_title": "NV1 - Kịch bản 5: Ưu Đãi Độc Quyền",
+        "style": "Phòng Mẫu Nghiên Cứu Sản Phẩm R&D",
+        "outfit_en": "wearing a smart beige blazer over a dark blouse and tailored trousers",
+        "setting_en": "standing behind a presentation table in a clean modern R&D product sample room with display racks, lighting fixtures, and specialists softly blurred in the background"
+      }
+    ],
+    "nv2": [
+      {
+        "variant_index": 1,
+        "legacy_vkey": "v2",
+        "char_v": "nv2_v1",
+        "hook_title": "NV2 - Kịch bản 1: Giá Sốc Tận Xưởng",
+        "style": "Phòng Kiểm Định Chất Lượng QC",
+        "outfit_en": "wearing a polite professional cream-white tailored blazer over a dark navy blouse and black trousers",
+        "setting_en": "standing behind a clean white inspection counter in a bright, modern glass-walled Quality Control (QC) testing and inspection laboratory with precision inspection lamps, sample testing shelves, quality pass certificates, and QC specialists in white lab coats softly blurred in the background"
+      },
+      {
+        "variant_index": 2,
+        "legacy_vkey": "v4",
+        "char_v": "nv2_v2",
+        "hook_title": "NV2 - Kịch bản 2: Không Qua Trung Gian",
+        "style": "Showroom Trưng Bày Chính Hãng",
+        "outfit_en": "wearing a polite elegant black tailored blazer over a silk ivory blouse and dark trousers",
+        "setting_en": "standing behind a wooden display counter in a warm-lit official brand showroom and sample display gallery with illuminated wooden shelves displaying products, framed ISO quality awards, and warm spotlighting softly blurred in the background"
+      },
+      {
+        "variant_index": 3,
+        "legacy_vkey": "v6",
+        "char_v": "nv2_v3",
+        "hook_title": "NV2 - Kịch bản 3: Săn Deal Tận Gốc",
+        "style": "Khu Băng Chuyền Đóng Gói Xuất Kho",
+        "outfit_en": "wearing a polite smart-casual dove-grey blazer over a soft pastel pink collared shirt and black trousers",
+        "setting_en": "standing behind a stainless-steel packing station in a modern automated factory packaging and parcel fulfillment center with roller conveyor belts, barcode scanners, neatly taped shipping boxes, and fulfillment workers in navy polo uniforms softly blurred in the background"
+      },
+      {
+        "variant_index": 4,
+        "legacy_vkey": "v8",
+        "char_v": "nv2_v4",
+        "hook_title": "NV2 - Kịch bản 4: Trợ Giá Chớp Nhoáng",
+        "style": "Kho Phân Phối Nhanh Fulfillment",
+        "outfit_en": "wearing a neat white blazer over a light blue blouse and black trousers",
+        "setting_en": "standing behind a dispatch counter in a bright modern e-commerce fulfillment center with organized sorting shelves, parcel bins, and staff softly blurred in the background"
+      },
+      {
+        "variant_index": 5,
+        "legacy_vkey": "v10",
+        "char_v": "nv2_v5",
+        "hook_title": "NV2 - Kịch bản 5: Xả Hàng Chính Hãng",
+        "style": "Xưởng Hoàn Thiện & Đóng Hộp",
+        "outfit_en": "wearing a tailored camel blazer over a cream blouse and dark trousers",
+        "setting_en": "standing behind a clean worktable in a bright product finishing and gift-box packaging workshop with neat retail boxes and technicians softly blurred in the background"
+      }
+    ]
+  },
+  "scene_actions": {
+    "1": "The woman looks directly at the camera with a confident, energetic expression, naturally speaking while holding the exact product from the reference image steady at waist level, tilting it slightly toward the camera to showcase it, then keeping the presenting pose at the end.",
+    "2": "The woman looks directly at the camera with a warm, enthusiastic expression, naturally speaking while holding the exact product from the reference image steady at waist level and gesturing lightly toward the bottom-left shopping cart, then keeping the presenting pose at the end.",
+    "3": "The woman looks directly at the camera with a bright, friendly smile, naturally speaking while holding the exact product from the reference image steady at waist level to showcase it clearly, then keeping the presenting pose at the end."
+  },
+  "code": "001",
+  "demo_video_caption": "Demo #001: Cân Tiểu Ly Inox 304 — Nhân Vật Đứng Xưởng + Voice + Sub Karaoke (1080p 60FPS)",
+  "role_skill_file": "ROLE_SKILL.md",
+  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 001"
+}

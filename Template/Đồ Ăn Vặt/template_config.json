@@ -1,0 +1,108 @@
+{
+  "id": "do_an_vat",
+  "folder_name": "Đồ Ăn Vặt",
+  "name": "Đồ Ăn Vặt & Đồ Uống UGC (Food & Drink Continuity)",
+  "badge": "HOT • ẨM THỰC & F&B UGC",
+  "category": "Ẩm Thực / Đồ Ăn Vặt / F&B",
+  "price_label": "299.000đ • Đã Kích Hoạt",
+  "tier_badge": "💎 PREMIUM TEMPLATE",
+  "author": "Lê Việt Tùng - SkillAutoVeo",
+  "zalo": "0915967790",
+  "facebook": "https://www.facebook.com/tungbinh.38/",
+  "description": "Template chuyên biệt cho Đồ Ăn Vặt, Bánh Ngọt, Topping Pha Chế, Trà Trái Cây & Đồ Ăn Liền (Haidilao, Mì, Bánh Pía, Hạt Đác...). Kể câu chuyện vòng đời sản phẩm từ Bao Bì -> Bóc Gói -> Bày Đĩa / Pha Chế Đá Lạnh -> Bẻ Đôi Lộ Nhân Trứng Chảy / Múc Sốt -> Thưởng Thức với cùng 1 bối cảnh Quầy Tiệm Hà Nội hoặc Góc Bàn Học Gen Z đồng bộ 100%.",
+  "default_videos_per_character": 2,
+  "scenes_per_video": 4,
+  "scene_duration_sec": 8,
+  "video_aspect": "9:16",
+  "image_resolution": "2K (1536x2752)",
+  "video_resolution": "1080p • 60 FPS",
+  "image_model": "GPT-Image-2 / Nano Banana 2.1",
+  "video_model": "Grok Imagine Video 1.5 / Veo 3.1",
+  "tags": [
+    "Đồ Ăn Vặt",
+    "Bánh Kẹo & Đặc Sản",
+    "Topping & Trà Sữa",
+    "Đồ Ăn Liền 5 Phút",
+    "POV Bàn Tay Nữ",
+    "Macro Nhân Chảy"
+  ],
+  "highlights": [
+    "Khóa đồng bộ 100% bối cảnh Quầy Tiệm Ăn Vặt Hà Nội hoặc Góc Bàn Học Gen Z qua mọi cảnh",
+    "Khóa nhận diện bàn tay nữ nail trắng nhũ bóng (Fixed Hand Block) thao tác tự nhiên",
+    "Chống lặp cảnh bao bì nhàm chán (Packshot Quota <= 2 cảnh), tập trung Macro Nhân Chảy / Sốt Sánh / Đá Lạnh",
+    "Tự động phân loại 3 kịch bản: Bánh Kẹo Ăn Liền, Hũ Topping Pha Chế & Cốc Ăn Liền Châm Nước Sôi"
+  ],
+  "workflow_steps": [
+    {
+      "step": 1,
+      "icon": "🛍️",
+      "title": "Bước 1: Crawl Ảnh & Thông Tin Thực Phẩm",
+      "detail": "Tự động lấy ảnh bao bì gốc (gói bánh, hũ hạt đác, cốc hoành thánh) và phân tích hương vị, thành phần, quy cách đóng gói từ Link/ID TikTok Shop."
+    },
+    {
+      "step": 2,
+      "icon": "🧠",
+      "title": "Bước 2: AI Director Khóa Continuity & Sinh Kịch Bản Vòng Đời",
+      "detail": "Nhúng FIXED BACKGROUND BLOCK + FIXED HAND BLOCK + FIXED PRODUCT BLOCK vào từng cảnh độc lập. Chia 4-6 cảnh theo vòng đời: Pack Hero -> Mở Gói -> Chế Biến/Bày Đĩa -> Bẻ Đôi Lộ Nhân -> Thưởng Thức."
+    },
+    {
+      "step": 3,
+      "icon": "🖼️",
+      "title": "Bước 3: Tạo Ảnh Storyboard 9:16 Kèm Strict Product Reference",
+      "detail": "Render ảnh tĩnh từng phân cảnh với ảnh sản phẩm gốc làm tham chiếu bắt buộc để giữ nguyên 100% màu bao bì, logo và chữ tiếng Việt."
+    },
+    {
+      "step": 4,
+      "icon": "🎬",
+      "title": "Bước 4: Render Video Macro 8s & Ghép Nối FFmpeg 1080p",
+      "detail": "Chuyển hóa từng ảnh Storyboard thành clip 8s mượt mà (nhân trứng chảy, sốt nhỏ giọt, đá xoay trong ly, khói bốc lên) kèm âm thanh ASMR/Voice và nối thành Video Final."
+    }
+  ],
+  "scene_breakdown": [
+    {
+      "scene": 1,
+      "title": "Cảnh 1: PACK HERO — Mở Màn Trên Quầy Tiệm / Bàn Học",
+      "purpose": "Giới thiệu bao bì chính hãng sắc nét đặt cạnh một phần thành phẩm gợi mở sự thèm ăn.",
+      "camera": "Very slow push-in + subtle rack focus làm nét nhãn sản phẩm."
+    },
+    {
+      "scene": 2,
+      "title": "Cảnh 2: UNBOXING — Bóc Gói / Mở Nắp Lộ Kết Cấu Thật",
+      "purpose": "Bàn tay nữ bóc vỏ túi bánh hoặc mở nắp hũ múc muỗng sốt sánh, chứng minh chất lượng bên trong.",
+      "camera": "Locked macro close-up theo chuyển động bóc vỏ / nâng muỗng."
+    },
+    {
+      "scene": 3,
+      "title": "Cảnh 3: FOOD PORN / CHẾ BIẾN — Bẻ Đôi Lộ Nhân Chảy / Pha Ly Đá / Châm Nước Sôi",
+      "purpose": "Điểm cao trào thị giác: nhân kim sa trứng chảy kéo sợi, hạt đác rơi vào ly đá viên đọng sương, hoặc nước sôi bốc khói trong cốc hoành thánh.",
+      "camera": "Slow macro push-in / gentle pan theo dòng chảy của sốt và nhân bánh."
+    },
+    {
+      "scene": 4,
+      "title": "Cảnh 4: THƯỞNG THỨC & ENDING HERO — Bố Cục Thương Mại Hoàn Chỉnh",
+      "purpose": "Khay bánh cắt đôi đủ vị cạnh tách trà nóng / bát sữa chua topping đặt cùng bao bì sản phẩm, thúc đẩy chốt đơn.",
+      "camera": "Smooth pull-back khoe trọn vẹn cả thành phẩm lẫn bao bì."
+    }
+  ],
+  "sample_products": [
+    {
+      "product_id": "1731538566295553898",
+      "name": "Bánh Pía Mini Mix Vị - Trứng Chảy, Môn, Dứa, Đậu Trứng Muối Cô An",
+      "sub_type": "Bánh Ngọt / Đồ Ăn Vặt Đóng Gói"
+    },
+    {
+      "product_id": "1732219603106695747",
+      "name": "Hạt Đác Rim Chanh Dây 500gram Nhà Làm BaoQuang Food",
+      "sub_type": "Hũ Topping / Nguyên Liệu Pha Chế"
+    },
+    {
+      "product_id": "1732189701678859916",
+      "name": "Hoành Thánh Haidilao Phiên Bản Mới 3 Vị Trộn Dầu & Nước Dùng",
+      "sub_type": "Đồ Ăn Liền Chế Biến 5 Phút"
+    }
+  ],
+  "code": "003",
+  "demo_video_caption": "Demo #003: Hạt Đác Rim Chanh Dây — UGC Cận Cảnh Pha Chế + Sub Karaoke (1080p 60FPS)",
+  "role_skill_file": "ROLE_SKILL.md",
+  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 003"
+}

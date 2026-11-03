@@ -1,0 +1,52 @@
+# Python bytecode & cache
+__pycache__/
+*.py[cod]
+*$py.class
+*.so
+.Python
+.venv/
+venv/
+env/
+
+# Sensitive local credentials, tokens, cookies & browser profiles
+accounts.json
+Flow_nhieu_worker_accounts.json
+veo3_config.json
+proxy_config.json
+cookies/
+profiles/
+native_profiles/
+auth_attempts/
+session_metadata/
+browser_settings/
+locks/
+data/google_flow_grok/
+data/captcha-bridge.secret
+data/projects/
+data/tiktok_crawler/profiles/
+data/tiktok_crawler/tiktok_chrome_profile/
+data/tiktok_crawler/work/
+data/tiktok_crawler/data/product_images/
+data/tiktok_crawler/data/hot_products/
+tiktok_crawler/tiktok_chrome_profile/
+
+# Runtime generated projects & heavy rendered videos
+projects/
+output_videos/
+final_videos/
+thumbnails/
+flow_final_pipeline/projects/
+flow_final_pipeline/final_videos/
+flow_final_pipeline/voice_samples/_uptedb_dump.txt
+flow_final_pipeline/voice_samples/nv1_vn.mp3
+flow_final_pipeline/voice_samples/captured_flow_audio.mp3
+
+# Legacy extension backups (keep only LeVietTung_autoveo)
+Extension Recapcha/veo3-captcha-extension*/
+
+# OS & IDE files
+.DS_Store
+Thumbs.db
+*.log
+*.tmp
+*.zip

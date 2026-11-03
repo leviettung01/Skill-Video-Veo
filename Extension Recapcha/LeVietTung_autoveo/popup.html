@@ -1,0 +1,373 @@
+<!DOCTYPE html>
+<html lang="vi">
+<head>
+  <meta charset="utf-8">
+  <title>LeVietTung_autoveo — Lê Việt Tùng</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:         #080a0f;
+      --surface:    #0f141e;
+      --card:       #161e2e;
+      --border:     #2a3347;
+      --border-gold: rgba(245, 158, 11, 0.35);
+      --accent:     #f59e0b;
+      --accent-lt:  #fbbf24;
+      --accent-dim: #d97706;
+      --green:      #10b981;
+      --red:        #ef4444;
+      --yellow:     #fbbf24;
+      --text:       #f8fafc;
+      --muted:      #94a3b8;
+      --font:       'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
+      --mono:       'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+    }
+
+    html, body {
+      width: 390px;
+      min-height: 240px;
+      background: var(--bg);
+      color: var(--text);
+      font-family: var(--font);
+      font-size: 11.5px;
+      line-height: 1.45;
+    }
+
+    /* ── Brand Header ── */
+    header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 10px;
+      padding: 10px 12px;
+      border-bottom: 1px solid var(--border-gold);
+      background: linear-gradient(135deg, #121826 0%, #1c160d 100%);
+    }
+
+    .brand-left {
+      display: flex;
+      align-items: center;
+      gap: 9px;
+      min-width: 0;
+    }
+
+    .brand-badge {
+      width: 30px;
+      height: 30px;
+      border-radius: 8px;
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #10b981 100%);
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 15px;
+      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.38);
+      flex-shrink: 0;
+    }
+
+    .header-title {
+      font-size: 13px;
+      font-weight: 800;
+      letter-spacing: 0.02em;
+      color: #fff;
+      line-height: 1.2;
+    }
+
+    .header-title span {
+      color: var(--accent-lt);
+    }
+
+    .header-sub {
+      font-size: 10px;
+      color: #fcd34d;
+      font-weight: 600;
+      opacity: 0.9;
+      display: block;
+      margin-top: 1px;
+    }
+
+    #btn-panel {
+      padding: 6px 11px;
+      font-family: var(--font);
+      font-size: 10px;
+      font-weight: 700;
+      letter-spacing: 0.04em;
+      text-transform: uppercase;
+      border: 1px solid rgba(251, 191, 36, 0.45);
+      border-radius: 6px;
+      background: linear-gradient(135deg, #f59e0b, #d97706);
+      color: #090d16;
+      cursor: pointer;
+      transition: all 0.15s;
+      flex-shrink: 0;
+      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+    }
+
+    #btn-panel:hover {
+      background: linear-gradient(135deg, #fbbf24, #f59e0b);
+      transform: translateY(-1px);
+    }
+
+    /* ── Author Contact Strip ── */
+    .author-bar {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      gap: 6px;
+      padding: 6px 12px;
+      background: #0b1019;
+      border-bottom: 1px solid var(--border);
+      font-size: 10.5px;
+    }
+
+    .author-name {
+      font-weight: 700;
+      color: #e2e8f0;
+      display: flex;
+      align-items: center;
+      gap: 4px;
+    }
+
+    .author-links {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+    }
+
+    .social-pill {
+      display: inline-flex;
+      align-items: center;
+      gap: 4px;
+      padding: 2px 7px;
+      border-radius: 99px;
+      font-size: 10px;
+      font-weight: 700;
+      text-decoration: none;
+      transition: all 0.15s;
+    }
+
+    .social-pill.zalo {
+      background: rgba(0, 104, 255, 0.16);
+      color: #60a5fa;
+      border: 1px solid rgba(59, 130, 246, 0.4);
+    }
+
+    .social-pill.zalo:hover {
+      background: rgba(0, 104, 255, 0.28);
+      color: #93c5fd;
+    }
+
+    .social-pill.fb {
+      background: rgba(24, 119, 242, 0.16);
+      color: #38bdf8;
+      border: 1px solid rgba(56, 189, 248, 0.4);
+    }
+
+    .social-pill.fb:hover {
+      background: rgba(24, 119, 242, 0.28);
+      color: #7dd3fc;
+    }
+
+    /* ── Log Section ── */
+    .log-header {
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      padding: 6px 12px 5px;
+      font-size: 9.5px;
+      font-weight: 700;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+    }
+
+    #log-count {
+      background: rgba(245, 158, 11, 0.16);
+      border: 1px solid rgba(245, 158, 11, 0.35);
+      border-radius: 10px;
+      padding: 1px 7px;
+      font-size: 9.5px;
+      font-weight: 700;
+      color: var(--accent-lt);
+    }
+
+    #log-list {
+      max-height: 400px;
+      overflow-y: auto;
+      scrollbar-width: thin;
+      scrollbar-color: var(--border) transparent;
+    }
+
+    #log-list::-webkit-scrollbar { width: 4px; }
+    #log-list::-webkit-scrollbar-track { background: transparent; }
+    #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
+
+    .log-empty {
+      padding: 24px 12px;
+      text-align: center;
+      color: var(--muted);
+      font-size: 11px;
+    }
+
+    .entry {
+      border-bottom: 1px solid rgba(42, 51, 71, 0.65);
+    }
+
+    .entry-row {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 12px;
+      cursor: pointer;
+      transition: background 0.12s;
+      user-select: none;
+    }
+
+    .entry-row:hover { background: rgba(245, 158, 11, 0.07); }
+
+    .entry-id {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      color: var(--muted);
+      min-width: 54px;
+      flex-shrink: 0;
+    }
+
+    .entry-type {
+      flex: 1;
+      font-family: var(--mono);
+      font-size: 10px;
+      font-weight: 700;
+      color: var(--accent-lt);
+      letter-spacing: 0.03em;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      white-space: nowrap;
+    }
+
+    .entry-time {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      color: var(--muted);
+      flex-shrink: 0;
+      font-variant-numeric: tabular-nums;
+    }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      gap: 2px;
+      padding: 1px 6px;
+      border-radius: 4px;
+      font-size: 9px;
+      font-weight: 700;
+      flex-shrink: 0;
+    }
+
+    .badge-ok   { background: rgba(16, 185, 129, 0.15); color: var(--green); }
+    .badge-fail { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
+    .badge-proc { background: rgba(245, 158, 11, 0.16); color: var(--yellow); }
+
+    .expand-icon {
+      font-size: 9px;
+      color: var(--muted);
+      flex-shrink: 0;
+      transition: transform 0.15s;
+    }
+
+    .entry.open .expand-icon { transform: rotate(90deg); }
+
+    .entry-details {
+      display: none;
+      padding: 0 12px 8px;
+      background: var(--surface);
+    }
+
+    .entry.open .entry-details { display: block; }
+
+    .detail-section { margin-top: 6px; }
+
+    .detail-label {
+      font-size: 9px;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 2px;
+    }
+
+    .detail-value {
+      font-family: var(--mono);
+      font-size: 9.5px;
+      color: var(--text);
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 4px;
+      padding: 4px 6px;
+      word-break: break-all;
+      white-space: pre-wrap;
+      max-height: 80px;
+      overflow-y: auto;
+    }
+
+    .detail-value.url {
+      color: var(--accent-lt);
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+      max-height: none;
+    }
+
+    .detail-error { color: var(--red); }
+
+    .footer {
+      padding: 7px 12px;
+      border-top: 1px solid var(--border);
+      background: var(--surface);
+      font-size: 9.5px;
+      color: var(--muted);
+      text-align: center;
+    }
+  </style>
+</head>
+<body>
+  <header>
+    <div class="brand-left">
+      <div class="brand-badge">⚡</div>
+      <div>
+        <div class="header-title"><span>LeVietTung</span>_autoveo</div>
+        <span class="header-sub">Lê Việt Tùng - SkillAutoVeo</span>
+      </div>
+    </div>
+    <button id="btn-panel">Mở Bảng Điều Khiển</button>
+  </header>
+
+  <div class="author-bar">
+    <div class="author-name">👑 Tác giả: Lê Việt Tùng</div>
+    <div class="author-links">
+      <a class="social-pill zalo" href="https://zalo.me/0915967790" target="_blank" title="Nhắn Zalo: 0915967790">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.83 7.08-.16.92-.59 2.31-1.46 3.31-.22.25-.03.65.3.61 1.79-.2 3.63-.95 4.77-1.62.82.21 1.68.32 2.56.32 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
+        Zalo: 0915967790
+      </a>
+      <a class="social-pill fb" href="https://www.facebook.com/tungbinh.38/" target="_blank" title="Facebook: Lê Việt Tùng">
+        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>
+        Facebook
+      </a>
+    </div>
+  </div>
+
+  <div class="log-header">
+    Nhật Ký Captcha & Request Gần Đây
+    <span id="log-count">0</span>
+  </div>
+
+  <div id="log-list">
+    <div class="log-empty">Chưa có request nào</div>
+  </div>
+
+  <div class="footer">Bấm vào từng dòng để xem chi tiết • Đồng bộ cùng SkillAutoVeo</div>
+
+  <script src="popup.js"></script>
+</body>
+</html>
