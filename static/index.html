@@ -3956,9 +3956,30 @@
         <img src="/api/media?path=${encodeURIComponent(sp)}" title="Ảnh phân loại Slide #${i + 1} (hiển thị 20s cuối) — Bấm để mở trong Explorer" onclick="openFolderEncoded('${encodeURIComponent(sp)}')" style="width:28px; height:28px; border-radius:5px; object-fit:cover; border:1px solid #475569; cursor:pointer; background:#000;" />
       `).join("");
 
+      const tplList = (STATE.videoTemplates && STATE.videoTemplates.length) ? STATE.videoTemplates : [
+        { code: "001", folder_name: "Nhà Xưởng", name: "Báo Giá Tận Xưởng & Kiểm Định QC (Có Nhân Vật + Voice)" },
+        { code: "002", folder_name: "Đồ Ăn Vặt POV (Có Voice)", name: "Đồ Ăn Vặt & Ẩm Thực POV (Có Voice Review)" },
+        { code: "003", folder_name: "Đồ Ăn Vặt", name: "Đồ Ăn Vặt & Pha Chế UGC (Cận Cảnh & ASMR)" }
+      ];
+      if (!STATE.studioSelectedTemplate) STATE.studioSelectedTemplate = {};
+      if (!STATE.studioSelectedVpc) STATE.studioSelectedVpc = {};
+      const activeTplCode = STATE.studioSelectedTemplate[proj.id] || proj.template_code || "001";
+      const activeVpc = STATE.studioSelectedVpc[proj.id] || proj.videos_per_character || 3;
+      const activeTplObj = tplList.find(t => t.code === activeTplCode || t.folder_name === activeTplCode) || tplList[0];
+
+      const studioTplOptsHtml = tplList.map(t => {
+        const val = t.code || t.folder_name;
+        const isSel = (val === activeTplCode || t.folder_name === activeTplCode);
+        return `<option value="${val}" ${isSel ? 'selected' : ''}>🎬 [#${t.code || '001'}] ${t.folder_name}</option>`;
+      }).join("");
+
+      const studioVpcOptsHtml = [1, 2, 3, 4, 5].map(n =>
+        `<option value="${n}" ${Number(activeVpc) === n ? 'selected' : ''}>🎞️ ${n} Vid/NV (${n * 2} Video)</option>`
+      ).join("");
+
       document.getElementById("curProjTitle").innerHTML = `
         ${origProdThumb ? `
-          <div style="position:relative; flex-shrink:0; cursor:pointer;" onclick="openFolderEncoded('${encodeURIComponent(origProdThumb)}')" title="Ảnh Sản Phẩm Mẫu Đơn Chiếc (Dùng làm tham chiếu tạo ảnh AI) — Bấm để mở trong Explorer">
+          <div style="position:relative; flex-shrink:0; cursor:zoom-in;" onclick="openStudioProductLightbox('${proj.id}', 0)" title="Ảnh Sản Phẩm Mẫu Đơn Chiếc (Dùng làm tham chiếu tạo ảnh AI) — Bấm để Phóng To">
             <img class="proj-thumb" style="width:40px; height:40px; border:2px solid #f59e0b;" src="/api/media?path=${encodeURIComponent(origProdThumb)}" />
             <span style="position:absolute; bottom:-3px; left:0; right:0; background:#f59e0b; color:#000; font-size:8px; font-weight:800; text-align:center; border-radius:3px;">MẪU AI</span>
           </div>
@@ -3968,6 +3989,7 @@
           <div class="proj-head-sub">
             <span class="proj-id-tag">ID: ${meta.pid || proj.id}</span>
             ${meta.price ? `<span class="proj-price-tag">💰 ${meta.price}</span>` : ''}
+            <span style="background:rgba(139,92,246,0.16); color:#c4b5fd; border:1px solid rgba(139,92,246,0.38); padding:1px 6px; border-radius:4px; font-size:10px; font-weight:700;">🎬 #${activeTplObj.code || '001'} ${activeTplObj.folder_name}</span>
             <span>• Đang còn: <b style="color:${doneCount > 0 ? '#34d399' : '#fbbf24'}">${doneCount} Video Final</b></span>
             ${proj.deleted_finals_count ? `<span style="color:#94a3b8;">(Đã upload/xoá: ${proj.deleted_finals_count})</span>` : ''}
           </div>
@@ -3984,9 +4006,16 @@
         <button class="btn-filter ${STATE.charFilter === 'all' ? 'active' : ''}" onclick="setCharFilter('all')">Tất cả (${allProds.length})</button>
         <button class="btn-filter ${STATE.charFilter === 'nv1' ? 'active' : ''}" onclick="setCharFilter('nv1')">👩‍💼 NV1 (${nv1Count})</button>
         <button class="btn-filter ${STATE.charFilter === 'nv2' ? 'active' : ''}" onclick="setCharFilter('nv2')">👩‍💼 NV2 (${nv2Count})</button>
+        <select id="selStudioToolbarTemplate" onchange="onChangeStudioTemplate('${proj.id}', this.value)" title="Chọn Template Video để tạo kịch bản & dựng video cho sản phẩm này" style="width:auto; min-width:165px; max-width:215px; padding:4px 8px; font-size:11px; font-weight:700; background:#0f172a; border:1px solid rgba(139,92,246,0.5); color:#e2e8f0; border-radius:6px;">
+          ${studioTplOptsHtml}
+        </select>
+        <select id="selStudioToolbarVpc" onchange="onChangeStudioVpc('${proj.id}', this.value)" title="Số lượng Video tạo cho mỗi Nhân vật" style="width:auto; padding:4px 6px; font-size:11px; font-weight:600; background:#0f172a; border:1px solid var(--border-light); color:#cbd5e1; border-radius:6px;">
+          ${studioVpcOptsHtml}
+        </select>
+        <button class="btn btn-outline" style="border-color:rgba(99,102,241,0.5); color:#a5b4fc;" onclick="generateStudioProductPromptsOnly('${proj.id}')" title="Tạo hoặc đổi kịch bản mới theo Template đang chọn (Xem trước các cảnh trước khi chạy)">📝 Tạo Kịch Bản</button>
         <button class="btn btn-success" onclick="openFolderEncoded('${finalDirEnc}')" title="Mở thư mục riêng chứa toàn bộ Video Final trên máy tính">📂 Mở Folder Video Final</button>
         ${proj.has_rendered_cache ? `
-          <button class="btn btn-danger" onclick="cleanProjectRender('${proj.id}', ${doneCount > 0})" title="Xoá toàn bộ ảnh ref AI & video phân cảnh đã render của sản phẩm này để làm lại như sản phẩm mới">🧹 Xoá Ảnh/Video Render (${proj.rendered_size_mb || 0} MB)</button>
+          <button class="btn btn-danger" onclick="cleanProjectRender('${proj.id}', ${doneCount > 0})" title="Xoá toàn bộ ảnh ref AI & video phân cảnh đã render của sản phẩm này để làm lại như sản phẩm mới">🧹 Xoá Render (${proj.rendered_size_mb || 0} MB)</button>
         ` : ''}
         <button class="btn btn-primary" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng</button>
       `;
@@ -3994,6 +4023,8 @@
       const logsHtml = (proj.logs || []).slice(-60).join("\n") || "Chưa có nhật ký.";
       const structSig = JSON.stringify([
         STATE.charFilter,
+        activeTplCode,
+        activeVpc,
         proj.has_rendered_cache,
         proj.rendered_files_count,
         proj.is_clean_new,
@@ -4015,32 +4046,120 @@
       STATE.renderedProjectSig = structSig;
 
       if (allProds.length === 0) {
+        const prodImgs = proj.all_product_image_paths || (origProdThumb ? [origProdThumb] : []);
+        const prodImgsStripHtml = prodImgs.map((imgP, idx) => {
+          const isPri = (imgP === origProdThumb);
+          return `
+            <div style="position:relative; width:64px; height:64px; border-radius:8px; overflow:hidden; border:2px solid ${isPri ? '#f59e0b' : 'rgba(255,255,255,0.14)'}; background:#000; cursor:zoom-in; flex-shrink:0;"
+                 onclick="openStudioProductLightbox('${proj.id}', ${idx})"
+                 title="Ảnh SP #${idx + 1}${isPri ? ' (⭐ Ảnh Mẫu AI)' : ''} — Bấm để Xem Full & Zoom">
+              <img src="/api/media?path=${encodeURIComponent(imgP)}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" />
+              ${isPri ? `<span style="position:absolute; bottom:0; left:0; right:0; background:rgba(245,158,11,0.92); color:#000; font-size:8px; font-weight:900; text-align:center;">⭐ MẪU AI</span>` : ''}
+            </div>
+          `;
+        }).join("");
+
+        const tplCardsHtml = tplList.map(t => {
+          const code = t.code || "001";
+          const isSelected = (code === activeTplCode || t.folder_name === activeTplCode);
+          let icon = "🏭";
+          let shortDesc = "Nhân vật NV1 & NV2 tại xưởng • Có Voice + Sub Karaoke 60FPS";
+          if (code === "002") {
+            icon = "🍲";
+            shortDesc = "Góc quay POV Bày biện món ăn • Có Voice Review + Sub Karaoke 60FPS";
+          } else if (code === "003") {
+            icon = "🧋";
+            shortDesc = "Góc quay UGC Cận cảnh bàn tay & Topping • ASMR + Sub Karaoke 60FPS";
+          }
+          return `
+            <div onclick="onChangeStudioTemplate('${proj.id}', '${code}')"
+                 style="cursor:pointer; text-align:left; padding:11px 12px; border-radius:10px; background:${isSelected ? 'linear-gradient(145deg, rgba(59,130,246,0.22), rgba(99,102,241,0.14))' : '#0b0f19'}; border:1.5px solid ${isSelected ? '#60a5fa' : 'rgba(255,255,255,0.1)'}; box-shadow:${isSelected ? '0 0 16px rgba(59,130,246,0.22)' : 'none'}; transition:all 0.16s;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
+                <span style="font-size:11px; font-weight:800; color:${isSelected ? '#93c5fd' : '#a78bfa'}; background:rgba(99,102,241,0.16); padding:2px 7px; border-radius:5px;">${icon} Mã #${code}</span>
+                ${isSelected ? `<span style="font-size:10px; font-weight:800; color:#34d399;">✓ Đang chọn</span>` : `<span style="font-size:10px; color:#64748b;">Bấm chọn</span>`}
+              </div>
+              <div style="font-size:12.5px; font-weight:800; color:#f8fafc; margin-bottom:3px; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">${t.folder_name}</div>
+              <div style="font-size:10.5px; color:#94a3b8; line-height:1.35;">${shortDesc}</div>
+            </div>
+          `;
+        }).join("");
+
         document.getElementById("curProjBody").innerHTML = `
           <div class="log-drawer ${STATE.logsOpen ? 'open' : ''}" id="projLogBox">${logsHtml}</div>
-          <div style="margin:24px auto; max-width:660px; background:var(--panel); border:1px solid var(--border-light); border-radius:12px; padding:24px; text-align:center;">
-            ${proj.has_rendered_cache ? `
-              <div style="font-size:32px; margin-bottom:8px;">📦</div>
-              <div style="font-size:15px; font-weight:700; color:#fff; margin-bottom:6px;">Sản phẩm này đã được upload & xoá hết Video Final</div>
-              <div style="font-size:12.5px; color:var(--muted); margin-bottom:16px; line-height:1.5;">
-                Sản phẩm đã tự động chuyển xuống cuối danh sách.<br/>
-                Hiện vẫn còn <b>${proj.rendered_files_count || 0} file ảnh ref / video phân cảnh 10s (${proj.rendered_size_mb || 0} MB)</b> lưu trong thư mục tạm của sản phẩm. Bạn có thể bấm nút bên dưới để xoá sạch dữ liệu render cũ, đưa sản phẩm về nguyên trạng như <b>1 sản phẩm mới</b> cho lần làm tiếp theo.
+          <div style="margin:18px auto; max-width:780px; background:var(--panel); border:1px solid var(--border-light); border-radius:14px; padding:22px 24px; box-shadow:0 12px 36px rgba(0,0,0,0.4);">
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:12px; flex-wrap:wrap; padding-bottom:14px; border-bottom:1px solid var(--border);">
+              <div style="display:flex; align-items:center; gap:12px;">
+                <div style="width:44px; height:44px; border-radius:10px; background:${proj.has_rendered_cache ? 'rgba(245,158,11,0.16)' : 'rgba(6,182,212,0.16)'}; border:1px solid ${proj.has_rendered_cache ? 'rgba(245,158,11,0.4)' : 'rgba(6,182,212,0.4)'}; display:flex; align-items:center; justify-content:center; font-size:22px;">
+                  ${proj.has_rendered_cache ? '📦' : '🆕'}
+                </div>
+                <div style="text-align:left;">
+                  <div style="font-size:15px; font-weight:800; color:${proj.has_rendered_cache ? '#fcd34d' : '#67e8f9'};">
+                    ${proj.has_rendered_cache ? 'Sản Phẩm Đã Upload Hết Video Final — Tạo Lô Video Mới' : 'Sản Phẩm Mới — Chọn Template Để Tạo Video AI'}
+                  </div>
+                  <div style="font-size:12px; color:var(--muted); margin-top:2px;">
+                    ${proj.has_rendered_cache
+                      ? `Còn <b>${proj.rendered_files_count || 0} file render cũ (${proj.rendered_size_mb || 0} MB)</b>. Bạn có thể xoá sạch cache cũ hoặc chọn Template bên dưới để tạo bộ video mới.`
+                      : `Đã có sẵn <b>${prodImgs.length} ảnh sản phẩm gốc</b> trong <code>product_images/</code>. Hãy chọn Template bên dưới rồi bấm <b>Chạy Đa Luồng</b>.`}
+                  </div>
+                </div>
               </div>
-              <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                <button class="btn btn-danger" style="padding:8px 16px; font-size:12.5px;" onclick="cleanProjectRender('${proj.id}', false)">🧹 Xoá Ảnh/Video Đã Render (Đưa Về Như Sản Phẩm Mới)</button>
-                <button class="btn btn-outline" style="padding:8px 14px; font-size:12.5px;" onclick="openFolderEncoded('${encodeURIComponent(proj.project_dir || '')}')">📂 Mở Thư Mục Sản Phẩm</button>
+              ${proj.has_rendered_cache ? `
+                <button class="btn btn-danger" style="padding:7px 12px; font-size:11.5px;" onclick="cleanProjectRender('${proj.id}', false)">🧹 Xoá Render Cũ (${proj.rendered_size_mb || 0} MB)</button>
+              ` : ''}
+            </div>
+
+            <!-- BƯỚC 1: CHỌN TEMPLATE VIDEO (3 THẺ TRỰC QUAN) -->
+            <div style="margin-top:16px; text-align:left;">
+              <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
+                <label style="margin:0; font-size:12px; font-weight:800; color:#e2e8f0;">🎬 1. Chọn Template Tạo Video (`Template/...`)</label>
+                <span style="font-size:11px; color:#93c5fd;">Đang chọn: <b>[#${activeTplObj.code || '001'}] ${activeTplObj.folder_name}</b></span>
               </div>
-            ` : `
-              <div style="font-size:32px; margin-bottom:8px;">🆕</div>
-              <div style="font-size:15px; font-weight:700; color:#67e8f9; margin-bottom:6px;">Sản Phẩm Mới (Đã dọn sạch toàn bộ ảnh/video render cũ)</div>
-              <div style="font-size:12.5px; color:var(--muted); margin-bottom:16px; line-height:1.5;">
-                Toàn bộ thông tin gốc và bộ ảnh sản phẩm (<code>product_images/</code>) được giữ nguyên.<br/>
-                Khi cần làm video mới cho sản phẩm này, bạn chỉ cần bấm <b>Chạy Đa Luồng</b> bên dưới.
+              <div style="display:grid; grid-template-columns: repeat(3, minmax(0, 1fr)); gap:10px;">
+                ${tplCardsHtml}
               </div>
-              <div style="display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
-                <button class="btn btn-success" style="padding:8px 16px; font-size:12.5px;" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng Tạo Mới 6 Video Final</button>
-                <button class="btn btn-outline" style="padding:8px 14px; font-size:12.5px;" onclick="openFolderEncoded('${encodeURIComponent(proj.primary_product_image_path || '')}')">🖼️ Xem Ảnh Sản Phẩm Gốc</button>
+            </div>
+
+            <!-- BƯỚC 2: CHỌN TEMPLATE DROPDOWN + SỐ LƯỢNG VIDEO / NHÂN VẬT -->
+            <div style="margin-top:14px; display:grid; grid-template-columns: 1.5fr 1fr; gap:12px; text-align:left; background:#090d16; padding:12px; border-radius:10px; border:1px solid var(--border);">
+              <div>
+                <label style="font-size:11px; color:var(--muted);">🎬 Mã Template Video Áp Dụng</label>
+                <select id="selStudioCenterTemplate" onchange="onChangeStudioTemplate('${proj.id}', this.value)" style="font-weight:700; color:#f8fafc;">
+                  ${studioTplOptsHtml}
+                </select>
               </div>
-            `}
+              <div>
+                <label style="font-size:11px; color:var(--muted);">🎞️ Số Lượng Video / Nhân Vật</label>
+                <select id="selStudioCenterVpc" onchange="onChangeStudioVpc('${proj.id}', this.value)" style="font-weight:700; color:#f8fafc;">
+                  ${studioVpcOptsHtml}
+                </select>
+              </div>
+            </div>
+
+            <!-- BƯỚC 3: BỘ ẢNH SẢN PHẨM GỐC -->
+            ${prodImgs.length > 0 ? `
+              <div style="margin-top:14px; text-align:left;">
+                <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px;">
+                  <label style="margin:0; font-size:11.5px; color:var(--muted);">🖼️ Bộ Ảnh Sản Phẩm Gốc (${prodImgs.length} ảnh — Bấm vào ảnh để Phóng To)</label>
+                  <button class="btn btn-xs btn-outline" onclick="openStudioProductLightbox('${proj.id}', 0)">🔍 Phóng To Toàn Màn Hình</button>
+                </div>
+                <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
+                  ${prodImgsStripHtml}
+                </div>
+              </div>
+            ` : ''}
+
+            <!-- BƯỚC 4: NÚT HÀNH ĐỘNG -->
+            <div style="margin-top:18px; padding-top:16px; border-top:1px solid var(--border); display:flex; gap:10px; justify-content:center; flex-wrap:wrap;">
+              <button class="btn btn-success" style="padding:10px 20px; font-size:13px; font-weight:800;" onclick="runProjectBatch('${proj.id}', '')">
+                🚀 Tạo Kịch Bản [#${activeTplObj.code || '001'}] & Chạy Đa Luồng (${Number(activeVpc) * 2} Video Final)
+              </button>
+              <button class="btn btn-primary" style="padding:10px 16px; font-size:12.5px; font-weight:700;" onclick="generateStudioProductPromptsOnly('${proj.id}')">
+                📝 Chỉ Tạo Kịch Bản (Xem Trước Các Cảnh)
+              </button>
+              <button class="btn btn-outline" style="padding:10px 14px; font-size:12px;" onclick="openFolderEncoded('${encodeURIComponent(proj.primary_product_image_path || proj.project_dir || '')}')">
+                📂 Mở Thư Mục SP
+              </button>
+            </div>
           </div>
         `;
         return;
@@ -4329,16 +4448,91 @@
       await refreshAll();
     }
 
+    function onChangeStudioTemplate(projectId, tplVal) {
+      if (!STATE.studioSelectedTemplate) STATE.studioSelectedTemplate = {};
+      STATE.studioSelectedTemplate[projectId] = tplVal;
+      STATE.renderedProjectSig = "";
+      loadProjectDetail(projectId, false);
+    }
+
+    function onChangeStudioVpc(projectId, vpcVal) {
+      if (!STATE.studioSelectedVpc) STATE.studioSelectedVpc = {};
+      STATE.studioSelectedVpc[projectId] = parseInt(vpcVal || "3", 10);
+      STATE.renderedProjectSig = "";
+      loadProjectDetail(projectId, false);
+    }
+
+    function openStudioProductLightbox(projectId, startIdx = 0) {
+      const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;
+      if (!proj) return;
+      const imgs = proj.all_product_image_paths || (proj.primary_product_image_path ? [proj.primary_product_image_path] : []);
+      if (!imgs.length) return;
+      const pri = proj.primary_product_image_path || imgs[0];
+      const gallery = imgs.map((absPath, i) => ({
+        absPath,
+        title: `${proj.full_product_name || proj.name || projectId} — Ảnh SP #${i + 1}${absPath === pri ? ' (⭐ Ảnh Mẫu AI)' : ''}`
+      }));
+      const idx = Math.max(0, Math.min(startIdx, gallery.length - 1));
+      openImageLightbox(gallery[idx].absPath, gallery[idx].title, gallery, idx);
+    }
+
+    async function generateStudioProductPromptsOnly(projectId) {
+      const tpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
+        || document.getElementById("selStudioCenterTemplate")?.value
+        || document.getElementById("selStudioToolbarTemplate")?.value
+        || "001";
+      const vpc = (STATE.studioSelectedVpc && STATE.studioSelectedVpc[projectId])
+        || document.getElementById("selStudioCenterVpc")?.value
+        || document.getElementById("selStudioToolbarVpc")?.value
+        || 3;
+      const res = await apiPost("/api/products-store/create-video", {
+        input: projectId,
+        template_name: tpl,
+        method: "auto",
+        videos_per_character: parseInt(vpc, 10) || 3,
+        force_regenerate_prompts: true,
+        auto_run: false,
+      });
+      if (!res || !res.ok) {
+        alert("Lỗi tạo kịch bản: " + ((res && res.error) || "Không xác định"));
+        return;
+      }
+      delete STATE.projectDetailsCache[projectId];
+      STATE.renderedProjectSig = "";
+      await refreshAll(false);
+      await loadProjectDetail(projectId, false);
+    }
+
     async function runProjectBatch(projectId, productId) {
+      const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;
+      const tpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
+        || document.getElementById("selStudioCenterTemplate")?.value
+        || document.getElementById("selStudioToolbarTemplate")?.value
+        || (proj && proj.template_code)
+        || "001";
+      const vpc = (STATE.studioSelectedVpc && STATE.studioSelectedVpc[projectId])
+        || document.getElementById("selStudioCenterVpc")?.value
+        || document.getElementById("selStudioToolbarVpc")?.value
+        || (proj && proj.videos_per_character)
+        || 3;
+      const isNewOrChangedTpl = !proj || (proj.products || []).length === 0 || (proj.template_code && proj.template_code !== tpl);
       const res = await apiPost("/api/projects/run", {
         project_id: projectId,
         product_id: productId || "",
+        template_name: isNewOrChangedTpl ? tpl : "",
+        videos_per_character: parseInt(vpc, 10) || 3,
+        force_regenerate_prompts: isNewOrChangedTpl,
         product_workers: 2,
         scene_workers: 3,
       });
-      if (res.ok) {
+      if (res && res.ok) {
         if (res.message) alert(res.message);
-        await loadProjectDetail(projectId);
+        delete STATE.projectDetailsCache[projectId];
+        STATE.renderedProjectSig = "";
+        await refreshAll(false);
+        await loadProjectDetail(projectId, false);
+      } else if (res && res.error) {
+        alert("Lỗi: " + res.error);
       }
     }
 

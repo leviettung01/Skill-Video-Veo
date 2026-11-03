@@ -666,6 +666,12 @@ def prepare_and_optionally_run_product(
         return crawl_info
 
     pid = crawl_info["pid"]
+    marker_clean = os.path.join(PROJECTS_DIR, pid, ".cleaned_new")
+    if os.path.exists(marker_clean):
+        try:
+            os.remove(marker_clean)
+        except OSError:
+            pass
     prompts_obj = generate_prompts_for_product(
         pid=pid,
         template_name=template_name,

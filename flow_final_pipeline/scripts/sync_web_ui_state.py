@@ -294,7 +294,11 @@ def sync_web_ui(force: bool = True):
                 os.remove(marker_path)
             except OSError:
                 pass
-        is_marked_clean = os.path.exists(marker_path) or not has_rendered_cache
+        has_prompts = os.path.exists(prompts_path) and bool(prompts_data.get("videos"))
+        is_marked_clean = os.path.exists(marker_path) or (not has_rendered_cache and not has_prompts)
+        tpl_code = str(prompts_data.get("template_code") or info_data.get("template_code") or "001")
+        tpl_name = str(prompts_data.get("template_name") or info_data.get("template_name") or "Nhà Xưởng")
+        vpc_val = int(prompts_data.get("videos_per_character") or 3)
 
         state_path = os.path.join(pdir, "flow_state.json")
         state = {"uploaded_refs": {}, "scene_uuids": {}, "built_finals": []}
@@ -465,7 +469,10 @@ def sync_web_ui(force: bool = True):
             "has_rendered_cache": has_rendered_cache,
             "rendered_files_count": rendered_files_count,
             "rendered_size_mb": rendered_size_mb,
-            "is_clean_new": (done_cnt == 0 and not has_rendered_cache),
+            "is_clean_new": (done_cnt == 0 and is_marked_clean),
+            "template_code": tpl_code,
+            "template_name": tpl_name,
+            "videos_per_character": vpc_val,
             "settings": {
                 "role_skill_file": "FlowFinalPipeline.MD",
                 "img_model": "Nano Banana 2.1 (2K)",
@@ -501,7 +508,10 @@ def sync_web_ui(force: bool = True):
                 "has_rendered_cache": has_rendered_cache,
                 "rendered_files_count": rendered_files_count,
                 "rendered_size_mb": rendered_size_mb,
-                "is_clean_new": (done_cnt == 0 and not has_rendered_cache),
+                "is_clean_new": (done_cnt == 0 and is_marked_clean),
+                "template_code": tpl_code,
+                "template_name": tpl_name,
+                "videos_per_character": vpc_val,
                 "settings": proj_obj["settings"],
             }
         ))

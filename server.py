@@ -477,14 +477,41 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/projects/run":
-            project_id = body.get("project_id") or ""
-            product_id = body.get("product_id") or ""
+            project_id = (body.get("project_id") or "").strip()
+            product_id = (body.get("product_id") or "").strip()
+            template_name = (body.get("template_name") or "").strip()
+            vpc = body.get("videos_per_character")
+            vpc_int = int(vpc) if vpc is not None and str(vpc).strip() != "" else None
+            force_prompts = bool(body.get("force_regenerate_prompts", False))
             prod_workers = int(body.get("product_workers", 2))
             scene_workers = int(body.get("scene_workers", 3))
             pdir = core.PROJECTS_DIR / project_id
             mt_script = PIPELINE_SCRIPTS_DIR / "run_all_7_videos_mt.py"
+            marker = pdir / ".cleaned_new"
+
+            # Nếu sản phẩm chưa có prompts.json, hoặc đang ở trạng thái Sản Phẩm Mới (.cleaned_new), hoặc người dùng chọn Template mới:
+            # Tự động sinh kịch bản theo Template rồi kích hoạt đa luồng!
+            if pdir.is_dir() and (not (pdir / "prompts.json").is_file() or marker.is_file() or force_prompts or template_name):
+                _ensure_latest_sws()
+                res = _pcb.prepare_and_optionally_run_product(
+                    raw_id_or_url=project_id,
+                    template_name=template_name or "001",
+                    crawl_method="auto",
+                    videos_per_character=vpc_int,
+                    force_regenerate_prompts=True,
+                    auto_run_pipeline=True,
+                )
+                if res.get("ok"):
+                    self._send_json({
+                        "ok": True,
+                        "message": f"Đã tạo kịch bản Template [{res.get('template_name')}] ({res.get('videos_count', 6)} Video Final) và kích hoạt chạy đa luồng cho SP {project_id}!",
+                        **res,
+                    })
+                else:
+                    self._send_json(res, 400)
+                return
+
             if (pdir / "prompts.json").is_file() and mt_script.is_file():
-                marker = pdir / ".cleaned_new"
                 if marker.is_file():
                     try:
                         marker.unlink()
