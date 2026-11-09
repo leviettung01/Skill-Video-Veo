@@ -1,11 +1,29 @@
 #!/usr/bin/env python3
 # -*- coding: utf-8 -*-
-"""Build final 1080p 60fps video: concat scenes + 1-line karaoke subtitles + top-left slide overlays.
+"""Build final 1080p 60fps video: concat scenes + Kho Template Subtitle (Karaoke / Custom ASS) + top-left slide overlays.
 Usage: python3 build_final.py spec.json
 """
-import json, subprocess, sys, os, shutil
+import json, subprocess, sys, os, shutil, re
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+
+try:
+    import engine_settings_manager as _esm
+except Exception:
+    _esm = None
+
+try:
+    from subtitle_template_engine import (
+        DEFAULT_SUBTITLE_SETTINGS,
+        build_ass_from_subtitle_settings,
+    )
+except Exception:
+    DEFAULT_SUBTITLE_SETTINGS = {}
+    build_ass_from_subtitle_settings = None
 
 TARGET_FPS = 60
 
@@ -40,7 +58,16 @@ def probe_clip_duration(clip_path: str, default_dur: float = 10.0) -> float:
     return default_dur
 
 
-def build_ass(spec, ass_path, scene_durations):
+def build_ass(spec, ass_path, scene_durations, subtitle_settings=None):
+    if build_ass_from_subtitle_settings is not None:
+        return build_ass_from_subtitle_settings(
+            spec=spec,
+            ass_path=ass_path,
+            scene_durations=scene_durations,
+            subtitle_settings=subtitle_settings,
+        )
+
+    # Fallback mặc định chuẩn hiện tại (Font DejaVu Sans cỡ 48, Trắng + Vàng Gold #FFE066, Viền đen 3px, MarginV 225)
     L = []
     L.append(
         "[Script Info]\nScriptType: v4.00+\nPlayResX: 1080\nPlayResY: 1920\n"
@@ -52,7 +79,6 @@ def build_ass(spec, ass_path, scene_durations):
         "StrikeOut, ScaleX, ScaleY, Spacing, Angle, BorderStyle, Outline, Shadow, "
         "Alignment, MarginL, MarginR, MarginV, Encoding\n"
     )
-    # white primary, pale yellow #FFE066 secondary (ASS is &HAABBGGRR), black outline (scaled 1.5x for 1080x1920)
     L.append(
         "Style: Sub,DejaVu Sans,48,&H00FFFFFF,&H0066E0FF,&H00000000,"
         "&H80000000,-1,0,0,0,100,100,0,0,1,3,0,2,30,30,225,1\n"
@@ -67,8 +93,8 @@ def build_ass(spec, ass_path, scene_durations):
         phrases = sc.get("phrases") or []
         total = sum(max(1, sw) for _, sw in phrases) or max(1, sc.get("words", 10))
         t = off
-        for text, sw in phrases:
-            text_str = str(text or "").strip()
+        for _, (text, sw) in enumerate(phrases):
+            text_str = str(text or "").strip().upper()
             if not text_str:
                 continue
             dur = (max(1, sw) / float(total)) * sc_dur
@@ -94,7 +120,6 @@ def main():
     assert n_scenes >= 2, "need at least 2 scenes"
     ov = [im for im in (spec.get("overlays") or []) if os.path.exists(os.path.join(base, im))]
     if not ov:
-        # fallback to any image in product_images/ or ref image
         p_img_dir = os.path.join(base, "product_images")
         if os.path.isdir(p_img_dir):
             for fn in sorted(os.listdir(p_img_dir)):
@@ -111,6 +136,32 @@ def main():
     ]
     total_dur = sum(scene_durations)
 
+    # Hardware-aware FFmpeg configuration & Subtitle Template settings from engine_settings_manager
+    threads_cnt = 4
+    use_nvenc = False
+    cpu_preset = "medium"
+    auto_gen_thumb = True
+    auto_inject_01s = True
+    sub_settings = dict(DEFAULT_SUBTITLE_SETTINGS or {})
+    if _esm is not None:
+        try:
+            cfg = _esm.load_engine_settings()
+            hw = cfg.get("hardware") or {}
+            threads_cnt = int(cfg.get("ffmpeg_threads_per_job") or 4)
+            enc_pref = cfg.get("video_encoder", "auto")
+            use_nvenc = (enc_pref == "h264_nvenc") or (enc_pref == "auto" and hw.get("has_nvenc"))
+            cpu_preset = cfg.get("ffmpeg_preset") or "fast"
+            if cpu_preset not in ("ultrafast", "superfast", "veryfast", "faster", "fast", "medium"):
+                cpu_preset = "fast"
+            auto_gen_thumb = bool(cfg.get("auto_generate_thumbnail", True))
+            auto_inject_01s = bool(cfg.get("auto_inject_thumbnail_01s", True))
+            if isinstance(cfg.get("subtitle_settings"), dict):
+                sub_settings.update(cfg["subtitle_settings"])
+        except Exception:
+            pass
+    if isinstance(spec.get("subtitle_settings"), dict):
+        sub_settings.update(spec["subtitle_settings"])
+
     out_rel = os.path.basename(spec["output"])
     tmp_out_rel = "_tmp_build_" + out_rel
     tmp_out = os.path.join(base, tmp_out_rel)
@@ -123,7 +174,7 @@ def main():
             os.remove(old_same_ass)
         except OSError:
             pass
-    build_ass(spec, ass, scene_durations)
+    build_ass(spec, ass, scene_durations, subtitle_settings=sub_settings)
 
     ov_window = min(20.0, max(total_dur - scene_durations[0], total_dur * 0.66))
     ov_start = max(0.0, total_dur - ov_window)
@@ -154,7 +205,6 @@ def main():
         + "".join(norm_a)
         + f"{v_inputs}concat=n={n_scenes}:v=1:a=0[vcat];"
         + f"{a_inputs}concat=n={n_scenes}:v=0:a=1[acat];"
-        + f"[vcat]ass='{ass_rel}'[vsub];"
     )
     for j in range(n_ov):
         fc += (
@@ -162,12 +212,15 @@ def main():
             f"pad=390:390:(ow-iw)/2:(oh-ih)/2:color=black@0.0,format=rgba[ov{j+1}];"
         )
 
-    prev = "vsub"
+    prev = "vcat"
+    # 1. Chèn các ảnh Slide Sản Phẩm góc trên bên trái (20s cuối)
     for j, (a, b) in enumerate(marks, start=1):
-        nxt = "vout" if j == n_ov else f"v{j}"
+        nxt = f"vov{j}"
         fc += f"[{prev}][ov{j}]overlay=30:30:eof_action=repeat:enable='between(t,{a},{b})'[{nxt}];"
         prev = nxt
-    fc = fc.rstrip(";")
+
+    # 2. Render Phụ đề chuyên nghiệp từ Kho Template Subtitle (`[vout]`)
+    fc += f"[{prev}]ass='{ass_rel}'[vout]"
 
     cmd = ["ffmpeg", "-y", "-v", "error"]
     for sc in spec["scenes"]:
@@ -178,7 +231,13 @@ def main():
         "-filter_complex", fc,
         "-map", "[vout]", "-map", "[acat]",
         "-r", str(TARGET_FPS),
-        "-c:v", "libx264", "-preset", "medium", "-crf", "19",
+        "-threads", str(threads_cnt),
+    ]
+    if use_nvenc:
+        cmd += ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20"]
+    else:
+        cmd += ["-c:v", "libx264", "-preset", cpu_preset, "-crf", "19"]
+    cmd += [
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp_out_rel,
     ]
     subprocess.run(cmd, cwd=base, check=True)
@@ -199,6 +258,24 @@ def main():
             os.replace(tmp_out, out)
     except Exception as e:
         print("WARN copying to final_videos:", e)
+
+    # Auto-generate AI Thumbnail & inject 0.1s intro frame into Final Video
+    if _esm is not None and auto_gen_thumb:
+        try:
+            pid_dir = os.path.basename(base)
+            spec_bname = os.path.basename(spec_path)
+            m_vk = re.match(r"^spec_(.+)\.json$", spec_bname, re.I)
+            vkey_str = m_vk.group(1) if m_vk else "v1"
+            res_th = _esm.generate_thumbnail_for_variant(
+                pid=pid_dir,
+                vkey=vkey_str,
+                inject_01s=auto_inject_01s,
+                prefer_existing_ref=True,
+            )
+            if res_th.get("ok"):
+                print(f"THUMB_OK: {res_th.get('thumbnail_path')} (injected_01s={res_th.get('injected_01s')})")
+        except Exception as th_err:
+            print("WARN generating/injecting thumbnail:", th_err)
 
     r = subprocess.run(
         [

@@ -1,0 +1,87 @@
+{
+  "id": "motion_control_video_fashion",
+  "code": "004",
+  "folder_name": "Motion Control Video Fashion",
+  "name": "Motion Control Video Fashion (Thay Đồ Theo Nhạc & Video Gốc)",
+  "badge": "NEW • OMNI FLASH VIDEO REF",
+  "category": "Thời Trang / Lookbook / OOTD Thay Đồ Theo Nhạc",
+  "price_label": "399.000đ • Đã Kích Hoạt",
+  "tier_badge": "👗 THỜI TRANG BIẾN HÌNH 2K",
+  "author": "Lê Việt Tùng - SkillAutoVeo",
+  "zalo": "0915967790",
+  "facebook": "https://www.facebook.com/tungbinh.38/",
+  "description": "Template chuyên dụng cho ngành Thời Trang Nữ / Nam / OOTD Lookbook: Dùng 1 Ảnh Nhân Vật 2K (trong phòng ngủ/studio) + 1 Video Tham Chiếu Chuyển Động & Nhạc + Nhiều Bộ Đồ (Product Sheet 2K). Tool tự động phân tích thời lượng video gốc để chia khít thành các phân cảnh 8s hoặc 10s (VD: 16s -> 2 cảnh 8s; 20s -> 2 cảnh 10s), tự động cắt video tham chiếu thành từng phân cảnh, bắt nhịp beat nhạc để tối ưu Prompt theo Timeline kèm thẻ chip ảnh trực tiếp ([Ảnh_1], [Bộ_đồ_1], [Bộ_đồ_2]) và chạy trên model Omni Flash (abra_edit / jIps6) giữ nguyên nhạc gốc.",
+  "default_videos_per_character": 1,
+  "scenes_per_video": 2,
+  "scene_duration_sec": 8,
+  "video_aspect": "9:16",
+  "image_resolution": "2K (1536x2752 / 2048x3639)",
+  "video_resolution": "1080p • 60 FPS",
+  "image_model": "Nano Banana 2.1 (BELUGA) + SPrCad 2K",
+  "video_model": "Omni 1.1 Flash Video Reference (abra_edit • 6s/8s/10s)",
+  "demo_video_caption": "Demo #004: Motion Control Video Fashion — Chia 2 Phân Cảnh × 8s (16s) Thay 3 Bộ Đồ Theo Beat Nhạc",
+  "role_skill_file": "ROLE_SKILL.md",
+  "ai_agent_command_example": "Tạo video thời trang theo template 004 từ ảnh nhân vật 2K, video tham chiếu và các bộ đồ",
+  "tags": [
+    "Motion Control Fashion",
+    "Thay Đồ Theo Beat Nhạc",
+    "Video Tham Chiếu Omni Flash",
+    "Tự Cắt Phân Cảnh 8s / 10s",
+    "Ảnh Nhân Vật Chuẩn 2K",
+    "Inline Media Chip Prompt"
+  ],
+  "highlights": [
+    "Tự động phân tích thời lượng Video Tham Chiếu và chia khít cho 8s hoặc 10s (VD: 16s -> 2 cảnh 8s; 20s -> 2 cảnh 10s; 24s -> 3 cảnh 8s; 30s -> 3 cảnh 10s) vì chỉ có model Omni Flash mới cho phép tham chiếu video",
+    "Tự động cắt rời Video Tham Chiếu thành từng file phân cảnh (ref_clip_s1_8s.mp4, ref_clip_s2_8s.mp4...) và tách file nhạc gốc chất lượng cao (ref_master_audio.m4a)",
+    "Quét điểm chuyển cảnh hình ảnh (scdet) kết hợp đỉnh nhịp bass âm thanh (Audio Beat Onset) để xác định chính xác từng mốc giây thay đồ (VD: Cảnh 1 tại 4:04; Cảnh 2 tại 3:04 và 6:12)",
+    "Đảm bảo Ảnh Ref Nhân Vật mở đầu mỗi phân cảnh luôn đạt chuẩn 2K (1536x2752): Phân cảnh 2 tự động tạo Ảnh Ref 2K nhân vật mặc bộ đồ cuối của Phân cảnh 1 đứng trong đúng căn phòng đó để nối cảnh mượt 100%",
+    "Tối ưu Prompt theo Timeline kết hợp gắn trực tiếp thẻ Chip Tham Chiếu Ảnh ([07_Nhan_Vat_Basic_Phong_Ngu_2K.png], [03_Product_Sheet_Quan_Xanh_2K.png]...) chuẩn giao thức jIps6 (abra_edit) của Google Flow"
+  ],
+  "workflow_steps": [
+    {
+      "step": 1,
+      "icon": "👗",
+      "title": "Bước 1: Chuẩn Hóa Ảnh Nhân Vật Gốc 2K + Bảng Nhân Vật 2K + Bộ Sưu Tập Outfit 2K",
+      "detail": "Kiểm tra & nâng cấp toàn bộ Ảnh Nhân Vật mở đầu (07_Nhan_Vat_Basic_Phong_Ngu_2K.png), Bảng Nhân Vật (01_Character_Sheet_4_Outfits_2K.png) và các Ảnh Sản Phẩm Bộ Đồ (Outfit 1, 2, 3...) lên độ phân giải chuẩn 2K sắc nét."
+    },
+    {
+      "step": 2,
+      "icon": "✂️",
+      "title": "Bước 2: Phân Tích Video Tham Chiếu & Tự Động Chia Cắt Phân Cảnh 8s / 10s",
+      "detail": "Đọc thời lượng Video Tham Chiếu (VD: 16.28s -> chia thành 2 phân cảnh × 8s; 20s -> 2 phân cảnh × 10s). Dùng FFmpeg cắt video gốc thành từng clip phân cảnh riêng biệt và tách nhạc gốc."
+    },
+    {
+      "step": 3,
+      "icon": "🎵",
+      "title": "Bước 3: Bắt Nhịp Beat Nhạc & Tạo Timeline Prompt Kèm Inline Asset Chips",
+      "detail": "Phát hiện mốc giây beat đập / chuyển động trong từng clip (VD: Cảnh 1 đổi Bộ 1 tại 4:04; Cảnh 2 đổi Bộ 2 tại 3:04 và Bộ 3 tại 6:12), sinh câu lệnh Timeline gắn trực tiếp chip ảnh tham chiếu."
+    },
+    {
+      "step": 4,
+      "icon": "🖼️",
+      "title": "Bước 4: Tạo Ảnh Ref Nhân Vật 2K Nối Tiếp Giữa Các Phân Cảnh (Continuity 2K Ref)",
+      "detail": "Để Cảnh 2 bắt đầu mượt mà không bị nhảy hình, hệ thống dùng Ảnh Nhân Vật 2K + Bộ Đồ 1 tạo ra Ảnh Ref 2K nhân vật đang mặc Bộ Đồ 1 trong đúng phòng ngủ đó làm ảnh mở đầu Cảnh 2."
+    },
+    {
+      "step": 5,
+      "icon": "🎬",
+      "title": "Bước 5: Upload Video Clip (Scotty) + Chạy Omni Flash (jIps6) + Upscale 1080p & Ghép Nhạc Gốc",
+      "detail": "Upload từng clip tham chiếu 8s/10s cùng bộ ảnh 2K lên Google Flow, gửi lệnh Omni Flash (abra_edit), tải bản Upscale 1080p và ghép nối hoàn chỉnh với nhạc gốc của video tham chiếu."
+    }
+  ],
+  "scene_breakdown": [
+    {
+      "scene": 1,
+      "title": "Phân Cảnh 1 (0.00s - 8.00s): MỞ ĐẦU TRANG PHỤC BASIC 2K -> BIẾN HÌNH BỘ ĐỒ 1 TẠI GIÂY 4:04",
+      "purpose": "Nhân vật xuất hiện trong bối cảnh phòng ngủ (Ảnh 1 chuẩn 2K), thực hiện đúng chuyển động và biểu cảm theo clip tham chiếu 1 (0s-8s). Đúng nhịp beat tại giây 4:04, nhân vật biến hình sang Bộ Đồ 1 (Áo yếm vàng cổ hoa đỏ + Quần suông xanh coban).",
+      "camera": "Full-body / Three-quarter 9:16 cố định góc máy như Ảnh 1 2K; chuyển động cơ thể bám sát 100% Video Tham Chiếu Cảnh 1."
+    },
+    {
+      "scene": 2,
+      "title": "Phân Cảnh 2 (8.00s - 16.00s | Clip 0.00s - 8.00s): NỐI TIẾP BỘ ĐỒ 1 -> ĐỔI BỘ ĐỒ 2 TẠI 3:04 -> ĐỔI BỘ ĐỒ 3 TẠI 6:12",
+      "purpose": "Bắt đầu từ Ảnh Ref 2K nhân vật đang mặc Bộ Đồ 1 trong phòng ngủ, tiếp tục nhún nhảy theo clip tham chiếu 2 (8s-16s). Tại giây 3:04 đổi sang Bộ Đồ 2 (Váy ngắn xếp tầng vàng bơ), đến giây 6:12 đổi sang Bộ Đồ 3 (Áo yếm vàng + Quần ống rộng màu be + Kính hồng).",
+      "camera": "Full-body / Three-quarter 9:16 đồng nhất ánh sáng và phòng ngủ với Cảnh 1; sử dụng nhạc gốc xuyên suốt 16 giây."
+    }
+  ]
+}
+

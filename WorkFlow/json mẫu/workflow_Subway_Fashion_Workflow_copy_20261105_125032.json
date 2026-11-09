@@ -1,0 +1,487 @@
+{
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:50:32.042Z",
+  "workflow": {
+    "name": "Subway Fashion Workflow (copy)",
+    "description": "Subway Fashion Workflow\nWorkflow tạo video thời trang theo phong cách cinematic ga tàu điện ngầm. Phù hợp để sáng tạo làm content thời trang bán hàng.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true
+    },
+    "nodes": [
+      {
+        "node_id": "node_nvSDn87e",
+        "node_type": "image",
+        "node_name": "Model",
+        "pos_x": 369.066,
+        "pos_y": 137.108,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/6f005ec8-1982-4ae0-bba1-796ab7fd0ce1.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_hn5AWNar",
+        "node_type": "image",
+        "node_name": "Outfit 01",
+        "pos_x": 362.066,
+        "pos_y": 845.108,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/4e60c777-2bfb-403b-9577-d63332a88208.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_F3vX1W0D",
+        "node_type": "image",
+        "node_name": "Outfit 02",
+        "pos_x": 780.072,
+        "pos_y": 855.164,
+        "enabled": true,
+        "slug": "image_video_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/a9aab537-89aa-4fcf-bdec-c0666817dc84.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_57gcP96R",
+        "node_type": "prompt",
+        "node_name": "Character Sheet Prompt",
+        "pos_x": 798.219,
+        "pos_y": 163.311,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_6NG1f1qA",
+        "node_type": "generate",
+        "node_name": "Character Sheet 01",
+        "pos_x": 1452,
+        "pos_y": -185,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_OIOJZZQN",
+        "node_type": "generate",
+        "node_name": "Character Sheet 02",
+        "pos_x": 1457,
+        "pos_y": 889,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_Igmlu2qJ",
+        "node_type": "image",
+        "node_name": "Model Ref",
+        "pos_x": 2193,
+        "pos_y": 411,
+        "enabled": true,
+        "slug": "image_video_4",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/a3a74cad-4142-4c6c-bcbd-4058e20ef8bb.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_N2lai2fN",
+        "node_type": "image",
+        "node_name": "Subway BG",
+        "pos_x": 2194,
+        "pos_y": 1176,
+        "enabled": true,
+        "slug": "image_video_5",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/61dbe7f7-8c23-4f37-91f8-47bd43136fbd.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_2J4mXswq",
+        "node_type": "generate",
+        "node_name": "Model + Outfit 01",
+        "pos_x": 2811,
+        "pos_y": -155.14688329389,
+        "enabled": true,
+        "slug": "flow_image_video_generate_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_XuqoWp2d",
+        "node_type": "prompt",
+        "node_name": "Subway Prompt",
+        "pos_x": 2200,
+        "pos_y": 78,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "TASK:\nCreate an ultra-detailed, photorealistic 8K full-body fashion editorial image of the female model from IMAGE_1 standing inside the subway station from IMAGE_3, using IMAGE_2 only as the standing-position and composition reference.\n\nREFERENCE ROLES:\n- IMAGE_1 = exact female identity, face, blonde hairstyle, body proportions, complete outfit 01, footwear and accessories\n- IMAGE_2 = standing position, body placement, framing, camera angle, subject scale and natural pose reference only\n- IMAGE_3 = exact subway station background, architecture, wall tiles, BROADWAY sign, floor, yellow safety strip and lighting environment\n\nREFERENCE PRIORITY:\n- Highest priority: IMAGE_1 for the model’s identity, face, outfit, footwear and accessories\n- Second priority: IMAGE_3 for the station environment and lighting\n- IMAGE_2 must be used only for pose, placement, subject scale and framing\n- Do not copy the face, clothing or accessories from IMAGE_2\n\nSUBJECT:\nUse the exact same blonde female model from IMAGE_1.\nPreserve her facial identity precisely, including:\n- face shape\n- eye shape\n- eyebrow shape\n- nose shape\n- lips\n- jawline\n- cheek structure\n- skin tone\n- blonde hairstyle\n\nShe must wear the exact complete outfit from IMAGE_1:\n- layered distressed knit top in mint/lavender tones\n- blue mesh sleeves\n- purple velvet mini skirt\n- patterned tights\n- black boots\n\nPreserve the outfit exactly as shown in IMAGE_1.\nDo not redesign, simplify, restyle or reinterpret the clothing.\nKeep the exact garment layering, silhouette, fit, texture, colors, proportions and visible accessories.\n\nCOMPOSITION:\nVertical 9:16 full-body shot.\nShow the entire body including shoes.\nPlace the model in the same standing position and scale as the woman in IMAGE_2.\nUse a front-facing, fixed-camera fashion editorial composition.\nNatural perspective, realistic proportions, no wide-angle distortion.\n\nPOSE:\nNatural relaxed standing pose.\nSubtle elegant fashion posture.\nArms relaxed or lightly posed in a natural understated way.\nKeep the pose realistic, calm and refined.\n\nBACKGROUND:\nRecreate the subway station from IMAGE_3 exactly.\nPreserve:\n- BROADWAY sign\n- blue stripe\n- tiled wall\n- empty ad frame\n- platform floor\n- yellow safety line\n- overall station geometry and perspective\n\nThe model stands safely behind the yellow line.\n\nLIGHTING:\nMatch the subway lighting from IMAGE_3 and IMAGE_2.\nSoft indoor station lighting.\nEven facial illumination.\nNatural skin tones.\nRealistic shadows.\nAccurate environmental light on hair, face and outfit.\n\nIMAGE QUALITY / DETAIL LOCK:\nRender as an ultra-sharp, ultra-detailed, high-resolution fashion editorial still.\n8K photorealistic quality.\nExtremely crisp facial detail.\nSharp eyes, defined eyelashes, clear eyebrows, natural lips and realistic skin texture.\nKeep the face clean, clear and in focus.\nPreserve pore-level skin detail without excessive smoothing.\nHigh clarity in the outfit textures, knit details, mesh sleeves, velvet skirt texture, patterned tights and boots.\nCrisp edges, high micro-detail, realistic fabric rendering and strong overall image clarity.\n\nFOCUS / SHARPNESS:\nThe model’s face must be sharp and clearly readable.\nEyes must be in crisp focus.\nDo not let the face become soft, blurry or low-detail.\nKeep the model as the visual focal point.\nMaintain clear detail in both the face and the outfit.\nUse natural depth of field only; do not blur the face.\n\nSTYLE:\nPhotorealistic, clean, luxury fashion editorial, polished but realistic, high-end campaign image, natural body proportions, authentic subway environment.\n\nNEGATIVE:\nDo not create a 4-panel collage.\nDo not generate multiple views.\nDo not copy the person from IMAGE_2.\nDo not change the outfit design.\nDo not change hair color.\nDo not change the station.\nNo extra people.\nNo face blur.\nNo soft-focus face.\nNo low-detail face.\nNo distorted facial features.\nNo beauty-filter skin.\nNo plastic skin.\nNo over-smoothed skin.\nNo distorted hands.\nNo extra limbs.\nNo warped anatomy.\nNo incorrect tights pattern.\nNo altered footwear.\nNo text.\nNo watermark.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_8S1uFoyw",
+        "node_type": "generate",
+        "node_name": "Model + Outfit 02",
+        "pos_x": 2822,
+        "pos_y": 945,
+        "enabled": true,
+        "slug": "flow_image_video_generate_2_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_OJcLZiGd",
+        "node_type": "generate",
+        "node_name": "Final Video",
+        "pos_x": 4259.4522712144,
+        "pos_y": 37,
+        "enabled": true,
+        "slug": "flow_image_video_generate_3",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "8s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_VQiZxrFN",
+        "node_type": "image",
+        "node_name": "Image/Video 6",
+        "pos_x": 3523,
+        "pos_y": 544.05447028499,
+        "enabled": true,
+        "slug": "image_video_6",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/61dbe7f7-8c23-4f37-91f8-47bd43136fbd.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_IMx8QRZN",
+        "node_type": "image",
+        "node_name": "Image/Video 7",
+        "pos_x": 3528,
+        "pos_y": 1269,
+        "enabled": true,
+        "slug": "image_video_7",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/11/6f005ec8-1982-4ae0-bba1-796ab7fd0ce1.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_JX3akEDH",
+        "node_type": "prompt",
+        "node_name": "Video Prompt - PHONE CALL → CUTE SMILE",
+        "pos_x": 3529,
+        "pos_y": 227,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "TOBYFLOW SUBWAY FASHION VIDEO 01 — V7.0\nUltra-Sharp Face | 8K Detail Target | Absolute Wardrobe Lock | High-Speed Train Transition\n\nTASK\nGenerate one continuous, ultra-photorealistic 8-second vertical fashion video featuring the same female model in two exact reference outfits at a subway station.\n\nThe model initially appears to be listening to a phone call, then changes to a charming smile after a fast subway train passes in front of the camera.\n\nThe final result must resemble exceptionally sharp, high-resolution professional fashion footage.\n\nINPUT REFERENCES\n\nIMAGE_1 = MASTER_OUTFIT_01_AT_STATION\nIMAGE_2 = MASTER_OUTFIT_02_AT_STATION\nIMAGE_3 = EMPTY_SUBWAY_BACKGROUND\nIMAGE_4 = CHARACTER_REFERENCE_SHEET\n\nREFERENCE PRIORITY\n\nIMAGE_4:\nCanonical facial identity reference.\n\nIMAGE_1:\nExact outfit 01, hairstyle, complete body appearance, accessories, standing position and framing.\n\nIMAGE_2:\nExact outfit 02, hairstyle, complete body appearance, accessories, standing position and framing.\n\nIMAGE_3:\nExact station architecture, permanent background, lighting and environment.\n\nNever allow IMAGE_4 to overwrite clothing, footwear, accessories or hairstyle details defined by the outfit master images.\n\nVIDEO CONFIGURATION\n\nDURATION = 8 seconds\nASPECT_RATIO = 9:16\nRESOLUTION = HIGHEST_NATIVE_AVAILABLE\nDETAIL_TARGET = ULTRA_DETAILED_8K_APPEARANCE\nCAMERA = ABSOLUTELY_STATIC\nFOCUS = MODEL_FACE_AND_OUTFIT\nFOCUS_MODE = LOCKED\nTRAIN_DIRECTION = LEFT_TO_RIGHT\nTRAIN_SPEED = ULTRA_FAST\nTRAIN_BLUR = EXTREME_HORIZONTAL_MOTION_BLUR\nSPEECH = NONE\nSUBTITLES = NONE\n\nMANDATORY SCENE ORDER\n\nTRAIN EXIT\n→ OUTFIT 01 / PHONE CALL\n→ FAST TRAIN WIPE\n→ OUTFIT 02 / CUTE SMILE\n→ FINAL TRAIN OCCLUSION\n\n==================================================\n1. ABSOLUTE FACE IDENTITY & CLARITY LOCK\n==================================================\n\nIMAGE_4 is the authoritative facial identity reference.\n\nPreserve the exact same facial identity in every visible frame.\n\nMaintain:\n- Original facial structure and proportions.\n- Eye shape and spacing.\n- Eyebrow shape and position.\n- Nose structure.\n- Lip shape and natural contours.\n- Jawline and cheek structure.\n- Natural skin tone.\n- Distinctive visible facial details.\n\nFACE CLARITY:\n\nThe model's face must remain exceptionally clear, naturally sharp and recognizable throughout both outfit scenes.\n\nRender:\n- Crisp, clearly defined eyes.\n- Detailed iris and pupil structure when resolvable.\n- Natural eyelashes and eyebrows.\n- Accurate nose and lip contours.\n- Realistic skin texture.\n- Natural facial highlights and shadows.\n- Fine hair strands surrounding the face.\n\nPreserve identity without artificial beautification.\n\nDo not generate a similar-looking replacement face.\n\nDo not reconstruct a new facial identity during head movements.\n\nFACIAL MOTION:\n\nAllow subtle and realistic facial expressions.\n\nKeep head turns small and controlled.\n\nAvoid rapid head rotation, exaggerated facial motion and unnecessary facial deformation.\n\nIf an expression threatens identity accuracy, simplify the expression.\n\n==================================================\n2. ULTRA-SHARP IMAGE QUALITY LOCK\n==================================================\n\nTARGET:\nUltra-photorealistic professional fashion cinematography with an 8K-level detail aesthetic.\n\nUse the maximum native output resolution supported by the video model.\n\nPRIORITIZE:\n\n- Fine facial structure.\n- Clear facial features.\n- Natural skin microtexture.\n- Individual hair detail where visible.\n- Accurate clothing construction.\n- Detailed fabric weave.\n- Sharp garment edges.\n- Precise footwear details.\n- Stable architectural details.\n\nIMAGE CHARACTERISTICS:\n\nCrisp professional optical sharpness.\nNatural fine detail.\nClean image reproduction.\nBalanced local contrast.\nRealistic color separation.\nNatural highlight roll-off.\nControlled digital noise.\nNo artificial over-sharpening.\n\nThe face and outfit must remain the primary visual focus.\n\nAvoid cinematic softness on the model.\n\nAvoid excessive depth-of-field blur.\n\nMaintain sharp, readable garment details in the full-body composition.\n\n==================================================\n3. TEMPORAL DETAIL CONSISTENCY LOCK\n==================================================\n\nPreserve fine visual details consistently across consecutive frames.\n\nFACE:\nNo fluctuating facial sharpness.\nNo changes to eye shape.\nNo unstable eyebrows.\nNo shifting facial proportions.\nNo facial texture flicker.\nNo sudden face softening.\n\nCLOTHING:\nNo fabric texture flicker.\nNo disappearing stitching.\nNo changing garment patterns.\nNo unstable mesh or knit details.\nNo changing tights pattern.\nNo changing footwear structure.\n\nBACKGROUND:\nNo moving wall tiles.\nNo flickering architectural details.\nNo changing station signs.\nNo unstable floor markings.\n\nSmall natural movement must not trigger visual reconstruction of the model or outfit.\n\n==================================================\n4. ABSOLUTE WARDROBE PRESERVATION LOCK\n==================================================\n\nIMAGE_1 and IMAGE_2 are immutable outfit references.\n\nPreserve EXACTLY:\n\n- Every garment and layer.\n- Original silhouette and fit.\n- Neckline and collar.\n- Sleeve length and shape.\n- Waist position and construction.\n- Skirt or dress length.\n- Hemline and proportions.\n- Fabric type and texture.\n- Knit, mesh, denim and velvet details.\n- Colors and patterns.\n- Stitching, buttons and trims.\n- Tights and footwear.\n- All original accessories.\n\nNo redesign.\nNo restyling.\nNo simplification.\nNo creative clothing improvements.\nNo color changes.\nNo material replacement.\nNo altered garment length.\nNo added or missing layers.\nNo accessory changes.\nNo hybrid outfits.\n\nIf movement would distort the clothing, reduce movement instead.\n\nThe outfit switch is allowed ONLY during complete train occlusion.\n\n==================================================\n5. CAMERA, LIGHTING & FOCUS LOCK\n==================================================\n\nUse IMAGE_3 as the exact permanent station environment.\n\nPreserve the station architecture, signs, platform geometry, floor, safety strip and lighting.\n\nCAMERA:\nStationary tripod.\nIdentical framing throughout.\nIdentical camera height and lens perspective.\nFull-body fashion composition.\n\nNo pan.\nNo tilt.\nNo zoom.\nNo tracking.\nNo camera shake.\n\nOPTICAL FOCUS:\n\nKeep the subject inside the sharp focus plane.\n\nMaintain clear facial and outfit detail.\n\nDo not shift focus to the background.\n\nDo not shift focus to the train.\n\nUse sufficient depth of field to keep the full-body subject acceptably sharp.\n\nLIGHTING:\n\nSoft, even station illumination.\nNatural skin tones.\nClear but gentle facial lighting.\nRealistic fabric highlights.\nPhysically plausible shadows.\n\nAvoid underexposed faces and excessive contrast.\n\n==================================================\n6. TRAIN DESIGN & SELECTIVE BLUR LOCK\n==================================================\n\nTRAIN_DESIGN_ID = SUBWAY_TRAIN_001\n\nTRAIN EXTERIOR:\nClassic New York subway train.\nBrushed stainless-steel silver.\nNeutral metallic silver (#A8ADB2).\nDark charcoal window frames (#25292D).\nDark tinted rectangular windows.\nConsistent windows, doors and panel geometry.\nNo colorful advertisements.\n\nTRAIN MOVEMENT:\n\nExtremely fast LEFT_TO_RIGHT movement across the extreme foreground.\n\nVery strong horizontal motion blur.\nLong metallic reflection streaks.\nHeavily blurred windows.\nPhysically plausible high-speed motion.\n\nSELECTIVE MOTION BLUR:\n\nApply extreme motion blur ONLY to the moving train.\n\nKeep sharp:\n- Model's face.\n- Eyes and hair.\n- Clothing and accessories.\n- Station architecture.\n- Platform floor.\n\nNo global image blur.\nNo camera motion blur.\nNo radial blur.\nNo zoom blur.\n\n==================================================\n7. EXACT SCENE TIMELINE\n==================================================\n\nSCENE 1 | 0.0–0.7s\nOPENING TRAIN EXIT\n\nBegin with the entire frame already covered by the fast-moving silver train.\n\nThe train moves LEFT_TO_RIGHT and rapidly exits.\n\nReveal the exact model and outfit from IMAGE_1.\n\nSCENE 2 | 0.7–2.7s\nOUTFIT 01 — PHONE CALL\n\nThe model wears the exact outfit from IMAGE_1.\n\nShe naturally holds a smartphone near her ear and appears to be listening to a phone call.\n\nHer expression is pleasant and relaxed.\n\nShe makes a gentle head tilt and subtle natural smile.\n\nKeep facial features sharp and clearly visible.\n\nNo speaking.\nNo exaggerated lip movement.\n\nThe smartphone is the only permitted new handheld prop for this scene; it must not change existing fashion accessories.\n\nSCENE 3 | 2.7–3.7s\nULTRA-FAST TRAIN WIPE\n\nA metallic silver subway train rushes LEFT_TO_RIGHT across the extreme foreground.\n\nApply extremely strong horizontal motion blur.\n\nThe train completely covers the model and entire station.\n\nDuring 100% occlusion, switch from outfit 01 to outfit 02.\n\nNo visible clothing transformation.\n\nThe train clears.\n\nSCENE 4 | 3.7–6.5s\nOUTFIT 02 — CUTE SMILE\n\nReveal the exact model wearing outfit 02 from IMAGE_2.\n\nShe initially looks slightly away.\n\nShe gently turns her head toward the camera.\n\nShe establishes natural eye contact and gives a warm, charming, genuine smile.\n\nKeep the smile subtle and beautiful.\n\nMaintain natural facial anatomy and identity.\n\nEyes, face, hair and outfit remain exceptionally sharp.\n\nNo exaggerated expressions.\n\nSCENE 5 | 6.5–8.0s\nFINAL HIGH-SPEED TRAIN OCCLUSION\n\nAn identical silver train rapidly passes LEFT_TO_RIGHT.\n\nExtreme horizontal motion blur.\n\nThe train progressively covers the model and station.\n\nEnd while the train completely occupies the frame.\n\nFINAL FRAME:\n100% moving train exterior.\nNo visible model.\nNo visible station.\nNo frozen train.\nNo black frame.\n\n==================================================\n8. MULTI-VIDEO CONTINUITY\n==================================================\n\nThis segment is designed to join another video using the same five-scene structure.\n\nThe final train wipe and the next video's opening train exit represent one continuous train movement.\n\nPreserve:\n- Same silver train.\n- Same carriage design.\n- Same movement direction.\n- Same apparent speed.\n- Same directional blur.\n- Same station.\n- Same camera framing.\n- Same model identity.\n\nIf PREVIOUS_END_FRAME is supported, use it as a continuity reference for subsequent segments.\n\n==================================================\n9. NEGATIVE CONSTRAINTS\n==================================================\n\nNo blurry face.\nNo soft-focus model.\nNo low-detail facial features.\nNo changing eyes.\nNo facial texture flicker.\nNo facial identity drift.\nNo plastic skin.\nNo excessive beauty filters.\nNo oversharpening halos.\nNo global motion blur.\nNo inconsistent garment texture.\nNo wardrobe redesign.\nNo outfit blending.\nNo changing footwear.\nNo changing accessories.\nNo background instability.\nNo moving camera.\nNo slow train.\nNo weak train blur.\nNo different train design.\nNo visible outfit transformation.\nNo duplicated model.\nNo distorted anatomy.\nNo subtitles.\nNo watermarks.\n\nFINAL OUTPUT\n\nAn ultra-photorealistic 8-second vertical fashion video with exceptionally sharp facial identity, stable fine garment detail and fast metallic subway train transitions.\n\nTRAIN EXIT\n→ PHONE CALL / OUTFIT 01\n→ FAST TRAIN WIPE\n→ CUTE SMILE / OUTFIT 02\n→ FINAL FULL-FRAME TRAIN OCCLUSION.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_lulO67hT",
+        "node_type": "prompt",
+        "node_name": "Video Prompt - FASHION POSE → OUTFIT ADJUS",
+        "pos_x": 3530,
+        "pos_y": -99.565219943603,
+        "enabled": true,
+        "slug": "prompt_3_1",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "TOBYFLOW SUBWAY FASHION VIDEO 02 — V7.0\nUltra-Sharp Face | Exact Wardrobe | Fashion Pose | Outfit Adjustment & Smile\n\nTASK\nGenerate one continuous ultra-photorealistic 8-second vertical fashion video that visually continues the previous subway fashion segment.\n\nThe same female model appears in two new exact reference outfits.\n\nUse extremely fast metallic subway train transitions to conceal outfit switching.\n\nMaintain ultra-sharp facial detail, stable outfit textures and consistent station architecture.\n\nINPUT REFERENCES\n\nIMAGE_1 = MASTER_OUTFIT_03_AT_STATION\nIMAGE_2 = MASTER_OUTFIT_04_AT_STATION\nIMAGE_3 = EMPTY_SUBWAY_BACKGROUND\nIMAGE_4 = CHARACTER_REFERENCE_SHEET\n\nREFERENCE PRIORITY\n\nIMAGE_4 = Canonical facial identity.\nIMAGE_1 = Exact outfit 03, body appearance, standing position and framing.\nIMAGE_2 = Exact outfit 04, body appearance, standing position and framing.\nIMAGE_3 = Permanent station environment.\n\nThe character sheet controls facial identity only.\nNever copy clothing or accessories from IMAGE_4.\n\nCONFIGURATION\n\nDURATION = 8 seconds\nASPECT_RATIO = 9:16\nRESOLUTION = HIGHEST_NATIVE_AVAILABLE\nDETAIL_TARGET = ULTRA_DETAILED_8K_APPEARANCE\nCAMERA = ABSOLUTELY_STATIC\nFOCUS = MODEL_FACE_AND_OUTFIT\nTRAIN_DESIGN_ID = SUBWAY_TRAIN_001\nTRAIN_DIRECTION = LEFT_TO_RIGHT\nTRAIN_SPEED = ULTRA_FAST\nTRAIN_BLUR = EXTREME_HORIZONTAL\nSPEECH = NONE\nSUBTITLES = NONE\n\nMANDATORY SCENE ORDER\n\nTRAIN EXIT\n→ OUTFIT 03 / FASHION POSE\n→ FAST TRAIN WIPE\n→ OUTFIT 04 / ADJUST & SMILE\n→ FINAL TRAIN OCCLUSION\n\n==================================================\n1. ABSOLUTE FACIAL IDENTITY LOCK\n==================================================\n\nUse IMAGE_4 as the exact facial identity reference.\n\nPreserve:\n- Face shape and proportions.\n- Eye shape and spacing.\n- Eyebrow structure.\n- Nose shape.\n- Mouth and lip contours.\n- Jawline and cheek structure.\n- Natural skin tone.\n- Distinctive facial details.\n\nMaintain the exact same face throughout the video.\n\nNo new identity.\nNo facial blending.\nNo changes in facial proportions.\nNo facial reconstruction during movement.\n\nFacial expression may change naturally without changing identity.\n\n==================================================\n2. ULTRA-SHARP FACE & 8K DETAIL LOCK\n==================================================\n\nProduce professional high-resolution fashion cinematography with an 8K-quality detail target.\n\nUse the highest native rendering resolution available.\n\nFACE DETAIL:\n\nKeep the model's face sharp and recognizable during every visible frame.\n\nPreserve:\n- Clearly defined eyes.\n- Realistic eyelashes and eyebrows.\n- Detailed facial contours.\n- Natural lip texture.\n- Realistic skin texture.\n- Fine hair strands.\n- Stable facial highlights.\n\nAvoid:\n- Soft facial rendering.\n- Blurry eyes.\n- Excessive skin smoothing.\n- Artificial beautification.\n- Plastic-looking skin.\n- Low-detail facial reconstruction.\n\nOUTFIT DETAIL:\n\nMaintain clear garment construction.\nKeep fabric texture, knit weave, mesh structure, stitching, patterns, hems and accessories visually stable.\n\nMaintain accurate tights patterns and footwear geometry.\n\nNo garment texture flicker.\nNo disappearing design elements.\n\nIMAGE QUALITY:\n\nCrisp professional lens detail.\nNatural local contrast.\nClean tonal transitions.\nAccurate color reproduction.\nControlled image noise.\nNo excessive sharpening.\nNo artificial HDR halos.\n\n==================================================\n3. TEMPORAL CONSISTENCY LOCK\n==================================================\n\nMaintain stable fine details across consecutive frames.\n\nFACE:\nNo flickering facial features.\nNo changing eye shape.\nNo unstable mouth contours.\nNo blurred-to-sharp fluctuations.\nNo identity drift during smiles.\n\nWARDROBE:\nNo changing fabric structure.\nNo altered layers.\nNo missing garment details.\nNo unstable patterns.\nNo material morphing.\n\nBACKGROUND:\nNo shifting station tiles.\nNo changing signs.\nNo perspective changes.\nNo lighting flicker.\n\nEvery visible frame must preserve consistent high-quality visual details.\n\n==================================================\n4. ABSOLUTE WARDROBE LOCK\n==================================================\n\nIMAGE_1 and IMAGE_2 are immutable wardrobe references.\n\nOUTFIT 03:\nPreserve the exact complete outfit from IMAGE_1.\n\nOUTFIT 04:\nPreserve the exact complete outfit from IMAGE_2.\n\nPreserve:\n- Silhouettes and proportions.\n- Necklines and sleeves.\n- Waistlines and hems.\n- Garment layers.\n- Fabric types and textures.\n- Colors and patterns.\n- Stitching and trims.\n- Tights and footwear.\n- Original fashion accessories.\n\nNo redesign.\nNo simplification.\nNo restyling.\nNo additional garment pieces.\nNo removed clothing elements.\nNo changed fabric.\nNo altered color.\nNo changed skirt or dress length.\nNo outfit mixing.\nNo visible wardrobe morphing.\n\nIf an action threatens garment accuracy, reduce the movement.\n\n==================================================\n5. CAMERA, ENVIRONMENT & OPTICAL FOCUS\n==================================================\n\nIMAGE_3 defines the exact station.\n\nPreserve the entire subway environment without alteration.\n\nCAMERA:\nFixed tripod.\nFixed camera height.\nFixed framing.\nFixed lens perspective.\nFixed subject position and scale.\n\nNo camera movement.\nNo zoom.\nNo pan.\nNo tilt.\nNo tracking.\n\nFOCUS:\nKeep the model and complete outfit in clear optical focus.\n\nMaintain the face as the primary sharpness priority.\n\nUse sufficient depth of field to keep the full-body subject acceptably sharp.\n\nDo not shift focus toward the train.\n\nLIGHTING:\nSoft station illumination.\nNatural skin tones.\nClear facial exposure.\nRealistic shadow direction.\nAccurate garment colors.\nNo excessive cinematic haze.\n\n==================================================\n6. TRAIN DESIGN, SPEED & MOTION BLUR\n==================================================\n\nTRAIN_DESIGN_ID = SUBWAY_TRAIN_001\n\nUse the exact same classic silver subway train design as VIDEO 01.\n\nTRAIN EXTERIOR:\nBrushed stainless-steel silver body.\nNeutral metallic silver (#A8ADB2).\nCharcoal window frames (#25292D).\nDark rectangular windows.\nConsistent door and window geometry.\nSame carriage proportions.\nNo advertisements or colorful stripes.\n\nTRAIN MOTION:\nExtremely fast LEFT_TO_RIGHT movement.\nExtreme horizontal motion blur.\nLong metallic streaks.\nHeavily blurred train windows.\nRealistic rapid pass close to the camera.\n\nMotion blur affects ONLY the moving train.\n\nThe model's face, hair, clothing and station must remain sharp whenever visible.\n\nThe train completely covers the entire frame during outfit switching.\n\n==================================================\n7. EXACT SCENE TIMELINE\n==================================================\n\nSCENE 1 | 0.0–0.7s\nCONTINUOUS TRAIN EXIT\n\nBegin with the frame completely covered by a fast-moving silver subway train.\n\nThe train is already moving LEFT_TO_RIGHT.\n\nIts design and visual motion must match the previous video's final train wipe.\n\nThe train rapidly clears to reveal the model wearing IMAGE_1 outfit.\n\nSCENE 2 | 0.7–2.7s\nOUTFIT 03 — FASHION POSE\n\nThe model wears the complete exact outfit from IMAGE_1.\n\nShe performs a graceful natural fashion pose.\n\nShe gently shifts her weight.\nMakes a small shoulder adjustment.\nPositions her hands elegantly.\nLooks confidently toward the camera.\n\nKeep her face sharp and clearly recognizable.\n\nDo not walk.\nDo not rotate the body excessively.\nDo not distort the outfit.\n\nSCENE 3 | 2.7–3.7s\nULTRA-FAST TRAIN WIPE\n\nThe same silver subway train rushes LEFT_TO_RIGHT across the extreme foreground.\n\nStrong horizontal directional motion blur.\n\nThe train completely covers the model and station.\n\nOnly during full occlusion, switch to outfit 04 from IMAGE_2.\n\nNo visible wardrobe transformation.\n\nThe train continues moving and clears the scene.\n\nSCENE 4 | 3.7–6.5s\nOUTFIT 04 — OUTFIT ADJUSTMENT & CUTE SMILE\n\nReveal the model wearing the complete outfit from IMAGE_2.\n\nShe gently looks down.\n\nShe lightly adjusts an existing garment detail, such as the edge of a sleeve or the waistline.\n\nThe adjustment must not change the garment's original design, length, fit, texture or layering.\n\nShe then raises her head and looks directly toward the camera.\n\nShe gives a warm, charming, natural smile.\n\nKeep facial detail exceptionally sharp during the entire expression.\n\nMaintain accurate eye shape, mouth anatomy and facial identity.\n\nAvoid fast head movement or exaggerated facial expressions.\n\nSCENE 5 | 6.5–8.0s\nFINAL TRAIN OCCLUSION\n\nAn identical metallic silver subway train rushes LEFT_TO_RIGHT across the foreground.\n\nVery strong horizontal motion blur.\n\nThe train rapidly covers the entire frame.\n\nEnd while the train continues moving and completely obscures the scene.\n\nFINAL FRAME:\n100% moving train exterior.\nNo model.\nNo station.\nNo fade.\nNo frozen train.\n\n==================================================\n8. MULTI-VIDEO CONTINUITY\n==================================================\n\nThis video must match the visual style and camera geometry of VIDEO 01.\n\nMaintain:\n- Same female identity.\n- Same subway station.\n- Same camera position.\n- Same lighting and color grade.\n- Same metallic train design.\n- Same train speed and direction.\n- Same extreme horizontal motion blur.\n- Same high-detail rendering quality.\n\nThe opening train exit must be compatible with the previous video's final train wipe.\n\nWhen PREVIOUS_END_FRAME is supported, use that frame as the train continuity reference.\n\nDo not restart or reverse the train.\n\nDo not introduce a new camera angle.\n\n==================================================\n9. STRICT NEGATIVE PROMPT\n==================================================\n\nNo blurry face.\nNo soft-focus eyes.\nNo low-resolution facial details.\nNo facial flicker.\nNo changing face shape.\nNo identity drift.\nNo distorted smiles.\nNo plastic skin.\nNo excessive beauty filters.\nNo artificial oversharpening.\nNo global motion blur.\nNo outfit redesign.\nNo altered garment length.\nNo changed materials.\nNo clothing simplification.\nNo disappearing accessories.\nNo changing tights pattern.\nNo changing footwear.\nNo background instability.\nNo moving camera.\nNo zoom.\nNo slow train.\nNo weak train blur.\nNo train design changes.\nNo visible clothing transformation.\nNo duplicated people.\nNo distorted anatomy.\nNo crossfade.\nNo subtitles.\nNo watermarks.\n\nFINAL OUTPUT\n\nAn 8-second ultra-photorealistic 9:16 fashion video with extremely sharp facial detail, stable outfit textures, consistent identity and rapid metallic subway train transitions.\n\nTRAIN EXIT\n→ FASHION POSE / OUTFIT 03\n→ FAST TRAIN WIPE\n→ OUTFIT ADJUSTMENT & CUTE SMILE / OUTFIT 04\n→ FINAL FULL-FRAME TRAIN OCCLUSION.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_6_input_1",
+        "source_node_id": "node_nvSDn87e",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OIOJZZQN",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_1_output_1_5_input_1",
+        "source_node_id": "node_nvSDn87e",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_6NG1f1qA",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_5_input_1",
+        "source_node_id": "node_hn5AWNar",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_6NG1f1qA",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_3_output_1_6_input_1",
+        "source_node_id": "node_F3vX1W0D",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OIOJZZQN",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_4_output_1_5_input_2",
+        "source_node_id": "node_57gcP96R",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_6NG1f1qA",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_4_output_1_6_input_2",
+        "source_node_id": "node_57gcP96R",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_OIOJZZQN",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_5_output_1_9_input_1",
+        "source_node_id": "node_6NG1f1qA",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_2J4mXswq",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_6_output_1_11_input_1",
+        "source_node_id": "node_OIOJZZQN",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_8S1uFoyw",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_7_output_1_11_input_1",
+        "source_node_id": "node_Igmlu2qJ",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_8S1uFoyw",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_7_output_1_9_input_1",
+        "source_node_id": "node_Igmlu2qJ",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_2J4mXswq",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_8_output_1_11_input_1",
+        "source_node_id": "node_N2lai2fN",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_8S1uFoyw",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_8_output_1_9_input_1",
+        "source_node_id": "node_N2lai2fN",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_2J4mXswq",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_9_output_1_12_input_1",
+        "source_node_id": "node_2J4mXswq",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OJcLZiGd",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_10_output_1_9_input_2",
+        "source_node_id": "node_XuqoWp2d",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_2J4mXswq",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_10_output_1_11_input_2",
+        "source_node_id": "node_XuqoWp2d",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_8S1uFoyw",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_11_output_1_12_input_1",
+        "source_node_id": "node_8S1uFoyw",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OJcLZiGd",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_13_output_1_12_input_1",
+        "source_node_id": "node_VQiZxrFN",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OJcLZiGd",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_14_output_1_12_input_1",
+        "source_node_id": "node_IMx8QRZN",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_OJcLZiGd",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_15_output_1_12_input_2",
+        "source_node_id": "node_JX3akEDH",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_OJcLZiGd",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      }
+    ]
+  }
+}

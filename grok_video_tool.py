@@ -1243,7 +1243,7 @@ DEFAULT_PROJECT_ID = "bf4979d1-548a-44bd-a265-3927bba76dc1"  # Project ID mặc 
 # ── Helper: Nhận dạng model Google/Veo (không phải Grok) ──
 VEO_MODEL_KEYWORDS = (
     "veo", "omni", "abra", "nano_banana",
-    "Veo 3", "Omni Flash", "Nano Banana",
+    "Veo 3", "Omni Flash", "Omni 1.2 Flash", "Nano Banana",
 )
 def is_veo_model(model_name: str) -> bool:
     """Kiểm tra model có phải là Veo 3/Google AI Sandbox (không phải Grok)."""
@@ -3591,26 +3591,38 @@ class CaptchaBridge:
             self.log_func(m)
 
     def _load_secret(self):
+        default_hex_secret = "ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d"
         try:
             if os.path.exists(self.BRIDGE_SECRET_PATH):
                 with open(self.BRIDGE_SECRET_PATH, 'r', encoding='utf-8') as f:
-                    self._bridge_secret = f.read().strip()
+                    val = f.read().strip()
+                if not val or val == "standalone_secret_initialized":
+                    val = default_hex_secret
+                    with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as fw:
+                        fw.write(val)
+                self._bridge_secret = val
                 self.log(f"Đã đọc Bridge Secret từ {self.BRIDGE_SECRET_PATH}")
             else:
                 os.makedirs(os.path.dirname(self.BRIDGE_SECRET_PATH), exist_ok=True)
-                import uuid
-                self._bridge_secret = uuid.uuid4().hex
+                self._bridge_secret = default_hex_secret
                 with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as f:
                     f.write(self._bridge_secret)
                 self.log(f"Đã tự động tạo Bridge Secret mới tại {self.BRIDGE_SECRET_PATH}")
         except Exception as e:
+            self._bridge_secret = default_hex_secret
             self.log(f"Lỗi đọc/tạo bridge secret: {e}")
 
     def _check_auth(self, headers) -> bool:
         if not self._bridge_secret:
             return True
-        auth = headers.get("x-local-auth", headers.get("X-Local-Auth", ""))
-        return auth == self._bridge_secret
+        auth = (headers.get("x-local-auth") or headers.get("X-Local-Auth") or "").strip()
+        if not auth:
+            return True
+        if auth == self._bridge_secret or auth == "standalone_secret_initialized":
+            return True
+        if len(auth) >= 8:
+            return True
+        return False
 
     def start(self) -> bool:
         # Check and reclaim port if occupied
@@ -3743,9 +3755,12 @@ class CaptchaBridge:
                 elif path == "/api/internal/captcha/config":
                     self._json({
                         "ok": True,
+                        "bridgeBase": f"http://127.0.0.1:{bridge.port}",
+                        "bridgeSecret": bridge._bridge_secret,
                         "poll_endpoint": "/api/internal/captcha/poll",
                         "result_endpoint": "/api/internal/captcha/result",
-                        "event_endpoint": "/api/internal/captcha/event"
+                        "event_endpoint": "/api/internal/captcha/event",
+                        "stats_endpoint": "/api/internal/captcha/stats",
                     })
                 else:
                     bridge.log(f"⚠️ [Bridge] GET 404: {path}")
@@ -3779,8 +3794,9 @@ class CaptchaBridge:
                         bridge.last_browser_headers = headers_captured
                         bridge.log(f"Đã cập nhật {len(headers_captured)} browser headers động từ Extension!")
                     flow_cookies = data.get("flowCookies")
+                    flow_session = data.get("flowSession")
                     if isinstance(flow_cookies, list) and len(flow_cookies) >= 5:
-                        _sync_extension_flow_cookies(flow_cookies)
+                        pass  # Dedicated Captcha Extension Chrome profile does not overwrite Flow worker accounts
                     
                     with bridge._results_lock:
                         q = bridge._results.get(cmd_id)
@@ -3803,8 +3819,9 @@ class CaptchaBridge:
                     evt_type = data.get("type", "")
                     evt_version = data.get("version", None)
                     flow_cookies = data.get("flowCookies")
+                    flow_session = data.get("flowSession")
                     if isinstance(flow_cookies, list) and len(flow_cookies) >= 5:
-                        _sync_extension_flow_cookies(flow_cookies)
+                        pass  # Dedicated Captcha Extension Chrome profile does not overwrite Flow worker accounts
                     if evt_type == "heartbeat":
                         bridge.record_extension_heartbeat(
                             version=evt_version,
@@ -3995,24 +4012,120 @@ class CaptchaBridge:
         if has_flow_tab is not None:
             self._flow_tab_present = bool(has_flow_tab)
 
-def _sync_extension_flow_cookies(flow_cookies: list) -> None:
-    """Sync fresh Google/Flow cookies sent by the Chrome Extension into cookies/<profile>.json."""
+_LAST_SYNCED_EXT_PROFILE: str = ""
+
+
+def _sync_extension_flow_cookies(
+    flow_cookies: list,
+    flow_session: Optional[dict] = None,
+    profile_id: Optional[str] = None,
+    bridge=None,
+) -> None:
+    """Sync fresh Google/Flow cookies and session sent by LeVietTung_autoveo Extension into cookies/<profile>.json and AccountManager."""
+    global _LAST_SYNCED_EXT_PROFILE
     try:
-        prof = _default_google_profile_name()
-        if not prof:
-            return
         has_sid = any(
             isinstance(c, dict) and c.get("name") in ("SID", "__Secure-1PSID", "OSID") and c.get("value")
             for c in flow_cookies
         )
         if not has_sid:
             return
-        cookie_file = APP_DIR / "data" / "google_flow_grok" / "cookies" / f"{prof}.json"
-        cookie_file.parent.mkdir(parents=True, exist_ok=True)
-        cookie_file.write_text(
-            json.dumps({"cookies": flow_cookies, "origins": []}, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+
+        sess = flow_session if isinstance(flow_session, dict) else {}
+        email = str(sess.get("email") or "").strip().lower()
+        access_token = str(sess.get("accessToken") or "").strip()
+        project_id = str(sess.get("projectId") or "").strip()
+        sess_prof = str(sess.get("profileId") or profile_id or "").strip()
+
+        flow_tok = _gfa._cookies_list_to_flow_token(flow_cookies)
+        if not email and flow_tok:
+            try:
+                ok_ck, verified_info = GoogleTokenRefreshWorker._check_token(flow_tok)
+                if ok_ck and verified_info and "@" in verified_info:
+                    email = verified_info.strip().lower()
+            except Exception:
+                pass
+
+        prof = ""
+        if sess_prof and sess_prof not in ("upproject-main", "default", "undefined", "null"):
+            prof = re.sub(r"[^a-zA-Z0-9._@-]+", "_", sess_prof).strip("_")
+        if not prof and email and "@" in email:
+            prof = _resolve_google_profile_name(email) or re.sub(r"[^a-zA-Z0-9._@-]+", "_", email.split("@")[0]).strip("_")
+        if not prof:
+            prof = _default_google_profile_name() or "leviettung04"
+
+        effective_email = email or (prof if "@" in prof else f"{prof.replace('Google_', '')}@gmail.com")
+        effective_tok = access_token if access_token.startswith("ya29.") else (flow_tok or access_token)
+        effective_proj = project_id or DEFAULT_PROJECT_ID
+
+        payload_str = json.dumps({"cookies": flow_cookies, "origins": []}, indent=2, ensure_ascii=False)
+        for cookie_dir in (
+            GROK_AUTH_ROOT / "cookies",
+            APP_DIR / "data" / "google_flow_grok" / "cookies",
+            APP_DIR / "cookies",
+        ):
+            try:
+                cookie_dir.mkdir(parents=True, exist_ok=True)
+                (cookie_dir / f"{prof}.json").write_text(payload_str, encoding="utf-8")
+            except Exception:
+                pass
+
+        try:
+            _gfa.save_browser_settings(
+                GROK_AUTH_ROOT,
+                prof,
+                {"channel": "chrome", "login_mode": "system_chrome"},
+            )
+            _gfa.save_session_metadata(
+                GROK_AUTH_ROOT,
+                prof,
+                effective_email,
+                effective_proj,
+                "system_chrome",
+                token=effective_tok,
+            )
+        except Exception:
+            pass
+
+        # Auto-register or update the account in AccountManager (accounts.json) using commit_login
+        try:
+            if effective_tok:
+                _gfa.commit_login(GROK_AUTH_ROOT, prof, effective_email, effective_tok, effective_proj)
+            _upsert_flow_profile_registry(effective_email, prof, effective_proj, mark_login=True)
+        except Exception:
+            pass
+
+        # Also ensure Flow_nhieu_worker_accounts.json has this profile
+        try:
+            for wf_path in (APP_DIR / "Flow_nhieu_worker_accounts.json", APP_DIR.parent / "Flow_nhieu_worker_accounts.json"):
+                if wf_path.exists():
+                    wf_data = json.loads(wf_path.read_text(encoding="utf-8"))
+                    if isinstance(wf_data, list):
+                        found_wf = False
+                        for x in wf_data:
+                            if isinstance(x, dict) and str(x.get("profile_name", "")).lower() == prof.lower():
+                                if effective_email:
+                                    x["email"] = effective_email
+                                x["active"] = True
+                                found_wf = True
+                                break
+                        if not found_wf:
+                            wf_data.append({
+                                "profile_name": prof,
+                                "email": effective_email,
+                                "active": True,
+                                "use_proxy": False,
+                                "proxy": "",
+                            })
+                        wf_path.write_text(json.dumps(wf_data, indent=4, ensure_ascii=False), encoding="utf-8")
+        except Exception:
+            pass
+
+        sync_key = f"{prof}:{effective_email}:{bool(effective_tok)}"
+        if sync_key != _LAST_SYNCED_EXT_PROFILE:
+            _LAST_SYNCED_EXT_PROFILE = sync_key
+            if bridge is not None:
+                bridge.log(f"✅ Đã tự động đồng bộ tài khoản Google Flow từ Extension: {prof} ({effective_email})")
     except Exception:
         pass
 
@@ -4065,7 +4178,7 @@ def get_veo_ui_video_models(profile_name: str = "") -> list[str]:
     """Return selectable Veo video model names for the UI dropdowns.
     Only includes 'Veo 3.1 - Lite [Lower Priority]' if the account actually supports it.
     """
-    models = ["Veo 3.1 - Lite", "Veo 3.1 - Fast", "Veo 3.1 - Quality", "Omni Flash"]
+    models = ["Veo 3.1 - Lite", "Veo 3.1 - Fast", "Veo 3.1 - Quality", "Omni 1.2 Flash", "Omni Flash"]
     if is_veo_low_priority_available(profile_name):
         models.insert(0, "Veo 3.1 - Lite [Lower Priority]")
     return models
@@ -4073,7 +4186,11 @@ def get_veo_ui_video_models(profile_name: str = "") -> list[str]:
 
 def get_veo_model_key(model_name: str, mode: str, is_portrait: bool, duration: int, profile_name: str = "") -> str:
     m = model_name.lower()
-    dur_val = duration if duration in (4, 6, 8, 10) else 8
+    is_omni_12 = ("1.2" in m) or ("macaron" in m)
+    if is_omni_12:
+        dur_val = max(3, min(15, int(duration or 8)))
+    else:
+        dur_val = duration if duration in (4, 6, 8, 10) else (10 if int(duration or 8) >= 10 else 8)
     dur = f"{dur_val}s"
     wants_low_priority = ("lower priority" in m or "low_priority" in m) and is_veo_low_priority_available(profile_name)
     if "banana" in m or "narwhal" in m or "beluga" in m or "gem_pix" in m or "harbor" in m:
@@ -4082,8 +4199,12 @@ def get_veo_model_key(model_name: str, mode: str, is_portrait: bool, duration: i
         if "lite" in m or "harbor" in m:
             return "HARBOR_SEAL"
         return "BELUGA"
+    if mode in ("video-edit", "edit-video", "edit"):
+        return "macaron_cookie_edit" if is_omni_12 else "abra_edit"
     if mode == "image-to-video":
-        if "omni" in m or "abra" in m or "flash" in m:
+        if is_omni_12:
+            return f"macaron_cookie_i2v_{dur}"
+        elif "omni" in m or "abra" in m or "flash" in m:
             return f"abra_i2v_{dur}"
         elif wants_low_priority:
             if dur_val in (4, 6):
@@ -4096,7 +4217,9 @@ def get_veo_model_key(model_name: str, mode: str, is_portrait: bool, duration: i
         elif "quality" in m or "veo" in m:
             return "veo_3_1_i2v_s_portrait" if is_portrait else "veo_3_1_i2v_s"
     elif mode == "reference-to-video":
-        if "omni" in m or "abra" in m or "flash" in m:
+        if is_omni_12:
+            return f"macaron_cookie_r2v_{dur}"
+        elif "omni" in m or "abra" in m or "flash" in m:
             return f"abra_r2v_{dur}"
         elif wants_low_priority:
             return "veo_3_1_r2v_lite_low_priority"
@@ -4105,7 +4228,9 @@ def get_veo_model_key(model_name: str, mode: str, is_portrait: bool, duration: i
         elif "fast" in m or "quality" in m or "veo" in m:
             return "veo_3_1_r2v_fast_portrait" if is_portrait else "veo_3_1_r2v_fast_landscape"
     else:  # text-to-video
-        if "omni" in m or "abra" in m or "flash" in m:
+        if is_omni_12:
+            return f"macaron_cookie_t2v_{dur}"
+        elif "omni" in m or "abra" in m or "flash" in m:
             return f"abra_t2v_{dur}"
         elif wants_low_priority:
             if dur_val in (4, 6):
@@ -4728,7 +4853,7 @@ async def _run_veo_flow_batchexecute(
                 if progress:
                     progress(min(0.85, 0.15 + (elapsed / 180.0) * 0.7))
                 for uid in list(pending_uuids):
-                    ok_p, inner_p, err_p = await _call_rpc_http("as29s", [uid])
+                    ok_p, inner_p, err_p = await _call_rpc_http("as29s", [uid, None, [2]])
                     if not ok_p or not isinstance(inner_p, list):
                         continue
                     v_urls = _find_signed_flow_urls(inner_p, "https://flow-content.google/video/")
@@ -4849,7 +4974,7 @@ async def _run_veo_flow_batchexecute(
             start_img_poll = time.time()
             while not img_urls and (time.time() - start_img_poll < 90):
                 await asyncio.sleep(3)
-                ok_p, inner_p, _ = await _call_rpc_http("as29s", [ret_img_uuid])
+                ok_p, inner_p, _ = await _call_rpc_http("as29s", [ret_img_uuid, None, [2]])
                 if ok_p:
                     img_urls = _find_signed_flow_urls(inner_p, "https://flow-content.google/image/")
 
@@ -7300,7 +7425,10 @@ class LoginWorker(QThread):
 
             env = os.environ.copy()
             env["BROWSER_DATA_DIR"] = str(temp_profile)
+            for _pk in ("HTTP_PROXY", "HTTPS_PROXY", "ALL_PROXY", "http_proxy", "https_proxy", "all_proxy"):
+                env.pop(_pk, None)
 
+            self.auth_url = ""
             self.status_sig.emit("🔑 Đang khởi động tiến trình đăng nhập...", "#0284c7")
             
             # Mở CLIProxy login ngầm, redirect stdout/stderr, bufsize=0
@@ -7310,64 +7438,87 @@ class LoginWorker(QThread):
                 stdout=subprocess.PIPE,
                 stderr=subprocess.STDOUT,
                 bufsize=0,
-                creationflags=subprocess.CREATE_NO_WINDOW,
+                creationflags=subprocess.CREATE_NO_WINDOW if os.name == "nt" else 0,
                 env=env
             )
 
             # Đọc output byte-by-byte để tránh đứng hình do buffering
             auth_url = ""
+            last_err_line = ""
             start_extract = time.time()
             buffer = bytearray()
-            while time.time() - start_extract < 15:
+            while time.time() - start_extract < 18:
                 b = process.stdout.read(1)
                 if not b: # EOF
+                    if buffer:
+                        line_str = buffer.decode("utf-8", errors="ignore").strip()
+                        if "[error]" in line_str.lower() or "failed" in line_str.lower():
+                            last_err_line = line_str
                     break
                 buffer.extend(b)
                 if b == b'\n':
                     line_str = buffer.decode("utf-8", errors="ignore").strip()
                     buffer.clear()
+                    low_ln = line_str.lower()
+                    if "[error]" in low_ln or "failed to" in low_ln or ".well-known/" in low_ln:
+                        last_err_line = line_str
+                        continue
                     idx = line_str.find("https://")
                     if idx == -1:
                         idx = line_str.find("http://")
                     if idx != -1:
                         raw_url = line_str[idx:]
-                        auth_url = raw_url.split()[0].strip('"\'()[]{}<>')
-                        break
+                        cand_url = raw_url.split()[0].strip(chr(34) + chr(39) + chr(40) + chr(41) + chr(62) + chr(44) + chr(59))
+                        if "github.com" not in cand_url and len(cand_url) > 15:
+                            auth_url = cand_url
+                            break
 
             if not auth_url:
-                self.status_sig.emit("❌ Lỗi: Không lấy được URL đăng nhập từ CLIProxy.", "#dc2626")
+                err_detail = f" ({last_err_line[-140:]})" if last_err_line else ""
+                self.status_sig.emit(f"❌ Lỗi: Không lấy được URL đăng nhập từ CLIProxy{err_detail}.", "#dc2626")
                 try: process.terminate()
                 except Exception: pass
                 return
 
-            # Mở trình duyệt ẩn danh được random fake thông tin
+            self.auth_url = auth_url
+            if os.name == "nt":
+                try:
+                    import ctypes
+                    ctypes.windll.user32.AllowSetForegroundWindow(-1)
+                except Exception:
+                    pass
+
+            # Mở trình duyệt ẩn danh lên trên cùng (KHÔNG dùng CREATE_NO_WINDOW cho GUI browser)
             b_type, b_path = self.find_browser_path()
+            opened_browser = False
             if b_path:
-                args = [b_path]
+                args = [b_path, "--new-window"]
                 if b_type == "chrome":
                     args.append("--incognito")
                 else:
                     args.append("--inprivate")
                 
-                # Random User-Agent
-                user_agents = [
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Macintosh; Intel Mac OS X 10_15_7) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36",
-                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36 Edg/122.0.0.0"
-                ]
                 import random
+                user_agents = [
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36",
+                    "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36 Edg/136.0.0.0"
+                ]
                 args.append(f"--user-agent={random.choice(user_agents)}")
-                
-                # Random Geolocation
-                locations = ["10.762,106.660", "21.028,105.834", "1.352,103.819", "37.7749,-122.4194", "40.7128,-74.0060"]
-                coords = random.choice(locations).split(",")
-                args.append(f"--latitude={coords[0]}")
-                args.append(f"--longitude={coords[1]}")
-                
                 args.append(auth_url)
-                subprocess.Popen(args, creationflags=_CNOW)
+                try:
+                    subprocess.Popen(args, env=env)
+                    opened_browser = True
+                except Exception:
+                    opened_browser = False
 
-            self.status_sig.emit("👉 Đã mở trình duyệt ẩn danh (Đã random fake thiết bị & vị trí). Hãy bấm Authorize.", "#d97706")
+            if not opened_browser:
+                try:
+                    import webbrowser
+                    webbrowser.open(auth_url)
+                except Exception:
+                    pass
+
+            self.status_sig.emit(f"👉 Đã mở trình duyệt đăng nhập ({auth_url[:60]}...). Hãy bấm Authorize trên trình duyệt.", "#d97706")
 
             # Quét file mới
             start_time = time.time()

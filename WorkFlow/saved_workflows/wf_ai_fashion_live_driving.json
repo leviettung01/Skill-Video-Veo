@@ -1,0 +1,442 @@
+{
+  "id": "wf_ai_fashion_live_driving",
+  "_wf_id": "wf_ai_fashion_live_driving",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T09:29:17.000Z",
+  "workflow": {
+    "name": "💃 AI Fashion Live Driving & Motion Control (Nhân Vật + Đồ + Video Ref ➔ Video Mới)",
+    "description": "Hướng dẫn chi tiết quy trình (workflow) tạo video thời trang chuyển động mượt mà theo phong cách Live Driving. Kết hợp kỹ thuật Motion Control để kiểm soát góc quay, dáng người và trang phục chuẩn xác từng khung hình.\n\nAn optimized AI video workflow for fashion showcase. By combining Live Driving and Motion Control, this pipeline ensures consistent character details and garment texture while providing fine-grained control over model movement and camera dynamics in real time.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2
+    },
+    "nodes": [
+      {
+        "node_id": "node_unKk8sly",
+        "node_type": "generate",
+        "node_name": "🖼️ Google Flow Ảnh 2K — Nhân Vật Đã Mặc Bộ Đồ",
+        "pos_x": 878.0,
+        "pos_y": 207.0,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_unKk8sly",
+        "label": "🖼️ Google Flow Ảnh 2K — Nhân Vật Đã Mặc Bộ Đồ",
+        "provider": "flow",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_image_video_generate",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_CTkorSpd",
+        "node_type": "image",
+        "node_name": "👤 Ảnh Tham Chiếu Nhân Vật Gốc (Character Ref)",
+        "pos_x": 274.918,
+        "pos_y": -148.772,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          }
+        ],
+        "id": "node_CTkorSpd",
+        "label": "👤 Ảnh Tham Chiếu Nhân Vật Gốc (Character Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "config": {
+          "slug": "image_video",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_zJ07nXux",
+        "node_type": "image",
+        "node_name": "👗 Ảnh Tham Chiếu Bộ Đồ Tách Nền (Outfit Ref)",
+        "pos_x": 288.63264875926,
+        "pos_y": 576.63264875926,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png"
+          }
+        ],
+        "id": "node_zJ07nXux",
+        "label": "👗 Ảnh Tham Chiếu Bộ Đồ Tách Nền (Outfit Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png",
+        "config": {
+          "slug": "image_video_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_B6AzOqJM",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video — Kết Quả Nhân Vật Mới Nhảy Theo Ref (1080p)",
+        "pos_x": 1719.0,
+        "pos_y": 53.0,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "8s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_B6AzOqJM",
+        "label": "🎬 Google Flow Video — Kết Quả Nhân Vật Mới Nhảy Theo Ref (1080p)",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_image_video_generate_1",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_4pkBYqlu",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Chuyển Giao Chuyển Động Sang Nhân Vật Mới",
+        "pos_x": 1453.0,
+        "pos_y": -271.0,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "TASK: CHARACTER REPLACEMENT WITH REFERENCE-VIDEO MOTION TRANSFER\n\nUse the provided character reference image (IMAGE_1) as the authoritative source for the main character's identity, appearance, and outfit. Use the provided reference video (VIDEO_1) as the authoritative source for the original performance, motion, scene, camera behavior, composition, and timing.\n\nPRIMARY OBJECTIVE\nRecreate VIDEO_1 as faithfully as possible, replacing only the main character with the character from IMAGE_1. The result should appear as though the IMAGE_1 character originally performed the actions in VIDEO_1.\n\nREFERENCE PRIORITY\nIMAGE_1 controls: facial identity, facial structure, hairstyle, skin tone, body proportions, outfit, clothing colors, textures, accessories, and character styling.\nVIDEO_1 controls: action sequence, body motion, poses, gestures, movement direction, spatial position, scene layout, environment, lighting, camera movement, framing, shot transitions, and temporal pacing.\nNever transfer the original actor's face, hairstyle, body identity, or clothing from VIDEO_1 to the replacement character.\n\nSTRICT CHARACTER IDENTITY & OUTFIT LOCK\nPreserve the recognizable facial geometry, eyes, nose, mouth, jawline, hairstyle, skin tone, body shape, and proportions from IMAGE_1 throughout the video.\nMaintain the exact outfit design, silhouette, colors, materials, patterns, accessories, and styling shown in IMAGE_1.\nPreserve character identity during head turns, profile views, full-body movements, partial occlusions, and changes in perspective.\nAllow only natural perspective changes, facial expressions, body articulation, fabric movement, and lighting responses required by the performance.\nDo not redesign, beautify, stylize, morph, or replace the character.\n\nFRAME-ALIGNED MOTION TRANSFER\nFollow VIDEO_1's original action sequence and movement timing as closely as possible.\nMatch the main character's body orientation, posture, limb positions, head direction, gestures, walking direction, movement speed, pauses, and action transitions at corresponding moments.\nPreserve the original performance's rhythm, choreography, and emotional expression.\nAdapt the motion naturally to IMAGE_1's body proportions without changing the intended actions.\nMaintain realistic balance, anatomy, joint articulation, foot placement, contact with surfaces, and physically coherent movement.\nDo not invent additional actions, gestures, turns, or poses.\n\nSTRICT CAMERA & COMPOSITION LOCK\nPreserve VIDEO_1's camera viewpoint, camera height, angle, lens perspective, framing, subject scale, and screen position.\nFollow the original camera motion, including pans, tilts, tracking, zooms, and static shots where applicable.\nKeep the subject's movement path and distance relative to the camera consistent with VIDEO_1.\nPreserve the original shot order and camera transitions.\nDo not introduce new camera angles, reframing, cinematic movements, or unnecessary zooms.\n\nENVIRONMENT & INTERACTION PRESERVATION\nRetain VIDEO_1's original location, background, scene geometry, furniture, props, objects, and overall composition.\nPreserve the original lighting direction, exposure, shadows, color temperature, and atmosphere.\nKeep background objects stationary or moving exactly as required by the reference scene.\nMaintain natural interaction with objects and surfaces, including correct hand contact, object positioning, depth relationships, and occlusion.\nDo not add, remove, replace, or rearrange environmental elements unless strictly necessary to accommodate the replacement character.\n\nTEMPORAL & VISUAL CONSISTENCY\nMaintain stable facial identity, body proportions, outfit details, and environment across consecutive frames.\nEnsure smooth temporal continuity without flickering, face drift, clothing changes, frame-to-frame morphing, duplicated limbs, distorted hands, unnatural joints, sliding feet, or disappearing objects.\nPreserve realistic depth, motion blur, contact shadows, fabric physics, and lighting continuity.\nKeep the replacement character naturally integrated into the original scene.\n\nTIMING & EDITING\nMatch VIDEO_1's total duration, action order, pacing, pauses, and shot transitions as closely as the generation settings allow.\nSynchronize important gestures, body turns, movement starts, movement stops, and scene transitions with their corresponding moments in VIDEO_1.\nDo not insert additional scenes, unnecessary slow motion, speed ramps, or new cuts.\n\nOUTPUT\nGenerate a high-quality, photorealistic live-action video with stable character identity, accurate outfit preservation, natural human movement, coherent anatomy, faithful reference-video motion, and consistent camera and environment.\n\nFINAL PRIORITY\nChange only the identity and appearance of the main character according to IMAGE_1. Preserve VIDEO_1's original performance, choreography, scene, camera behavior, and timing as faithfully as possible. The final result must feel like the original video performed by the IMAGE_1 character, not a newly invented interpretation.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_4pkBYqlu",
+        "label": "📝 Prompt Chuyển Giao Chuyển Động Sang Nhân Vật Mới",
+        "config": {
+          "slug": "prompt",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "TASK: CHARACTER REPLACEMENT WITH REFERENCE-VIDEO MOTION TRANSFER\n\nUse the provided character reference image (IMAGE_1) as the authoritative source for the main character's identity, appearance, and outfit. Use the provided reference video (VIDEO_1) as the authoritative source for the original performance, motion, scene, camera behavior, composition, and timing.\n\nPRIMARY OBJECTIVE\nRecreate VIDEO_1 as faithfully as possible, replacing only the main character with the character from IMAGE_1. The result should appear as though the IMAGE_1 character originally performed the actions in VIDEO_1.\n\nREFERENCE PRIORITY\nIMAGE_1 controls: facial identity, facial structure, hairstyle, skin tone, body proportions, outfit, clothing colors, textures, accessories, and character styling.\nVIDEO_1 controls: action sequence, body motion, poses, gestures, movement direction, spatial position, scene layout, environment, lighting, camera movement, framing, shot transitions, and temporal pacing.\nNever transfer the original actor's face, hairstyle, body identity, or clothing from VIDEO_1 to the replacement character.\n\nSTRICT CHARACTER IDENTITY & OUTFIT LOCK\nPreserve the recognizable facial geometry, eyes, nose, mouth, jawline, hairstyle, skin tone, body shape, and proportions from IMAGE_1 throughout the video.\nMaintain the exact outfit design, silhouette, colors, materials, patterns, accessories, and styling shown in IMAGE_1.\nPreserve character identity during head turns, profile views, full-body movements, partial occlusions, and changes in perspective.\nAllow only natural perspective changes, facial expressions, body articulation, fabric movement, and lighting responses required by the performance.\nDo not redesign, beautify, stylize, morph, or replace the character.\n\nFRAME-ALIGNED MOTION TRANSFER\nFollow VIDEO_1's original action sequence and movement timing as closely as possible.\nMatch the main character's body orientation, posture, limb positions, head direction, gestures, walking direction, movement speed, pauses, and action transitions at corresponding moments.\nPreserve the original performance's rhythm, choreography, and emotional expression.\nAdapt the motion naturally to IMAGE_1's body proportions without changing the intended actions.\nMaintain realistic balance, anatomy, joint articulation, foot placement, contact with surfaces, and physically coherent movement.\nDo not invent additional actions, gestures, turns, or poses.\n\nSTRICT CAMERA & COMPOSITION LOCK\nPreserve VIDEO_1's camera viewpoint, camera height, angle, lens perspective, framing, subject scale, and screen position.\nFollow the original camera motion, including pans, tilts, tracking, zooms, and static shots where applicable.\nKeep the subject's movement path and distance relative to the camera consistent with VIDEO_1.\nPreserve the original shot order and camera transitions.\nDo not introduce new camera angles, reframing, cinematic movements, or unnecessary zooms.\n\nENVIRONMENT & INTERACTION PRESERVATION\nRetain VIDEO_1's original location, background, scene geometry, furniture, props, objects, and overall composition.\nPreserve the original lighting direction, exposure, shadows, color temperature, and atmosphere.\nKeep background objects stationary or moving exactly as required by the reference scene.\nMaintain natural interaction with objects and surfaces, including correct hand contact, object positioning, depth relationships, and occlusion.\nDo not add, remove, replace, or rearrange environmental elements unless strictly necessary to accommodate the replacement character.\n\nTEMPORAL & VISUAL CONSISTENCY\nMaintain stable facial identity, body proportions, outfit details, and environment across consecutive frames.\nEnsure smooth temporal continuity without flickering, face drift, clothing changes, frame-to-frame morphing, duplicated limbs, distorted hands, unnatural joints, sliding feet, or disappearing objects.\nPreserve realistic depth, motion blur, contact shadows, fabric physics, and lighting continuity.\nKeep the replacement character naturally integrated into the original scene.\n\nTIMING & EDITING\nMatch VIDEO_1's total duration, action order, pacing, pauses, and shot transitions as closely as the generation settings allow.\nSynchronize important gestures, body turns, movement starts, movement stops, and scene transitions with their corresponding moments in VIDEO_1.\nDo not insert additional scenes, unnecessary slow motion, speed ramps, or new cuts.\n\nOUTPUT\nGenerate a high-quality, photorealistic live-action video with stable character identity, accurate outfit preservation, natural human movement, coherent anatomy, faithful reference-video motion, and consistent camera and environment.\n\nFINAL PRIORITY\nChange only the identity and appearance of the main character according to IMAGE_1. Preserve VIDEO_1's original performance, choreography, scene, camera behavior, and timing as faithfully as possible. The final result must feel like the original video performed by the IMAGE_1 character, not a newly invented interpretation.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "TASK: CHARACTER REPLACEMENT WITH REFERENCE-VIDEO MOTION TRANSFER\n\nUse the provided character reference image (IMAGE_1) as the authoritative source for the main character's identity, appearance, and outfit. Use the provided reference video (VIDEO_1) as the authoritative source for the original performance, motion, scene, camera behavior, composition, and timing.\n\nPRIMARY OBJECTIVE\nRecreate VIDEO_1 as faithfully as possible, replacing only the main character with the character from IMAGE_1. The result should appear as though the IMAGE_1 character originally performed the actions in VIDEO_1.\n\nREFERENCE PRIORITY\nIMAGE_1 controls: facial identity, facial structure, hairstyle, skin tone, body proportions, outfit, clothing colors, textures, accessories, and character styling.\nVIDEO_1 controls: action sequence, body motion, poses, gestures, movement direction, spatial position, scene layout, environment, lighting, camera movement, framing, shot transitions, and temporal pacing.\nNever transfer the original actor's face, hairstyle, body identity, or clothing from VIDEO_1 to the replacement character.\n\nSTRICT CHARACTER IDENTITY & OUTFIT LOCK\nPreserve the recognizable facial geometry, eyes, nose, mouth, jawline, hairstyle, skin tone, body shape, and proportions from IMAGE_1 throughout the video.\nMaintain the exact outfit design, silhouette, colors, materials, patterns, accessories, and styling shown in IMAGE_1.\nPreserve character identity during head turns, profile views, full-body movements, partial occlusions, and changes in perspective.\nAllow only natural perspective changes, facial expressions, body articulation, fabric movement, and lighting responses required by the performance.\nDo not redesign, beautify, stylize, morph, or replace the character.\n\nFRAME-ALIGNED MOTION TRANSFER\nFollow VIDEO_1's original action sequence and movement timing as closely as possible.\nMatch the main character's body orientation, posture, limb positions, head direction, gestures, walking direction, movement speed, pauses, and action transitions at corresponding moments.\nPreserve the original performance's rhythm, choreography, and emotional expression.\nAdapt the motion naturally to IMAGE_1's body proportions without changing the intended actions.\nMaintain realistic balance, anatomy, joint articulation, foot placement, contact with surfaces, and physically coherent movement.\nDo not invent additional actions, gestures, turns, or poses.\n\nSTRICT CAMERA & COMPOSITION LOCK\nPreserve VIDEO_1's camera viewpoint, camera height, angle, lens perspective, framing, subject scale, and screen position.\nFollow the original camera motion, including pans, tilts, tracking, zooms, and static shots where applicable.\nKeep the subject's movement path and distance relative to the camera consistent with VIDEO_1.\nPreserve the original shot order and camera transitions.\nDo not introduce new camera angles, reframing, cinematic movements, or unnecessary zooms.\n\nENVIRONMENT & INTERACTION PRESERVATION\nRetain VIDEO_1's original location, background, scene geometry, furniture, props, objects, and overall composition.\nPreserve the original lighting direction, exposure, shadows, color temperature, and atmosphere.\nKeep background objects stationary or moving exactly as required by the reference scene.\nMaintain natural interaction with objects and surfaces, including correct hand contact, object positioning, depth relationships, and occlusion.\nDo not add, remove, replace, or rearrange environmental elements unless strictly necessary to accommodate the replacement character.\n\nTEMPORAL & VISUAL CONSISTENCY\nMaintain stable facial identity, body proportions, outfit details, and environment across consecutive frames.\nEnsure smooth temporal continuity without flickering, face drift, clothing changes, frame-to-frame morphing, duplicated limbs, distorted hands, unnatural joints, sliding feet, or disappearing objects.\nPreserve realistic depth, motion blur, contact shadows, fabric physics, and lighting continuity.\nKeep the replacement character naturally integrated into the original scene.\n\nTIMING & EDITING\nMatch VIDEO_1's total duration, action order, pacing, pauses, and shot transitions as closely as the generation settings allow.\nSynchronize important gestures, body turns, movement starts, movement stops, and scene transitions with their corresponding moments in VIDEO_1.\nDo not insert additional scenes, unnecessary slow motion, speed ramps, or new cuts.\n\nOUTPUT\nGenerate a high-quality, photorealistic live-action video with stable character identity, accurate outfit preservation, natural human movement, coherent anatomy, faithful reference-video motion, and consistent camera and environment.\n\nFINAL PRIORITY\nChange only the identity and appearance of the main character according to IMAGE_1. Preserve VIDEO_1's original performance, choreography, scene, camera behavior, and timing as faithfully as possible. The final result must feel like the original video performed by the IMAGE_1 character, not a newly invented interpretation.",
+          "ai_used": false
+        }
+      },
+      {
+        "node_id": "node_CZwawip7",
+        "node_type": "video",
+        "node_name": "📹 Video Tham Chiếu Chuyển Động Gốc (Motion Ref 8s)",
+        "pos_x": 1206.0,
+        "pos_y": 575.0,
+        "enabled": true,
+        "slug": "image_video_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          }
+        ],
+        "id": "node_CZwawip7",
+        "label": "📹 Video Tham Chiếu Chuyển Động Gốc (Motion Ref 8s)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+        "config": {
+          "slug": "image_video_3",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        },
+        "media_type": "Video"
+      },
+      {
+        "node_id": "node_cw0Ry310",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Character Sheet Nhân Vật Mặc Đồ",
+        "pos_x": 861.0,
+        "pos_y": -205.0,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "# TASK: GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_cw0Ry310",
+        "label": "📝 Prompt Tạo Character Sheet Nhân Vật Mặc Đồ",
+        "config": {
+          "slug": "prompt_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "# TASK: GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "# TASK: GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.",
+          "ai_used": false
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_4_input_1",
+        "source_node_id": "node_unKk8sly",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_B6AzOqJM",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_2_output_1_1_input_1",
+        "source_node_id": "node_CTkorSpd",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_unKk8sly",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_3_output_1_1_input_1",
+        "source_node_id": "node_zJ07nXux",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_unKk8sly",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_5_output_1_4_input_2",
+        "source_node_id": "node_4pkBYqlu",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_B6AzOqJM",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_6_output_1_4_input_3",
+        "source_node_id": "node_CZwawip7",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_B6AzOqJM",
+        "target_handle": "input_3",
+        "target_port": "video_ref",
+        "data_type": "video",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_7_output_1_1_input_2",
+        "source_node_id": "node_cw0Ry310",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_unKk8sly",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_node_B6AzOqJM",
+        "node_id": "node_B6AzOqJM",
+        "label": "🎬 Google Flow Video — Kết Quả Nhân Vật Mới Nhảy Theo Ref (1080p)",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_livedriving_out_1080p.mp4",
+        "duration": "8s"
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\wf_ai_fashion_live_driving_final_1080p.mp4",
+    "batch_history": []
+  }
+}

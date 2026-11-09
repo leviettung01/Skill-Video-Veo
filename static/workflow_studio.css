@@ -1,0 +1,975 @@
+/* ═══════════════════════════════════════════════════════════════════════════
+   ⚡ LÊ VIỆT TÙNG — SKILLAUTOVEO WORKFLOW STUDIO PRO (THUẦN VIỆT + MUSEFLOW + GOOGLE FLOW)
+   Giao diện Sơ Đồ Nối Dây Trực Quan — Hỗ trợ Ảnh 2K, Video Tham Chiếu, Xem Full,
+   Menu Chuột Phải Đa Ngữ Cảnh, Kịch Bản ➔ Node, và Timeline Ghép Cảnh Xuất MP4.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+#tab-workflow.active {
+  display: flex;
+  flex-direction: column;
+  height: calc(100vh - 78px);
+  padding: 0 !important;
+  overflow: hidden;
+  background: #070910;
+  user-select: none;
+}
+
+/* ── 1. THANH CÔNG CỤ TRÊN CÙNG (TOPBAR THUẦN VIỆT) ── */
+.wf-topbar {
+  min-height: 50px;
+  background: linear-gradient(180deg, #111522 0%, #0b0e17 100%);
+  border-bottom: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 14px;
+  gap: 10px;
+  flex-shrink: 0;
+  z-index: 30;
+  flex-wrap: wrap;
+}
+
+.wf-topbar-left,
+.wf-topbar-right {
+  display: flex;
+  align-items: center;
+  gap: 7px;
+  flex-wrap: wrap;
+}
+
+.wf-brand-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 7px;
+  padding: 5px 11px;
+  border-radius: 9px;
+  background: linear-gradient(135deg, rgba(16, 185, 129, 0.18), rgba(99, 102, 241, 0.18));
+  border: 1px solid rgba(16, 185, 129, 0.45);
+  box-shadow: 0 4px 14px rgba(16, 185, 129, 0.12);
+}
+
+.wf-stat-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 5px;
+  padding: 4px 10px;
+  border-radius: 8px;
+  background: #151928;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  font-size: 11.5px;
+  color: #cbd5e1;
+  font-weight: 600;
+}
+
+.wf-stat-pill b {
+  color: #34d399;
+  font-family: Consolas, monospace;
+}
+
+/* ── 2. KHÔNG GIAN LÀM VIỆC CHÍNH (WORKSPACE & VIEWPORT) ── */
+.wf-workspace {
+  position: relative;
+  flex: 1;
+  display: flex;
+  overflow: hidden;
+  background: #070910;
+  min-height: 0;
+}
+
+.wf-viewport {
+  position: relative;
+  flex: 1;
+  height: 100%;
+  overflow: hidden;
+  cursor: grab;
+  background-color: #07090f;
+  background-image:
+    radial-gradient(rgba(148, 163, 184, 0.15) 1px, transparent 1px),
+    linear-gradient(to right, rgba(255, 255, 255, 0.015) 1px, transparent 1px),
+    linear-gradient(to bottom, rgba(255, 255, 255, 0.015) 1px, transparent 1px);
+  background-size: 24px 24px, 120px 120px, 120px 120px;
+}
+
+.wf-viewport.panning {
+  cursor: grabbing;
+}
+
+.wf-viewport.grouping {
+  cursor: crosshair;
+}
+
+.wf-transform-stage {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8000px;
+  height: 8000px;
+  transform-origin: 0 0;
+  pointer-events: none;
+}
+
+.wf-groups-layer,
+.wf-notes-layer,
+.wf-nodes-layer {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8000px;
+  height: 8000px;
+  pointer-events: none;
+}
+
+.wf-groups-layer { z-index: 1; }
+.wf-edges-svg {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 8000px;
+  height: 8000px;
+  overflow: visible;
+  pointer-events: none;
+  z-index: 2;
+}
+.wf-notes-layer { z-index: 3; }
+.wf-nodes-layer { z-index: 4; }
+
+/* ── 3. DÂY NỐI (EDGES / WIRES) ── */
+.wf-edge-hit {
+  fill: none;
+  stroke: transparent;
+  stroke-width: 16px;
+  pointer-events: stroke;
+  cursor: pointer;
+}
+
+.wf-edge-path {
+  fill: none;
+  stroke: #6366f1;
+  stroke-width: 2.5px;
+  pointer-events: none;
+  transition: stroke 0.15s, stroke-width 0.15s, filter 0.15s;
+}
+
+.wf-edge-group:hover .wf-edge-path {
+  stroke: #a3e635;
+  stroke-width: 3.8px;
+  filter: drop-shadow(0 0 6px rgba(163, 230, 53, 0.7));
+}
+
+.wf-edge-path.edge-image {
+  stroke: #818cf8;
+}
+
+.wf-edge-path.edge-video {
+  stroke: #f472b6;
+}
+
+.wf-edge-path.edge-text {
+  stroke: #38bdf8;
+}
+
+.wf-edge-path.edge-running {
+  stroke: #a3e635;
+  stroke-dasharray: 8 5;
+  animation: wfEdgeDash 0.65s linear infinite;
+}
+
+@keyframes wfEdgeDash {
+  to { stroke-dashoffset: -26; }
+}
+
+/* ── 4. KHUNG NHÓM VÙNG (GROUPS — PHÍM G) & GHI CHÚ DÁN (STICKY NOTES — PHÍM T) ── */
+.wf-group-box {
+  position: absolute;
+  border: 2px dashed rgba(99, 102, 241, 0.55);
+  background: rgba(99, 102, 241, 0.05);
+  border-radius: 16px;
+  pointer-events: none;
+  transition: border-color 0.15s;
+}
+
+.wf-group-box:hover {
+  border-color: rgba(163, 230, 53, 0.75);
+}
+
+.wf-group-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 6px 12px;
+  background: rgba(99, 102, 241, 0.22);
+  border-bottom: 1px solid rgba(99, 102, 241, 0.35);
+  border-radius: 14px 14px 0 0;
+  cursor: grab;
+  color: #e0e7ff;
+  font-size: 12px;
+  font-weight: 800;
+  pointer-events: auto;
+}
+
+.wf-sticky-note {
+  position: absolute;
+  width: 220px;
+  min-height: 120px;
+  background: linear-gradient(160deg, rgba(254, 240, 138, 0.16), rgba(234, 179, 8, 0.1));
+  border: 1.5px solid rgba(250, 204, 21, 0.45);
+  border-radius: 12px;
+  box-shadow: 0 10px 28px rgba(0, 0, 0, 0.55);
+  pointer-events: auto;
+  display: flex;
+  flex-direction: column;
+  backdrop-filter: blur(8px);
+}
+
+.wf-sticky-head {
+  padding: 6px 10px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  border-bottom: 1px solid rgba(250, 204, 21, 0.22);
+  cursor: grab;
+  font-size: 11px;
+  font-weight: 800;
+  color: #fde047;
+}
+
+.wf-sticky-body {
+  flex: 1;
+  padding: 8px 10px;
+}
+
+.wf-sticky-body textarea {
+  width: 100%;
+  min-height: 80px;
+  background: transparent;
+  border: none;
+  color: #fef9c3;
+  font-size: 11.5px;
+  line-height: 1.45;
+  resize: vertical;
+  outline: none;
+}
+
+/* ── 5. THẺ NODE CHUYÊN NGHIỆP (PRO INTERACTIVE VIETNAMESE NODE CARD) ── */
+.wf-node-card {
+  position: absolute;
+  width: 265px;
+  background: linear-gradient(170deg, #141826 0%, #0e111b 100%);
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 14px;
+  box-shadow: 0 14px 34px rgba(0, 0, 0, 0.68);
+  pointer-events: auto;
+  cursor: grab;
+  transition: border-color 0.15s, box-shadow 0.15s, transform 0.1s;
+  display: flex;
+  flex-direction: column;
+  user-select: none;
+}
+
+.wf-node-card.wf-node-generate {
+  width: 285px;
+  border-color: rgba(16, 185, 129, 0.32);
+}
+
+.wf-node-card.wf-node-video {
+  border-color: rgba(244, 114, 182, 0.35);
+}
+
+.wf-node-card.wf-node-image {
+  border-color: rgba(99, 102, 241, 0.35);
+}
+
+.wf-node-card.wf-node-prompt {
+  border-color: rgba(56, 189, 248, 0.32);
+}
+
+.wf-node-card:hover {
+  border-color: rgba(163, 230, 53, 0.55);
+  box-shadow: 0 16px 38px rgba(0, 0, 0, 0.8), 0 0 0 1px rgba(163, 230, 53, 0.2);
+}
+
+.wf-node-card.selected {
+  border-color: #a3e635;
+  box-shadow: 0 0 0 2.5px rgba(163, 230, 53, 0.32), 0 18px 42px rgba(0, 0, 0, 0.85);
+}
+
+.wf-node-card.status-running {
+  border-color: #f59e0b;
+  box-shadow: 0 0 22px rgba(245, 158, 11, 0.45);
+}
+
+.wf-node-card.status-done {
+  border-color: rgba(34, 197, 94, 0.68);
+}
+
+.wf-node-card.status-error {
+  border-color: #ef4444;
+  box-shadow: 0 0 18px rgba(239, 68, 68, 0.35);
+}
+
+.wf-node-card.is-disabled {
+  opacity: 0.48;
+  filter: grayscale(0.6);
+}
+
+/* Header của Node */
+.wf-node-head {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+  background: rgba(255, 255, 255, 0.025);
+  border-radius: 13px 13px 0 0;
+}
+
+.wf-node-title-wrap {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  min-width: 0;
+  flex: 1;
+}
+
+.wf-node-type-badge {
+  font-size: 9px;
+  font-weight: 800;
+  padding: 1.5px 5px;
+  border-radius: 5px;
+  background: rgba(255, 255, 255, 0.08);
+  color: #cbd5e1;
+  flex-shrink: 0;
+  text-transform: uppercase;
+}
+
+.wf-node-title {
+  font-size: 11.5px;
+  font-weight: 800;
+  color: #f8fafc;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.wf-node-head-actions {
+  display: flex;
+  align-items: center;
+  gap: 3px;
+  flex-shrink: 0;
+}
+
+.wf-node-mini-btn {
+  width: 22px;
+  height: 22px;
+  border-radius: 6px;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  background: rgba(15, 23, 42, 0.75);
+  color: #cbd5e1;
+  font-size: 10.5px;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  padding: 0;
+  transition: all 0.14s;
+}
+
+.wf-node-mini-btn:hover {
+  background: #a3e635;
+  color: #050811;
+  border-color: #a3e635;
+}
+
+.wf-node-mini-btn.danger:hover {
+  background: #ef4444;
+  color: #fff;
+  border-color: #ef4444;
+}
+
+.wf-node-status-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: #22c55e;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px rgba(34, 197, 94, 0.7);
+}
+.wf-node-status-dot.idle { background: #64748b; box-shadow: none; }
+.wf-node-status-dot.running { background: #f59e0b; box-shadow: 0 0 8px #f59e0b; animation: pulse 1s infinite; }
+.wf-node-status-dot.error { background: #ef4444; box-shadow: 0 0 8px #ef4444; }
+
+/* Body của Node */
+.wf-node-body {
+  padding: 9px 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 7px;
+}
+
+.wf-node-media-box {
+  width: 100%;
+  aspect-ratio: 9 / 16;
+  max-height: 265px;
+  background: #07090e;
+  border: 1px solid rgba(255, 255, 255, 0.09);
+  border-radius: 9px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  position: relative;
+}
+
+.wf-node-media-box.landscape {
+  aspect-ratio: 16 / 9;
+  max-height: 175px;
+}
+
+.wf-node-media-box img,
+.wf-node-media-box video {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
+}
+
+.wf-node-media-overlay {
+  position: absolute;
+  inset: 0;
+  background: linear-gradient(180deg, rgba(0,0,0,0.45) 0%, transparent 35%, transparent 65%, rgba(0,0,0,0.75) 100%);
+  opacity: 0;
+  transition: opacity 0.16s;
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  padding: 7px;
+  pointer-events: none;
+}
+
+.wf-node-media-box:hover .wf-node-media-overlay {
+  opacity: 1;
+}
+
+.wf-node-media-overlay button {
+  pointer-events: auto;
+}
+
+/* Ô nhập văn bản trực tiếp ngay trên Node (Inline Textarea) */
+.wf-node-inline-textarea {
+  width: 100%;
+  min-height: 78px;
+  max-height: 150px;
+  font-size: 11px;
+  line-height: 1.45;
+  color: #e2e8f0;
+  background: #080b12;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  padding: 7px 9px;
+  resize: vertical;
+  font-family: 'Segoe UI', Inter, sans-serif;
+  outline: none;
+}
+
+.wf-node-inline-textarea:focus {
+  border-color: #38bdf8;
+  box-shadow: 0 0 0 2px rgba(56, 189, 248, 0.18);
+}
+
+/* Hàng điều khiển nhanh trực tiếp trên Node (Model / Tỷ lệ / Thời lượng) */
+.wf-node-inline-controls {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  align-items: center;
+}
+
+.wf-node-inline-select {
+  background: #0a0d16;
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #e2e8f0;
+  font-size: 10px;
+  font-weight: 700;
+  padding: 3px 6px;
+  border-radius: 6px;
+  flex: 1;
+  min-width: 70px;
+  cursor: pointer;
+}
+
+.wf-node-action-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 5px;
+  padding-top: 4px;
+  border-top: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.wf-node-btn-full {
+  flex: 1;
+  padding: 4px 7px;
+  border-radius: 6px;
+  background: rgba(56, 189, 248, 0.14);
+  border: 1px solid rgba(56, 189, 248, 0.38);
+  color: #7dd3fc;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.14s;
+}
+
+.wf-node-btn-full:hover {
+  background: #0284c7;
+  color: #fff;
+}
+
+.wf-node-btn-run {
+  padding: 4px 9px;
+  border-radius: 6px;
+  background: rgba(163, 230, 53, 0.18);
+  border: 1px solid rgba(163, 230, 53, 0.48);
+  color: #bef264;
+  font-size: 10.5px;
+  font-weight: 800;
+  cursor: pointer;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 4px;
+  transition: all 0.14s;
+}
+
+.wf-node-btn-run:hover {
+  background: #a3e635;
+  color: #050811;
+}
+
+.wf-node-foot {
+  padding: 5px 10px 7px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  font-size: 9.5px;
+  color: #94a3b8;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 0 0 13px 13px;
+}
+
+/* ── 6. CỔNG NỐI DÂY (PORTS CÓ NHÃN TIẾNG VIỆT TRỰC QUAN) ── */
+.wf-port {
+  position: absolute;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #191d2b;
+  border: 2px solid #64748b;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 9.5px;
+  font-weight: 900;
+  cursor: crosshair;
+  z-index: 8;
+  transition: transform 0.12s, background 0.12s, border-color 0.12s, box-shadow 0.12s;
+}
+
+.wf-port:hover,
+.wf-port.port-active {
+  transform: scale(1.32);
+  background: #a3e635;
+  border-color: #ecfccb;
+  color: #050811;
+  box-shadow: 0 0 12px rgba(163, 230, 53, 0.9);
+}
+
+.wf-port-label {
+  position: absolute;
+  white-space: nowrap;
+  background: rgba(15, 23, 42, 0.94);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: #f8fafc;
+  font-size: 9.5px;
+  font-weight: 700;
+  padding: 2px 6px;
+  border-radius: 5px;
+  pointer-events: none;
+  opacity: 0;
+  transition: opacity 0.14s;
+  box-shadow: 0 4px 10px rgba(0, 0, 0, 0.6);
+}
+
+.wf-node-card:hover .wf-port-label,
+.wf-port:hover .wf-port-label {
+  opacity: 1;
+}
+
+.wf-port-in-media {
+  left: -11px;
+  top: 38%;
+  border-color: #818cf8;
+  color: #a5b4fc;
+}
+.wf-port-in-media .wf-port-label {
+  right: 24px;
+}
+
+.wf-port-in-text {
+  left: -11px;
+  top: 68%;
+  border-color: #38bdf8;
+  color: #7dd3fc;
+}
+.wf-port-in-text .wf-port-label {
+  right: 24px;
+}
+
+.wf-port-out {
+  right: -11px;
+  top: 52%;
+  border-color: #a3e635;
+  color: #bef264;
+}
+.wf-port-out .wf-port-label {
+  left: 24px;
+}
+
+/* ── 7. THANH CÔNG CỤ NỔI BÊN TRÁI (LEFT FLOATING DOCK) ── */
+.wf-left-dock {
+  position: absolute;
+  left: 14px;
+  top: 50%;
+  transform: translateY(-50%);
+  background: rgba(15, 18, 28, 0.95);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  border-radius: 22px;
+  padding: 8px 6px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 5px;
+  z-index: 20;
+  box-shadow: 0 14px 36px rgba(0, 0, 0, 0.72);
+  backdrop-filter: blur(12px);
+}
+
+.wf-dock-btn {
+  width: 34px;
+  height: 34px;
+  border-radius: 50%;
+  border: 1px solid transparent;
+  background: transparent;
+  color: #cbd5e1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+
+.wf-dock-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #ffffff;
+  transform: scale(1.08);
+}
+
+.wf-dock-btn.active {
+  background: rgba(163, 230, 53, 0.22);
+  color: #a3e635;
+  border-color: rgba(163, 230, 53, 0.5);
+}
+
+.wf-dock-btn.add-primary {
+  background: #a3e635;
+  color: #050811;
+  font-weight: 900;
+  font-size: 18px;
+  box-shadow: 0 0 14px rgba(163, 230, 53, 0.5);
+}
+
+.wf-dock-btn.run-primary {
+  background: #10b981;
+  color: #050811;
+  font-weight: 900;
+  box-shadow: 0 0 14px rgba(16, 185, 129, 0.5);
+}
+
+/* ── 8. BẢNG CHI TIẾT CẤU HÌNH BÊN PHẢI (INSPECTOR SIDEBAR) ── */
+.wf-inspector {
+  width: 365px;
+  background: #0d1018;
+  border-left: 1px solid rgba(255, 255, 255, 0.09);
+  display: flex;
+  flex-direction: column;
+  height: 100%;
+  flex-shrink: 0;
+  z-index: 25;
+}
+
+.wf-inspector.closed {
+  display: none;
+}
+
+.wf-insp-topbar {
+  padding: 8px 12px;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 6px;
+}
+
+.wf-insp-tabs {
+  display: flex;
+  gap: 4px;
+  background: #151926;
+  padding: 3px;
+  border-radius: 8px;
+}
+
+.wf-insp-tab {
+  padding: 4px 11px;
+  border-radius: 6px;
+  font-size: 11.5px;
+  font-weight: 700;
+  color: #94a3b8;
+  background: transparent;
+  border: none;
+  cursor: pointer;
+}
+
+.wf-insp-tab.active {
+  background: #252b40;
+  color: #f8fafc;
+}
+
+.wf-insp-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 13px;
+  display: flex;
+  flex-direction: column;
+  gap: 11px;
+}
+
+.wf-insp-foot {
+  padding: 10px 14px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  background: #090b11;
+}
+
+/* ── 9. MENU CHUỘT PHẢI ĐA NGỮ CẢNH (NODE / DÂY NỐI / BÀN CỜ CANVAS) ── */
+.wf-context-menu {
+  position: fixed;
+  width: 270px;
+  max-height: 82vh;
+  overflow-y: auto;
+  background: #141824;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  border-radius: 12px;
+  padding: 6px;
+  box-shadow: 0 18px 48px rgba(0, 0, 0, 0.88);
+  z-index: 9999;
+  display: none;
+  flex-direction: column;
+  gap: 2px;
+}
+
+.wf-context-menu.open {
+  display: flex;
+}
+
+.wf-ctx-header {
+  padding: 6px 10px;
+  font-size: 10.5px;
+  font-weight: 900;
+  color: #a3e635;
+  text-transform: uppercase;
+  letter-spacing: 0.4px;
+  background: rgba(163, 230, 53, 0.08);
+  border-radius: 7px;
+  margin-bottom: 3px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+}
+
+.wf-ctx-item {
+  padding: 7px 10px;
+  border-radius: 7px;
+  font-size: 12px;
+  font-weight: 600;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  cursor: pointer;
+  background: transparent;
+  border: none;
+  text-align: left;
+  width: 100%;
+  transition: background 0.12s, color 0.12s;
+}
+
+.wf-ctx-item:hover {
+  background: rgba(163, 230, 53, 0.14);
+  color: #ecfccb;
+}
+
+.wf-ctx-item.danger {
+  color: #fca5a5;
+}
+
+.wf-ctx-item.danger:hover {
+  background: rgba(239, 68, 68, 0.2);
+  color: #fecaca;
+}
+
+.wf-ctx-sep {
+  height: 1px;
+  background: rgba(255, 255, 255, 0.08);
+  margin: 4px 0;
+}
+
+/* ── 10. THANH TIMELINE GHÉP CẢNH & XUẤT VIDEO MP4 Ở ĐÁY WORKFLOW ── */
+.wf-timeline-dock {
+  background: #0c0f18;
+  border-top: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  flex-direction: column;
+  flex-shrink: 0;
+  z-index: 26;
+  transition: height 0.2s;
+}
+
+.wf-timeline-dock.collapsed .wf-timeline-body {
+  display: none;
+}
+
+.wf-timeline-head {
+  height: 36px;
+  padding: 0 14px;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 10px;
+  background: rgba(255, 255, 255, 0.02);
+  cursor: pointer;
+}
+
+.wf-timeline-body {
+  height: 138px;
+  padding: 8px 14px 10px;
+  display: flex;
+  gap: 12px;
+  align-items: stretch;
+  overflow: hidden;
+}
+
+.wf-timeline-track {
+  flex: 1;
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  overflow-x: auto;
+  padding: 4px 6px;
+  background: #07090f;
+  border: 1px dashed rgba(255, 255, 255, 0.12);
+  border-radius: 10px;
+}
+
+.wf-tl-clip {
+  width: 145px;
+  height: 104px;
+  flex-shrink: 0;
+  background: #131724;
+  border: 1.5px solid rgba(255, 255, 255, 0.12);
+  border-radius: 9px;
+  overflow: hidden;
+  position: relative;
+  display: flex;
+  flex-direction: column;
+  cursor: pointer;
+}
+
+.wf-tl-clip.active {
+  border-color: #a3e635;
+  box-shadow: 0 0 12px rgba(163, 230, 53, 0.4);
+}
+
+.wf-tl-clip video,
+.wf-tl-clip img {
+  width: 100%;
+  height: 74px;
+  object-fit: cover;
+  background: #000;
+}
+
+.wf-tl-clip-foot {
+  padding: 3px 6px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #e2e8f0;
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  background: #0d101a;
+}
+
+/* ── 11. DANH MỤC CHỌN NODE TRONG MODAL ── */
+.wf-addnode-item {
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.025);
+  border: 1px solid rgba(255, 255, 255, 0.06);
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  cursor: pointer;
+  transition: all 0.14s;
+}
+
+.wf-addnode-item:hover,
+.wf-addnode-item.active {
+  background: rgba(163, 230, 53, 0.1);
+  border-color: rgba(163, 230, 53, 0.5);
+}
+
+.wf-addnode-icon {
+  width: 34px;
+  height: 34px;
+  border-radius: 9px;
+  background: #161b29;
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+
+/* Khung kéo chọn nhiều Node (Marquee Box) */
+.wf-marquee-rect {
+  position: fixed;
+  border: 1.5px dashed #a3e635;
+  background: rgba(163, 230, 53, 0.1);
+  pointer-events: none;
+  z-index: 9990;
+  display: none;
+}
+

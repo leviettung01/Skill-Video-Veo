@@ -14,7 +14,7 @@
       --border-gold: rgba(245, 158, 11, 0.35);
       --accent:      #f59e0b;
       --accent-lt:   #fbbf24;
-      --accent-dim:  #d97706;
+      --indigo:      #6366f1;
       --green:       #10b981;
       --red:         #ef4444;
       --yellow:      #fbbf24;
@@ -36,54 +36,44 @@
       color: var(--text);
       font-family: var(--font);
       font-size: 12px;
-      line-height: 1.5;
+      line-height: 1.45;
       display: flex;
       flex-direction: column;
     }
 
-    /* ── Header ─────────────────────────────────────── */
     header {
       display: flex;
       align-items: center;
       gap: 9px;
-      padding: 12px 14px 10px;
+      padding: 10px 12px;
       border-bottom: 1px solid var(--border-gold);
       background: linear-gradient(135deg, #121826 0%, #1d160c 100%);
     }
 
     .brand-badge {
-      width: 32px;
-      height: 32px;
+      width: 30px;
+      height: 30px;
       border-radius: 8px;
       background: linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #10b981 100%);
       display: flex;
       align-items: center;
       justify-content: center;
-      font-size: 16px;
+      font-size: 15px;
       box-shadow: 0 2px 10px rgba(245, 158, 11, 0.38);
       flex-shrink: 0;
     }
 
-    .header-info {
-      flex: 1;
-      min-width: 0;
-    }
-
+    .header-info { flex: 1; min-width: 0; }
     .header-title {
-      font-size: 13.5px;
+      font-size: 13px;
       font-weight: 800;
-      letter-spacing: 0.02em;
       color: #fff;
       display: flex;
       align-items: center;
       gap: 6px;
       line-height: 1.2;
     }
-
-    .header-title span {
-      color: var(--accent-lt);
-    }
-
+    .header-title span { color: var(--accent-lt); }
     .header-sub {
       font-size: 10px;
       color: #fcd34d;
@@ -92,138 +82,158 @@
       margin-top: 1px;
     }
 
-    /* Connection dot */
     #conn-dot {
       width: 9px;
       height: 9px;
       border-radius: 50%;
       background: var(--red);
-      box-shadow: 0 0 0 0 var(--red);
-      transition: background 0.3s, box-shadow 0.3s;
       flex-shrink: 0;
     }
-
     #conn-dot.on {
       background: var(--green);
       box-shadow: 0 0 7px 1px rgba(16, 185, 129, 0.55);
-      animation: pulse-dot 2.4s ease-in-out infinite;
     }
 
-    @keyframes pulse-dot {
-      0%, 100% { box-shadow: 0 0 4px 1px rgba(16, 185, 129, 0.45); }
-      50%       { box-shadow: 0 0 11px 3px rgba(16, 185, 129, 0.25); }
-    }
-
-    /* ON/OFF toggle */
-    .toggle-wrap {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      flex-shrink: 0;
-    }
-
-    .toggle-label {
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--muted);
-      letter-spacing: 0.06em;
-      text-transform: uppercase;
-    }
-
-    .toggle {
-      position: relative;
-      width: 34px;
-      height: 19px;
-      cursor: pointer;
-    }
-
+    .toggle-wrap { display: flex; align-items: center; gap: 6px; flex-shrink: 0; }
+    .toggle-label { font-size: 10px; font-weight: 700; color: var(--muted); }
+    .toggle { position: relative; width: 34px; height: 19px; cursor: pointer; }
     .toggle input { opacity: 0; width: 0; height: 0; }
-
     .toggle-track {
-      position: absolute;
-      inset: 0;
-      background: var(--border);
-      border-radius: 99px;
-      transition: background 0.25s;
+      position: absolute; inset: 0; background: var(--border); border-radius: 99px; transition: background 0.25s;
     }
-
     .toggle-thumb {
-      position: absolute;
-      top: 3px;
-      left: 3px;
-      width: 13px;
-      height: 13px;
-      border-radius: 50%;
-      background: var(--muted);
-      transition: transform 0.25s, background 0.25s;
+      position: absolute; top: 3px; left: 3px; width: 13px; height: 13px;
+      border-radius: 50%; background: var(--muted); transition: transform 0.25s, background 0.25s;
     }
-
     .toggle input:checked ~ .toggle-track { background: rgba(245, 158, 11, 0.32); border: 1px solid var(--accent); }
-    .toggle input:checked ~ .toggle-thumb {
-      transform: translateX(15px);
-      background: var(--accent-lt);
-    }
+    .toggle input:checked ~ .toggle-thumb { transform: translateX(15px); background: var(--accent-lt); }
 
-    /* ── Author Banner ──────────────────────────────── */
     .author-banner {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 7px 14px;
-      background: #0c111b;
+      display: flex; align-items: center; justify-content: space-between;
+      gap: 6px; padding: 6px 12px; background: #0c111b; border-bottom: 1px solid var(--border); flex-wrap: wrap;
+    }
+    .author-label { font-size: 10.5px; font-weight: 700; color: #f8fafc; }
+    .author-contacts { display: flex; align-items: center; gap: 5px; }
+    .contact-btn {
+      display: inline-flex; align-items: center; gap: 4px; padding: 2px 7px;
+      border-radius: 99px; font-size: 9.5px; font-weight: 700; text-decoration: none;
+    }
+    .contact-btn.zalo { background: rgba(0, 104, 255, 0.16); color: #60a5fa; border: 1px solid rgba(59, 130, 246, 0.45); }
+    .contact-btn.fb { background: rgba(24, 119, 242, 0.16); color: #38bdf8; border: 1px solid rgba(56, 189, 248, 0.45); }
+
+    /* ── Bridge Config Card (Giống hệt UpProject Captcha Bridge) ── */
+    .bridge-config-box {
+      padding: 10px 12px;
+      background: #0d1320;
       border-bottom: 1px solid var(--border);
+    }
+    .cfg-head {
+      display: flex;
+      justify-content: space-between;
+      align-items: center;
+      margin-bottom: 6px;
+    }
+    .cfg-title {
+      font-size: 10px;
+      font-weight: 800;
+      text-transform: uppercase;
+      letter-spacing: 0.06em;
+      color: #a5b4fc;
+    }
+    .cfg-field { margin-bottom: 7px; }
+    .cfg-field label {
+      display: block;
+      font-size: 10.5px;
+      font-weight: 600;
+      color: #cbd5e1;
+      margin-bottom: 3px;
+    }
+    .cfg-input-group { display: flex; gap: 5px; }
+    .cfg-input {
+      flex: 1;
+      min-width: 0;
+      padding: 5px 8px;
+      font-size: 11.5px;
+      font-family: var(--mono);
+      color: #f8fafc;
+      background: #070a10;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      outline: none;
+    }
+    .cfg-input:focus { border-color: var(--indigo); }
+    .cfg-eye-btn {
+      padding: 0 8px;
+      background: #161e2e;
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 12px;
+    }
+    .cfg-btn-row {
+      display: flex;
+      gap: 6px;
+      margin-top: 8px;
       flex-wrap: wrap;
     }
-
-    .author-label {
+    .cfg-btn {
+      padding: 5px 10px;
+      border-radius: 6px;
       font-size: 11px;
       font-weight: 700;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: #1e293b;
       color: #f8fafc;
-      display: flex;
-      align-items: center;
-      gap: 5px;
+    }
+    .cfg-btn.primary {
+      background: #4f46e5;
+      border-color: #6366f1;
+      color: #fff;
+    }
+    .cfg-btn.primary:hover { background: #4338ca; }
+    .cfg-btn:hover { border-color: #818cf8; }
+
+    .test-banner {
+      margin-top: 7px;
+      padding: 6px 9px;
+      border-radius: 6px;
+      font-family: var(--mono);
+      font-size: 11px;
+      font-weight: 600;
+      display: none;
+    }
+    .test-banner.ok {
+      display: block;
+      background: rgba(20, 83, 45, 0.65);
+      color: #86efac;
+      border: 1px solid #16a34a;
+    }
+    .test-banner.fail {
+      display: block;
+      background: rgba(69, 10, 10, 0.7);
+      color: #fca5a5;
+      border: 1px solid #dc2626;
     }
 
-    .author-contacts {
-      display: flex;
-      align-items: center;
+    .poll-stats-grid {
+      margin-top: 8px;
+      padding-top: 7px;
+      border-top: 1px dashed var(--border);
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
       gap: 6px;
-    }
-
-    .contact-btn {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 3px 8px;
-      border-radius: 99px;
       font-size: 10px;
-      font-weight: 700;
-      text-decoration: none;
-      transition: all 0.15s;
     }
-
-    .contact-btn.zalo {
-      background: rgba(0, 104, 255, 0.16);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.45);
+    .poll-stat-item {
+      background: #080b12;
+      border: 1px solid rgba(255,255,255,0.06);
+      border-radius: 5px;
+      padding: 4px 6px;
     }
-
-    .contact-btn.zalo:hover {
-      background: rgba(0, 104, 255, 0.28);
-      color: #93c5fd;
-    }
-
-    .contact-btn.fb {
-      background: rgba(24, 119, 242, 0.16);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.45);
-    }
-
-    .contact-btn.fb:hover {
-      background: rgba(24, 119, 242, 0.28);
-      color: #7dd3fc;
-    }
+    .poll-stat-item span { display: block; color: var(--muted); font-size: 9px; }
+    .poll-stat-item b { font-family: var(--mono); color: #e2e8f0; font-size: 10.5px; }
 
     /* ── Metrics grid ───────────────────────────────── */
     .metrics {
@@ -233,405 +243,150 @@
       background: var(--border);
       border-bottom: 1px solid var(--border);
     }
-
-    .metric-card {
-      background: var(--card);
-      padding: 10px 8px 8px;
-      text-align: center;
-    }
-
+    .metric-card { background: var(--card); padding: 8px 6px 6px; text-align: center; }
     .metric-value {
-      font-family: var(--mono);
-      font-size: 21px;
-      font-weight: 800;
-      line-height: 1;
-      letter-spacing: -0.02em;
-      color: var(--accent-lt);
-      margin-bottom: 4px;
+      font-family: var(--mono); font-size: 18px; font-weight: 800; line-height: 1;
+      color: var(--accent-lt); margin-bottom: 3px;
     }
-
     .metric-value.green { color: var(--green); }
     .metric-value.red   { color: var(--red); }
-
-    .metric-label {
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-    }
+    .metric-label { font-size: 8.5px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
 
     /* ── State bar ──────────────────────────────────── */
     .state-bar {
-      display: flex;
-      align-items: center;
-      gap: 8px;
-      padding: 6px 14px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--muted);
-      letter-spacing: 0.04em;
+      display: flex; align-items: center; gap: 8px; padding: 5px 12px;
+      background: var(--surface); border-bottom: 1px solid var(--border);
+      font-size: 10px; font-weight: 600; color: var(--muted);
     }
-
     #state-badge {
-      padding: 1px 7px;
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      background: var(--border);
-      color: var(--muted);
+      padding: 1px 7px; border-radius: 4px; font-size: 9px; font-weight: 700;
+      text-transform: uppercase; background: var(--border); color: var(--muted);
     }
-
-    #state-badge.idle    { background: rgba(16, 185, 129, 0.16); color: var(--green); }
-    #state-badge.running { background: rgba(245, 158, 11, 0.18); color: var(--yellow); }
-    #state-badge.off     { background: var(--border);            color: var(--muted); }
-
-    #token-status {
-      margin-left: auto;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-    }
-
+    #state-badge.connected, #state-badge.idle { background: rgba(16, 185, 129, 0.18); color: var(--green); }
+    #state-badge.connecting { background: rgba(245, 158, 11, 0.18); color: var(--yellow); }
+    #token-status { margin-left: auto; font-family: var(--mono); font-size: 10px; font-weight: 700; }
     #token-status.ok   { color: var(--green); }
-    #token-status.bad  { color: var(--red); }
     #token-status.warn { color: var(--yellow); }
+    #token-status.bad  { color: var(--red); }
 
     /* ── Log section ────────────────────────────────── */
     .log-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 8px 14px 6px;
-      font-size: 9.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      padding: 6px 12px 4px; background: var(--surface);
     }
-
-    #log-count {
-      background: rgba(245, 158, 11, 0.16);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      border-radius: 10px;
-      padding: 1px 7px;
-      font-size: 9.5px;
-      font-weight: 700;
-      color: var(--accent-lt);
+    .log-title { font-size: 9.5px; font-weight: 700; text-transform: uppercase; color: var(--muted); }
+    .log-count {
+      font-family: var(--mono); font-size: 9.5px; color: var(--accent-lt);
+      background: rgba(245, 158, 11, 0.14); padding: 1px 6px; border-radius: 99px;
     }
-
-    .log-section {
-      flex: 1;
-      display: flex;
-      flex-direction: column;
-      min-height: 0;
-    }
-
-    .log-table-wrap {
-      flex: 1;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-
-    .log-table-wrap::-webkit-scrollbar { width: 4px; }
-    .log-table-wrap::-webkit-scrollbar-track { background: transparent; }
-    .log-table-wrap::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    table {
-      width: 100%;
-      border-collapse: collapse;
-    }
-
+    .log-wrap { flex: 1; min-height: 0; overflow-y: auto; background: var(--bg); }
+    table { width: 100%; border-collapse: collapse; font-size: 10.5px; }
     thead th {
-      position: sticky;
-      top: 0;
-      padding: 5px 10px;
-      text-align: left;
-      font-size: 9px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      z-index: 1;
+      position: sticky; top: 0; background: var(--surface); color: var(--muted);
+      font-size: 8.5px; font-weight: 700; text-transform: uppercase;
+      padding: 4px 8px; text-align: left; border-bottom: 1px solid var(--border);
     }
-
-    thead th:first-child { width: 60px; }
-    thead th:last-child { width: 36%; }
-
-    tbody tr {
-      border-bottom: 1px solid rgba(42, 51, 71, 0.65);
-      transition: background 0.12s;
-    }
-
-    tbody tr:hover { background: rgba(245, 158, 11, 0.07); }
-
-    tbody td {
-      padding: 5px 10px;
-      vertical-align: middle;
-      white-space: nowrap;
-    }
-
-    .td-id {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--accent-lt);
-      font-variant-numeric: tabular-nums;
-      letter-spacing: 0.03em;
-      cursor: pointer;
-      text-decoration: underline;
-      text-decoration-color: transparent;
-      transition: text-decoration-color 0.15s;
-    }
-
-    .td-id:hover {
-      text-decoration-color: var(--accent-lt);
-    }
-
-    /* ── Detail modal ──────────────────────────────── */
-    .detail-overlay {
-      display: none;
-      position: fixed;
-      inset: 0;
-      background: rgba(0,0,0,0.68);
-      z-index: 100;
-    }
-
-    .detail-overlay.open { display: flex; align-items: center; justify-content: center; }
-
-    .detail-panel {
-      width: 92%;
-      max-height: 80vh;
-      background: var(--card);
-      border: 1px solid var(--border-gold);
-      border-radius: 8px;
-      overflow: hidden;
-      display: flex;
-      flex-direction: column;
-    }
-
-    .detail-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 10px 14px;
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-      font-size: 11px;
-      font-weight: 700;
-      color: var(--accent-lt);
-    }
-
-    .detail-close {
-      background: none;
-      border: none;
-      color: var(--muted);
-      cursor: pointer;
-      font-size: 16px;
-      line-height: 1;
-    }
-
-    .detail-close:hover { color: var(--text); }
-
-    .detail-body {
-      padding: 12px 14px;
-      overflow-y: auto;
-      font-size: 10px;
-      line-height: 1.6;
-      max-height: 65vh;
-    }
-
-    .detail-row {
-      display: flex;
-      gap: 8px;
-      padding: 4px 0;
-      border-bottom: 1px solid rgba(42, 51, 71, 0.5);
-    }
-
-    .detail-label {
-      width: 90px;
-      flex-shrink: 0;
-      color: var(--muted);
-      font-weight: 700;
-      text-transform: uppercase;
-      font-size: 9px;
-      letter-spacing: 0.06em;
-    }
-
-    .detail-value {
-      flex: 1;
-      font-family: var(--mono);
-      word-break: break-all;
-      color: var(--text);
-    }
-
-    .detail-value.error { color: var(--red); }
-    .detail-value.ok { color: var(--green); }
-
-    .td-type {
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      color: var(--accent-lt);
-    }
-
-    .td-time {
-      font-family: var(--mono);
-      font-size: 10px;
-      color: var(--muted);
-      font-variant-numeric: tabular-nums;
-    }
-
-    /* Status badges */
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 3px;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-    }
-
-    .badge-ok   { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .badge-fail { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
+    tbody tr { border-bottom: 1px solid rgba(30, 35, 48, 0.7); }
+    tbody td { padding: 4px 8px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+    .td-id { font-family: var(--mono); font-size: 9.5px; color: var(--accent-lt); }
+    .td-type { font-family: var(--mono); font-size: 9.5px; font-weight: 600; color: var(--text); }
+    .td-time { font-family: var(--mono); font-size: 9.5px; color: var(--muted); }
+    .badge { display: inline-flex; padding: 1px 5px; border-radius: 3px; font-family: var(--mono); font-size: 8.5px; font-weight: 700; }
+    .badge-ok { background: rgba(16, 185, 129, 0.14); color: var(--green); }
+    .badge-fail { background: rgba(239, 68, 68, 0.14); color: var(--red); }
     .badge-proc { background: rgba(245, 158, 11, 0.16); color: var(--yellow); }
+    .log-empty { padding: 18px 12px; text-align: center; color: var(--muted); font-size: 11px; }
 
-    .td-error {
-      max-width: 120px;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      font-size: 10px;
-      color: var(--red);
-      cursor: default;
-    }
-
-    .td-error.empty { color: var(--muted); }
-
-    .log-empty {
-      padding: 24px 14px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    /* ── Action buttons ─────────────────────────────── */
     .actions {
-      display: flex;
-      gap: 8px;
-      padding: 10px 14px;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
+      display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
+      padding: 9px 12px; background: var(--surface); border-top: 1px solid var(--border);
     }
-
     .btn {
-      flex: 1;
-      padding: 7px 10px;
-      font-family: var(--font);
-      font-size: 10.5px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border: 1px solid var(--border);
-      border-radius: 6px;
-      background: var(--card);
-      color: var(--text);
-      cursor: pointer;
-      transition: all 0.15s;
+      display: inline-flex; align-items: center; justify-content: center; gap: 5px;
+      padding: 7px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
+      border: 1px solid var(--border); cursor: pointer; background: var(--card); color: var(--text);
     }
-
-    .btn:hover {
-      background: #1f293d;
-      border-color: var(--accent-lt);
-      color: var(--accent-lt);
-    }
-
-    .btn:active { opacity: 0.75; }
-
     .btn-primary {
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      border-color: rgba(251, 191, 36, 0.6);
-      color: #090d16;
-      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+      background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%);
+      border-color: #fbbf24; color: #080a0f;
     }
-
-    .btn-primary:hover {
-      background: linear-gradient(135deg, #fbbf24, #f59e0b);
-      border-color: #fde68a;
-      color: #090d16;
-    }
-
-    /* ── Signature Footer ───────────────────────────── */
-    .signature {
-      padding: 8px 14px;
-      text-align: center;
-      font-size: 10px;
-      font-weight: 600;
-      color: var(--muted);
-      background: #06080c;
-      border-top: 1px solid var(--border);
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      flex-wrap: wrap;
-    }
-
-    .signature a {
-      color: var(--accent-lt);
-      text-decoration: none;
-      font-weight: 700;
-    }
-
-    .signature a:hover {
-      color: #fff;
-      text-decoration: underline;
+    footer {
+      padding: 5px 12px; background: var(--bg); border-top: 1px solid var(--border);
+      display: flex; align-items: center; justify-content: space-between;
+      font-size: 9.5px; color: var(--muted); font-family: var(--mono);
     }
   </style>
 </head>
 <body>
 
-  <!-- Header -->
   <header>
     <div class="brand-badge">⚡</div>
     <div class="header-info">
       <div class="header-title">
-        <div id="conn-dot"></div>
-        <div><span>LeVietTung</span>_autoveo</div>
+        <span id="conn-dot"></span>
+        LeVietTung<span>_autoveo</span>
       </div>
       <span class="header-sub">Lê Việt Tùng - SkillAutoVeo</span>
     </div>
     <div class="toggle-wrap">
-      <span class="toggle-label" id="toggle-label">OFF</span>
-      <label class="toggle">
-        <input type="checkbox" id="main-toggle">
-        <span class="toggle-track"></span>
-        <span class="toggle-thumb"></span>
+      <span class="toggle-label" id="toggle-label">ON</span>
+      <label class="toggle" title="Bật / Tắt kết nối">
+        <input type="checkbox" id="main-toggle" checked>
+        <div class="toggle-track"></div>
+        <div class="toggle-thumb"></div>
       </label>
     </div>
   </header>
 
-  <!-- Author & Support Contacts -->
   <div class="author-banner">
     <div class="author-label">👑 Lê Việt Tùng</div>
     <div class="author-contacts">
-      <a class="contact-btn zalo" href="https://zalo.me/0915967790" target="_blank" title="Liên hệ Zalo: 0915967790">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.83 7.08-.16.92-.59 2.31-1.46 3.31-.22.25-.03.65.3.61 1.79-.2 3.63-.95 4.77-1.62.82.21 1.68.32 2.56.32 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
-        Zalo: 0915967790
-      </a>
-      <a class="contact-btn fb" href="https://www.facebook.com/tungbinh.38/" target="_blank" title="Facebook: Lê Việt Tùng">
-        <svg width="12" height="12" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>
-        Facebook
-      </a>
+      <a class="contact-btn zalo" href="https://zalo.me/0915967790" target="_blank">💬 Zalo: 0915967790</a>
+      <a class="contact-btn fb" href="https://www.facebook.com/tungbinh.38/" target="_blank">📘 Facebook</a>
+    </div>
+  </div>
+
+  <!-- CẤU HÌNH KẾT NỐI CAPTCHA BRIDGE (1 Bảng Duy Nhất Bên Phải) -->
+  <div class="bridge-config-box">
+    <div class="cfg-head">
+      <span class="cfg-title">🔑 Cấu hình kết nối Captcha Bridge</span>
+      <span id="sp-flow-email-badge" style="font-size:10px; font-weight:700; color:#34d399; font-family:var(--mono);"></span>
+    </div>
+
+    <div class="cfg-field">
+      <label for="sp-bridge-url">Bridge URL</label>
+      <input type="url" id="sp-bridge-url" class="cfg-input" style="width:100%;" value="http://127.0.0.1:4000" placeholder="http://127.0.0.1:4000" />
+    </div>
+
+    <div class="cfg-field">
+      <label for="sp-bridge-secret">Bridge Secret</label>
+      <div class="cfg-input-group">
+        <input type="password" id="sp-bridge-secret" class="cfg-input" placeholder="••••••••" />
+        <button type="button" id="sp-toggle-secret" class="cfg-eye-btn" title="Hiện/Ẩn Secret">👁</button>
+      </div>
+    </div>
+
+    <div class="cfg-btn-row">
+      <button type="button" id="sp-save-btn" class="cfg-btn primary">Lưu cấu hình</button>
+      <button type="button" id="sp-test-btn" class="cfg-btn">Test kết nối</button>
+      <button type="button" id="sp-sync-btn" class="cfg-btn" title="Tự động lấy Secret từ Tool">🔄 Tự lấy Secret</button>
+    </div>
+
+    <div id="sp-test-result" class="test-banner"></div>
+
+    <div class="poll-stats-grid">
+      <div class="poll-stat-item">
+        <span>Lần poll cuối</span>
+        <b id="sp-last-poll">—</b>
+      </div>
+      <div class="poll-stat-item">
+        <span>Lần mint cuối</span>
+        <b id="sp-last-mint">—</b>
+      </div>
+      <div class="poll-stat-item">
+        <span>Thời gian mint</span>
+        <b id="sp-last-mint-dur">—</b>
+      </div>
     </div>
   </div>
 
@@ -653,60 +408,44 @@
 
   <!-- State bar -->
   <div class="state-bar">
-    TRẠNG THÁI
-    <span id="state-badge" class="off">off</span>
+    <span>TRẠNG THÁI</span>
+    <span id="state-badge" class="connecting">connecting</span>
     <span id="token-status" class="bad">no token</span>
   </div>
 
   <!-- Request log -->
-  <div class="log-section">
-    <div class="log-header">
-      Nhật Ký Giải Captcha & API Bridge
-      <span id="log-count">0</span>
-    </div>
-
-    <div class="log-table-wrap">
-      <table>
-        <thead>
-          <tr>
-            <th>ID</th>
-            <th>Loại</th>
-            <th>Giờ</th>
-            <th>KQ</th>
-            <th>Chi tiết</th>
-          </tr>
-        </thead>
-        <tbody id="log-body">
-          <tr>
-            <td colspan="5" class="log-empty">Chưa có request nào</td>
-          </tr>
-        </tbody>
-      </table>
-    </div>
+  <div class="log-header">
+    <span class="log-title">Nhật Ký Giải Captcha & API Bridge</span>
+    <span class="log-count" id="log-count">0</span>
   </div>
 
-  <!-- Actions -->
+  <div class="log-wrap">
+    <table>
+      <thead>
+        <tr>
+          <th>ID</th>
+          <th>Loại</th>
+          <th>Giờ</th>
+          <th>KQ</th>
+          <th>Chi Tiết</th>
+        </tr>
+      </thead>
+      <tbody id="log-body">
+        <tr><td colspan="5" class="log-empty">Chưa có request nào</td></tr>
+      </tbody>
+    </table>
+  </div>
+
+  <!-- Action buttons -->
   <div class="actions">
     <button class="btn btn-primary" id="btn-flow">🌐 Mở Tab Google Flow</button>
-    <button class="btn" id="btn-token">🔄 Làm Mới Token</button>
+    <button class="btn" id="btn-token">🔄 Đồng Bộ Phiên Flow</button>
   </div>
 
-  <!-- Signature -->
-  <div class="signature">
-    <span>⚡ <b>LeVietTung_autoveo</b> v2.0</span>
-    <span><a href="https://zalo.me/0915967790" target="_blank">Zalo: 0915967790</a> · <a href="https://www.facebook.com/tungbinh.38/" target="_blank">FB: Lê Việt Tùng</a></span>
-  </div>
-
-  <!-- Detail overlay -->
-  <div class="detail-overlay" id="detail-overlay">
-    <div class="detail-panel">
-      <div class="detail-header">
-        <span id="detail-title">Chi Tiết Request</span>
-        <button class="detail-close" id="detail-close">&times;</button>
-      </div>
-      <div class="detail-body" id="detail-body"></div>
-    </div>
-  </div>
+  <footer>
+    <span>⚡ LeVietTung_autoveo v2.1</span>
+    <span style="color:#fbbf24;">Zalo: 0915967790</span>
+  </footer>
 
   <script src="side_panel.js"></script>
 </body>

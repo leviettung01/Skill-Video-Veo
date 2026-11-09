@@ -686,15 +686,28 @@ def prepare_and_optionally_run_product(
     if auto_run_pipeline:
         runner_script = os.path.join(SCRIPTS_DIR, "run_all_7_videos_mt.py")
         log_file = os.path.join(PROJECTS_DIR, pid, "pipeline_run.log")
-        with open(log_file, "a", encoding="utf-8") as lf:
-            lf.write(f"\n=== AUTO START PIPELINE ({time.strftime('%Y-%m-%d %H:%M:%S')}) | Template: {template_name} ===\n")
-            p = subprocess.Popen(
-                [sys.executable, "-u", runner_script, pid],
-                cwd=WS_DIR,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-            )
-            proc_pid = p.pid
+        lf = open(log_file, "a", encoding="utf-8", errors="replace")
+        lf.write(f"\n=== AUTO START PIPELINE ({time.strftime('%Y-%m-%d %H:%M:%S')}) | Template: {template_name} ===\n")
+        lf.flush()
+        p = subprocess.Popen(
+            [sys.executable, "-u", runner_script, pid],
+            cwd=WS_DIR,
+            stdout=lf,
+            stderr=subprocess.STDOUT,
+        )
+        proc_pid = p.pid
+        try:
+            st_init = {
+                "pid": pid,
+                "pid_os": proc_pid,
+                "is_running": True,
+                "current_step_text": f"🚀 Đang khởi động Đa Luồng cho SP {pid} (Template: {template_name})...",
+                "updated_at": time.strftime("%H:%M:%S"),
+            }
+            json.dump(st_init, open(os.path.join(PROJECTS_DIR, pid, "pipeline_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+        sync_web_ui(force=True)
 
     return {
         "ok": True,

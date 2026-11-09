@@ -27,7 +27,7 @@
     "Gia Dụng & Phụ Kiện"
   ],
   "highlights": [
-    "Ghép mặt Nhân Vật (NV1/NV2) cầm đúng sản phẩm thật ở tỉ lệ chuẩn xác tại 10 bối cảnh Nhà Máy / Tổng Kho / Phòng QC",
+    "Ghép mặt Nhân Vật (NV1/NV2/NV3) siêu thực chuẩn 2K (lỗ chân lông, da căng bóng tự nhiên, ánh mắt có thần) cầm đúng sản phẩm thật ở tỉ lệ chuẩn xác tại 10 bối cảnh Nhà Máy / Tổng Kho / Phòng QC",
     "Kịch bản 3 cảnh × 10s chốt đơn cực mạnh: Hook Trợ Giá Sàn -> Neo Giá 3 Tầng (200K - 150K - Dưới 70K) -> USP & Chốt Giỏ Hàng",
     "Tự động lồng Giọng Đọc Nhân Vật đã lưu sẵn trên Google Flow không cần thu âm ngoài",
     "Hậu kỳ FFmpeg tự động gắn Slide ảnh sản phẩm phóng to ở 20s cuối + Phụ đề Karaoke 2 dòng in hoa nổi bật"
@@ -42,14 +42,14 @@
     {
       "step": 2,
       "icon": "🖼️",
-      "title": "Bước 2: Tạo Ảnh Reference 2K Nhân Vật Cầm Sản Phẩm Tại Xưởng",
-      "detail": "Kết hợp Character ID (NV1/NV2) + Ảnh Sản Phẩm gốc tạo ảnh dọc 9:16 2K đứng tại Dây Chuyền Lắp Ráp, Phòng QC, Tổng Kho Pallet..."
+      "title": "Bước 2: Tạo Ảnh Reference 2K Hyper-Realism Nhân Vật Cầm Sản Phẩm Tại Xưởng",
+      "detail": "Kết hợp Character ID (NV1/NV2/NV3) + Ảnh Sản Phẩm gốc tạo ảnh dọc 9:16 2K cận trung (Sony A7R V 50mm f/1.4 GM, da thật có lỗ chân lông, dáng đứng tự nhiên) tại Dây Chuyền Lắp Ráp, Phòng QC, Tổng Kho Pallet..."
     },
     {
       "step": 3,
       "icon": "🎬",
       "title": "Bước 3: Render 3 Cảnh Video 10s Kèm Voice Đọc Thoại Chuẩn Nhịp",
-      "detail": "Từ ảnh Ref 2K, Veo 3.1 render 3 cảnh 10s (Hook -> Neo Giá -> USP) khớp khẩu hình với Voice ID của nhân vật, kết thúc đúng giây thứ 10."
+      "detail": "Từ ảnh Ref 2K duy nhất, Veo 3.1 render 3 cảnh 10s (Hook -> Neo Giá -> USP) giữ nguyên 100% nét mặt thật từ ảnh Ref 2K và khớp khẩu hình với Voice ID của nhân vật."
     },
     {
       "step": 4,
@@ -63,19 +63,19 @@
       "scene": 1,
       "title": "Cảnh 1 (0s - 10s): HOOK TRỢ GIÁ SÀN / GIÁ SỐC TẬN XƯỞNG",
       "purpose": "Giữ chân người xem trong 3 giây đầu bằng thông điệp xả kho tận gốc, không qua trung gian, nhân vật cầm sản phẩm đưa nhẹ về phía camera.",
-      "camera": "Medium shot 9:16 cố định, nhân vật nhìn thẳng camera nói tự nhiên, giơ sản phẩm ngang tầm eo."
+      "camera": "Close-medium upper-body 9:16 (Sony A7R V 50mm f/1.4), nhân vật nhìn thẳng camera nói tự nhiên, giơ sản phẩm ngang tầm ngực-eo."
     },
     {
       "scene": 2,
       "title": "Cảnh 2 (10s - 20s): NEO GIÁ 3 TẦNG & KÍCH THÍCH BẤM GIỎ HÀNG",
       "purpose": "Neo giá từ cao xuống thấp ('Không phải 200, không phải 150, 70K cũng không luôn') và chỉ tay xuống giỏ hàng góc trái kèm Slide ảnh sản phẩm.",
-      "camera": "Medium shot 9:16 + bắt đầu hiển thị khung Slide ảnh sản phẩm phóng to bên dưới."
+      "camera": "Close-medium upper-body 9:16 + bắt đầu hiển thị khung Slide ảnh sản phẩm phóng to bên dưới."
     },
     {
       "scene": 3,
       "title": "Cảnh 3 (20s - 30s): ĐIỂM MẠNH SẢN PHẨM (USP) & CHỐT ĐƠN KHẨN CẤP",
       "purpose": "Nêu bật chất liệu, tính năng thực tế của sản phẩm, cam kết kiểm tra hàng tại xưởng và thúc giục đặt ngay trước khi về giá gốc.",
-      "camera": "Medium shot 9:16 + tiếp tục chạy Slide 5 ảnh chi tiết sản phẩm + Phụ đề Karaoke."
+      "camera": "Close-medium upper-body 9:16 + tiếp tục chạy Slide 5 ảnh chi tiết sản phẩm + Phụ đề Karaoke."
     }
   ],
   "sample_products": [
@@ -98,8 +98,8 @@
         "char_v": "nv1_v1",
         "hook_title": "NV1 - Kịch bản 1: Trợ Giá Sàn",
         "style": "Xưởng Dây Chuyền Lắp Ráp & Sản Xuất",
-        "outfit_en": "wearing a polite professional dark navy blazer over a crisp light blue collared shirt and black trousers",
-        "setting_en": "standing behind a display worktable in a reputable modern manufacturing and assembly factory floor with production lines, neatly stacked boxes, and factory technicians in blue uniforms softly blurred in the background"
+        "outfit_en": "wearing a chic open tailored dark-navy blazer over a fitted soft ivory ribbed knit top with a flattering feminine V-neckline and delicate silver pendant necklace, following her natural figure",
+        "setting_en": "standing behind a clean foreground display worktable in a bright, modern manufacturing and assembly workshop with automated production lines, neatly stacked export cartons, and technicians clearly visible with crisp architectural depth across the spacious factory floor behind her"
       },
       {
         "variant_index": 2,
@@ -107,8 +107,8 @@
         "char_v": "nv1_v2",
         "hook_title": "NV1 - Kịch bản 2: Báo Động Giá Xưởng",
         "style": "Tổng Kho Pallet Xuất Xưởng",
-        "outfit_en": "wearing a polite charcoal-grey tailored waistcoat vest over a crisp white collared office shirt and dark trousers",
-        "setting_en": "standing behind a packing table in a spacious high-bay factory dispatch and logistics warehouse with towering orange-and-blue steel pallet racks stacked high with brown export shipping cartons, yellow warehouse aisle markings, and logistics staff softly blurred in the background"
+        "outfit_en": "wearing a flattering fitted soft white ribbed knit top under an open smart-casual charcoal cardigan jacket with rolled cuffs and a dainty silver necklace, following her natural feminine silhouette",
+        "setting_en": "standing behind a clean foreground packing table in a bright, spacious high-bay factory dispatch warehouse with warm-and-daylight industrial lighting, towering orange-and-blue pallet racks stacked high with shipping cartons, yellow floor safety lines, and warehouse staff clearly visible with authentic environmental depth behind her"
       },
       {
         "variant_index": 3,
@@ -116,8 +116,8 @@
         "char_v": "nv1_v3",
         "hook_title": "NV1 - Kịch bản 3: Xả Kho Lô Mới",
         "style": "Phòng Thử Nghiệm & Hiệu Chuẩn Kỹ Thuật",
-        "outfit_en": "wearing a polite warm mocha-brown tailored blazer over a slate-blue collared shirt and black trousers",
-        "setting_en": "standing behind a stainless-steel workbench in a bright precision testing and finishing workshop with measurement instruments, organized storage shelves, and engineers softly blurred in the background"
+        "outfit_en": "wearing a modern open warm mocha-brown blazer over a fitted cream scoop-neck top with natural fabric folds and a thin silver necklace",
+        "setting_en": "standing behind a clean stainless-steel workbench in a brightly lit precision quality testing workshop with inspection instruments, organized sample shelves, and engineers clearly visible in the spacious technical lab behind her"
       },
       {
         "variant_index": 4,
@@ -125,17 +125,17 @@
         "char_v": "nv1_v4",
         "hook_title": "NV1 - Kịch bản 4: Xuất Kho Trực Tiếp",
         "style": "Khu Đóng Thùng Xuất Khẩu",
-        "outfit_en": "wearing a polite navy-blue vest over a white collared shirt and dark trousers",
-        "setting_en": "standing behind a clean packing table in a modern export packaging warehouse with stacked master cartons, pallet jacks, and warehouse staff softly blurred in the background"
+        "outfit_en": "wearing a fitted soft pastel-blue knit blouse with an open tailored navy jacket and delicate collar detail",
+        "setting_en": "standing behind a clean foreground packing counter in a modern export packaging warehouse with stacked master cartons, pallet racks, and active fulfillment rows clearly visible in the background"
       },
       {
         "variant_index": 5,
         "legacy_vkey": "v9",
         "char_v": "nv1_v5",
         "hook_title": "NV1 - Kịch bản 5: Ưu Đãi Độc Quyền",
-        "style": "Phòng Mẫu Nghiên Cứu Sản Phẩm R&D",
-        "outfit_en": "wearing a smart beige blazer over a dark blouse and tailored trousers",
-        "setting_en": "standing behind a presentation table in a clean modern R&D product sample room with display racks, lighting fixtures, and specialists softly blurred in the background"
+        "style": "Showroom & Phòng Mẫu R&D Chính Hãng",
+        "outfit_en": "wearing an open tailored beige blazer over a fitted black ribbed knit top with a subtle silver pendant necklace",
+        "setting_en": "standing behind a presentation table in a bright modern official brand flagship showroom and R&D sample room with illuminated display shelves clearly visible in the background"
       }
     ],
     "nv2": [
@@ -145,17 +145,17 @@
         "char_v": "nv2_v1",
         "hook_title": "NV2 - Kịch bản 1: Giá Sốc Tận Xưởng",
         "style": "Phòng Kiểm Định Chất Lượng QC",
-        "outfit_en": "wearing a polite professional cream-white tailored blazer over a dark navy blouse and black trousers",
-        "setting_en": "standing behind a clean white inspection counter in a bright, modern glass-walled Quality Control (QC) testing and inspection laboratory with precision inspection lamps, sample testing shelves, quality pass certificates, and QC specialists in white lab coats softly blurred in the background"
+        "outfit_en": "wearing an elegant open cream-white tailored blazer over a fitted soft navy ribbed knit top with a flattering feminine neckline and small hoop earrings",
+        "setting_en": "standing behind a clean white inspection counter in a bright, modern glass-walled Quality Control (QC) laboratory with soft daylight lamps, organized sample display shelves, and QC specialists clearly visible across the spacious inspection floor in the background"
       },
       {
         "variant_index": 2,
         "legacy_vkey": "v4",
         "char_v": "nv2_v2",
         "hook_title": "NV2 - Kịch bản 2: Không Qua Trung Gian",
-        "style": "Showroom Trưng Bày Chính Hãng",
-        "outfit_en": "wearing a polite elegant black tailored blazer over a silk ivory blouse and dark trousers",
-        "setting_en": "standing behind a wooden display counter in a warm-lit official brand showroom and sample display gallery with illuminated wooden shelves displaying products, framed ISO quality awards, and warm spotlighting softly blurred in the background"
+        "style": "Showroom & Cửa Hàng Chính Hãng Luxury",
+        "outfit_en": "wearing a chic open black tailored blazer over a fitted silk ivory camisole blouse with a delicate gold necklace, flattering her natural feminine curves",
+        "setting_en": "standing behind a warm marble-and-wood display counter in an official luxury brand flagship showroom and sample gallery with illuminated display shelves, curated product showcases, and warm architectural lighting clearly visible in the background"
       },
       {
         "variant_index": 3,
@@ -163,8 +163,8 @@
         "char_v": "nv2_v3",
         "hook_title": "NV2 - Kịch bản 3: Săn Deal Tận Gốc",
         "style": "Khu Băng Chuyền Đóng Gói Xuất Kho",
-        "outfit_en": "wearing a polite smart-casual dove-grey blazer over a soft pastel pink collared shirt and black trousers",
-        "setting_en": "standing behind a stainless-steel packing station in a modern automated factory packaging and parcel fulfillment center with roller conveyor belts, barcode scanners, neatly taped shipping boxes, and fulfillment workers in navy polo uniforms softly blurred in the background"
+        "outfit_en": "wearing a smart-casual open dove-grey jacket over a fitted soft pastel-pink ribbed top with a dainty silver necklace",
+        "setting_en": "standing behind a stainless-steel packing station in a brightly lit modern factory fulfillment center with roller conveyor belts, pallet racks, and neatly taped shipping boxes clearly visible across the background"
       },
       {
         "variant_index": 4,
@@ -172,8 +172,8 @@
         "char_v": "nv2_v4",
         "hook_title": "NV2 - Kịch bản 4: Trợ Giá Chớp Nhoáng",
         "style": "Kho Phân Phối Nhanh Fulfillment",
-        "outfit_en": "wearing a neat white blazer over a light blue blouse and black trousers",
-        "setting_en": "standing behind a dispatch counter in a bright modern e-commerce fulfillment center with organized sorting shelves, parcel bins, and staff softly blurred in the background"
+        "outfit_en": "wearing a neat open white blazer over a fitted baby-blue knit top",
+        "setting_en": "standing behind a dispatch counter in a bright modern e-commerce fulfillment center with organized sorting shelves and high-bay storage racks clearly visible in the background"
       },
       {
         "variant_index": 5,
@@ -181,15 +181,44 @@
         "char_v": "nv2_v5",
         "hook_title": "NV2 - Kịch bản 5: Xả Hàng Chính Hãng",
         "style": "Xưởng Hoàn Thiện & Đóng Hộp",
-        "outfit_en": "wearing a tailored camel blazer over a cream blouse and dark trousers",
-        "setting_en": "standing behind a clean worktable in a bright product finishing and gift-box packaging workshop with neat retail boxes and technicians softly blurred in the background"
+        "outfit_en": "wearing an open tailored camel jacket over a fitted cream ribbed top",
+        "setting_en": "standing behind a clean worktable in a bright product finishing and gift-box packaging workshop with neat retail boxes and shelving clearly visible in the background"
+      }
+    ],
+    "nv3": [
+      {
+        "variant_index": 1,
+        "legacy_vkey": "nv3_v1",
+        "char_v": "nv3_v1",
+        "hook_title": "NV3 - Kịch bản 1: Xả Kho Trực Tiếp Tại Xưởng",
+        "style": "Xưởng Sản Xuất & Kiểm Định Kỹ Thuật",
+        "outfit_en": "wearing a crisp fitted white long-sleeve linen shirt with sleeves neatly rolled to the forearms, top button casually open with a thin gold pendant necklace and silver steel wristwatch",
+        "setting_en": "standing behind a clean foreground worktable in a bright modern manufacturing and quality inspection floor with production equipment, shelving racks, and stacked export cartons clearly visible in the spacious facility behind him"
+      },
+      {
+        "variant_index": 2,
+        "legacy_vkey": "nv3_v2",
+        "char_v": "nv3_v2",
+        "hook_title": "NV3 - Kịch bản 2: Báo Giá Tận Gốc Nhà Máy",
+        "style": "Tổng Kho Pallet Xuất Xưởng",
+        "outfit_en": "wearing a smart tailored charcoal polo shirt with a structured collar and a silver steel wristwatch, showcasing his athletic masculine shoulders",
+        "setting_en": "standing behind a foreground packing table in a spacious high-bay factory dispatch warehouse with towering orange-and-blue pallet racks stacked high with shipping cartons clearly visible in the background"
+      },
+      {
+        "variant_index": 3,
+        "legacy_vkey": "nv3_v3",
+        "char_v": "nv3_v3",
+        "hook_title": "NV3 - Kịch bản 3: Cam Kết Chất Lượng Chuẩn Xưởng",
+        "style": "Showroom & Cửa Hàng Luxury Kỹ Thuật",
+        "outfit_en": "wearing an open dark-navy smart-casual jacket over a fitted white crew-neck tee and silver wristwatch",
+        "setting_en": "standing behind a presentation counter in a bright official factory sample showroom and flagship store with illuminated display shelves clearly visible in the background"
       }
     ]
   },
   "scene_actions": {
-    "1": "The woman looks directly at the camera with a confident, energetic expression, naturally speaking while holding the exact product from the reference image steady at waist level, tilting it slightly toward the camera to showcase it, then keeping the presenting pose at the end.",
-    "2": "The woman looks directly at the camera with a warm, enthusiastic expression, naturally speaking while holding the exact product from the reference image steady at waist level and gesturing lightly toward the bottom-left shopping cart, then keeping the presenting pose at the end.",
-    "3": "The woman looks directly at the camera with a bright, friendly smile, naturally speaking while holding the exact product from the reference image steady at waist level to showcase it clearly, then keeping the presenting pose at the end."
+    "1": "The presenter looks directly into the camera lens with a warm, charming, energetic smile and lifelike eye contact (natural eye blinking and crisp catchlights), speaking naturally with accurate Vietnamese lip-sync and subtle head movements while holding the exact product from the reference image steady at chest-to-waist level, tilting it slightly toward the camera to showcase its authentic texture, then holding the natural presenting pose at the end.",
+    "2": "The presenter looks directly into the camera lens with an enthusiastic, persuasive expression and lifelike facial micro-expressions, speaking naturally with accurate Vietnamese lip-sync while holding the exact product from the reference image steady at chest-to-waist level and gesturing lightly toward the bottom-left shopping cart, then keeping the natural presenting pose at the end.",
+    "3": "The presenter looks directly into the camera lens with a bright, reassuring smile and authentic human warmth, speaking naturally with accurate Vietnamese lip-sync while holding and showcasing the exact product from the reference image steady at chest-to-waist level, then keeping the natural presenting pose at the end."
   },
   "code": "001",
   "demo_video_caption": "Demo #001: Cân Tiểu Ly Inox 304 — Nhân Vật Đứng Xưởng + Voice + Sub Karaoke (1080p 60FPS)",

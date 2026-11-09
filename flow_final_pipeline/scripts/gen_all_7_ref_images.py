@@ -92,12 +92,12 @@ def find_img_url(obj):
     return None
 
 
-def upload_product_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id, img_path):
+def upload_product_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id, img_path, quality=95):
     with Image.open(img_path) as im:
         im_rgb = im.convert("RGB")
         width, height = im_rgb.size
         tmp_jpg = img_path + ".upload_tmp.jpg"
-        im_rgb.save(tmp_jpg, format="JPEG", quality=92)
+        im_rgb.save(tmp_jpg, format="JPEG", quality=int(quality or 95))
     try:
         raw_bytes = open(tmp_jpg, "rb").read()
     finally:
@@ -187,7 +187,7 @@ def generate_one_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id,
     if not img_url:
         for _ in range(25):
             time.sleep(3)
-            ok_p, inner_p, _ = call_flow_rpc_cffi(http_session, cookie_hdr, wiz, flow_project_id, "as29s", [gen_uuid])
+            ok_p, inner_p, _ = call_flow_rpc_cffi(http_session, cookie_hdr, wiz, flow_project_id, "as29s", [gen_uuid, None, [2]])
             if ok_p:
                 img_url = find_img_url(inner_p)
                 if img_url:
@@ -195,18 +195,56 @@ def generate_one_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id,
     if not img_url:
         raise RuntimeError(f"No image URL returned for {gen_uuid}")
 
-    r_img = http_session.get(
-        img_url,
-        headers={"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": wiz["ua"]},
-        timeout=60,
-        allow_redirects=True,
-    )
-    if r_img.status_code != 200 or len(r_img.content) < 5000:
-        raise RuntimeError(f"Failed to download image: HTTP {r_img.status_code}")
+    # Step 2: Upsample & download 2K (1536x2752) via SPrCad (0 credits)
+    saved_2k = False
+    nbytes_2k = 0
+    for _try_2k in range(1, 5):
+        try:
+            rcap_2k = get_rcap_token(page, "IMAGE_GENERATION")
+            S_2k = [None, 22, None, None, None, flow_project_id, None, None, None, None, [rcap_2k, 1]]
+            ok_s, inner_s, _ = call_flow_rpc_cffi(http_session, cookie_hdr, wiz, flow_project_id, "SPrCad", [gen_uuid, 1, S_2k])
+            if ok_s and isinstance(inner_s, list) and len(inner_s) >= 2 and isinstance(inner_s[1], str):
+                raw_2k = base64.b64decode(inner_s[1])
+                if len(raw_2k) > 50000:
+                    with open(out_file, "wb") as f:
+                        f.write(raw_2k)
+                    saved_2k = True
+                    nbytes_2k = len(raw_2k)
+                    break
+        except Exception:
+            pass
+        time.sleep(3.0)
 
-    with open(out_file, "wb") as f:
-        f.write(r_img.content)
-    return gen_uuid, img_url, len(r_img.content)
+    if not saved_2k:
+        r_img = http_session.get(
+            img_url,
+            headers={"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": wiz["ua"]},
+            timeout=60,
+            allow_redirects=True,
+        )
+        if r_img.status_code != 200 or len(r_img.content) < 5000:
+            raise RuntimeError(f"Failed to download image: HTTP {r_img.status_code}")
+        with open(out_file, "wb") as f:
+            f.write(r_img.content)
+        try:
+            from PIL import ImageFilter
+            with Image.open(out_file) as im_fb:
+                im_2k = im_fb.convert("RGB").resize((1536, 2752), Image.Resampling.LANCZOS)
+                im_2k = im_2k.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=2))
+                im_2k.save(out_file, format="JPEG", quality=98, subsampling=0)
+            nbytes_2k = os.path.getsize(out_file)
+        except Exception:
+            nbytes_2k = len(r_img.content)
+
+    # Re-upload the downloaded 2K image back to Google Flow via maseQ so video scenes use the 2K asset!
+    try:
+        uuid_2k = upload_product_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id, out_file, quality=98)
+        if uuid_2k:
+            gen_uuid = uuid_2k
+    except Exception as e_u2k:
+        print(f"  [WARN] 2K re-upload warning: {e_u2k}", flush=True)
+
+    return gen_uuid, img_url, nbytes_2k
 
 
 def main():

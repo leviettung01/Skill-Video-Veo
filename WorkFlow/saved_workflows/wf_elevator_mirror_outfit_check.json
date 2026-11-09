@@ -1,0 +1,507 @@
+{
+  "id": "wf_elevator_mirror_outfit_check",
+  "_wf_id": "wf_elevator_mirror_outfit_check",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T08:26:38.000Z",
+  "workflow": {
+    "name": "🛗 Workflow - Elevator Mirror Outfit Check (Thay Đồ Gương Thang Máy)",
+    "description": "A TobyFlow Workflow using AI Models (ChatGPT + Google Flow) to swap any outfit onto a model in the viral elevator mirror-selfie scene, then animate it into a 9:16 video. Generate trendy first-outfit-check fashion content for social reels on autopilot.\n\nWorkflow TobyFlow dùng AI Model (ChatGPT + Google Flow) ghép trang phục bất kỳ lên người mẫu trong cảnh selfie gương thang máy đang viral, rồi dựng thành video 9:16. Tạo content outfit check thời thượng cho social reels tự động.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2
+    },
+    "nodes": [
+      {
+        "node_id": "node_j6J92FvO",
+        "node_type": "image",
+        "node_name": "👗 Ảnh Tham Chiếu Bộ Đồ Thay Thế (IMAGE 02)",
+        "pos_x": 126.0,
+        "pos_y": 340.0,
+        "enabled": true,
+        "slug": "image_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          }
+        ],
+        "id": "node_j6J92FvO",
+        "label": "👗 Ảnh Tham Chiếu Bộ Đồ Thay Thế (IMAGE 02)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+        "config": {
+          "slug": "image_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_ixyFnhE2",
+        "node_type": "generate",
+        "node_name": "🖼️ Google Flow Ảnh 2K — Nhân Vật Đã Mặc Bộ Đồ Mới",
+        "pos_x": 878.0,
+        "pos_y": -368.0,
+        "enabled": true,
+        "slug": "flow_images_videos_genera",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_ixyFnhE2",
+        "label": "🖼️ Google Flow Ảnh 2K — Nhân Vật Đã Mặc Bộ Đồ Mới",
+        "provider": "flow",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_images_videos_genera",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg",
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_swapped_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_tTfIoakt",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Ảnh 2K (Ghép Nhân Vật + Bộ Đồ)",
+        "pos_x": 126.0,
+        "pos_y": 695.06077348066,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face, wearing a fluffy cream oversized sweater, beige mini skirt, and knee-high boots.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie composition\n* camera angle\n* body pose\n* hair style\n* lighting mood\n* body proportions\n* hidden-face aesthetic\n* overall realistic fashion vibe\n* original person identity\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the clothing and accessories on the model from IMAGE 01 using the outfit from IMAGE 02 while fully preserving:\n\n* the original person\n* original pose\n* original body shape\n* original hair\n* original elevator background\n* original framing and composition\n* original lighting direction\n* original mirror selfie perspective\n\nThe final image must look like the same real person from IMAGE 01 naturally wearing the outfit from IMAGE 02 inside the same elevator scene.\n\nIMPORTANT OUTFIT RULES:\n\n* preserve all outfit details from IMAGE 02 exactly\n* preserve fabric texture, stitching, folds, silhouette, fit, layering, and accessories\n* do not redesign or reinterpret the outfit\n* do not simplify clothing details\n* maintain accurate garment proportions\n* outfit must realistically wrap around the existing body pose\n* preserve realistic fabric tension and gravity\n\nPHONE REQUIREMENT:\nReplace the original phone with an iPhone 17 Pro Max in elegant desert orange / soft orange titanium color.\nThe phone should look premium, realistic, and naturally held in front of the face.\nMaintain the same hidden-face mirror selfie composition.\n\nREALISM REQUIREMENTS:\n\n* ultra realistic fashion photography\n* indistinguishable from a real iPhone mirror selfie\n* natural skin texture\n* realistic lighting and shadows\n* realistic stainless steel elevator reflections\n* realistic hair strands\n* natural body proportions\n* authentic mirror reflection behavior\n* realistic fabric wrinkles and movement\n* no AI artifacts\n* no distorted anatomy\n* no warped elevator background\n* no fake glossy skin\n* no plastic texture\n* no unrealistic fingers or hands\n* no over-beautified face\n\nSTYLE:\nLuxury Korean fashion influencer mirror selfie, premium Instagram fashion aesthetic, cozy minimal luxury mood, realistic smartphone photography, natural cinematic lighting, authentic social media fashion content, soft neutral tones, elegant feminine styling.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60,
+        "id": "node_tTfIoakt",
+        "label": "📝 Prompt Tạo Ảnh 2K (Ghép Nhân Vật + Bộ Đồ)",
+        "config": {
+          "slug": "prompt",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face, wearing a fluffy cream oversized sweater, beige mini skirt, and knee-high boots.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie composition\n* camera angle\n* body pose\n* hair style\n* lighting mood\n* body proportions\n* hidden-face aesthetic\n* overall realistic fashion vibe\n* original person identity\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the clothing and accessories on the model from IMAGE 01 using the outfit from IMAGE 02 while fully preserving:\n\n* the original person\n* original pose\n* original body shape\n* original hair\n* original elevator background\n* original framing and composition\n* original lighting direction\n* original mirror selfie perspective\n\nThe final image must look like the same real person from IMAGE 01 naturally wearing the outfit from IMAGE 02 inside the same elevator scene.\n\nIMPORTANT OUTFIT RULES:\n\n* preserve all outfit details from IMAGE 02 exactly\n* preserve fabric texture, stitching, folds, silhouette, fit, layering, and accessories\n* do not redesign or reinterpret the outfit\n* do not simplify clothing details\n* maintain accurate garment proportions\n* outfit must realistically wrap around the existing body pose\n* preserve realistic fabric tension and gravity\n\nPHONE REQUIREMENT:\nReplace the original phone with an iPhone 17 Pro Max in elegant desert orange / soft orange titanium color.\nThe phone should look premium, realistic, and naturally held in front of the face.\nMaintain the same hidden-face mirror selfie composition.\n\nREALISM REQUIREMENTS:\n\n* ultra realistic fashion photography\n* indistinguishable from a real iPhone mirror selfie\n* natural skin texture\n* realistic lighting and shadows\n* realistic stainless steel elevator reflections\n* realistic hair strands\n* natural body proportions\n* authentic mirror reflection behavior\n* realistic fabric wrinkles and movement\n* no AI artifacts\n* no distorted anatomy\n* no warped elevator background\n* no fake glossy skin\n* no plastic texture\n* no unrealistic fingers or hands\n* no over-beautified face\n\nSTYLE:\nLuxury Korean fashion influencer mirror selfie, premium Instagram fashion aesthetic, cozy minimal luxury mood, realistic smartphone photography, natural cinematic lighting, authentic social media fashion content, soft neutral tones, elegant feminine styling.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_WnKF3PoT",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video 01 — Kết Quả Render 1080p",
+        "pos_x": 1531.0,
+        "pos_y": -582.06077348066,
+        "enabled": true,
+        "slug": "flow_images_videos_genera_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_WnKF3PoT",
+        "label": "🎬 Google Flow Video 01 — Kết Quả Render 1080p",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_images_videos_genera_1",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_rGXX9NuY",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video 02 — Kết Quả Render 1080p",
+        "pos_x": 1535.0,
+        "pos_y": 288.0,
+        "enabled": true,
+        "slug": "flow_images_videos_genera_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_rGXX9NuY",
+        "label": "🎬 Google Flow Video 02 — Kết Quả Render 1080p",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_images_videos_genera_2",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_MnikFJvV",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Video 01 (Xoay Người Khoe Dáng Đồ)",
+        "pos_x": 879.0,
+        "pos_y": 348.40820980616,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face, wearing a fluffy cream oversized sweater, beige mini skirt, and knee-high boots.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie framing\n* hidden-face aesthetic\n* camera angle\n* pose style\n* body proportions\n* hair style\n* lighting mood\n* original person identity\n* overall luxury fashion vibe\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the outfit from IMAGE 01 with the outfit from IMAGE 02 while preserving:\n\n* the same real person\n* same pose style\n* same hair\n* same body shape\n* same elevator background\n* same mirror selfie composition\n* same camera perspective\n* same lighting direction\n\nThe final video must look like the same real girl from IMAGE 01 naturally wearing the outfit from IMAGE 02 inside the same elevator environment.\n\nCreate a 10-second ultra realistic cinematic fashion reel filmed as a handheld mirror selfie inside a luxury stainless steel elevator.\n\nVIDEO STYLE:\n\n* ultra realistic fashion reel\n* realistic iPhone mirror selfie footage\n* cozy luxury Korean influencer vibe\n* cinematic soft lighting\n* realistic elevator reflections\n* smooth natural movement\n* handheld smartphone feel\n* ultra realistic fabric physics\n* not AI-looking\n\nPHONE REQUIREMENT:\nReplace the current phone with an iPhone 17 Pro Max in elegant desert orange / soft orange titanium color.\nThe phone must continuously cover the face during the entire video.\n\nSCENE FLOW:\n\n0s – 2s\nThe model stands casually in front of the mirror as if the elevator has just started moving. One leg crosses naturally in front of the other. Small body sway. Hair softly resting over the outfit.\n\n2s – 4s\nShe gently adjusts one sleeve or outfit detail naturally while slightly tilting her hips. The fabric from IMAGE 02 moves naturally and realistically.\n\n4s – 6s\nThe model slowly turns slightly sideways to showcase the silhouette of the outfit from IMAGE 02. Her free hand softly smooths the clothing fabric.\n\n6s – 8s\nShe subtly lifts one leg forward to highlight the lower outfit styling while the shoulder bag or accessories naturally move with body motion.\n\n8s – 10s\nFinal calm pose facing the mirror. Relaxed luxury fashion mood. Soft hair movement. Realistic reflections and natural fabric folds.\n\nIMPORTANT:\n\n* face always hidden behind the iPhone 17 Pro Max\n* preserve exact outfit details from IMAGE 02\n* preserve same person and same environment from IMAGE 01\n* realistic body movement only\n* no exaggerated acting\n* no AI artifacts\n* ultra realistic smartphone video aesthetic",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60,
+        "id": "node_MnikFJvV",
+        "label": "📝 Prompt Tạo Video 01 (Xoay Người Khoe Dáng Đồ)",
+        "config": {
+          "slug": "prompt_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face, wearing a fluffy cream oversized sweater, beige mini skirt, and knee-high boots.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie framing\n* hidden-face aesthetic\n* camera angle\n* pose style\n* body proportions\n* hair style\n* lighting mood\n* original person identity\n* overall luxury fashion vibe\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the outfit from IMAGE 01 with the outfit from IMAGE 02 while preserving:\n\n* the same real person\n* same pose style\n* same hair\n* same body shape\n* same elevator background\n* same mirror selfie composition\n* same camera perspective\n* same lighting direction\n\nThe final video must look like the same real girl from IMAGE 01 naturally wearing the outfit from IMAGE 02 inside the same elevator environment.\n\nCreate a 10-second ultra realistic cinematic fashion reel filmed as a handheld mirror selfie inside a luxury stainless steel elevator.\n\nVIDEO STYLE:\n\n* ultra realistic fashion reel\n* realistic iPhone mirror selfie footage\n* cozy luxury Korean influencer vibe\n* cinematic soft lighting\n* realistic elevator reflections\n* smooth natural movement\n* handheld smartphone feel\n* ultra realistic fabric physics\n* not AI-looking\n\nPHONE REQUIREMENT:\nReplace the current phone with an iPhone 17 Pro Max in elegant desert orange / soft orange titanium color.\nThe phone must continuously cover the face during the entire video.\n\nSCENE FLOW:\n\n0s – 2s\nThe model stands casually in front of the mirror as if the elevator has just started moving. One leg crosses naturally in front of the other. Small body sway. Hair softly resting over the outfit.\n\n2s – 4s\nShe gently adjusts one sleeve or outfit detail naturally while slightly tilting her hips. The fabric from IMAGE 02 moves naturally and realistically.\n\n4s – 6s\nThe model slowly turns slightly sideways to showcase the silhouette of the outfit from IMAGE 02. Her free hand softly smooths the clothing fabric.\n\n6s – 8s\nShe subtly lifts one leg forward to highlight the lower outfit styling while the shoulder bag or accessories naturally move with body motion.\n\n8s – 10s\nFinal calm pose facing the mirror. Relaxed luxury fashion mood. Soft hair movement. Realistic reflections and natural fabric folds.\n\nIMPORTANT:\n\n* face always hidden behind the iPhone 17 Pro Max\n* preserve exact outfit details from IMAGE 02\n* preserve same person and same environment from IMAGE 01\n* realistic body movement only\n* no exaggerated acting\n* no AI artifacts\n* ultra realistic smartphone video aesthetic",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_7uE1RgvP",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Video 02 (Vuốt Tóc & Chỉnh Túi Xách)",
+        "pos_x": 884.06077348066,
+        "pos_y": 630.0,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie composition\n* hidden-face aesthetic\n* body proportions\n* pose style\n* lighting mood\n* hair style\n* realistic fashion vibe\n* original person identity\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the clothing and accessories while fully preserving the original girl, pose style, background, and mirror framing from IMAGE 01.\n\nCreate a 10-second ultra realistic vertical fashion video that feels like a continuation of VIDEO 01, filmed moments later inside the same elevator.\n\nSTYLE:\n\n* luxury Korean fashion influencer reel\n* calm feminine energy\n* realistic elevator reflections\n* premium soft indoor lighting\n* natural handheld phone movement\n* ultra realistic hair and fabric motion\n* indistinguishable from real smartphone footage\n\nPHONE REQUIREMENT:\nUse an iPhone 17 Pro Max in elegant desert orange titanium color.\nThe phone must fully cover the face during the entire video.\n\nSCENE FLOW:\n\n0s – 2s\nThe model stands slightly closer to the mirror than before. One shoulder lowered naturally, creating a relaxed oversized styling silhouette.\n\n2s – 4s\nShe softly flips part of her hair behind one shoulder while leaning slightly toward the mirror. The phone still fully hides the face.\n\n4s – 5.5s\nThe model gently adjusts the shoulder bag or outfit accessory while slowly turning her body sideways to reveal the silhouette and texture of the outfit from IMAGE 02.\n\n5.5s – 7s\nShe lightly touches the outfit fabric and smooths it naturally, showcasing realistic material texture and fit.\n\n7s – 8.5s\nThe model bends one knee slightly and shifts weight naturally, highlighting the lower part of the styling and silhouette in a relaxed fashion pose.\n\n8.5s – 10s\nFinal close mirror pose. Calm luxury mood. Slight body tilt. Natural outfit folds and soft hair movement.\n\nIMPORTANT:\n\n* maintain same outfit and elevator continuity\n* preserve exact outfit details from IMAGE 02\n* preserve same girl from IMAGE 01\n* no dramatic movement\n* realistic influencer-style posing only\n* face fully hidden entire video\n* realistic proportions and reflections\n* no AI-looking textures or movements",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60,
+        "id": "node_7uE1RgvP",
+        "label": "📝 Prompt Tạo Video 02 (Vuốt Tóc & Chỉnh Túi Xách)",
+        "config": {
+          "slug": "prompt_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "IMAGE 01 = the elevator mirror selfie reference image with the girl standing inside a stainless steel elevator, holding a phone covering her face.\n\nIMAGE 02 = the uploaded outfit reference image that will replace the current clothing on the model.\n\nUse IMAGE 01 as the primary reference for:\n\n* elevator environment\n* mirror selfie composition\n* hidden-face aesthetic\n* body proportions\n* pose style\n* lighting mood\n* hair style\n* realistic fashion vibe\n* original person identity\n\nUse IMAGE 02 as the exact outfit replacement reference.\nReplace ONLY the clothing and accessories while fully preserving the original girl, pose style, background, and mirror framing from IMAGE 01.\n\nCreate a 10-second ultra realistic vertical fashion video that feels like a continuation of VIDEO 01, filmed moments later inside the same elevator.\n\nSTYLE:\n\n* luxury Korean fashion influencer reel\n* calm feminine energy\n* realistic elevator reflections\n* premium soft indoor lighting\n* natural handheld phone movement\n* ultra realistic hair and fabric motion\n* indistinguishable from real smartphone footage\n\nPHONE REQUIREMENT:\nUse an iPhone 17 Pro Max in elegant desert orange titanium color.\nThe phone must fully cover the face during the entire video.\n\nSCENE FLOW:\n\n0s – 2s\nThe model stands slightly closer to the mirror than before. One shoulder lowered naturally, creating a relaxed oversized styling silhouette.\n\n2s – 4s\nShe softly flips part of her hair behind one shoulder while leaning slightly toward the mirror. The phone still fully hides the face.\n\n4s – 5.5s\nThe model gently adjusts the shoulder bag or outfit accessory while slowly turning her body sideways to reveal the silhouette and texture of the outfit from IMAGE 02.\n\n5.5s – 7s\nShe lightly touches the outfit fabric and smooths it naturally, showcasing realistic material texture and fit.\n\n7s – 8.5s\nThe model bends one knee slightly and shifts weight naturally, highlighting the lower part of the styling and silhouette in a relaxed fashion pose.\n\n8.5s – 10s\nFinal close mirror pose. Calm luxury mood. Slight body tilt. Natural outfit folds and soft hair movement.\n\nIMPORTANT:\n\n* maintain same outfit and elevator continuity\n* preserve exact outfit details from IMAGE 02\n* preserve same girl from IMAGE 01\n* no dramatic movement\n* realistic influencer-style posing only\n* face fully hidden entire video\n* realistic proportions and reflections\n* no AI-looking textures or movements",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_Ld8FM3qT",
+        "node_type": "image",
+        "node_name": "👤 Ảnh Tham Chiếu Nhân Vật & Gương Thang Máy (IMAGE 01)",
+        "pos_x": 123.59179019384,
+        "pos_y": -371.40820980616,
+        "enabled": true,
+        "slug": "image",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg"
+          }
+        ],
+        "id": "node_Ld8FM3qT",
+        "label": "👤 Ảnh Tham Chiếu Nhân Vật & Gương Thang Máy (IMAGE 01)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg",
+        "config": {
+          "slug": "image",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\elevator_ref_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_9_output_1_10_input_1",
+        "source_node_id": "node_j6J92FvO",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ixyFnhE2",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_9_output_1_13_input_1",
+        "source_node_id": "node_j6J92FvO",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_rGXX9NuY",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_9_output_1_12_input_1",
+        "source_node_id": "node_j6J92FvO",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WnKF3PoT",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_10_output_1_13_input_1",
+        "source_node_id": "node_ixyFnhE2",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_rGXX9NuY",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_10_output_1_12_input_1",
+        "source_node_id": "node_ixyFnhE2",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WnKF3PoT",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_11_output_1_10_input_2",
+        "source_node_id": "node_tTfIoakt",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_ixyFnhE2",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_14_output_1_12_input_2",
+        "source_node_id": "node_MnikFJvV",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_WnKF3PoT",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_15_output_1_13_input_2",
+        "source_node_id": "node_7uE1RgvP",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_rGXX9NuY",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_16_output_1_10_input_1",
+        "source_node_id": "node_Ld8FM3qT",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ixyFnhE2",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_node_WnKF3PoT",
+        "node_id": "node_WnKF3PoT",
+        "label": "🎬 Google Flow Video 01 — Kết Quả Render 1080p",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_WnKF3PoT_1080p.mp4",
+        "duration": "10s"
+      },
+      {
+        "clip_id": "clip_node_rGXX9NuY",
+        "node_id": "node_rGXX9NuY",
+        "label": "🎬 Google Flow Video 02 — Kết Quả Render 1080p",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_elevator_mirror_outfit_check\\node_rGXX9NuY_1080p.mp4",
+        "duration": "10s"
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\wf_elevator_mirror_outfit_check_final_1080p.mp4",
+    "batch_history": []
+  }
+}

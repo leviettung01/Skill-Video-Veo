@@ -1,20 +1,22 @@
-# ROLE SKILL: FLOW FINAL PIPELINE (VEO GOOGLE FLOW OMNI FLASH 10S — 6 VIDEOS / SẢN PHẨM)
+# ROLE SKILL: FLOW FINAL PIPELINE (VEO GOOGLE FLOW OMNI FLASH 10S — HYPER-REALISTIC 2K REF & 1080P VIDEO)
 
-Quy trình khép kín từ thông tin sản phẩm TikTok Shop đến **6 Video Final 30s** (`2 Nhân vật × 3 Kịch bản = 6 Video Final`, dọc `9:16`, `720p`):
-1. **Bước 1 (Kịch bản B1 — 6 Video / Sản phẩm)**:
-   - Nhân vật 1 (`NV1`): `V1` (Kịch bản 1: Trợ Giá Sàn), `V3` (Kịch bản 2: Báo Động Giá Xưởng / Luxury), `V5` (Kịch bản 3: Xả Kho Lô Mới).
-   - Nhân vật 2 (`NV2`): `V2` (Kịch bản 1: Giá Sốc Tận Xưởng), `V4` (Kịch bản 2: Không Qua Trung Gian), `V6` (Kịch bản 3: Săn Deal Tận Gốc).
-   - Mỗi kịch bản gồm 3 phân cảnh × 10s, 44–48 từ đọc/cảnh, áp dụng luật thang giá giảm dần ở Cảnh 2, chia 3 mốc `TIMELINE` kết thúc tại `10.0s`.
-2. **Bước 2 (Tạo 6 Ảnh Tham Chiếu 9:16 riêng biệt `v1-refimg.jpg` .. `v6-refimg.jpg` bằng Nano Banana 2.1 — Tải chất lượng 2K `1536x2752`)**:
-   - Mỗi Video Final có **1 ảnh tham chiếu và 1 bối cảnh riêng** (`V1`: Dây chuyền lắp ráp chính, `V2`: Phòng kiểm định QC, `V3`: Tổng kho pallet, `V4`: Showroom trưng bày mẫu, `V5`: Xưởng chế tác nguyên liệu, `V6`: Khu băng chuyền đóng gói tự động).
-   - Gắn đúng **1 ảnh nhân vật (`NV1` / `NV2`)** + **1 ảnh sản phẩm đơn chiếc (chọn 1 phân loại hiển thị đầu tiên, không chọn ảnh ghép nhiều mẫu)**.
-   - **Cấu trúc Prompt Ảnh**: Chỉ mô tả **Nhân vật + Trang phục + Bối cảnh + Hành động cầm sản phẩm + Biểu cảm + Chi tiết xung quanh**. Không mô tả lại màu sắc hay chi tiết sản phẩm bằng chữ, không viết `"no logo"` (để giữ nguyên logo/họa tiết gốc trên sản phẩm), yêu cầu lấy nguyên sản phẩm từ ảnh tham chiếu với tỉ lệ kích thước thật so với cơ thể người.
-   - **Chất lượng tải Ảnh Ref**: Tải ảnh tham chiếu nhân vật cầm sản phẩm ở độ phân giải **2K (`1536x2752`)** qua RPC `SPrCad` (`ts=1`) để video đầu ra sắc nét nhất.
-3. **Bước 3 (Tạo 3 Phân cảnh Video 10s B3 qua Google Flow Omni Flash, delay 15s giữa các request — Tải chất lượng 1080p `1080x1920`)**:
-   - Đưa **CẢ 2 ẢNH THAM CHIẾU** vào `ref_list` của `MZZa6b`: `[Ảnh Ref Nhân vật cầm sản phẩm (ref_uuid), Ảnh Sản phẩm mẫu đơn chiếc (prod_uuid)]` + giọng nói tùy chỉnh (`voice_id`).
-   - **Cấu trúc Prompt Video Ngắn Gọn (Chống biến dạng sản phẩm)**: Không mô tả lại trang phục, bối cảnh hay chi tiết sản phẩm bằng chữ. Chỉ yêu cầu bắt đầu trực tiếp từ ảnh tham chiếu ở trên, giữ nguyên 100% nhân vật + sản phẩm trên tay + bối cảnh, kèm `ACTION` ngắn gọn và `VOICE` theo 3 mốc `TIMELINE` kết thúc tại `10.0s`.
+Quy trình khép kín từ thông tin sản phẩm TikTok Shop đến **Video Final 30s** (`1080x1920`, `60fps`):
+1. **Bước 1 (Kịch bản B1 — Đa Nhân Vật × Đa Kịch Bản / Sản phẩm)**:
+   - Nhân vật 1 (`NV1`): `V1` (Kịch bản 1: Trợ Giá Sàn), `V3` (`nv1_v2` — Kịch bản 2: Báo Động Giá Xưởng), `V5` (`nv1_v3` — Kịch bản 3: Xả Kho Lô Mới).
+   - Nhân vật 2 (`NV2`): `V2` (`nv2_v1` — Kịch bản 1: Giá Sốc Tận Xưởng), `V4` (`nv2_v2` — Kịch bản 2: Không Qua Trung Gian), `V6` (`nv2_v3` — Kịch bản 3: Săn Deal Tận Gốc).
+   - Nhân vật 3 (`NV3` — Nam): `nv3_v1`, `nv3_v2`, `nv3_v3`.
+   - Mỗi kịch bản gồm 3 phân cảnh × 10s, 42–48 từ đọc/cảnh, áp dụng luật thang giá giảm dần ở Cảnh 2, chia 3 mốc `TIMELINE` kết thúc tại `10.0s`.
+2. **Bước 2 (Tạo Ảnh Tham Chiếu 9:16 2K `1536x2752` Hyper-Photorealistic bằng Nano Banana 2.1 `BELUGA`)**:
+   - **Cấu trúc Prompt Ảnh Ref 2K Chuẩn Siêu Thực (6 Khối)**:
+     1. `Subject & Identity`: Cận trung nửa người trên (`close-medium upper-body portrait`, từ đỉnh đầu có headroom tự nhiên tới ngang eo/hông, khoảng cách máy `1.2m`) để gương mặt nhân vật chiếm tỉ lệ lớn, sắc nét từng chi tiết, khóa 100% đường nét khuôn mặt từ Character Reference.
+     2. `Skin & Makeup`: Lỗ chân lông tự nhiên nhìn thấy rõ (`detailed visible natural skin pores`), kết cấu biểu bì thật, hiệu ứng da căng bóng `Douyin glass-skin` phản chiếu ánh sáng nhẹ trên sống mũi, gò má và trán; tông da trắng hồng đều màu giữa mặt, cổ và bàn tay; trang điểm Hàn/Douyin trong trẻo (má hồng phớt, bọng mắt `aegyosal` tự nhiên, mi cong tơi, eyeliner mảnh, môi bóng `ombré` hồng anh đào; kính gọng mảnh chống lóa trong suốt 100% với NV1).
+     3. `PHYSIQUE`: Tỷ lệ cơ thể người trưởng thành quyến rũ, tự nhiên (`90-60-90 feminine proportions, C-cup natural bust, slender waist` với nữ; hoặc dáng thể thao vai rộng nam tính với nam).
+     4. `Expression / Pose`: Nụ cười tươi tự nhiên, đầu hơi nghiêng nhẹ, thân người xoay nhẹ góc `5-10 độ` (`relaxed asymmetry`, tuyệt đối không đứng đơ đối xứng như ma-nơ-canh).
+     5. `Product Action & Lock`: Cầm và giới thiệu đúng sản phẩm thật từ Product Reference ở tầm ngực–eo với tỉ lệ kích thước chuẩn thực tế (`NOT oversized`), giữ nguyên 100% kiểu dáng, chất liệu, màu sắc, logo.
+     6. `Camera, Lens & Lighting + Negative Prompt`: Chụp bằng `Sony A7R V` + ống kính `50mm f/1.4 GM` tại `f/2.0` kết hợp chất ảnh chân thật của `iPhone 16 Pro`, ánh sáng `soft diffused key light + fill light` chiếu sáng đều gương mặt không bóng gắt, xóa phông bokeh quang học mượt mà; kèm `Negative prompt` chống da nhựa AI, chống mắt lác/mờ, chống lóa kính.
+   - **Upsample 2K & Upload Ngược 2K Lên Flow**: Sau khi tạo ảnh qua `ogiZ0b`, gọi `SPrCad` (`ts=1`) để tải bản **2K (`1536x2752`)** về máy, đồng thời upload bản 2K (`1536x2752`, JPEG quality 96) lên Google Flow qua `maseQ` để lấy `uuid_2k` truyền trực tiếp cho bước tạo video.
+3. **Bước 3 (Tạo 3 Phân cảnh Video 10s qua Google Flow Veo 3.1 `abra_r2v_10s` — Tải chất lượng 1080p `1080x1920`)**:
+   - **Khóa Đơn Ảnh Tham Chiếu 2K (`[[None, ref_uuid]]`)**: Khi đã có ảnh Ref 2K nhân vật cầm sẵn sản phẩm (`ref_uuid`), **CHỈ truyền duy nhất `[[None, ref_uuid]]`** vào `MZZa6b` (không truyền thêm `prod_uuid` lần 2) để Veo 3.1 khóa chặt 100% vào khung hình 2K gốc, không tự ý tổng hợp lại làm biến dạng khuôn mặt, mắt kính hay đổi màu ánh sáng.
    - Sau khi render xong phân cảnh video, nâng cấp và tải về ở độ phân giải **1080p (`1080x1920`)** qua RPC `p0UkFb` (`veo_3_1_upsampler_1080p`).
-4. **Bước 4 (Ghép nối Final 30s 1080p + Subtitle Karaoke + Slide Ảnh Phân Loại 20s Cuối B4)**:
-   - Dùng FFmpeg (`flow_final_pipeline/scripts/build_final.py`) nối 3 cảnh 10s thành video 30s chuẩn **Full HD 1080p (`1080x1920`)**, đốt phụ đề `.ass` karaoke 1 dòng chữ in hoa (`#FFE066`), và trình chiếu **slide ảnh các phân loại sản phẩm (`390x390` ở góc trên trái `30:30`) trong suốt 20 giây cuối (`10.0s–30.0s`)**, xuất trực tiếp ra thư mục `final_videos/`.
-
-
+4. **Bước 4 (Ghép nối Final 30s 1080p 60FPS + Subtitle Karaoke + Slide Ảnh Phân Loại 20s Cuối)**:
+   - Dùng FFmpeg (`flow_final_pipeline/scripts/build_final.py`) nối 3 cảnh 10s thành video 30s chuẩn **Full HD 1080p (`1080x1920`, 60fps)** kèm phụ đề Karaoke và Slide ảnh sản phẩm, xuất ra `final_videos/`.

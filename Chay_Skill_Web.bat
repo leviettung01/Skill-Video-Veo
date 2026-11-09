@@ -10,5 +10,5 @@ echo   - Template Video   : Template\Nha Xuong (va cac Template moi)
 echo   - Crawler San Pham : Cach 1 (SPAI Auto) + Cach 2 (Browser + Captcha BoxPhone)
 echo   - Thu Vien Nhan Vat: Character Sheet Templates (Nano Banana 2K / ChatGPT)
 echo ========================================================================
-python -u server.py
+python -u server.py --restart
 pause

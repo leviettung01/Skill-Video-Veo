@@ -1,0 +1,201 @@
+{
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:48:16.657Z",
+  "workflow": {
+    "name": "Elevator Fashion Video Workflow (Workflow Tạo Video Thời Trang Thang Máy) (copy)",
+    "description": "Workflow AI Fashion giúp tạo video thời trang cao cấp trong bối cảnh thang máy hiện đại với phong cách editorial sang trọng. Hệ thống giữ nguyên khuôn mặt nhân vật, tạo chuyển động điện ảnh, ánh sáng chuyên nghiệp và bố cục thời trang như một chiến dịch quảng cáo thực tế.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true
+    },
+    "nodes": [
+      {
+        "node_id": "node_lO9DjrN2",
+        "node_type": "image",
+        "node_name": "Face",
+        "pos_x": 255,
+        "pos_y": 34,
+        "enabled": true,
+        "slug": "face",
+        "slug_auto": false,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/36356810-3915-4231-9df2-9140227a46ea.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_sURtB9p7",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate",
+        "pos_x": 945,
+        "pos_y": 535,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "prompt": "REFERENCE LOCK\n\nimage_1 = Identity reference ONLY.\nLock the identity throughout the entire video.\n\nMaintain identical:\n• eye shape\n• eye size\n• eye spacing\n• eyelids\n• eyebrows\n• eyelashes\n• nose\n• lips\n• jawline\n• cheekbones\n• forehead\n• hairline\n• skin texture\n• facial proportions\n• facial expression\n\nThe facial identity must remain unchanged in every frame.\nNever regenerate, reinterpret or beautify the face.\n\n\nimage_2:\nUse ONLY as the outfit and styling reference.\n\nPreserve exactly every visible fashion item from image_2, including:\n• all garments\n• handbag\n• belt\n• scarf\n• jewelry\n• footwear\n• any outfit-related accessories\n\nMaintain exactly:\n• design\n• silhouette\n• proportions\n• materials\n• textures\n• colors\n• patterns\n• stitching\n• hardware\n• layering\n• styling\n\nDo not redesign, replace, remove or reinterpret any visible fashion item.\n\nDo not inherit any facial features, hairstyle, skin tone or body shape from image_2.\n\nIf another reference image explicitly defines a specific accessory (for example sunglasses), that reference overrides image_2 only for that accessory.\n\n\nimage_3:\nUse ONLY as the elevator architecture reference.\n\nRecreate the elevator from image_3 exactly.\n\nLock:\n• elevator cabin\n• door\n• door frame\n• wall panels\n• ceiling\n• lighting fixtures\n• button panel\n• floor\n• brushed stainless-steel material\n• reflections\n• perspective\n• symmetry\n• architectural layout\n\nOnly inherit the elevator architecture.\n\nDo NOT inherit from image_3:\n• color grading\n• white balance\n• exposure\n• contrast\n• saturation\n• skin tone\n• facial lighting\n• wardrobe colors\n• handbag colors\n• global color palette\n\nOnly the elevator architecture may be inherited from image_3.\n\n\nPriority\n\n1. Identity (image_1)\n2. Outfit (image_2)\n3. Elevator Architecture (image_3)\n4. Motion\n\n\nVIDEO LENGTH\n\n6 seconds\n24 fps\n9:16\n\n\nSTYLE\n\nUltra-realistic luxury fashion commercial.\nPremium editorial campaign.\nCinematic realism.\nNot AI-looking.\n\n\nSCENE\n\nUse the elevator architecture from image_3 exactly.\n\nKeep identical:\n• elevator geometry\n• materials\n• wall layout\n• ceiling\n• floor\n• reflections\n• perspective\n\nThe model must NOT inherit the lighting or color grading from image_3.\n\nNo people except the model.\n\n\nCAMERA\n\nLocked camera on tripod.\n\nEye-level, slightly lower than the model's face.\n\n50mm lens.\n\nDeep depth of field.\n\nNo zoom.\nNo dolly.\nNo handheld movement.\nNo camera shake.\nNo focus breathing.\n\nMaintain identical framing during the entire shot.\n\n\nTEMPORAL CONSISTENCY\n\nMaintain perfect frame-to-frame consistency.\n\nThe same person must appear in every frame.\n\nThe face in the final frame must be identical to the first frame.\n\nNo identity drift.\n\nNo identity regeneration.\n\nNo facial morphing.\n\nNo frame-to-frame facial variation.\n\nThe elevator must remain identical in every frame.\n\nNo architectural changes.\n\nNo reflection drift.\n\nNo environment regeneration.\n\n\nLIGHTING\n\nSoft overhead key light with subtle frontal fill.\n\n5600K neutral daylight.\n\nLuxury commercial beauty lighting.\n\nMedium contrast.\n\nClean stainless-steel reflections.\n\nMaintain warm healthy skin tones regardless of the cool elevator environment.\n\n\nSKIN TONE LOCK\n\nMaintain natural healthy skin tones.\n\nPreserve realistic warm skin color.\n\nNatural pink undertones.\n\nHealthy skin saturation.\n\nDo not desaturate the skin.\n\nDo not introduce blue, gray or green color cast.\n\nDo not inherit the cool metallic color cast from the elevator.\n\nSkin must remain vibrant and naturally illuminated throughout the video.\n\n\nCOLOR SEPARATION\n\nThe elevator may retain cool metallic gray tones.\n\nThe model must retain warm healthy skin tones.\n\nKeep the model visually separated from the cool environment.\n\nThe environment must never change the perceived skin color.\n\n\nFACIAL LIGHTING LOCK\n\nFacial lighting must remain constant throughout the video.\n\nNo exposure fluctuation on the face.\n\nNo changing skin tone.\n\nNo changing facial shadows.\n\nNo lighting flicker across frames.\n\n\nTIMELINE\n\n0.00–0.60s\n\nThe elevator doors remain fully closed.\n\nEverything is perfectly still.\n\nA short cinematic pause builds anticipation.\n\n\n0.60–1.20s\n\nThe elevator doors open quickly and smoothly with premium commercial precision.\n\nThe camera never moves.\n\nAs the doors open, the model is gradually revealed standing perfectly centered.\n\n\n1.20–1.40s\n\nThe doors finish opening completely.\n\nThe model immediately establishes eye contact with the camera.\n\nShe stands naturally with confident posture.\n\n\n1.40–6.00s\n\nThe model performs one elegant editorial pose:\n\n• slightly shift body weight onto one leg\n• rotate shoulders around 10°\n• gently lift the handbag\n\nOnly a subtle chin lift.\n\nVery subtle breathing.\n\nVery subtle natural hair movement.\n\nHair never covers the face.\n\nHairline remains unchanged.\n\nOne natural blink only.\n\nEyes return to exactly the same shape after blinking.\n\nNo head rotation.\n\nNo face rotation.\n\nNo perspective change.\n\nMaintain stable head orientation.\n\nRelaxed confident expression.\n\nHold the final pose for the last 0.6 seconds.\n\n\nMODEL PERFORMANCE\n\nLuxury fashion campaign energy.\n\nConfident but effortless.\n\nNo smile.\n\nNatural facial muscles.\n\nNo exaggerated runway movements.\n\nEvery movement should feel realistic and minimal.\n\nMaintain stable head orientation.\n\nMaintain consistent eye contact.\n\n\nOUTFIT\n\nUse image_2 exactly.\n\nDo not alter any seam, silhouette, fabric, proportions, handbag, accessories or colors.\n\n\nENVIRONMENT\n\nUse image_3 ONLY for the elevator architecture.\n\nKeep the elevator perfectly symmetrical.\n\nKeep reflections physically accurate.\n\nNo geometry changes.\n\nNo material changes.\n\nNo background changes.\n\nNo lighting flicker.\n\n\nIMAGE QUALITY\n\nUltra realistic.\n\nHigh dynamic range.\n\nNatural skin texture.\n\nHealthy vibrant skin.\n\nPremium stainless-steel reflections.\n\nLuxury commercial finish.\n\nNo AI artifacts.\n\n\nNEGATIVE PROMPT\n\ncamera shake, handheld, zoom, dolly, focus hunting, rolling shutter, frame jitter, flickering lights, warped elevator, different elevator, architectural drift, reflection drift, environment regeneration, cool skin tone, blue skin, gray skin, green skin, desaturated skin, changing white balance, changing color grading, changing outfit, handbag deformation, handbag size change, identity drift, identity regeneration, face regeneration, facial morphing, frame-to-frame face variation, eye shape changes, eyelid changes, eyebrow changes, nose changes, jawline changes, cheekbone changes, hairline changes, skin texture changes, facial proportion changes, inconsistent facial lighting, extra people, exaggerated posing, smiling, unrealistic body motion, motion blur, low resolution, oversharpening, noisy image, AI artifacts.",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "textbox",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_rmgthWpS",
+        "node_type": "image",
+        "node_name": "Outfit",
+        "pos_x": 254,
+        "pos_y": 560.01260906672,
+        "enabled": true,
+        "slug": "outfit",
+        "slug_auto": false,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/d86eada4-6ccf-4bc0-885a-578662012e9a.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_ksyIA315",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate 2",
+        "pos_x": 1842,
+        "pos_y": 140.98739093328,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "6s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_we1yoPou",
+        "node_type": "image",
+        "node_name": "Image",
+        "pos_x": 253,
+        "pos_y": 825.01260906672,
+        "enabled": true,
+        "slug": "image",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/cc4a7079-4e21-4928-a761-378c2cd3d2f4.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_0oRvcr7m",
+        "node_type": "prompt",
+        "node_name": "Prompt Assistant",
+        "pos_x": 1124,
+        "pos_y": 1595.1706310534,
+        "enabled": true,
+        "slug": "prompt_assistant",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "REFERENCE LOCK\n\nimage_1 = Face Identity Reference ONLY.\n\nThe person in image_1 IS the final character.\n\nUse image_1 exclusively as the facial identity source.\n\nTreat image_1 as immutable identity data.\n\nExtract and preserve ONLY the facial identity.\n\nNever recreate, redesign, beautify, reinterpret, approximate or synthesize the face.\n\nThe facial identity must remain pixel-faithful throughout the entire video.\n\nLock permanently:\n\n• face shape\n\n• facial proportions\n\n• facial asymmetry\n\n• forehead\n\n• hairline\n\n• eyebrows\n\n• eyebrow shape\n\n• eye shape\n\n• eye size\n\n• eye spacing\n\n• eyelids\n\n• eyelashes\n\n• iris color\n\n• nose\n\n• nostrils\n\n• lips\n\n• lip thickness\n\n• mouth width\n\n• jawline\n\n• cheekbones\n\n• ears\n\n• skin tone\n\n• skin texture\n\n• pores\n\n• fine facial details\n\n• neutral facial expression\n\nNever inherit clothing, hairstyle, accessories, body pose, lighting or environment from image_1.\n\nimage_2 = Master Open-Door Scene Reference.\n\nTreat image_2 as the final approved scene after the elevator doors have completely opened.\n\nImage_2 is NOT the first frame of the video.\n\nImage_2 defines the target fully opened-door state.\n\nTreat image_2 as immutable visual source data.\n\nNever use image_2 as inspiration.\n\nNever redesign any part of image_2.\n\nEverything visible in image_2 except the face is authoritative.\n\nReplace ONLY the facial identity using image_1.\n\nPreserve exactly:\n\nSCENE\n\n• elevator architecture\n\n• elevator dimensions\n\n• wall spacing\n\n• wall proportions\n\n• door proportions\n\n• door frame\n\n• ceiling\n\n• floor\n\n• wall panels\n\n• joints\n\n• seams\n\n• button panel\n\n• control panel\n\n• reflections\n\n• materials\n\n• textures\n\n• colors\n\n• scratches\n\n• surface imperfections\n\n• every visible architectural detail\n\nCAMERA\n\n• camera position\n\n• camera height\n\n• camera distance\n\n• camera angle\n\n• perspective\n\n• framing\n\n• composition\n\n• subject scale\n\n• headroom\n\n• left margin\n\n• right margin\n\n• negative space\n\n• vanishing point\n\n• horizon\n\nMODEL\n\n• body placement\n\n• standing position\n\n• body orientation\n\n• shoulder position\n\n• arm position\n\n• hand position\n\n• leg position\n\n• body proportions\n\n• body scale\n\nHAIR\n\n• hairstyle\n\n• hair length\n\n• hair direction\n\n• hair volume\n\n• hair placement\n\nACCESSORIES\n\n• eyeglasses\n\n• eyeglass frame\n\n• eyeglass color\n\n• handbag\n\n• handbag position\n\n• handbag angle\n\n• handbag strap position\n\n• jewelry\n\n• earrings\n\n• necklace\n\n• bracelet\n\n• watch\n\n• every visible accessory\n\nOUTFIT\n\n• garment design\n\n• garment colors\n\n• garment materials\n\n• garment texture\n\n• garment silhouette\n\n• garment proportions\n\n• garment fit\n\n• clothing folds\n\n• fabric drape\n\n• sleeve position\n\n• skirt position\n\n• every visible outfit detail\n\nLIGHTING\n\n• lighting layout\n\n• light direction\n\n• exposure\n\n• reflections\n\n• shadow placement\n\nEverything outside the face must remain visually identical to image_2.\n\nCompletely ignore ONLY the facial identity from image_2.\n\nREFERENCE FUSION\n\nThe references are complementary.\n\nNever blend identities.\n\nNever average identities.\n\nThe final result must use:\n\n• Facial Identity → image_1\n\n• Everything Else → image_2\n\nImage_2 is the master visual reference.\n\nImage_1 replaces only the facial identity.\n\nEverything else remains unchanged.\n\nSCENE REFERENCE INTERPRETATION\n\nImage_2 is NOT:\n\n• a style reference\n\n• an inspiration reference\n\n• an approximate reference\n\nImage_2 IS:\n\n• the master scene\n\n• the master camera\n\n• the master composition\n\n• the master environment\n\n• the master outfit reference\n\n• the master accessory reference\n\n• the master body placement reference\n\nTreat every visible non-facial element in image_2 as immutable.\n\nNever recreate the scene.\n\nNever redesign the scene.\n\nNever reinterpret the scene.\n\nAnimate the existing scene only.\n\nREFERENCE CONFLICT RULE\n\nIf any written instruction conflicts with image_2,\n\nalways follow image_2.\n\nImage_2 overrides every:\n\n• scene description\n\n• environment description\n\n• camera description\n\n• composition description\n\n• outfit description\n\n• accessory description\n\n• body placement description\n\n• lighting description\n\nNever redesign the scene to satisfy the written prompt.\n\nImage_2 is the final authority for every non-facial element.\n\nPRIORITY\n\n1. Face Identity (image_1)\n\n2. Everything Else (image_2)\n\n3. Motion\n\n4. Rendering Quality\n\nIDENTITY RULE\n\nIdentity preservation overrides every other rendering objective.\n\nThe face must never be regenerated.\n\nNever redraw the face.\n\nNever synthesize missing facial features.\n\nNever modify facial anatomy.\n\nNever modify facial proportions.\n\nNever modify facial perspective.\n\nEvery rendered frame must appear as if the original face from image_1 is simply being animated while every non-facial element remains identical to image_2.\n\n\nVIDEO\n\nDuration: 6 seconds.\n\nFrame rate: 24 fps.\n\nAspect ratio: 9:16.\n\nSTYLE\n\nUltra-realistic luxury fashion commercial.\n\nPremium editorial campaign.\n\nCinematic realism.\n\nNatural skin.\n\nNatural fabric.\n\nPhysically accurate lighting.\n\nPhotorealistic stainless-steel reflections.\n\nNot AI-looking.\n\nSCENE\n\nThe entire environment is defined by image_2.\n\nImage_2 represents the fully opened-door state.\n\nThe elevator shown in image_2 already exists before the animation begins.\n\nThe opening doors only reveal the existing elevator.\n\nThe elevator must never be regenerated.\n\nThe elevator must never be replaced.\n\nThe elevator must never be redesigned.\n\nThe elevator must remain visually identical to image_2 throughout the entire video.\n\nPreserve exactly:\n\n• elevator architecture\n\n• wall proportions\n\n• ceiling\n\n• floor\n\n• wall panels\n\n• door frame\n\n• door proportions\n\n• joints\n\n• seams\n\n• control panel\n\n• buttons\n\n• materials\n\n• colors\n\n• textures\n\n• scratches\n\n• surface imperfections\n\n• reflections\n\n• every visible architectural detail\n\nNo visual redesign is allowed.\n\nNo material changes.\n\nNo texture changes.\n\nNo color changes.\n\nNo reflection changes.\n\nELEVATOR CONTINUITY\n\nThe elevator exists from the very first frame.\n\nBefore the doors open, the elevator interior already exists behind the closed doors.\n\nThe closed doors simply conceal the existing elevator.\n\nDoor opening is only a reveal animation.\n\nDoor opening must never generate a new elevator.\n\nDoor opening must never regenerate the scene.\n\nDoor opening must reveal exactly the same elevator shown in image_2.\n\nThe elevator interior must remain identical before, during and after the doors open.\n\nCAMERA\n\nTreat image_2 as the master camera reference.\n\nMaintain permanently:\n\n• camera position\n\n• camera height\n\n• camera distance\n\n• camera angle\n\n• framing\n\n• perspective\n\n• composition\n\n• subject scale\n\n• headroom\n\n• left margin\n\n• right margin\n\n• negative space\n\n• vanishing point\n\n• horizon\n\n• elevator alignment\n\nLocked camera.\n\nNo camera movement.\n\nNo zoom.\n\nNo dolly.\n\nNo orbit.\n\nNo crane.\n\nNo handheld movement.\n\nNo camera shake.\n\nNo focus breathing.\n\nNo focal length change.\n\nNo perspective shift.\n\nEvery frame must preserve the identical framing established by image_2.\n\nLAYOUT LOCK\n\nMaintain exactly:\n\n• subject X position\n\n• subject Y position\n\n• subject scale\n\n• distance to elevator doors\n\n• distance to frame edges\n\n• visual balance\n\n• empty space\n\nThe composition must remain unchanged.\n\nOnly the model is allowed to move.\n\nThe camera never follows the model.\n\nLIGHTING\n\nImage_2 defines the environmental lighting.\n\nMaintain:\n\n• lighting direction\n\n• exposure\n\n• reflection placement\n\n• reflection intensity\n\n• reflection colors\n\n• shadow placement\n\nFacial lighting remains constant.\n\nNo lighting flicker.\n\nNo exposure fluctuation.\n\nNo color temperature shift.\n\nMaintain the identical commercial lighting established by image_2.\n\nBACKGROUND CONTINUITY\n\nThe elevator is a completely static environment.\n\nThe background never updates.\n\nThe background never changes.\n\nThe elevator walls remain fixed.\n\nThe ceiling remains fixed.\n\nThe floor remains fixed.\n\nThe reflections remain fixed.\n\nThe architectural details remain fixed.\n\nOnly the elevator doors and the model are allowed to animate.\n\nThe camera never follows the subject.\n\nThe environment never reacts to the model's movement.\n\n\nHEAD LOCK\n\nThe head remains almost perfectly stationary throughout the video.\n\nMaximum head rotation:\n\n• Yaw ±2°\n\n• Pitch ±2°\n\n• Roll ±2°\n\nMaximum head translation: ±1 cm.\n\nThe nose continuously faces the camera.\n\nMaintain identical facial perspective throughout the video.\n\nHair moves naturally but never covers the face.\n\nEyeglasses remain perfectly aligned as shown in image_2.\n\nBODY MOTION\n\nOnly the body performs the pose.\n\nKeep all movement elegant, minimal and realistic.\n\nAllowed motion:\n\n• natural weight shift onto one leg\n\n• upper torso rotation up to approximately 5°\n\n• handbag lift up to approximately 5 cm\n\n• subtle shoulder movement\n\n• subtle breathing\n\nThe head remains nearly fixed.\n\nNo exaggerated motion.\n\nNo facial deformation.\n\nNo blink.\n\nNo expression change.\n\nTIMELINE\n\n0.00–0.60 s\n\nThe elevator doors are fully closed.\n\nEverything is perfectly still.\n\nThe camera remains completely locked.\n\nThe elevator behind the doors already exists exactly as defined by image_2.\n\n0.60–1.20 s\n\nThe elevator doors open smoothly.\n\nOnly the doors move.\n\nThe elevator itself never changes.\n\nThe camera remains completely locked.\n\nOpening the doors reveals the existing elevator shown in image_2.\n\nNo new environment may be generated.\n\n1.20–1.40 s\n\nThe elevator doors finish opening.\n\nThe scene now matches the fully opened-door reference defined by image_2.\n\nThe model is already looking directly into the camera.\n\nPause briefly before movement begins.\n\nMASTER FRAME MATCH\n\nThe first fully opened-door frame becomes the Master Frame.\n\nThis frame must be visually identical to image_2 except:\n\n• facial identity replaced using image_1.\n\nEverything else remains identical to image_2.\n\nFrom this moment onward, every frame must preserve the same scene.\n\nFRAME STABILITY\n\nAfter the Master Frame has been established, maintain permanently:\n\n• identical elevator\n\n• identical architecture\n\n• identical materials\n\n• identical textures\n\n• identical colors\n\n• identical reflections\n\n• identical lighting\n\n• identical camera position\n\n• identical framing\n\n• identical perspective\n\n• identical subject placement\n\nThe environment never changes.\n\nThe elevator never changes.\n\nThe background never changes.\n\nOnly the model performs subtle motion.\n\nOnly the elevator doors may animate during the opening sequence.\n\n1.40–6.00 s\n\nThe model performs one elegant editorial pose.\n\nShift body weight naturally.\n\nRotate only the upper torso slightly.\n\nLift the handbag slightly.\n\nMaintain uninterrupted eye contact.\n\nKeep the head almost perfectly fixed.\n\nFinish by holding the final pose steadily during the last 0.6 seconds.\n\nMODEL PERFORMANCE\n\nLuxury editorial fashion campaign.\n\nElegant.\n\nConfident.\n\nNatural.\n\nMinimal movement.\n\nNeutral facial muscles.\n\nNo smile.\n\nConstant eye contact.\n\nNo expression drift.\n\nOUTFIT & ACCESSORIES\n\nEverything outside the face must remain identical to image_2.\n\nPreserve exactly:\n\n• eyeglasses\n\n• handbag\n\n• handbag position\n\n• handbag angle\n\n• handbag strap\n\n• jewelry\n\n• watch\n\n• bracelet\n\n• shoes\n\n• garment fit\n\n• garment folds\n\n• fabric drape\n\n• every visible accessory\n\nDo not reposition any accessory.\n\nDo not redesign any accessory.\n\nDo not alter the way the outfit is worn.\n\nIMAGE QUALITY\n\nUltra-realistic.\n\nHigh dynamic range.\n\nNatural skin texture.\n\nNatural fabric texture.\n\nPhysically accurate reflections.\n\nCommercial fashion photography quality.\n\nNo AI artifacts.\n\nFINAL IDENTITY CHECK\n\nBefore rendering every frame:\n\nVerify that the facial identity remains identical to image_1.\n\nIf any facial feature differs from image_1,\n\ndiscard the frame and regenerate it.\n\nIdentity preservation overrides every other rendering objective.\n\nFINAL SCENE CHECK\n\nBefore rendering every frame:\n\nVerify that the environment remains identical to image_2.\n\nThe elevator must never change.\n\nThe camera must never move.\n\nThe background must never regenerate.\n\nThe scene must never drift.\n\nOnly the model and the elevator doors may animate.\n\nNEGATIVE PROMPT\n\nidentity drift,\n\nface replacement,\n\nface regeneration,\n\nface redraw,\n\nface morphing,\n\nidentity blending,\n\nidentity averaging,\n\nbeauty enhancement,\n\nplastic skin,\n\nCGI face,\n\nchanging facial anatomy,\n\nchanging facial proportions,\n\nchanging facial perspective,\n\nchanging eye shape,\n\nchanging eyebrows,\n\nchanging nose,\n\nchanging lips,\n\nchanging jawline,\n\nchanging skin tone,\n\nchanging skin texture,\n\nexpression drift,\n\nage change,\n\ncamera shake,\n\nhandheld movement,\n\nzoom,\n\ndolly,\n\norbit,\n\ncrane,\n\nfocus hunting,\n\nfocus breathing,\n\nrolling shutter,\n\nframe jitter,\n\ncamera position drift,\n\ncamera perspective drift,\n\nchanged framing,\n\nchanged composition,\n\nchanged subject scale,\n\nscene drift,\n\nbackground drift,\n\nenvironment drift,\n\ngeometry drift,\n\nappearance drift,\n\nlighting drift,\n\nreflection drift,\n\nmaterial drift,\n\ntexture drift,\n\ncolor drift,\n\ndifferent elevator,\n\nalternate architecture,\n\nhallucinated environment,\n\nhallucinated reflections,\n\nhallucinated wall panels,\n\nhallucinated ceiling,\n\nhallucinated floor,\n\nhallucinated materials,\n\nhallucinated textures,\n\nchanging outfit,\n\nchanging eyeglasses,\n\nchanging handbag,\n\nchanging accessory placement,\n\nAI artifacts.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_54koOmL7",
+        "node_type": "image",
+        "node_name": "Face Mask",
+        "pos_x": 952.8293689466,
+        "pos_y": -103,
+        "enabled": true,
+        "slug": "image_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/7bf3693e-0f7c-434f-9ac6-bd0ebb48b6ce.jpeg"
+          }
+        ]
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_2_input_1",
+        "source_node_id": "node_lO9DjrN2",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_sURtB9p7",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_4_input_1",
+        "source_node_id": "node_sURtB9p7",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ksyIA315",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_3_output_1_2_input_1",
+        "source_node_id": "node_rmgthWpS",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_sURtB9p7",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_5_output_1_2_input_1",
+        "source_node_id": "node_we1yoPou",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_sURtB9p7",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_6_output_1_4_input_2",
+        "source_node_id": "node_0oRvcr7m",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_ksyIA315",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_7_output_1_4_input_1",
+        "source_node_id": "node_54koOmL7",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ksyIA315",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      }
+    ]
+  }
+}

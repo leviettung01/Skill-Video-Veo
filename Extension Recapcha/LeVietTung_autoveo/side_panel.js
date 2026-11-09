@@ -1,234 +1,190 @@
 /**
- * Flow Kit — Side Panel
- * Displays live connection status, metrics, and request log.
+ * LeVietTung_autoveo — Side Panel Controller (v2.1.0)
+ * Tích hợp đầy đủ Cấu hình kết nối (Bridge URL + Bridge Secret + Lưu + Test kết nối)
+ * & Trạng thái Poll/Mint trực tiếp trên Side Panel.
  */
+'use strict';
 
-// ── Type label map ───────────────────────────────────────────
+const DEFAULT_BRIDGE_BASE = 'http://127.0.0.1:4000';
+const DEFAULT_BRIDGE_SECRET = 'ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d';
 
-const TYPE_LABELS = {
-  // Worker request types
-  GENERATE_IMAGE:           'GEN IMAGE',
-  REGENERATE_IMAGE:         'REGEN IMAGE',
-  EDIT_IMAGE:               'EDIT IMAGE',
-  GENERATE_CHARACTER_IMAGE: 'GEN REF',
-  REGENERATE_CHARACTER_IMAGE: 'REGEN REF',
-  EDIT_CHARACTER_IMAGE:     'EDIT REF',
-  GENERATE_VIDEO:           'GEN VIDEO',
-  GENERATE_VIDEO_REFS:      'GEN VIDEO FROM REFS',
-  UPSCALE_VIDEO:            'UPSCALE VIDEO',
-  // Captcha action types
-  IMAGE_GENERATION:         'GEN IMAGE',
-  VIDEO_GENERATION:         'GEN VIDEO',
-  // Extension-classified API types
-  GEN_IMG:                  'GEN IMAGE',
-  GEN_VID:                  'GEN VIDEO',
-  GEN_VID_REF:              'GEN VIDEO FROM REFS',
-  UPSCALE:                  'UPSCALE VIDEO',
-  UPS_IMG:                  'UPSCALE IMAGE',
-  POLL:                     'CHECK GEN VIDEO',
-  CREDITS:                  'CHECK CREDIT',
-  CREATE_PROJECT:           'CREATE PROJECT',
-  UPLOAD:                   'UPLOAD IMAGE',
-  MEDIA:                    'READ MEDIA',
-  TRACKING:                 'GOOGLE FLOW TRACK',
-  URL_REFRESH:              'URL REFRESH',
-  TRPC:                     'TRPC',
-  API:                      'API',
-};
+const spUrlInput = document.getElementById('sp-bridge-url');
+const spSecretInput = document.getElementById('sp-bridge-secret');
+const spToggleSecretBtn = document.getElementById('sp-toggle-secret');
+const spSaveBtn = document.getElementById('sp-save-btn');
+const spTestBtn = document.getElementById('sp-test-btn');
+const spSyncBtn = document.getElementById('sp-sync-btn');
+const spTestResult = document.getElementById('sp-test-result');
+const spLastPoll = document.getElementById('sp-last-poll');
+const spLastMint = document.getElementById('sp-last-mint');
+const spLastMintDur = document.getElementById('sp-last-mint-dur');
 
-function formatType(type) {
-  if (!type) return '—';
-  return TYPE_LABELS[type] || type.slice(0, 5).toUpperCase();
+let secretVisible = false;
+spToggleSecretBtn.addEventListener('click', () => {
+  secretVisible = !secretVisible;
+  spSecretInput.type = secretVisible ? 'text' : 'password';
+  spToggleSecretBtn.textContent = secretVisible ? '🙈' : '👁';
+});
+
+chrome.storage.local.get(['bridgeBase', 'bridgeSecret'], ({ bridgeBase, bridgeSecret }) => {
+  spUrlInput.value = bridgeBase || DEFAULT_BRIDGE_BASE;
+  spSecretInput.value = bridgeSecret || DEFAULT_BRIDGE_SECRET;
+  testBridgeConnection(true);
+});
+
+spSaveBtn.addEventListener('click', () => {
+  const bridgeBase = spUrlInput.value.trim().replace(/\/+$/, '') || DEFAULT_BRIDGE_BASE;
+  const bridgeSecret = spSecretInput.value.trim() || DEFAULT_BRIDGE_SECRET;
+  chrome.storage.local.set({ bridgeBase, bridgeSecret }, () => {
+    chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {});
+    spSaveBtn.textContent = '✓ Đã lưu';
+    setTimeout(() => { spSaveBtn.textContent = 'Lưu cấu hình'; }, 1500);
+    testBridgeConnection(false);
+  });
+});
+
+spTestBtn.addEventListener('click', () => testBridgeConnection(false));
+
+spSyncBtn.addEventListener('click', () => {
+  const bridgeBase = spUrlInput.value.trim().replace(/\/+$/, '') || DEFAULT_BRIDGE_BASE;
+  chrome.runtime.sendMessage({ type: 'AUTO_SYNC_CONFIG', bridgeBase }, (res) => {
+    if (res && res.ok) {
+      spUrlInput.value = res.bridgeBase || DEFAULT_BRIDGE_BASE;
+      spSecretInput.value = res.bridgeSecret || DEFAULT_BRIDGE_SECRET;
+      testBridgeConnection(false);
+    } else {
+      showSpTestBanner(false, 'Không tự động đọc được từ cổng 4000');
+    }
+  });
+});
+
+const spFlowEmailBadge = document.getElementById('sp-flow-email-badge');
+
+async function testBridgeConnection(silentIfFail = false) {
+  const bridgeBase = spUrlInput.value.trim().replace(/\/+$/, '');
+  const bridgeSecret = spSecretInput.value.trim();
+  if (!bridgeBase || !bridgeSecret) {
+    if (!silentIfFail) showSpTestBanner(false, 'Hãy nhập Bridge URL & Secret');
+    return;
+  }
+  spTestBtn.textContent = 'Đang test...';
+  try {
+    const resp = await fetch(`${bridgeBase}/api/internal/captcha/stats`, {
+      method: 'GET',
+      headers: { 'x-local-auth': bridgeSecret },
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      const pending = data.pendingCount ?? 0;
+      const queued = data.queuedCount ?? 0;
+      const pollers = data.pollerWaitingCount ?? 1;
+      showSpTestBanner(true, `OK — pending: ${pending}, queued: ${queued}, pollers: ${pollers}`);
+    } else if (!silentIfFail) {
+      showSpTestBanner(false, `HTTP ${resp.status}`);
+    }
+  } catch (e) {
+    if (!silentIfFail) showSpTestBanner(false, e?.message || 'Chưa kết nối cổng 4000');
+  } finally {
+    spTestBtn.textContent = 'Test kết nối';
+  }
 }
 
-// ── Time formatting ──────────────────────────────────────────
+function showSpTestBanner(ok, msg) {
+  spTestResult.className = `test-banner ${ok ? 'ok' : 'fail'}`;
+  spTestResult.textContent = ok ? `✓ ${msg}` : `✗ ${msg}`;
+}
+
+function formatAgo(ts) {
+  if (!ts) return '—';
+  const secs = Math.round((Date.now() - ts) / 1000);
+  if (secs < 5) return 'Vừa xong';
+  if (secs < 60) return `${secs}s trước`;
+  const mins = Math.floor(secs / 60);
+  const rem = secs % 60;
+  return rem > 0 ? `${mins}m ${rem}s trước` : `${mins}m trước`;
+}
 
 function formatTime(iso) {
   if (!iso) return '—';
   try {
     const d = new Date(iso);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ss = String(d.getSeconds()).padStart(2, '0');
-    return `${hh}:${mm}:${ss}`;
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}:${String(d.getSeconds()).padStart(2, '0')}`;
   } catch {
     return '—';
   }
 }
 
-// ── Status update ────────────────────────────────────────────
-
 function updateStatus(data) {
   if (!data) return;
 
-  // Connection dot
   const dot = document.getElementById('conn-dot');
-  const connected = data.agentConnected;
+  const connected = Boolean(data.agentConnected);
   dot.className = connected ? 'on' : '';
 
-  // Toggle state
-  const toggle = document.getElementById('main-toggle');
-  const toggleLabel = document.getElementById('toggle-label');
-  toggle.checked = true;
-  toggleLabel.textContent = 'ON';
-
-  // State badge
   const stateBadge = document.getElementById('state-badge');
-  const st = connected ? (data.state || 'idle') : 'connecting';
-  stateBadge.textContent = st;
-  stateBadge.className = st;
+  const st = connected ? 'connected' : (data.state || 'connecting');
+  stateBadge.textContent = connected ? 'CONNECTED (:4000)' : st.toUpperCase();
+  stateBadge.className = connected ? 'connected' : 'connecting';
 
-  // Token status
   const tokenEl = document.getElementById('token-status');
+  if (spFlowEmailBadge) {
+    spFlowEmailBadge.textContent = data.flowEmail ? `📧 ${data.flowEmail}` : '';
+  }
   if (data.flowKeyPresent) {
-    const ageMs = data.tokenAge || 0;
-    const ageMin = Math.round(ageMs / 60000);
-    if (ageMs > 3600000) {
-      tokenEl.textContent = `token expired — open Flow to refresh`;
-      tokenEl.className = 'warn';
-    } else {
-      tokenEl.textContent = `token synced ${ageMin}m`;
-      tokenEl.className = 'ok';
-    }
-    // Auto-refresh when token age > 55 min and connected
-    if (ageMs > 3300000 && data.agentConnected) {
-      chrome.runtime.sendMessage({ type: 'REFRESH_TOKEN' });
-    }
+    tokenEl.textContent = data.flowEmail ? `✓ ${data.flowEmail}` : `✓ Cookie Flow (${data.cookieCount || 0})`;
+    tokenEl.className = 'ok';
+  } else if (data.hasFlowTab) {
+    tokenEl.textContent = 'Chưa đăng nhập Flow';
+    tokenEl.className = 'warn';
   } else {
-    tokenEl.textContent = 'no token';
+    tokenEl.textContent = 'Chưa mở tab Flow';
     tokenEl.className = 'bad';
   }
 
-  // Metrics
-  const m = data.metrics || {};
-  document.getElementById('m-total').textContent   = m.requestCount || 0;
-  document.getElementById('m-success').textContent = m.successCount || 0;
-  document.getElementById('m-failed').textContent  = m.failedCount  || 0;
-}
+  spLastPoll.textContent = formatAgo(data.lastPollOkAt);
+  spLastMint.textContent = formatAgo(data.lastMintOkAt);
+  spLastMintDur.textContent = data.lastMintDurationMs != null ? `${data.lastMintDurationMs}ms` : '—';
 
-// ── Request log ──────────────────────────────────────────────
+  const m = data.metrics || {};
+  document.getElementById('m-total').textContent = m.requestCount || 0;
+  document.getElementById('m-success').textContent = m.successCount || 0;
+  document.getElementById('m-failed').textContent = m.failedCount || 0;
+}
 
 function updateRequestLog(entries) {
   const tbody = document.getElementById('log-body');
   const countEl = document.getElementById('log-count');
 
   if (!entries || entries.length === 0) {
-    tbody.innerHTML = '<tr><td colspan="5" class="log-empty">No requests yet</td></tr>';
+    tbody.innerHTML = '<tr><td colspan="5" class="log-empty">Chưa có request nào</td></tr>';
     countEl.textContent = '0';
     return;
   }
 
   countEl.textContent = entries.length;
-  _logEntries = entries;
-
-  // Render newest first (entries already sorted DESC by background.js)
-  const rows = entries.map((entry) => {
+  tbody.innerHTML = entries.map((entry) => {
     const shortId = entry.id ? String(entry.id).slice(0, 8) : '—';
-    const type   = formatType(entry.type || entry.method);
-    const time   = formatTime(entry.time || entry.timestamp || entry.createdAt);
-    const status = entry.status || entry.state || 'pending';
-    const error  = entry.error || '';
+    const type = entry.type || 'CAPTCHA';
+    const time = formatTime(entry.time);
+    const status = entry.status || 'pending';
+    const detail = entry.error || entry.responseSummary || entry.payloadSummary || '—';
 
-    let badgeHtml;
+    let badgeHtml = '<span class="badge badge-proc">⏳ xử lý</span>';
     if (status === 'COMPLETED' || status === 'success') {
-      badgeHtml = '<span class="badge badge-ok">&#10003; done</span>';
-    } else if (status === 'FAILED' || status === 'failed' || (typeof status === 'number' && status >= 400)) {
-      badgeHtml = '<span class="badge badge-fail">&#10007; fail</span>';
-    } else if (status === 'PROCESSING') {
-      badgeHtml = '<span class="badge badge-proc">&#9203; gen...</span>';
-    } else if (status === 200 || status === 'processing') {
-      badgeHtml = '<span class="badge badge-proc">&#9203; sent</span>';
-    } else {
-      badgeHtml = '<span class="badge badge-proc">&#9203; sent</span>';
+      badgeHtml = '<span class="badge badge-ok">✓ xong</span>';
+    } else if (status === 'FAILED' || status === 'failed') {
+      badgeHtml = '<span class="badge badge-fail">✕ lỗi</span>';
     }
 
-    const errorDisplay = error
-      ? `<td class="td-error" title="${escHtml(error)}">${escHtml(truncate(error, 28))}</td>`
-      : `<td class="td-error empty">—</td>`;
-
     return `<tr>
-      <td class="td-id" data-request-id="${escHtml(entry.id || '')}">${escHtml(shortId)}</td>
-      <td class="td-type">${escHtml(type)}</td>
-      <td class="td-time">${escHtml(time)}</td>
+      <td class="td-id">${shortId}</td>
+      <td class="td-type">${type}</td>
+      <td class="td-time">${time}</td>
       <td>${badgeHtml}</td>
-      ${errorDisplay}
+      <td title="${String(detail).replace(/"/g, '&quot;')}">${String(detail).slice(0, 26)}</td>
     </tr>`;
-  });
-
-  tbody.innerHTML = rows.join('');
-
-  // Attach click handlers to ID cells
-  tbody.querySelectorAll('.td-id[data-request-id]').forEach(td => {
-    td.addEventListener('click', () => {
-      const reqId = td.getAttribute('data-request-id');
-      if (reqId) showRequestDetail(reqId);
-    });
-  });
-}
-
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function truncate(str, len) {
-  if (!str || str.length <= len) return str;
-  return str.slice(0, len) + '…';
-}
-
-// ── Request detail modal ────────────────────────────────────
-
-let _logEntries = [];
-
-function showRequestDetail(reqId) {
-  const entry = _logEntries.find(e => e.id === reqId);
-  if (!entry) return;
-
-  const overlay = document.getElementById('detail-overlay');
-  const title = document.getElementById('detail-title');
-  const body = document.getElementById('detail-body');
-
-  title.textContent = `Request ${String(reqId).slice(0, 12)}`;
-
-  const fields = [
-    ['ID', entry.id],
-    ['Type', formatType(entry.type || entry.method)],
-    ['Time', formatTime(entry.time || entry.timestamp || entry.createdAt)],
-    ['Status', entry.status || entry.state || 'pending'],
-    ['HTTP', entry.httpStatus || '—'],
-    ['URL', entry.url || '—'],
-    ['Payload', entry.payloadSummary || '—'],
-    ['Response', entry.responseSummary || '—'],
-    ['Error', entry.error || '—'],
-  ];
-
-  body.innerHTML = fields.map(([label, value]) => {
-    let cls = 'detail-value';
-    if (label === 'Error' && value && value !== '—') cls += ' error';
-    if (label === 'Status' && (value === 'COMPLETED' || value === 'success')) cls += ' ok';
-    return `<div class="detail-row">
-      <div class="detail-label">${escHtml(label)}</div>
-      <div class="${cls}">${escHtml(String(value || '—'))}</div>
-    </div>`;
   }).join('');
-
-  overlay.classList.add('open');
 }
-
-document.getElementById('detail-close').addEventListener('click', () => {
-  document.getElementById('detail-overlay').classList.remove('open');
-});
-
-document.getElementById('detail-overlay').addEventListener('click', (e) => {
-  if (e.target === e.currentTarget) {
-    e.currentTarget.classList.remove('open');
-  }
-});
-
-// ── Initial data fetch ───────────────────────────────────────
 
 function fetchStatus() {
   chrome.runtime.sendMessage({ type: 'STATUS' }, (data) => {
@@ -244,50 +200,37 @@ function fetchLog() {
   });
 }
 
-// ── Message listener (push updates) ─────────────────────────
-
 chrome.runtime.onMessage.addListener((msg) => {
-  if (msg.type === 'STATUS_PUSH') {
-    fetchStatus();
-  }
-  if (msg.type === 'REQUEST_LOG_UPDATE') {
-    if (msg.log) updateRequestLog(msg.log);
-  }
+  if (msg.type === 'STATUS_PUSH') fetchStatus();
+  if (msg.type === 'REQUEST_LOG_UPDATE' && msg.log) updateRequestLog(msg.log);
 });
-
-// ── Toggle (connect / disconnect) ───────────────────────────
 
 document.getElementById('main-toggle').addEventListener('change', (e) => {
   const msgType = e.target.checked ? 'RECONNECT' : 'DISCONNECT';
+  document.getElementById('toggle-label').textContent = e.target.checked ? 'ON' : 'OFF';
   chrome.runtime.sendMessage({ type: msgType }, () => {
-    if (chrome.runtime.lastError) return;
-    setTimeout(fetchStatus, 400);
+    setTimeout(fetchStatus, 300);
   });
 });
 
-// ── Action buttons ───────────────────────────────────────────
-
 document.getElementById('btn-flow').addEventListener('click', () => {
-  chrome.runtime.sendMessage({ type: 'OPEN_FLOW_TAB' }, () => {
-    if (chrome.runtime.lastError) return;
-  });
+  chrome.runtime.sendMessage({ type: 'OPEN_FLOW_TAB' });
 });
 
 document.getElementById('btn-token').addEventListener('click', () => {
   const btn = document.getElementById('btn-token');
-  btn.textContent = 'Opening...';
-  btn.disabled = true;
+  btn.textContent = 'Đang đồng bộ...';
   chrome.runtime.sendMessage({ type: 'REFRESH_TOKEN' }, () => {
-    if (chrome.runtime.lastError) { /* ignore */ }
-    btn.textContent = 'Refresh Token';
-    btn.disabled = false;
+    setTimeout(() => {
+      btn.textContent = '🔄 Đồng Bộ Phiên Flow';
+      fetchStatus();
+      testBridgeConnection(true);
+    }, 500);
   });
 });
 
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {
-    if (chrome.runtime.lastError) { /* ignore */ }
-  });
+  chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {});
   fetchStatus();
   fetchLog();
   setInterval(fetchStatus, 2000);

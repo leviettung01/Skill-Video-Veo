@@ -1,0 +1,218 @@
+{
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:52:36.890Z",
+  "workflow": {
+    "name": "AI Fashion Transformation – Biến Hình Trang Phục (copy)",
+    "description": "Tạo video biến hình thời trang từ 2 ảnh nhân vật tham chiếu. Sử dụng hiệu ứng che khuất bằng ô để chuyển đổi trang phục mượt mà qua 2 video 4 giây, giữ nguyên nhân vật, bối cảnh và góc quay.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true
+    },
+    "nodes": [
+      {
+        "node_id": "node_5yYjOUQW",
+        "node_type": "image",
+        "node_name": "Image/Video",
+        "pos_x": 134,
+        "pos_y": -73,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/f7e45d2d-b6c0-4ea6-bce8-a138366d0fa4.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_mVwOo8cs",
+        "node_type": "image",
+        "node_name": "Image/Video 2",
+        "pos_x": 1040,
+        "pos_y": 800.36964685666,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/5eea757f-848a-47ce-96cb-73d2b4b0b234.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_3g9kcI1I",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate",
+        "pos_x": 964,
+        "pos_y": -94.630353143338,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "4s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_EQHAg3F6",
+        "node_type": "prompt",
+        "node_name": "Global",
+        "pos_x": 125,
+        "pos_y": 970.30151414293,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Ultra-clean high-definition photorealistic fashion cinematography. Prioritize maximum native image clarity, fine-detail preservation, sharp subject rendering, and temporal consistency in every frame. Preserve precise clothing seams, stitching, fabric weave, garment edges, folds, footwear details, hair strands, umbrella ribs, and realistic asphalt microtextures. Crisp natural textures with controlled fine-grain detail, accurate material definition, balanced exposure, realistic skin texture, and clean edge separation. Maintain consistent sharpness across the entire 4-second sequence, including during movement. Use a high-quality professional camera aesthetic, natural optical sharpness, minimal motion blur, stable focus, no artificial skin smoothing, no watercolor-like textures, no excessive denoising, no compression artifacts, no pixelation, no ghosting, no flickering, no frame-to-frame detail loss, no over-sharpening halos. Render at the highest supported native resolution and quality setting. Preserve original reference image details without stylization or reinterpretation.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_SUjlH7CG",
+        "node_type": "prompt",
+        "node_name": "Video 1",
+        "pos_x": 126,
+        "pos_y": 663,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use IMAGE_1 as the STRICT PRIMARY CHARACTER AND INITIAL OUTFIT REFERENCE. Create a realistic cinematic overhead fashion transition video, designed to connect seamlessly with Video 2.\n\n**CHARACTER IDENTITY LOCK:** Preserve the exact character identity, facial features, hairstyle, skin tone, body proportions, and physical appearance from IMAGE_1. The character must wear the exact sleepwear outfit shown in IMAGE_1, preserving its original design, colors, fabric texture, silhouette, and details. Do not modify or redesign the sleepwear.\n\n**SCENE AND CAMERA LOCK:** A realistic outdoor gray asphalt street with subtle natural surface texture, soft daylight, and physically accurate shadows. Camera positioned directly overhead at a fixed 90-degree top-down angle, looking vertically downward. Full-body character visible initially, positioned near the center of the vertical 9:16 frame. The camera remains completely stationary throughout the video. No zoom, pan, tilt, rotation, or perspective changes.\n\n**PROP LOCK:** One realistic large black umbrella with a circular canopy, dark fabric, natural radial ribs, and a straight handle. The umbrella must maintain consistent size, shape, color, and physical structure throughout the entire sequence.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** The character wearing the exact sleepwear from IMAGE_1 walks naturally into the center of the frame on the gray asphalt street, holding a folded black umbrella. Movement is relaxed, fluid, and realistic. Maintain a clear overhead view of the initial outfit.\n\n**0.8–1.8s:** The character slows down and smoothly raises the black umbrella above the head. The umbrella begins opening naturally with realistic mechanical motion. The character's body movements remain coordinated and anatomically correct.\n\n**1.8–3.0s:** The black umbrella fully opens into a wide circular canopy. From the fixed overhead camera perspective, the expanding umbrella progressively covers the character's head, torso, arms, legs, and entire outfit. The umbrella must move into the direct line of sight between the camera and the character.\n\n**3.0–4.0s:** The fully opened black umbrella completely conceals the entire character underneath it. The canopy is centered in the frame, with no visible body parts, clothing, shoes, or accessories extending beyond its edges. Maintain subtle natural umbrella movement, as if preparing for a smooth sideways reveal in the next video.\n\n**CRITICAL END FRAME REQUIREMENT:** At exactly 4.0 seconds, the final frame must show the fully opened black umbrella completely hiding the character and original sleepwear. The umbrella must occupy the central composition, with sufficient surrounding asphalt visible. The camera angle, lighting, shadows, umbrella geometry, and background must remain stable. This exact final frame will be extracted and used as FIRST_FRAME for Video 2.\n\n**CONTINUITY REQUIREMENT:** Design the ending specifically for an occlusion-based outfit transformation. The character must be completely invisible behind the umbrella at the final frame so that Video 2 can reveal the character wearing the new fashion outfit from IMAGE_2 without visible clothing morphing or discontinuity.\n\n**CRITICAL CONSTRAINTS:** No outfit transformation in Video 1, no appearance of the final fashion outfit, no character identity drift, no facial changes, no extra characters, no duplicated limbs, no distorted hands, no warped umbrella, no floating objects, no background changes, no camera movement, no jump cuts, no flickering, no magical effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, photorealistic cinematic fashion video, smooth continuous motion, realistic umbrella mechanics, accurate character reference fidelity, natural daylight, 30 fps.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_nZZtoTrI",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate 2",
+        "pos_x": 1733,
+        "pos_y": -43.630353143338,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "6s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_vCRlfDCe",
+        "node_type": "prompt",
+        "node_name": "Video 2",
+        "pos_x": 1736,
+        "pos_y": 827,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use FIRST_FRAME (the exact last frame of Video 1) as the PRIMARY VISUAL AND CONTINUITY REFERENCE. Use IMAGE_2 as the STRICT CHARACTER IDENTITY AND FINAL FASHION OUTFIT REFERENCE.\n\nCreate a seamless 4-second continuation of Video 1, featuring a cinematic overhead fashion transformation reveal.\n\n**SCENE AND CAMERA LOCK:** Preserve the exact 90-degree top-down camera angle, fixed camera position, framing, character scale, gray asphalt texture, natural lighting, shadows, black umbrella design, and spatial composition from FIRST_FRAME. The camera must remain completely stationary throughout the video. No zooming, panning, rotating, or perspective changes.\n\n**CHARACTER AND OUTFIT LOCK:** The revealed character must match IMAGE_2 precisely, including facial identity, hairstyle, body proportions, skin tone, complete clothing design, colors, fabric textures, layering, footwear, and accessories. Do not redesign, simplify, recolor, or invent any outfit details. Maintain one consistent character throughout.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** Begin with the exact composition of FIRST_FRAME. The black umbrella completely conceals the character and outfit. Continue the umbrella's natural motion from Video 1 without any visible jump or reset. The character is already wearing the complete outfit from IMAGE_2 underneath the umbrella.\n\n**0.8–1.8s:** The character smoothly tilts and moves the black umbrella sideways, progressively revealing the complete fashion outfit from IMAGE_2. The reveal must happen naturally through the umbrella's movement. No clothing morphing, no magical transformation effects, no body distortion, and no abrupt visual replacement.\n\n**1.8–3.2s:** The umbrella moves far enough aside to clearly reveal the complete outfit. The character performs subtle, confident street-fashion movements, including a small natural step, gentle body rotation, and relaxed arm movement. Clothing follows realistic fabric physics. Maintain the original overhead composition.\n\n**3.2–4.0s:** The character completes a stylish, confident fashion pose, showcasing the outfit from IMAGE_2. Hold the pose briefly for a clean, visually satisfying ending while maintaining natural micro-movements.\n\n**TRANSITION CONTINUITY:** Video 2 must feel like the uninterrupted continuation of Video 1. The opening frame must visually match the final frame of Video 1 exactly. Preserve umbrella position, movement direction, lighting, background, camera perspective, and character placement. The outfit change occurs exclusively while the character is fully hidden behind the umbrella.\n\n**CRITICAL CONSTRAINTS:** No visible clothing transformation, no identity drift, no outfit hallucination, no facial changes, no duplicated limbs, no extra characters, no background changes, no camera movement, no jump cuts, no flickering, no warped umbrella, no artificial transition effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, realistic cinematic fashion video, smooth continuous movement, natural fabric physics, precise reference fidelity, seamless transition, 30 fps.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_3_input_1",
+        "source_node_id": "node_5yYjOUQW",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_6_input_1",
+        "source_node_id": "node_mVwOo8cs",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_3_output_2_6_input_1",
+        "source_node_id": "node_3g9kcI1I",
+        "source_handle": "output_2",
+        "source_port": "frame",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "video"
+      },
+      {
+        "edge_id": "edge_4_output_1_6_input_2",
+        "source_node_id": "node_EQHAg3F6",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_4_output_1_3_input_2",
+        "source_node_id": "node_EQHAg3F6",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_5_output_1_3_input_2",
+        "source_node_id": "node_SUjlH7CG",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_7_output_1_6_input_2",
+        "source_node_id": "node_vCRlfDCe",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      }
+    ]
+  }
+}

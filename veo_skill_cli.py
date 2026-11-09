@@ -208,11 +208,26 @@ def get_project_file(project_id: str) -> Path:
     return get_project_dir(project_id) / "project.json"
 
 
+def _safe_read_project_json(pfile: Path) -> Optional[Dict[str, Any]]:
+    for attempt in range(3):
+        try:
+            raw = pfile.read_text(encoding="utf-8").strip()
+            if raw:
+                return json.loads(raw)
+        except Exception:
+            pass
+        if attempt < 2:
+            time.sleep(0.05)
+    return None
+
+
 def load_project(project_id_or_name: str) -> Optional[Dict[str, Any]]:
     with _STORE_LOCK:
         direct_file = get_project_file(project_id_or_name)
         if direct_file.is_file():
-            return json.loads(direct_file.read_text(encoding="utf-8"))
+            res = _safe_read_project_json(direct_file)
+            if res is not None:
+                return res
         # Tìm theo tên hoặc ID gần đúng
         idx = _load_projects_index()
         q = project_id_or_name.strip().lower()
@@ -220,7 +235,9 @@ def load_project(project_id_or_name: str) -> Optional[Dict[str, Any]]:
             if item["id"].lower() == q or item["name"].lower() == q or item["id"].lower().startswith(q):
                 f = get_project_file(item["id"])
                 if f.is_file():
-                    return json.loads(f.read_text(encoding="utf-8"))
+                    res = _safe_read_project_json(f)
+                    if res is not None:
+                        return res
         return None
 
 
@@ -585,15 +602,36 @@ class MultiThreadSkillRunner:
         google_accs = []
         grok_accs = []
         for a in acc_mgr.accounts:
-            is_google = a.name.startswith("Google_") or (a.api_key and a.api_key.startswith("ya29."))
+            is_google = self.gvt._is_google_flow_account(a)
+            prof = (
+                self.gvt._google_profile_name_for_account(a, allow_unresolved=True)
+                if is_google
+                else (getattr(a, "profile_name", "") or "")
+            )
+            raw_key = str(a.api_key or "").strip()
+            has_cookie = bool(raw_key.startswith("flow_cookie:"))
+            if is_google and prof and not has_cookie:
+                try:
+                    has_cookie = bool(self.gvt._load_flow_cookie_header(prof))
+                except Exception:
+                    has_cookie = False
+            has_token = bool(raw_key and len(raw_key) > 10)
+            g_email = getattr(a, "google_email", "") or (a.name[len("Google_"):] if a.name.startswith("Google_") else "")
             entry = {
                 "name": a.name,
                 "active": a.active,
-                "profile_name": getattr(a, "profile_name", ""),
+                "profile_name": prof,
+                "google_email": g_email,
+                "credits": getattr(a, "credits", None),
+                "tag": getattr(a, "tag", "Pro"),
+                "auth_state": getattr(a, "auth_state", "") or ("ready" if (has_cookie or has_token) else "missing"),
                 "proxy_url": a.proxy_url,
+                "project_id": a.proxy_url if (is_google and a.proxy_url and not str(a.proxy_url).startswith("http")) else self.gvt.DEFAULT_PROJECT_ID,
+                "has_cookie": has_cookie,
+                "has_token": has_token,
                 "type": "google_flow" if is_google else "cliproxy",
-                "available_video_models": self.gvt.get_veo_ui_video_models(getattr(a, "profile_name", "") or a.name) if is_google else ["grok-imagine-video"],
-                "has_low_priority_lite": self.gvt.is_veo_low_priority_available(getattr(a, "profile_name", "") or a.name) if is_google else False,
+                "available_video_models": self.gvt.get_veo_ui_video_models(prof or a.name) if is_google else ["grok-imagine-video"],
+                "has_low_priority_lite": self.gvt.is_veo_low_priority_available(prof or a.name) if is_google else False,
             }
             if is_google:
                 google_accs.append(entry)
@@ -617,7 +655,7 @@ class MultiThreadSkillRunner:
         if for_veo:
             veo_candidates = [
                 a for a in active
-                if a.name.startswith("Google_") or (a.api_key and a.api_key.startswith("ya29.")) or getattr(a, "profile_name", "")
+                if self.gvt._is_google_flow_account(a)
             ]
             if veo_candidates:
                 active = veo_candidates
@@ -626,8 +664,8 @@ class MultiThreadSkillRunner:
             acc = active[self._rr_idx % len(active)]
             self._rr_idx += 1
 
-        bearer = acc.api_key if (acc.api_key and acc.api_key.startswith("ya29.")) else ""
-        proj_id = acc.proxy_url if (acc.proxy_url and not acc.proxy_url.startswith("http")) else self.gvt.DEFAULT_PROJECT_ID
+        bearer = str(acc.api_key or "").strip()
+        proj_id = acc.proxy_url if (acc.proxy_url and not str(acc.proxy_url).startswith("http")) else self.gvt.DEFAULT_PROJECT_ID
         return acc, bearer, proj_id
 
     def _generate_single_scene_image(self, project_id: str, prod: Dict[str, Any], scene: Dict[str, Any]) -> str:
@@ -655,6 +693,7 @@ class MultiThreadSkillRunner:
                 str(scene.get("voice_id") or prod.get("voice_id") or ""),
             )
             eff_proj_id = str(prod.get("flow_project_id") or resolved_cv["project_id"] or veo_proj_id)
+            prof_name = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) if acc else ""
             job = self.gvt.VideoJob(
                 id=f"skill_img_{prod['id']}_{s_num}_{int(time.time())}",
                 model=model,
@@ -662,6 +701,8 @@ class MultiThreadSkillRunner:
                 resolution="1K",
                 aspect_ratio=aspect,
                 local_path=out_base,
+                account_name=acc.name if acc else "",
+                google_profile_name=prof_name,
             )
             if ref_img and Path(ref_img).is_file():
                 job.image_url = ref_img
@@ -746,6 +787,7 @@ class MultiThreadSkillRunner:
             )
             eff_proj_id = str(prod.get("flow_project_id") or resolved_cv["project_id"] or veo_proj_id)
             vid_mode = "reference-to-video" if resolved_cv["voice_id"] else "image-to-video"
+            prof_name = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) if acc else ""
             job = self.gvt.VideoJob(
                 id=f"skill_vid_{prod['id']}_{s_num}_{int(time.time())}",
                 model=model,
@@ -756,6 +798,8 @@ class MultiThreadSkillRunner:
                 duration=duration,
                 resolution=resolution,
                 local_path=out_video,
+                account_name=acc.name if acc else "",
+                google_profile_name=prof_name,
             )
             if resolved_cv["voice_id"]:
                 job.voice_id = resolved_cv["voice_id"]

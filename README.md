@@ -17,17 +17,17 @@
 3. **🛍️ Hệ Thống Crawl Sản Phẩm Tiềm Năng TikTokShop (2 Cơ Chế Tự Động)**:
    - Giao diện bảng **Sản phẩm Tiềm năng** nhóm theo ngày (`Hôm nay`, `Ngày ...`), đánh dấu 🔥 **SP HOT**, lọc theo ngày, chọn hàng loạt, Copy ID / Link ảnh / Full thông tin.
    - **Cách 1 (SPAI Auto API 1→2)** & **Cách 2 (Browser TikTokShop + Giải Captcha Tự Động bằng BoxPhone YOLO)**.
-4. **🏪 Chợ Template Video Affiliate 1080p 60 FPS (`Template/`)**:
+4. **🏪 Chợ Template Video Affiliate 1080p 60 FPS & 252 Fashion Motion Templates (`Template/` & `Template Thời Trang Video/`)**:
    - **`#001` (`Template/Nhà Xưởng`)**: Báo Giá Tận Xưởng & Kiểm Định QC — Có Nhân Vật + Voice + Sub Karaoke 60 FPS.
    - **`#002` (`Template/Đồ Ăn Vặt POV (Có Voice)`)**: Đồ Ăn Vặt & Ẩm Thực POV — Có Voice Review + Bày Biện Món Ăn + Sub Karaoke 60 FPS.
    - **`#003` (`Template/Đồ Ăn Vặt`)**: Đồ Ăn Vặt & Pha Chế UGC — Cận Cảnh Bàn Tay & Topping + Sub Karaoke 60 FPS.
-5. **👤 Thư Viện Nhân Vật Tinh Gọn & Tích Hợp Custom Voice Google Flow**:
-   - Đi kèm **3 Nhân Vật Mẫu (`NV1`, `NV2`, `NV3`)** và **4 Mẫu Character Sheet Chuẩn Studio (`Mẫu #01` – `Mẫu #04`)**:
-     - `Mẫu #01 • Chuẩn Studio 6 Góc (3 Toàn Thân + 3 Cận Mặt)`
-     - `Mẫu #02 • Hoạt Hình 3D Pixar (Turnaround + T-Pose + Biểu Cảm)`
-     - `Mẫu #03 • Lookbook & 5 Macro Zoom (4 Toàn Thân + 5 Chi Tiết)`
-     - `Mẫu #04 • Thời Trang & Phim AI (1 Chân Dung Lớn + 3 Toàn Thân)`
-   - **Tích hợp chọn Giọng Đọc ngay trong từng nhân vật**: Nghe thử trực tiếp bằng câu thoại tiếng Việt (`🔊 Nghe thử`), chỉnh sửa hoặc bấm tạo giọng đọc mới tự động trên Google Flow (`✏️ Custom` / `➕ Mới`).
+   - **`#004` (`Template/Motion Control Video Fashion` + `Template Thời Trang Video/`)**: Kho **252 Mẫu Video Thời Trang (`FVT_001` – `FVT_252`)** đã phân tích sâu chuyển động, nhịp beat âm thanh, điểm cắt cảnh & sinh sẵn bộ Prompt Lookbook Thay Đồ Theo Nhạc 2K/1080p.
+5. **🔗 Flow Workflow Studio (Visual Node-Based Canvas — `WorkFlow/` & `flow_workflow_engine.py`)**:
+   - Dựng & chạy tự động sơ đồ Node trực quan kết hợp **Google Flow (`Omni 1.2 Flash` 6s–15s, `Veo 3.1`, `Nano Banana 2.1 2K`) × ChatGPT (`gpt-image-1`) × Gemini × Grok**, đi kèm **12 Workflow Mẫu Thương Mại** (`Elevator Mirror Outfit Check`, `Subway Fashion`, `Office Lookbook`, `Live Driving`, `Building Timelapse`, `Nhà Xưởng 3 Cảnh 2K`...).
+6. **🖼️ Engine Thumbnail 2K (24 Mẫu Poster), Phụ Đề Karaoke & Video FX Đa Góc Máy**:
+   - **24 Preset Thumbnail Thương Mại (`Template/Thumbnail_Templates/`)**, **Kho Mẫu Phụ Đề (`Template/Subtitle_Templates/`)**, hiệu ứng HUD/3D Badge & Multi-shot B-Roll tự động ghép ở `0.1s` đầu video.
+7. **👤 Thư Viện Nhân Vật, Custom Voice & Quản Lý Đa Tài Khoản Tự Động Làm Mới Token (`token_manager.py` & `flow_account_gui.py`)**:
+   - Đi kèm **5 Nhân Vật Mẫu (`NV1` – `NV5`)**, **7 Mẫu Character & Product Sheet 2K (`Mẫu #01` – `Mẫu #07`)**, **10 Mẫu Giọng Đọc Tiếng Việt**, cùng hệ thống **Token Manager + GUI Quản Lý Đa Tài Khoản Google Flow (`Quan_Ly_Tai_Khoan_Flow.bat` / `extract_session.bat`)** tự động trích xuất & làm mới phiên đăng nhập khi hết hạn.
 
 ---
 
@@ -63,3 +63,4 @@ Hãy đọc file HUONG_DAN_CAI_DAT_CHO_AI_AGENT.md và SKILL.md trong thư mục
 - [`Template/`](./Template): Chợ Template Video (`#001`–`#003`) & 4 Mẫu Character Sheet (`Character_Sheet_Templates/`).
 - [`tiktok_crawler/`](./tiktok_crawler): Bộ công cụ Crawl TikTokShop & AI giải Captcha BoxPhone YOLO (`weights/`).
 - [`Extension Recapcha/LeVietTung_autoveo/`](./Extension%20Recapcha/LeVietTung_autoveo): Extension Chrome lấy Token Recaptcha & đồng bộ tài khoản Google Flow.
+

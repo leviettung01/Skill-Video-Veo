@@ -35,13 +35,20 @@ projects/
 output_videos/
 final_videos/
 thumbnails/
+fashion_motion_projects/
 flow_final_pipeline/projects/
 flow_final_pipeline/final_videos/
+flow_final_pipeline/fashion_motion_studio/
 flow_final_pipeline/voice_samples/_uptedb_dump.txt
 flow_final_pipeline/voice_samples/nv1_vn.mp3
 flow_final_pipeline/voice_samples/captured_flow_audio.mp3
+Template Thời Trang Video/_duplicates_excluded/
 
-# Legacy extension backups (keep only LeVietTung_autoveo)
+# External reference repos, local audit scratch & unpacked extension runtime metadata
+WorkFlow/museflow/
+audit_release.py
+audit_results/
+Extension Recapcha/LeVietTung_autoveo/_metadata/
 Extension Recapcha/veo3-captcha-extension*/
 
 # OS & IDE files

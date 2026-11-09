@@ -1,0 +1,415 @@
+{
+  "id": "wf_cliproxy_gpt_grok_fashion_2k",
+  "_wf_id": "wf_cliproxy_gpt_grok_fashion_2k",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:55:41.000Z",
+  "workflow": {
+    "name": "Workflow - Hybrid CLIProxy (ChatGPT Phân Tích Ảnh SP ➔ Tách Đồ 2K ➔ Nhân Vật NV5 Mặc Đồ & Tạo Video)",
+    "description": "Kết hợp sức mạnh của CLIProxy (ChatGPT Vision / Gemini phân tích ảnh quần áo gốc để sinh Prompt chuẩn) + Google Flow Nano Banana 2.1 tạo Ảnh Tách Quần Áo Phụ Kiện 2K + Ghép lên Nhân Vật 5 (NV5) và render Video Lookbook.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 2,
+      "timeout_per_node": 150,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2,
+      "run_count": 1
+    },
+    "nodes": [
+      {
+        "node_id": "node_raw_cloth",
+        "node_type": "image",
+        "node_name": "Ảnh Quần Áo Gốc",
+        "pos_x": 100.0,
+        "pos_y": -140.0,
+        "enabled": true,
+        "slug": "raw_cloth",
+        "slug_auto": true,
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5C%E1%BA%A3nh%20m%E1%BA%ABu%20thumbnail%5CTron_Bo_7_Anh_2K%5C01_Character_Sheet_4_Outfits_2K.png",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          }
+        ],
+        "id": "node_raw_cloth",
+        "label": "Ảnh Quần Áo Gốc",
+        "config": {
+          "slug": "raw_cloth",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "reference_images": [
+            "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\03_Product_Sheet_Quan_Xanh_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "error": ""
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5C%E1%BA%A3nh%20m%E1%BA%ABu%20thumbnail%5CTron_Bo_7_Anh_2K%5C01_Character_Sheet_4_Outfits_2K.png"
+        }
+      },
+      {
+        "node_id": "node_nv5_sheet",
+        "node_type": "image",
+        "node_name": "Nhân Vật 5 (NV5 Fashion 2K)",
+        "pos_x": 100.0,
+        "pos_y": 280.0,
+        "enabled": true,
+        "slug": "nv5_char",
+        "slug_auto": true,
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cflow_final_pipeline%5Ccharacters%5Cnv5_bedroom_2k.png",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png"
+          }
+        ],
+        "id": "node_nv5_sheet",
+        "label": "Nhân Vật 5 (NV5 Fashion 2K)",
+        "config": {
+          "slug": "nv5_char",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png",
+          "reference_images": [
+            "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_ref.png"
+          ],
+          "auto_download": false,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png"
+          ],
+          "error": ""
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv5_bedroom_2k.png",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cflow_final_pipeline%5Ccharacters%5Cnv5_bedroom_2k.png"
+        }
+      },
+      {
+        "node_id": "node_ai_prompt_deconstruct",
+        "node_type": "prompt",
+        "node_name": "Prompt AI (CLIProxy ChatGPT) - Tách Đồ 2K",
+        "pos_x": 540.0,
+        "pos_y": -140.0,
+        "enabled": true,
+        "slug": "prompt_deconstruct",
+        "slug_auto": true,
+        "prompt": "Ultra-clean commercial e-commerce deconstructed fashion outfit & accessories flat-lay product sheet (vertical 4:5, 2048x2559 2K resolution) isolated on a seamless pure solid white background (#FFFFFF). Left column: main upper garment and lower garment neatly laid flat with realistic 3D fabric volume and pleats from IMAGE 01. Right column: 4 coordinated accessories isolated vertically (necklace, shoulder bag, crew socks, Mary Jane shoes).",
+        "use_ai": true,
+        "ai_provider": "cliproxy_gpt",
+        "ai_model": "gpt-4o-mini",
+        "ai_system_instruction": "Keep or refine this English fashion flat-lay prompt into a single ultra-detailed paragraph for image generation. Output ONLY the English prompt.",
+        "ai_fallback": true,
+        "id": "node_ai_prompt_deconstruct",
+        "label": "Prompt AI (CLIProxy ChatGPT) - Tách Đồ 2K",
+        "config": {
+          "slug": "prompt_deconstruct",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Ultra-clean commercial e-commerce deconstructed fashion outfit & accessories flat-lay product sheet (vertical 4:5, 2048x2559 2K resolution) isolated on a seamless pure solid white background (#FFFFFF). Left column: main upper garment and lower garment neatly laid flat with realistic 3D fabric volume and pleats from IMAGE 01. Right column: 4 coordinated accessories isolated vertically (necklace, shoulder bag, crew socks, Mary Jane shoes).",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done",
+          "result_text": "Ultra-clean commercial e-commerce deconstructed fashion outfit & accessories flat-lay product sheet (vertical 4:5, 2048x2559 2K resolution) isolated on a seamless pure solid white background (#FFFFFF). Left column: main upper garment and lower garment neatly laid flat with realistic 3D fabric volume and pleats from IMAGE 01. Right column: 4 coordinated accessories isolated vertically (necklace, shoulder bag, crew socks, Mary Jane shoes)."
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "Ultra-clean commercial e-commerce deconstructed fashion outfit & accessories flat-lay product sheet (vertical 4:5, 2048x2559 2K resolution) isolated on a seamless pure solid white background (#FFFFFF). Left column: main upper garment and lower garment neatly laid flat with realistic 3D fabric volume and pleats from IMAGE 01. Right column: 4 coordinated accessories isolated vertically (necklace, shoulder bag, crew socks, Mary Jane shoes)."
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_flow_flatlay_2k",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "Flow - Ảnh Tách Quần Áo + Phụ Kiện 2K",
+        "pos_x": 980.0,
+        "pos_y": -140.0,
+        "enabled": true,
+        "slug": "flatlay_2k",
+        "slug_auto": true,
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "4:5",
+        "download_resolution": "2k",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "id": "node_flow_flatlay_2k",
+        "label": "Flow - Ảnh Tách Quần Áo + Phụ Kiện 2K",
+        "video_download_resolution": "1080p",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flatlay_2k",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "4:5",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png"
+          ],
+          "auto_download": true,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png"
+          ],
+          "error": ""
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_cliproxy_gpt_grok_fashion_2k%5Cnode_flow_flatlay_2k_Vay_Vang_2K.png",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png"
+          }
+        ],
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_flatlay_2k_Vay_Vang_2K.png",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_cliproxy_gpt_grok_fashion_2k%5Cnode_flow_flatlay_2k_Vay_Vang_2K.png"
+        }
+      },
+      {
+        "node_id": "node_prompt_tryon",
+        "node_type": "prompt",
+        "node_name": "Prompt - NV5 Mặc Bộ Đồ 2K",
+        "pos_x": 980.0,
+        "pos_y": 320.0,
+        "enabled": true,
+        "slug": "prompt_tryon",
+        "slug_auto": true,
+        "prompt": "Hyper-photorealistic vertical 9:16 2K full-body fashion lookbook video of the exact female model from IMAGE 01 (NV5) wearing the exact deconstructed outfit and accessories from IMAGE 02. She poses gracefully in a modern studio, turning slightly to showcase the garment drape, collar, bag, and shoes. Ultra-realistic fabric physics, 85mm lens.",
+        "use_ai": false,
+        "id": "node_prompt_tryon",
+        "label": "Prompt - NV5 Mặc Bộ Đồ 2K",
+        "config": {
+          "slug": "prompt_tryon",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Hyper-photorealistic vertical 9:16 2K full-body fashion lookbook video of the exact female model from IMAGE 01 (NV5) wearing the exact deconstructed outfit and accessories from IMAGE 02. She poses gracefully in a modern studio, turning slightly to showcase the garment drape, collar, bag, and shoes. Ultra-realistic fabric physics, 85mm lens.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done",
+          "result_text": "Hyper-photorealistic vertical 9:16 2K full-body fashion lookbook video of the exact female model from IMAGE 01 (NV5) wearing the exact deconstructed outfit and accessories from IMAGE 02. She poses gracefully in a modern studio, turning slightly to showcase the garment drape, collar, bag, and shoes. Ultra-realistic fabric physics, 85mm lens."
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "Hyper-photorealistic vertical 9:16 2K full-body fashion lookbook video of the exact female model from IMAGE 01 (NV5) wearing the exact deconstructed outfit and accessories from IMAGE 02. She poses gracefully in a modern studio, turning slightly to showcase the garment drape, collar, bag, and shoes. Ultra-realistic fabric physics, 85mm lens."
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_flow_lookbook_vid",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "🎬 Flow - Video Lookbook NV5 Mặc Đồ Mới (1080p)",
+        "pos_x": 1440.0,
+        "pos_y": 100.0,
+        "enabled": true,
+        "slug": "video_lookbook_nv5",
+        "slug_auto": true,
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "video_download_resolution": "1080p",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "id": "node_flow_lookbook_vid",
+        "label": "🎬 Flow - Video Lookbook NV5 Mặc Đồ Mới (1080p)",
+        "download_resolution": "2k",
+        "config": {
+          "slug": "video_lookbook_nv5",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4"
+          ],
+          "auto_download": true,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4"
+          ],
+          "error": ""
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_cliproxy_gpt_grok_fashion_2k%5Cnode_flow_lookbook_vid_NV5_1080p.mp4",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4"
+          }
+        ],
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e_raw_to_ai_prompt",
+        "source_node_id": "node_raw_cloth",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ai_prompt_deconstruct",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_raw_to_flatlay",
+        "source_node_id": "node_raw_cloth",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_flow_flatlay_2k",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_aip_to_flatlay",
+        "source_node_id": "node_ai_prompt_deconstruct",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_flow_flatlay_2k",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "e_nv5_to_vid",
+        "source_node_id": "node_nv5_sheet",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_flow_lookbook_vid",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_flatlay_to_vid",
+        "source_node_id": "node_flow_flatlay_2k",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_flow_lookbook_vid",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_ptryon_to_vid",
+        "source_node_id": "node_prompt_tryon",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_flow_lookbook_vid",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_lookbook_1",
+        "node_id": "node_flow_lookbook_vid",
+        "label": "Flow - Video Lookbook NV5",
+        "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_cliproxy_gpt_grok_fashion_2k\\node_flow_lookbook_vid_NV5_1080p.mp4",
+        "duration": 8
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\Workflow_Hybrid_CLIProxy_NV5_Fashion_2K_Final.mp4"
+  }
+}

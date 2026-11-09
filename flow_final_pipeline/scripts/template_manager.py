@@ -25,7 +25,12 @@ TEMPLATE_ROOT_DIR = os.path.join(WS_DIR, "Template")
 PROJECTS_DIR = os.path.join(WS_DIR, "projects")
 VOICES_CHARS_PATH = os.path.join(WS_DIR, "flow_final_pipeline", "voices_and_characters.json")
 
-RESERVED_SUBFOLDERS = {"Character_Sheet_Templates", "__pycache__"}
+RESERVED_SUBFOLDERS = {
+    "Character_Sheet_Templates",
+    "Thumbnail_Templates",
+    "Subtitle_Templates",
+    "__pycache__",
+}
 
 
 def ensure_template_root():
@@ -64,6 +69,18 @@ def _prettify_media_label(filename: str) -> str:
         "hat dac s3 muc sot": "Storyboard Cảnh 3: Muỗng Múc Hạt Đác Sốt Vàng",
         "haidilao s1 pack hero": "Storyboard Cảnh 1: Bộ 3 Cốc Hoành Thánh Haidilao",
         "haidilao s5 muc hoanh thanh": "Storyboard Cảnh 5: Muỗng Múc Hoành Thánh Nhân Thịt",
+        "character sheet 4 outfits 2k": "Bảng Nhân Vật 2K: 4 Góc Mặt + 4 Bộ Đồ Lookbook",
+        "character sheet basic poses 2k": "Bảng Nhân Vật 2K: Xoay 360° + 5 Tư Thế Tạo Dáng",
+        "product sheet quan xanh 2k": "Bộ Đồ 1 (2K): Áo Yếm Vàng Hoa Đỏ + Quần Suông Xanh Coban",
+        "product sheet vay vang 2k": "Bộ Đồ 2 (2K): Váy Ngắn Xếp Tầng Vàng Bơ + Túi Nhún Bèo",
+        "product sheet quan sooc trang 2k": "Bộ Đồ 3 Alt (2K): Áo Yếm Vàng + Quần Soóc Trắng Xếp Ly",
+        "product sheet quan be 2k": "Bộ Đồ 3 (2K): Áo Yếm Vàng + Quần Ống Rộng Màu Be + Kính Hồng",
+        "nhan vat basic phong ngu 2k": "Ảnh Ref Nhân Vật Gốc 2K: Đứng Trong Phòng Ngủ (Ảnh 1)",
+        "demo google flow phan canh 1 8s": "Thực Tế Google Flow Cảnh 1 (0s-8s): Thay Bộ Đồ 1 Tại 4:04",
+        "demo google flow phan canh 2 8s": "Thực Tế Google Flow Cảnh 2 (8s-16s): Thay Bộ 2 (3:04) & Bộ 3 (6:12)",
+        "final motion control video ref 16s": "🎬 Video Gốc Tham Chiếu (16.28s) -> Chia 2 Cảnh × 8s",
+        "phan canh 1 clip ref 0s 8s": "✂️ Phân Cảnh 1 Đã Cắt (0.00s - 8.00s | Đổi Đồ Tại 4:04)",
+        "phan canh 2 clip ref 8s 16s": "✂️ Phân Cảnh 2 Đã Cắt (8.00s - 16.00s | Đổi Đồ Tại 3:04 & 6:12)",
     }
     for k, v in label_map.items():
         if k.lower() in stem.lower():

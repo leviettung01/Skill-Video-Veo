@@ -1,0 +1,373 @@
+{
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:52:52.073Z",
+  "workflow": {
+    "name": "Ceiling Fan Outfit Transition Video Workflow (copy)",
+    "description": "Quy trình tự động tạo video thời trang biến hình ấn tượng với chuyển cảnh xoay từ cánh quạt trần, giúp outfit đổi mượt mà theo từng nhịp quay chỉ với vài bước đơn giản.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true
+    },
+    "nodes": [
+      {
+        "node_id": "node_S5peWiAL",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate",
+        "pos_x": 796,
+        "pos_y": -100,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_eIXnCp9m",
+        "node_type": "image",
+        "node_name": "Image/Video",
+        "pos_x": -337.14358881,
+        "pos_y": -110,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/09/03154a47-a153-45a2-9ae5-77fdd9bd6bb4.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_WaMQIVgT",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate 2",
+        "pos_x": 1796,
+        "pos_y": 1153.25,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_1XcAD2jo",
+        "node_type": "image",
+        "node_name": "Image/Video 2",
+        "pos_x": -329,
+        "pos_y": 203.85641119,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/9ee0761f-cf92-4e77-bd19-086d047fd894.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_c2tH6WsG",
+        "node_type": "image",
+        "node_name": "Image/Video 3",
+        "pos_x": -329,
+        "pos_y": 900,
+        "enabled": true,
+        "slug": "image_video_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/9ba981c4-8657-4f95-a7de-0c2905f4d975.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_1jTW8ZO9",
+        "node_type": "image",
+        "node_name": "Image/Video 4",
+        "pos_x": 224,
+        "pos_y": 924,
+        "enabled": true,
+        "slug": "image_video_4",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/bd632ff1-286c-4767-99ec-cc621430fb05.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_TjjKA9LU",
+        "node_type": "prompt",
+        "node_name": "Prompt",
+        "pos_x": 224,
+        "pos_y": 596.85641119,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "**ULTRA-REALISTIC CHARACTER FACE & OUTFIT REPLACEMENT — STRICT BASE IMAGE PRESERVATION**\n\nUse three reference images with strictly separated purposes:\n\n- **BASE_IMAGE:** The provided overhead fashion photograph. This is the ABSOLUTE PRIMARY REFERENCE for composition, body pose, camera angle, background, lighting and scene geometry.\n- **IMAGE_1:** Character sheet reference. Use EXCLUSIVELY for the replacement character's facial identity.\n- **IMAGE_2:** Outfit reference. Use EXCLUSIVELY for the replacement character's complete clothing, footwear and outfit-related accessories.\n\n**1. FACE REPLACEMENT — IMAGE_1**\n\nReplace the original woman's face in BASE_IMAGE with the exact facial identity from IMAGE_1.\n\nPreserve the character's distinctive facial structure, eye shape, eyebrows, nose, lips, jawline, facial proportions and recognizable identity with maximum accuracy.\n\nAdapt the new face naturally to the original head position, overhead camera perspective and lighting conditions.\n\nKeep the original hairstyle, hair length, hair arrangement, head orientation and natural hair spread across the rug from BASE_IMAGE unchanged.\n\nMaintain a natural, subtle smile and direct upward gaze toward the overhead camera.\n\nEnsure seamless blending between the replacement face, original hairline, neck and surrounding skin. Match skin tones and shadows realistically.\n\nDo NOT copy the character sheet's pose, outfit, background or camera angle.\n\n**2. COMPLETE OUTFIT REPLACEMENT — IMAGE_2**\n\nCompletely replace the original clothing, shoes and fashion accessories in BASE_IMAGE with the exact outfit shown in IMAGE_2.\n\nPrecisely reproduce:\n\n- Clothing design, silhouette and garment structure.\n- Exact colors, patterns and fabric textures.\n- Neckline, collars, sleeves, cuffs, waistline and hemline.\n- Stitching, seams, buttons, zippers and decorative details.\n- Clothing layers and their correct arrangement.\n- Footwear design, color, shape and material.\n- All clearly visible outfit-related accessories.\n\nThe replacement outfit must be visually faithful to IMAGE_2, without redesign, simplification or invented details.\n\nRealistically adapt the new outfit to the existing body proportions and lying-down pose in BASE_IMAGE.\n\nMaintain natural fabric folds, accurate garment tension, realistic contact shadows and physically plausible fabric draping.\n\nPreserve the original anatomy and body position. Do not alter the woman's body shape to match the model wearing the outfit in IMAGE_2.\n\n**3. ABSOLUTE POSE & COMPOSITION LOCK — BASE_IMAGE**\n\nPreserve the original composition with pixel-level accuracy wherever possible.\n\nThe woman remains lying on her back on the same beige woven rug, photographed from a perfectly vertical 90-degree overhead camera.\n\nSTRICTLY PRESERVE:\n\n- Exact head position and orientation.\n- Original hairstyle and hair spread around the head.\n- Both arms raised beside the face.\n- Both hands forming small heart gestures beside the cheeks.\n- Exact finger positions and hand anatomy.\n- Original shoulder, torso and hip alignment.\n- Original crossed-leg pose.\n- Exact knee, ankle and foot positions.\n- Original subject scale and placement within the frame.\n\nDo not reposition, rotate, enlarge or shrink the woman.\n\nThe final character must look as though she was originally photographed in this exact pose while wearing the new outfit.\n\n**4. BACKGROUND & FOREGROUND FAN LOCK**\n\nPreserve the entire background from BASE_IMAGE without modification.\n\nKeep the beige textured rug, its exact woven pattern, the surrounding wooden floorboards, the brown leather sofa along the left edge and all existing shadows.\n\nCRITICAL: Preserve the large dark wooden ceiling fan visible in the extreme foreground at the top of the image, including its original shape, position, perspective, partial occlusion and natural motion blur.\n\nDo not remove, redesign, reposition, sharpen or resize the fan.\n\nMaintain the original foreground-to-background layering, ensuring the fan remains visually in front of the character.\n\nDo not change the room geometry, camera framing or perspective.\n\n**5. LIGHTING & IMAGE QUALITY**\n\nPreserve the original warm cinematic indoor lighting, soft directional highlights, realistic skin tones, natural floor shadows and premium editorial fashion aesthetic.\n\nRender the replacement face and outfit with exceptional photorealistic quality, natural skin texture, precise facial details, sharp garment construction and realistic textile fibers.\n\nKeep the original photographic depth, color grading and lighting direction consistent across the entire image.\n\nOutput a high-resolution, ultra-detailed, photorealistic vertical fashion photograph in the same 9:16 aspect ratio as BASE_IMAGE.\n\n**6. STRICT NEGATIVE CONSTRAINTS**\n\nNo facial identity drift, no face blending with the original woman, no hairstyle replacement, no pose changes, no altered hand gestures, no distorted fingers, no extra limbs, no anatomy changes, no body proportion changes, no outfit redesign, no incorrect garment colors, no missing accessories, no background modification, no camera movement, no framing changes, no fan removal, no fan shape changes, no lighting inconsistencies, no artificial-looking skin, no cartoon effects, no excessive smoothing, no unnecessary text or watermarks.\n\n**FINAL PRIORITY RULE:**\n\nBASE_IMAGE controls 100% of the composition, body pose, hairstyle, environment, camera perspective and lighting.\n\nIMAGE_1 controls ONLY the facial identity.\n\nIMAGE_2 controls ONLY the complete outfit, footwear and relevant fashion accessories.\n\nThe ONLY intended visual modifications are the woman's face and outfit. Every other visible element must remain faithful to BASE_IMAGE.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_JDUdJyXJ",
+        "node_type": "prompt",
+        "node_name": "Prompt Video 01",
+        "pos_x": 1507,
+        "pos_y": -452.13842837672,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "NATURAL RELAXED FASHION MODEL & CONTINUOUS LONG FAN ROTATION | 4 SECONDS\n\nREFERENCE INPUTS:\n\nIMAGE_1: Primary starting frame, character, outfit, body position, scene and initial fan orientation.\n\nIMAGE_2: Reference for the extremely long wooden fan blade creating a full-height vertical foreground occlusion.\n\nCreate a seamless 4-second photorealistic overhead fashion video.\n\n**CHARACTER — NATURAL RELAXED BODY MOTION**\n\nThe adult female model lies comfortably on her back on the beige woven rug.\n\nMaintain her original identity, facial features, hairstyle, clothing, body proportions and overall position.\n\nHer body must feel naturally relaxed, comfortable and alive, rather than frozen in a rigid fashion pose.\n\nShe smiles gently, blinks naturally and makes subtle cute facial expressions.\n\nHer hands remain near her face, making tiny relaxed finger movements.\n\n**IMPORTANT — NATURAL LEG MOVEMENT**\n\nDo NOT freeze the legs in their original crossed position.\n\nAllow gentle, continuous, physically natural leg movements while she remains lying on the floor.\n\n0.0–1.2s: Her legs begin in the position shown in IMAGE_1. She softly relaxes the crossed-leg pose, allowing one knee to move slightly outward.\n\n1.2–2.6s: She slowly shifts one foot a few centimeters, gently straightens one leg and naturally relaxes both ankles. The movement should feel effortless, like someone comfortably resting on the floor.\n\n2.6–4.0s: Her legs settle into a slightly different comfortable resting position, with a tiny natural adjustment of the knees or feet.\n\nKeep the pelvis and torso anchored to the rug.\n\nMovement remains subtle, smooth and anatomically correct.\n\nNo exaggerated kicking, dancing, large leg lifts or sudden pose changes.\n\n**SHARED FAN ROTATION LOCK — CRITICAL**\n\nThe oversized wooden ceiling fan rotates continuously COUNTERCLOCKWISE when viewed from the fixed overhead camera.\n\nThis is the mandatory rotation direction for BOTH VIDEO 01 AND VIDEO 02.\n\nStarting with the blade pointing downward, its counterclockwise motion carries that blade toward the lower-right of the screen.\n\nMaintain a single constant angular velocity.\n\nThe fan rotates continuously around its completely stationary hub.\n\nNever reverse direction, oscillate, swing backward, pause or change speed.\n\n**FULL-HEIGHT FAN GEOMETRY**\n\nMaintain the original exceptionally long, broad wooden fan blades shown in IMAGE_2.\n\nPreserve identical blade length, width, thickness, wood texture, perspective and overall scale.\n\nThe blades must never shrink, shorten or transform.\n\nWhen a blade passes vertically through the center, it creates a large foreground band extending from the top edge to the bottom edge of the frame.\n\n**MANDATORY END FRAME**\n\nTime the continuous counterclockwise rotation so that the final frame shows the long wooden blade vertically centered, spanning the entire frame height and concealing the model as completely as possible.\n\nAchieve this through natural forward rotation only, without reversing or suddenly accelerating the fan.\n\n**CAMERA AND VISUAL STYLE**\n\nFixed 90-degree overhead camera.\n\nPreserve the original beige rug, brown leather sofa, wooden floor, lighting and composition.\n\nHigh-end photorealistic fashion editorial, warm cinematic lighting, realistic anatomy, detailed clothing and smooth natural movement.\n\n**STRICT RESTRICTIONS**\n\nNo clockwise rotation, no fan direction reversal, no short blades, no fan resizing, no camera movement, no outfit changes, no character replacement, no rigid frozen legs, no unnatural limb movement, no distorted anatomy, no scene cuts and no text overlays.\n\n**FINAL OBJECTIVE**\n\nA relaxed female model lying comfortably on the floor, smiling naturally and making gentle leg and hand movements, while the extremely long wooden fan rotates continuously counterclockwise and ends with a full-height vertical occlusion.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_pqYVPY9m",
+        "node_type": "prompt",
+        "node_name": "Prompt Video 02",
+        "pos_x": 2385.918002319,
+        "pos_y": -419,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "CONTINUOUS FAN ROTATION & PLAYFUL FASHION REVEAL | 4 SECONDS\n\nINPUT REFERENCES:\n\nIMAGE_1 — START FRAME:\nThe final frame of a fashion video, showing an oversized wooden ceiling fan blade vertically positioned in the center of the image, above a beige woven rug and wooden floor.\n\nUse IMAGE_1 as the exact starting composition, including the fan geometry, blade position, camera framing, room layout and lighting.\n\nIMAGE_2 — FASHION MODEL REFERENCE:\nA fashion photograph featuring an adult woman lying comfortably on the same beige rug, wearing a complete styled outfit.\n\nUse IMAGE_2 as the visual reference for the woman's appearance, outfit, hairstyle, accessories and relaxed lying-down pose.\n\n**SCENE**\n\nCreate a continuous 4-second photorealistic overhead fashion video.\n\nBegin with the long wooden fan blade covering the central area.\n\nAs the fan rotates away, reveal the fashion model resting on the rug in the outfit shown in IMAGE_2.\n\nThe model remains in the same location throughout the video.\n\n**FAN ROTATION — CRITICAL**\n\nThe wooden fan rotates exclusively COUNTERCLOCKWISE from the fixed overhead camera viewpoint.\n\nWhen the blade points vertically downward, its lower tip travels toward SCREEN-RIGHT.\n\nRotation path: 6 o'clock → 5 o'clock → 4 o'clock → 3 o'clock.\n\nMaintain this direction throughout the entire video.\n\nThe fan rotates continuously at one constant angular speed around a single stationary hub near the top-center of the image.\n\nNo reverse rotation, oscillation, pauses, sudden acceleration or angular jumps.\n\n**LONG FAN GEOMETRY**\n\nPreserve the oversized wooden fan structure from IMAGE_1.\n\nThere is only one fan with one stationary rotation center.\n\nThe blades remain exceptionally long, broad and visually dominant.\n\nKeep consistent blade length, width, wood texture, perspective and scale.\n\nWhen a blade points vertically downward, it extends continuously from the top edge to the bottom edge of the frame.\n\nDo not shorten, shrink or redesign the blades.\n\n**NATURAL CHARACTER ANIMATION**\n\nThe woman lies comfortably on her back, maintaining the natural body proportions and outfit from IMAGE_2.\n\nShe makes subtle playful expressions:\n\n0.0–1.0s: The fan gradually reveals her. She smiles gently toward the camera.\n\n1.0–2.0s: She gives one brief natural wink followed by a cute mischievous smile.\n\n2.0–3.0s: She relaxes into a cheerful smile, making a tiny finger movement near her face.\n\n3.0–4.0s: She maintains a sweet, relaxed expression as the fan covers her again.\n\nHer legs remain naturally relaxed.\n\nAllow gentle knee adjustments, small ankle movements and subtle foot movements while maintaining natural floor contact.\n\nNo rigid posing, exaggerated movement or significant body repositioning.\n\n**MANDATORY FINAL FRAME — HIGH PRIORITY**\n\nCoordinate the fan's continuous counterclockwise rotation from the beginning so that a naturally arriving blade reaches the vertical centerline at the end of the 4-second clip.\n\nAt the final frame:\n\nThe long wooden blade is vertically centered over the woman.\n\nThe blade extends continuously from the top edge to the bottom edge.\n\nThe woman's face and central body are obscured by the foreground blade.\n\nThe blade retains its original width, length and shape.\n\nThe central fan hub remains stationary.\n\nNever reverse the rotation or abruptly change speed to reach this final position.\n\n**CAMERA AND STYLE**\n\nFixed 90-degree overhead camera.\n\nPreserve the beige woven rug, brown leather sofa, wooden floor and warm cinematic lighting.\n\nPhotorealistic fashion editorial, natural facial expressions, detailed fabrics, realistic anatomy and smooth movement.\n\n**RESTRICTIONS**\n\nNo clockwise rotation.\nNo fan reversal.\nNo shortened fan blades.\nNo additional fan hub.\nNo camera movement.\nNo character resizing.\nNo outfit transformation during the clip.\nNo exaggerated gestures.\nNo scene cuts.\nNo added text.\n\n**FINAL RESULT**\n\nA simple continuous fashion shot featuring a relaxed model making cute expressions while one oversized wooden fan rotates counterclockwise at a constant speed.\n\nThe video starts and ends with a vertically centered, full-height wooden fan blade obscuring the central character area.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_Pr7lJrHf",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate 3",
+        "pos_x": 1500.55,
+        "pos_y": -109.897,
+        "enabled": true,
+        "slug": "flow_image_video_generate_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "4s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_ojVXl1gZ",
+        "node_type": "image",
+        "node_name": "Image/Video 5",
+        "pos_x": 789,
+        "pos_y": 682,
+        "enabled": true,
+        "slug": "image_video_5",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/10/52f26a20-b09e-430b-a7cc-647f4f2b9d1b.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_ABEJxzvN",
+        "node_type": "generate",
+        "node_name": "Flow - Image/Video Generate 4",
+        "pos_x": 2391.55,
+        "pos_y": -98.7498,
+        "enabled": true,
+        "slug": "flow_image_video_generate_2_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "4s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_10_input_1",
+        "source_node_id": "node_S5peWiAL",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_Pr7lJrHf",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_3_input_1",
+        "source_node_id": "node_eIXnCp9m",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WaMQIVgT",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_1_input_1",
+        "source_node_id": "node_eIXnCp9m",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_S5peWiAL",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_3_output_1_12_input_1",
+        "source_node_id": "node_WaMQIVgT",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_ABEJxzvN",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_4_output_1_1_input_1",
+        "source_node_id": "node_1XcAD2jo",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_S5peWiAL",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_4_output_1_3_input_1",
+        "source_node_id": "node_1XcAD2jo",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WaMQIVgT",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_5_output_1_1_input_1",
+        "source_node_id": "node_c2tH6WsG",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_S5peWiAL",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_6_output_1_3_input_1",
+        "source_node_id": "node_1jTW8ZO9",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WaMQIVgT",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_7_output_1_3_input_2",
+        "source_node_id": "node_TjjKA9LU",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_WaMQIVgT",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_7_output_1_1_input_2",
+        "source_node_id": "node_TjjKA9LU",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_S5peWiAL",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_8_output_1_10_input_2",
+        "source_node_id": "node_JDUdJyXJ",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_Pr7lJrHf",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_9_output_1_12_input_2",
+        "source_node_id": "node_pqYVPY9m",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_ABEJxzvN",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_10_output_2_12_input_1",
+        "source_node_id": "node_Pr7lJrHf",
+        "source_handle": "output_2",
+        "source_port": "frame",
+        "target_node_id": "node_ABEJxzvN",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "video"
+      },
+      {
+        "edge_id": "edge_11_output_1_10_input_1",
+        "source_node_id": "node_ojVXl1gZ",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_Pr7lJrHf",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      }
+    ]
+  }
+}

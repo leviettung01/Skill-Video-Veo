@@ -1,5 +1,6 @@
 # -*- coding: utf-8 -*-
 import os
+import re
 import sys
 import glob
 import json
@@ -7,6 +8,15 @@ import time
 import shutil
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+
+try:
+    import engine_settings_manager as _esm
+except Exception:
+    _esm = None
 
 WORKSPACE = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 PROJECTS_DIR = os.path.join(WORKSPACE, "projects")
@@ -57,9 +67,10 @@ def get_char_v_code(vkey: str, char_key: str = "") -> str:
     vk = (vkey or "").lower().strip()
     if vk in VKEY_TO_CHAR_V:
         return VKEY_TO_CHAR_V[vk]
-    if vk.startswith("nv1_") or vk.startswith("nv2_"):
+    if re.match(r"^nv\d+_v\d+$", vk):
         return vk
-    ck = "nv2" if "nv2" in (char_key or "").lower() else "nv1"
+    m_ck = re.search(r"(nv\d+)", (char_key or "").lower())
+    ck = m_ck.group(1) if m_ck else "nv1"
     return f"{ck}_{vk}"
 
 
@@ -82,10 +93,13 @@ def _list_rendered_intermediate_files(pdir: str) -> list:
         "*-final-30s.mp4",
         "*_nv1_v*.mp4",
         "*_nv2_v*.mp4",
+        "*_nv3_v*.mp4",
+        "*_nv*_v*.mp4",
+        "*_thumb.jpg",
         "flow_state.json",
         "flow_refs_state.json",
-        "spec_v7.json",
-        "spec_v8.json",
+        "pipeline_status.json",
+        "spec_*.json",
     ]
     found = []
     for pat in patterns:
@@ -182,15 +196,25 @@ def clean_product_rendered_cache(pid: str, also_delete_finals: bool = False) -> 
                     removed_bytes += sz
                 except OSError:
                     pass
+        for tdir in (os.path.join(pdir, "thumbnails"), os.path.join(WORKSPACE, "thumbnails")):
+            if os.path.isdir(tdir):
+                for fp in glob.glob(os.path.join(tdir, f"{pid}_*_thumb.jpg")):
+                    try:
+                        sz = os.path.getsize(fp)
+                        os.remove(fp)
+                        removed_count += 1
+                        removed_bytes += sz
+                    except OSError:
+                        pass
 
-    # Reset prompts.json to clean 6 variants (remove legacy v7/v8) and write .cleaned_new marker
+    # Reset prompts.json (remove legacy v7/v8 only, preserve v1..v6 and nv3_v*) and write .cleaned_new marker
     prompts_path = os.path.join(pdir, "prompts.json")
     if os.path.exists(prompts_path):
         try:
             pdata = json.load(open(prompts_path, encoding="utf-8"))
             vids = pdata.get("videos", {})
             for extra_k in list(vids.keys()):
-                if extra_k not in ("v1", "v2", "v3", "v4", "v5", "v6"):
+                if extra_k in ("v7", "v8"):
                     vids.pop(extra_k, None)
             with open(prompts_path, "w", encoding="utf-8") as f:
                 json.dump(pdata, f, ensure_ascii=False, indent=2)
@@ -226,6 +250,8 @@ def sync_web_ui(force: bool = True):
     pids = list(ALL_PIDS)
     if os.path.isdir(PROJECTS_DIR):
         for entry in sorted(os.listdir(PROJECTS_DIR)):
+            if entry.startswith("fashion_"):
+                continue
             full_e = os.path.join(PROJECTS_DIR, entry)
             if os.path.isdir(full_e) and entry not in pids:
                 pids.append(entry)
@@ -323,8 +349,13 @@ def sync_web_ui(force: bool = True):
             for vkey in ordered_vkeys:
                 vcfg = videos[vkey]
                 char_key = vcfg.get("character", "nv1")
-                is_nv1 = "nv1" in char_key.lower()
-                char_sheet_abs = os.path.join(CHARS_DIR, "nv1_ref.jpg" if is_nv1 else "nv2_ref.png")
+                ck_low = (char_key or "").lower()
+                if "nv3" in ck_low or vkey.lower().startswith("nv3"):
+                    char_sheet_abs = os.path.join(CHARS_DIR, "nv3_ref.jpg")
+                elif "nv2" in ck_low or vkey.lower() in ("v2", "v4", "v6", "v8", "v10") or vkey.lower().startswith("nv2"):
+                    char_sheet_abs = os.path.join(CHARS_DIR, "nv2_ref.png")
+                else:
+                    char_sheet_abs = os.path.join(CHARS_DIR, "nv1_ref.jpg")
 
                 char_v = get_char_v_code(vkey, char_key)
                 char_label = vcfg.get("hook_title") or DEFAULT_HOOK_LABELS.get(vkey, char_v.upper())
@@ -332,6 +363,18 @@ def sync_web_ui(force: bool = True):
                 ref_img_rel = vcfg.get("ref_image", f"{vkey}-refimg.jpg")
                 ref_img_abs = os.path.join(pdir, ref_img_rel)
                 ref_exists = os.path.exists(ref_img_abs) and os.path.getsize(ref_img_abs) > 5000
+
+                thumb_abs = ""
+                if _esm is not None:
+                    try:
+                        thumb_abs = _esm.get_variant_thumbnail_path(pid, char_v)
+                    except Exception:
+                        thumb_abs = ""
+                if not thumb_abs:
+                    cand_thumb = os.path.join(pdir, "thumbnails", f"{pid}_{char_v}_thumb.jpg")
+                    if os.path.exists(cand_thumb) and os.path.getsize(cand_thumb) > 5000:
+                        thumb_abs = cand_thumb
+                has_thumb = bool(thumb_abs and os.path.exists(thumb_abs))
 
                 final_filename = get_final_video_filename(pid, vkey, char_key)
                 old_final_filename = f"{pid}-{vkey}-final-30s.mp4"
@@ -377,12 +420,17 @@ def sync_web_ui(force: bool = True):
 
                 scenes_ui = []
                 any_scene_done = False
+                any_scene_tmp = False
                 for idx, sc in enumerate(vcfg.get("scenes", []), start=1):
                     s_file = sc["file"]
                     s_abs = os.path.join(pdir, s_file)
+                    s_tmp = s_abs + ".720p.tmp"
                     s_done = os.path.exists(s_abs) and os.path.getsize(s_abs) > 50000
+                    s_has_tmp = (not s_done) and os.path.exists(s_tmp) and os.path.getsize(s_tmp) > 10000
                     if s_done:
                         any_scene_done = True
+                    if s_has_tmp:
+                        any_scene_tmp = True
                     scenes_ui.append({
                         "scene_number": idx,
                         "scene_title": f"Phân cảnh {idx} (10s - {sc['words']} từ)",
@@ -390,14 +438,14 @@ def sync_web_ui(force: bool = True):
                         "image_prompt": vcfg.get("ref_image_prompt", "9:16 Factory / Workshop Reference Image (Nano Banana 2.1)"),
                         "video_prompt": sc["prompt"],
                         "image_path": ref_img_abs if ref_exists else "",
-                        "video_path": s_abs if s_done else "",
+                        "video_path": s_abs if s_done else (s_tmp if s_has_tmp else ""),
                         "primary_product_image_path": primary_prod_abs,
                         "character_sheet_path": char_sheet_abs if os.path.exists(char_sheet_abs) else "",
-                        "status": "done" if s_done else "pending",
+                        "status": "done" if s_done else ("running" if s_has_tmp else "pending"),
                         "error_msg": "",
                     })
 
-                p_status = "done" if final_exists else ("vid_gen" if any_scene_done else ("queued" if ref_exists else "img_gen"))
+                p_status = "done" if final_exists else ("vid_gen" if (any_scene_done or any_scene_tmp) else ("queued" if ref_exists else "img_gen"))
                 products_entries.append({
                     "id": f"{pid}_{char_v}",
                     "vkey": vkey,
@@ -406,6 +454,8 @@ def sync_web_ui(force: bool = True):
                     "product_name": f"{pname} — {char_v.upper()} ({char_label} | {style_label})",
                     "product_info": f"File: {final_filename} | Giá: {price_str} | Bối cảnh: {style_label} | Voice: {vcfg.get('voice_name','')}",
                     "product_image_path": ref_img_abs if ref_exists else "",
+                    "thumbnail_path": thumb_abs if has_thumb else "",
+                    "has_thumbnail": has_thumb,
                     "primary_product_image_path": primary_prod_abs,
                     "slide_overlay_image_paths": slide_abs_list,
                     "all_product_image_paths": all_prod_imgs,
@@ -446,6 +496,19 @@ def sync_web_ui(force: bool = True):
         run_cnt = sum(1 for e in products_entries if e["status"] != "done")
         fail_cnt = sum(1 for e in products_entries if e["status"] == "failed")
 
+        live_prog = {}
+        recent_logs = []
+        if _esm is not None and (has_rendered_cache or has_prompts):
+            try:
+                live_prog = _esm.get_project_live_progress(pid)
+                recent_logs = live_prog.get("logs", [])
+            except Exception:
+                pass
+
+        is_pipeline_running = bool(live_prog.get("is_running", False))
+        progress_pct = int(live_prog.get("progress_pct", 0))
+        thumbs_cnt = sum(1 for e in products_entries if e.get("has_thumbnail"))
+
         proj_title = f"{pname[:48]} ({pid}) — {price_str}" if price_str else f"{pname[:48]} ({pid})"
         proj_obj = {
             "id": pid,
@@ -465,11 +528,16 @@ def sync_web_ui(force: bool = True):
             "done_products": done_cnt,
             "running_products": run_cnt,
             "failed_products": fail_cnt,
+            "thumbnails_count": thumbs_cnt,
             "deleted_finals_count": deleted_finals_count,
             "has_rendered_cache": has_rendered_cache,
             "rendered_files_count": rendered_files_count,
             "rendered_size_mb": rendered_size_mb,
             "is_clean_new": (done_cnt == 0 and is_marked_clean),
+            "is_running": is_pipeline_running,
+            "progress_pct": progress_pct,
+            "live_status": live_prog,
+            "logs": recent_logs,
             "template_code": tpl_code,
             "template_name": tpl_name,
             "videos_per_character": vpc_val,
@@ -488,8 +556,10 @@ def sync_web_ui(force: bool = True):
         with open(os.path.join(pdir, "project.json"), "w", encoding="utf-8") as f:
             json.dump(proj_obj, f, ensure_ascii=False, indent=2)
 
+        # Group -1 = Đang chạy trực tiếp (TOP-MOST), Group 0 = Còn Video Final (TOP), Group 1 = Hết Video Final (BOTTOM)
+        sort_group = -1 if is_pipeline_running else (0 if done_cnt > 0 else 1)
         raw_index_items.append((
-            0 if done_cnt > 0 else 1,  # Group 0 = Còn Video Final (TOP), Group 1 = Hết Video Final (BOTTOM)
+            sort_group,
             order_idx,
             {
                 "id": pid,
@@ -504,17 +574,278 @@ def sync_web_ui(force: bool = True):
                 "done_products": done_cnt,
                 "running_products": run_cnt,
                 "failed_products": fail_cnt,
+                "thumbnails_count": thumbs_cnt,
                 "deleted_finals_count": deleted_finals_count,
                 "has_rendered_cache": has_rendered_cache,
                 "rendered_files_count": rendered_files_count,
                 "rendered_size_mb": rendered_size_mb,
                 "is_clean_new": (done_cnt == 0 and is_marked_clean),
+                "is_running": is_pipeline_running,
+                "progress_pct": progress_pct,
+                "current_step_text": live_prog.get("current_step_text", ""),
                 "template_code": tpl_code,
                 "template_name": tpl_name,
                 "videos_per_character": vpc_val,
                 "settings": proj_obj["settings"],
             }
         ))
+
+    # Đồng bộ thêm các dự án Video Thời Trang (fashion_motion_projects/*) đã có Video Final hoặc đang chạy vào Tổng Hợp (Studio Dự Án & Matrix)
+    fashion_root = os.path.join(WORKSPACE, "fashion_motion_projects")
+    if os.path.isdir(fashion_root):
+        fashion_json_files = glob.glob(os.path.join(fashion_root, "*", "fashion_project.json"))
+        fashion_json_files.sort(key=lambda p: os.path.getmtime(p), reverse=True)
+        overall_sheet_default = os.path.join(WORKSPACE, "ảnh mẫu thumbnail", "Tron_Bo_7_Anh_2K", "01_Character_Sheet_4_Outfits_2K.png")
+        for f_idx, fjson_path in enumerate(fashion_json_files):
+            try:
+                fproj = json.load(open(fjson_path, encoding="utf-8"))
+            except Exception:
+                continue
+            fpid = str(fproj.get("project_id") or os.path.basename(os.path.dirname(fjson_path))).strip()
+            if not fpid:
+                continue
+            fdir = os.path.dirname(fjson_path)
+            f_status = str(fproj.get("status") or "")
+            is_f_running = (f_status == "running_flow")
+            final_vid_path = fproj.get("final_video_path") or os.path.join(FINAL_VIDEOS_DIR, f"{fpid}_final.mp4")
+            if not os.path.exists(final_vid_path):
+                alt_final = os.path.join(FINAL_VIDEOS_DIR, f"{fpid}_final_1080p_60fps.mp4")
+                if os.path.exists(alt_final):
+                    final_vid_path = alt_final
+            final_exists = os.path.exists(final_vid_path) and os.path.getsize(final_vid_path) > 50000
+
+            f_scenes = fproj.get("scenes") or []
+            any_sc_done = any(
+                os.path.exists(sc.get("output_video_path") or "") and os.path.getsize(sc.get("output_video_path") or "") > 50000
+                for sc in f_scenes
+            )
+            # Chỉ đưa vào Tổng Hợp những dự án Thời Trang đang chạy, đã có cảnh render hoặc đã có Video Final
+            if not (final_exists or any_sc_done or is_f_running):
+                continue
+
+            base_char_abs = (fproj.get("base_char_2k") or {}).get("path") or ""
+            room_char_abs = (fproj.get("char_sheet_2k") or {}).get("path") or base_char_abs
+            overall_abs = overall_sheet_default if os.path.exists(overall_sheet_default) else room_char_abs
+            outfit_paths = [
+                o.get("path") for o in (fproj.get("outfits") or [])
+                if o.get("path") and os.path.exists(o.get("path"))
+            ]
+            tpl_code_f = str(fproj.get("source_template_code") or fproj.get("template_code") or "#004")
+            tpl_name_f = str(fproj.get("template_name") or "Motion Control Video Fashion (#004)")
+            ftitle = str(fproj.get("title") or fpid)
+            proj_title_f = f"👗 {ftitle}" if not ftitle.startswith("👗") else ftitle
+
+            scenes_ui_f = []
+            for sc_i, sc in enumerate(f_scenes, start=1):
+                sc_vid = sc.get("output_video_path") or os.path.join(fdir, sc.get("output_video_file") or f"fashion_scene_s{sc_i}_1080p.mp4")
+                sc_done = os.path.exists(sc_vid) and os.path.getsize(sc_vid) > 50000
+                sc_thumb = sc.get("keyframe_sheet_path") or sc.get("ref_clip_thumb") or room_char_abs
+                scenes_ui_f.append({
+                    "scene_number": sc_i,
+                    "scene_title": f"Phân cảnh {sc_i} ({sc.get('start_sec', (sc_i-1)*8)}s – {sc.get('end_sec', sc_i*8)}s)",
+                    "scene_description": sc.get("ai_motion_summary_vn") or f"Omni Flash 8s (9:16) — Đổi đồ theo nhạc",
+                    "image_prompt": "2K Character Sheet + 5 Outfit Product Sheets + Room Reference 2K",
+                    "video_prompt": sc.get("prompt") or sc.get("prompt_timeline_pro") or "",
+                    "image_path": sc_thumb if (sc_thumb and os.path.exists(sc_thumb)) else room_char_abs,
+                    "video_path": sc_vid if sc_done else "",
+                    "primary_product_image_path": overall_abs,
+                    "character_sheet_path": base_char_abs,
+                    "status": "done" if sc_done else ("running" if is_f_running else "pending"),
+                    "error_msg": sc.get("last_error") or "",
+                })
+
+            f_products = []
+            final_thumb_jpg = os.path.join(fdir, "final_video_thumb.jpg")
+            if final_exists and (not os.path.exists(final_thumb_jpg) or os.path.getmtime(final_thumb_jpg) < os.path.getmtime(final_vid_path)):
+                try:
+                    import subprocess as _sp
+                    _sp.run(
+                        ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "2.6", "-i", final_vid_path, "-frames:v", "1", "-q:v", "2", final_thumb_jpg],
+                        capture_output=True,
+                        timeout=10,
+                    )
+                except Exception:
+                    pass
+            use_final_thumb = final_thumb_jpg if os.path.exists(final_thumb_jpg) else room_char_abs
+
+            # Card 1: Video Final Hoàn Chỉnh (16s • 1080p 60FPS)
+            f_products.append({
+                "id": f"{fpid}_nv1_v1",
+                "vkey": "v1",
+                "char_v_code": "nv1_v1",
+                "video_filename": os.path.basename(final_vid_path) if final_exists else f"{fpid}_final.mp4",
+                "product_name": f"{ftitle} — NV1_V1 (🏆 VIDEO FINAL 16S • 1080P 60FPS | {tpl_code_f})",
+                "product_info": f"File: {os.path.basename(final_vid_path)} | Mẫu: {tpl_code_f} | Ghép {len(f_scenes)} cảnh + Nhạc gốc",
+                "product_image_path": room_char_abs,
+                "thumbnail_path": use_final_thumb,
+                "has_thumbnail": os.path.exists(use_final_thumb),
+                "primary_product_image_path": overall_abs,
+                "slide_overlay_image_paths": outfit_paths[:5],
+                "all_product_image_paths": ([overall_abs, room_char_abs] + outfit_paths)[:8],
+                "character_sheet_path": base_char_abs,
+                "role_skill_file": "FlowFinalPipeline.MD",
+                "img_model": "Nano Banana 2.1 (2K)",
+                "vid_model": "Omni 1.1 Flash (abra_edit 1080p)",
+                "aspect": "9:16",
+                "num_scenes": len(scenes_ui_f),
+                "seconds_per_scene": 8,
+                "video_resolution": "1080p",
+                "character_id": "nv5_fashion",
+                "voice_id": "",
+                "flow_project_id": fproj.get("flow_project_id") or "",
+                "output_dir": FINAL_VIDEOS_DIR,
+                "project_dir": fdir,
+                "status": "done" if final_exists else ("vid_gen" if (is_f_running or any_sc_done) else "queued"),
+                "error_msg": "",
+                "final_video_path": final_vid_path if final_exists else "",
+                "final_video_mtime": int(os.path.getmtime(final_vid_path)) if final_exists else 0,
+                "scenes": scenes_ui_f,
+                "created_at": fproj.get("created_at") or now_str,
+            })
+
+            # Card 2 & 3: Hiển thị luôn từng Video Phân Cảnh 1 (8s) và Phân Cảnh 2 (8s) để xem trực tiếp trong Tổng Hợp
+            for sc_i, sc in enumerate(f_scenes, start=1):
+                sc_vid = sc.get("output_video_path") or os.path.join(fdir, sc.get("output_video_file") or f"fashion_scene_s{sc_i}_1080p.mp4")
+                sc_done = os.path.exists(sc_vid) and os.path.getsize(sc_vid) > 50000
+                v_idx = sc_i + 1
+                v_code = f"nv1_v{v_idx}"
+                sc_ai_thumb = os.path.join(fdir, f"scene_s{sc_i}_ai_thumb.jpg")
+                if sc_done and (not os.path.exists(sc_ai_thumb) or os.path.getmtime(sc_ai_thumb) < os.path.getmtime(sc_vid)):
+                    try:
+                        import subprocess as _sp
+                        _sp.run(
+                            ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-ss", "3.2", "-i", sc_vid, "-frames:v", "1", "-q:v", "2", sc_ai_thumb],
+                            capture_output=True,
+                            timeout=10,
+                        )
+                    except Exception:
+                        pass
+                sc_thumb = sc_ai_thumb if os.path.exists(sc_ai_thumb) else (sc.get("ref_clip_thumb") or sc.get("keyframe_sheet_path") or room_char_abs)
+                f_products.append({
+                    "id": f"{fpid}_{v_code}",
+                    "vkey": f"v{v_idx}",
+                    "char_v_code": v_code,
+                    "video_filename": os.path.basename(sc_vid),
+                    "product_name": f"{ftitle} — {v_code.upper()} (🎬 Phân Cảnh {sc_i}: {sc.get('start_sec', (sc_i-1)*8)}s–{sc.get('end_sec', sc_i*8)}s | 1080p)",
+                    "product_info": sc.get("status_detail") or f"Phân cảnh {sc_i} (8s)",
+                    "product_image_path": sc_thumb if (sc_thumb and os.path.exists(sc_thumb)) else room_char_abs,
+                    "thumbnail_path": sc_thumb if (sc_thumb and os.path.exists(sc_thumb)) else room_char_abs,
+                    "has_thumbnail": bool(sc_thumb and os.path.exists(sc_thumb)),
+                    "primary_product_image_path": overall_abs,
+                    "slide_overlay_image_paths": outfit_paths[:5],
+                    "all_product_image_paths": ([overall_abs, room_char_abs] + outfit_paths)[:8],
+                    "character_sheet_path": base_char_abs,
+                    "role_skill_file": "FlowFinalPipeline.MD",
+                    "img_model": "Nano Banana 2.1 (2K)",
+                    "vid_model": "Omni 1.1 Flash (abra_edit 1080p)",
+                    "aspect": "9:16",
+                    "num_scenes": 1,
+                    "seconds_per_scene": 8,
+                    "video_resolution": "1080p",
+                    "character_id": "nv5_fashion",
+                    "voice_id": "",
+                    "flow_project_id": fproj.get("flow_project_id") or "",
+                    "output_dir": fdir,
+                    "project_dir": fdir,
+                    "status": "done" if sc_done else ("vid_gen" if is_f_running else "queued"),
+                    "error_msg": sc.get("last_error") or "",
+                    "final_video_path": sc_vid if sc_done else "",
+                    "final_video_mtime": int(os.path.getmtime(sc_vid)) if sc_done else 0,
+                    "scenes": [scenes_ui_f[sc_i - 1]] if sc_i - 1 < len(scenes_ui_f) else [],
+                    "created_at": fproj.get("created_at") or now_str,
+                })
+
+            f_done_cnt = sum(1 for e in f_products if e["status"] == "done")
+            f_run_cnt = sum(1 for e in f_products if e["status"] != "done")
+            f_pct = 100 if final_exists else (int(round((f_done_cnt / max(1, len(f_products))) * 100)) if any_sc_done else (35 if is_f_running else 0))
+
+            mirror_pdir = os.path.join(PROJECTS_DIR, fpid)
+            os.makedirs(mirror_pdir, exist_ok=True)
+            f_proj_obj = {
+                "id": fpid,
+                "name": proj_title_f,
+                "full_product_name": ftitle,
+                "price": tpl_code_f,
+                "shop": "Video Thời Trang (#004)",
+                "final_videos_dir": FINAL_VIDEOS_DIR,
+                "project_dir": fdir,
+                "primary_product_image_path": overall_abs,
+                "slide_overlay_image_paths": outfit_paths[:5],
+                "all_product_image_paths": ([overall_abs, room_char_abs] + outfit_paths)[:8],
+                "role_skill_file": "FlowFinalPipeline.MD",
+                "created_at": fproj.get("created_at") or now_str,
+                "updated_at": fproj.get("updated_at") or now_str,
+                "total_products": len(f_products),
+                "done_products": f_done_cnt,
+                "running_products": f_run_cnt,
+                "failed_products": 0,
+                "thumbnails_count": len(f_products),
+                "deleted_finals_count": 0,
+                "has_rendered_cache": True,
+                "rendered_files_count": f_done_cnt,
+                "rendered_size_mb": round(sum(os.path.getsize(e["final_video_path"]) for e in f_products if e.get("final_video_path") and os.path.exists(e["final_video_path"])) / (1024 * 1024), 1),
+                "is_clean_new": False,
+                "is_running": is_f_running,
+                "progress_pct": f_pct,
+                "live_status": {
+                    "is_running": is_f_running,
+                    "progress_pct": f_pct,
+                    "current_step_text": fproj.get("status_message") or "",
+                },
+                "logs": [fproj.get("status_message")] if fproj.get("status_message") else [],
+                "template_code": tpl_code_f,
+                "template_name": tpl_name_f,
+                "videos_per_character": len(f_products),
+                "is_fashion_motion_project": True,
+                "settings": {
+                    "role_skill_file": "FlowFinalPipeline.MD",
+                    "img_model": "Nano Banana 2.1 (2K)",
+                    "vid_model": "Omni 1.1 Flash (1080p)",
+                    "aspect": "9:16",
+                    "num_scenes": len(f_scenes),
+                    "seconds_per_scene": 8,
+                    "video_resolution": "1080p",
+                    "max_workers": 2,
+                },
+                "products": f_products,
+            }
+            with open(os.path.join(mirror_pdir, "project.json"), "w", encoding="utf-8") as f_out:
+                json.dump(f_proj_obj, f_out, ensure_ascii=False, indent=2)
+
+            # Đặt sort_group = -2 (nếu đang chạy) hoặc -1 (nếu đã có Video Final Thời Trang) để luôn nổi lên ĐẦU danh sách Tổng Hợp!
+            f_sort_group = -2 if is_f_running else (-1 if f_done_cnt > 0 else 1)
+            raw_index_items.append((
+                f_sort_group,
+                f_idx,
+                {
+                    "id": fpid,
+                    "name": proj_title_f,
+                    "primary_product_image_path": overall_abs,
+                    "final_videos_dir": FINAL_VIDEOS_DIR,
+                    "project_dir": fdir,
+                    "role_skill_file": "FlowFinalPipeline.MD",
+                    "created_at": fproj.get("created_at") or now_str,
+                    "updated_at": fproj.get("updated_at") or now_str,
+                    "total_products": len(f_products),
+                    "done_products": f_done_cnt,
+                    "running_products": f_run_cnt,
+                    "failed_products": 0,
+                    "thumbnails_count": len(f_products),
+                    "deleted_finals_count": 0,
+                    "has_rendered_cache": True,
+                    "rendered_files_count": f_done_cnt,
+                    "rendered_size_mb": f_proj_obj["rendered_size_mb"],
+                    "is_clean_new": False,
+                    "is_running": is_f_running,
+                    "progress_pct": f_pct,
+                    "current_step_text": fproj.get("status_message") or "",
+                    "template_code": tpl_code_f,
+                    "template_name": tpl_name_f,
+                    "videos_per_character": len(f_products),
+                    "is_fashion_motion_project": True,
+                    "settings": f_proj_obj["settings"],
+                }
+            ))
 
     # Products with Final Videos (>0) stay at the TOP; products with 0 Final Videos move to the BOTTOM!
     raw_index_items.sort(key=lambda x: (x[0], x[1]))

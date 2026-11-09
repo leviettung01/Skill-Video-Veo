@@ -1,138 +1,123 @@
-const TYPE_LABELS = {
-  GENERATE_IMAGE:           'GEN IMAGE',
-  REGENERATE_IMAGE:         'REGEN IMAGE',
-  EDIT_IMAGE:               'EDIT IMAGE',
-  GENERATE_CHARACTER_IMAGE: 'GEN REF',
-  REGENERATE_CHARACTER_IMAGE: 'REGEN REF',
-  EDIT_CHARACTER_IMAGE:     'EDIT REF',
-  GENERATE_VIDEO:           'GEN VIDEO',
-  GENERATE_VIDEO_REFS:      'GEN VIDEO FROM REFS',
-  UPSCALE_VIDEO:            'UPSCALE VIDEO',
-  GEN_IMG:                  'GEN IMAGE',
-  GEN_VID:                  'GEN VIDEO',
-  GEN_VID_REF:              'GEN VIDEO FROM REFS',
-  UPSCALE:                  'UPSCALE VIDEO',
-  TRACKING:                 'TRACKING',
-  URL_REFRESH:              'URL REFRESH',
+'use strict';
+
+const DEFAULT_BRIDGE_BASE = 'http://127.0.0.1:4000';
+const DEFAULT_BRIDGE_SECRET = 'ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d';
+
+const banner = document.getElementById('status-banner');
+const dot = document.getElementById('status-dot');
+const labelEl = document.getElementById('status-label');
+const subEl = document.getElementById('status-sub');
+const popUrl = document.getElementById('pop-url');
+const popSecret = document.getElementById('pop-secret');
+const btnSaveTest = document.getElementById('btn-save-test');
+const popTestRes = document.getElementById('pop-test-res');
+const btnOptions = document.getElementById('btn-options');
+const btnSidePanel = document.getElementById('btn-sidepanel');
+const btnFlow = document.getElementById('btn-flow');
+
+const STATE_LABELS = {
+  noconfig: 'Chưa cấu hình',
+  connected: 'Kết nối ổn định (:4000)',
+  stale: 'Kết nối chậm',
+  offline: 'Mất kết nối',
 };
 
-function formatType(type) {
-  if (!type) return '—';
-  return TYPE_LABELS[type] || type.slice(0, 12).toUpperCase();
+function formatAgoShort(ts) {
+  if (!ts) return null;
+  const secs = Math.round((Date.now() - ts) / 1000);
+  if (secs < 5) return 'vừa xong';
+  if (secs < 60) return `${secs}s trước`;
+  return `${Math.round(secs / 60)}m trước`;
 }
 
-function formatTime(iso) {
-  if (!iso) return '—';
-  try {
-    const d = new Date(iso);
-    const hh = String(d.getHours()).padStart(2, '0');
-    const mm = String(d.getMinutes()).padStart(2, '0');
-    const ss = String(d.getSeconds()).padStart(2, '0');
-    return `${hh}:${mm}:${ss}`;
-  } catch {
-    return '—';
-  }
-}
-
-function escHtml(str) {
-  return String(str)
-    .replace(/&/g, '&amp;')
-    .replace(/</g, '&lt;')
-    .replace(/>/g, '&gt;')
-    .replace(/"/g, '&quot;');
-}
-
-function badgeHtml(status) {
-  if (status === 'COMPLETED' || status === 'success') {
-    return '<span class="badge badge-ok">&#10003; done</span>';
-  } else if (status === 'FAILED' || status === 'failed' || (typeof status === 'number' && status >= 400)) {
-    return '<span class="badge badge-fail">&#10007; fail</span>';
-  } else if (status === 'PROCESSING') {
-    return '<span class="badge badge-proc">&#9203; gen...</span>';
+function applyState(state, pollAgo, mintAgo) {
+  banner.dataset.state = state;
+  dot.dataset.state = state;
+  labelEl.textContent = STATE_LABELS[state] ?? state;
+  if (state === 'noconfig') {
+    subEl.textContent = 'Nhập Bridge URL + Secret bên dưới';
+  } else if (mintAgo) {
+    subEl.textContent = `Poll: ${pollAgo || 'vừa xong'} • Mint: ${mintAgo}`;
   } else {
-    return '<span class="badge badge-proc">&#9203; sent</span>';
+    subEl.textContent = `Poll cuối: ${pollAgo || 'vừa xong'}`;
   }
 }
 
-function renderLog(entries) {
-  const list = document.getElementById('log-list');
-  const countEl = document.getElementById('log-count');
+function resolveStatus() {
+  chrome.storage.local.get(
+    ['bridgeBase', 'bridgeSecret', 'lastPollOkAt', 'lastMintOkAt'],
+    ({ bridgeBase, bridgeSecret, lastPollOkAt, lastMintOkAt }) => {
+      if (!popUrl.value) popUrl.value = bridgeBase || DEFAULT_BRIDGE_BASE;
+      if (!popSecret.value) popSecret.value = bridgeSecret || DEFAULT_BRIDGE_SECRET;
 
-  if (!entries || entries.length === 0) {
-    list.innerHTML = '<div class="log-empty">No requests yet</div>';
-    countEl.textContent = '0';
-    return;
-  }
+      const now = Date.now();
+      const pollAge = lastPollOkAt ? now - lastPollOkAt : Infinity;
+      const pollAgo = formatAgoShort(lastPollOkAt);
+      const mintAgo = formatAgoShort(lastMintOkAt);
 
-  countEl.textContent = entries.length;
+      let state;
+      if (pollAge < 35_000) state = 'connected';
+      else if (pollAge < 120_000) state = 'stale';
+      else state = 'offline';
 
-  list.innerHTML = entries.map((entry, i) => {
-    const shortId = entry.id ? String(entry.id).slice(0, 8) : '—';
-    const type = formatType(entry.type || entry.method);
-    const time = formatTime(entry.time || entry.timestamp);
-    const status = entry.status || 'pending';
-    const error = entry.error || '';
-
-    const urlDisplay = entry.url
-      ? `<div class="detail-section">
-           <div class="detail-label">URL</div>
-           <div class="detail-value url" title="${escHtml(entry.url)}">${escHtml(entry.url)}</div>
-         </div>`
-      : '';
-
-    const payloadDisplay = entry.payloadSummary
-      ? `<div class="detail-section">
-           <div class="detail-label">Payload</div>
-           <div class="detail-value">${escHtml(entry.payloadSummary)}</div>
-         </div>`
-      : '';
-
-    const responseDisplay = entry.responseSummary
-      ? `<div class="detail-section">
-           <div class="detail-label">Response${entry.httpStatus ? ` (${entry.httpStatus})` : ''}</div>
-           <div class="detail-value">${escHtml(entry.responseSummary)}</div>
-         </div>`
-      : '';
-
-    const errorDisplay = error
-      ? `<div class="detail-section">
-           <div class="detail-label">Error</div>
-           <div class="detail-value detail-error">${escHtml(error)}</div>
-         </div>`
-      : '';
-
-    const hasDetails = entry.url || entry.payloadSummary || entry.responseSummary || error;
-
-    return `<div class="entry" data-idx="${i}">
-      <div class="entry-row">
-        <span class="entry-id">${escHtml(shortId)}</span>
-        <span class="entry-type">${escHtml(type)}</span>
-        <span class="entry-time">${escHtml(time)}</span>
-        ${badgeHtml(status)}
-        ${hasDetails ? '<span class="expand-icon">&#9654;</span>' : '<span class="expand-icon" style="visibility:hidden">&#9654;</span>'}
-      </div>
-      ${hasDetails ? `<div class="entry-details">${urlDisplay}${payloadDisplay}${responseDisplay}${errorDisplay}</div>` : ''}
-    </div>`;
-  }).join('');
-
-  // Toggle expand on row click
-  list.querySelectorAll('.entry-row').forEach((row) => {
-    row.addEventListener('click', () => {
-      const entry = row.closest('.entry');
-      if (entry.querySelector('.entry-details')) {
-        entry.classList.toggle('open');
-      }
-    });
-  });
+      applyState(state, pollAgo, mintAgo);
+    },
+  );
 }
 
-document.getElementById('btn-panel').addEventListener('click', () => {
-  chrome.windows.getCurrent((win) => {
-    chrome.sidePanel.open({ windowId: win.id });
-  });
+chrome.storage.local.get(['bridgeBase', 'bridgeSecret'], ({ bridgeBase, bridgeSecret }) => {
+  popUrl.value = bridgeBase || DEFAULT_BRIDGE_BASE;
+  popSecret.value = bridgeSecret || DEFAULT_BRIDGE_SECRET;
 });
 
-chrome.runtime.sendMessage({ type: 'REQUEST_LOG' }, (data) => {
-  if (chrome.runtime.lastError) return;
-  if (data && data.log) renderLog(data.log);
+btnSaveTest.addEventListener('click', async () => {
+  const bridgeBase = popUrl.value.trim().replace(/\/+$/, '') || DEFAULT_BRIDGE_BASE;
+  const bridgeSecret = popSecret.value.trim() || DEFAULT_BRIDGE_SECRET;
+  chrome.storage.local.set({ bridgeBase, bridgeSecret }, () => {
+    chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {});
+  });
+  try {
+    const resp = await fetch(`${bridgeBase}/api/internal/captcha/stats`, {
+      method: 'GET',
+      headers: { 'x-local-auth': bridgeSecret },
+    });
+    if (resp.ok) {
+      const data = await resp.json().catch(() => ({}));
+      popTestRes.className = 'test-box ok';
+      popTestRes.textContent = `✓ OK — pending: ${data.pendingCount ?? 0}, queued: ${data.queuedCount ?? 0}, pollers: ${data.pollerWaitingCount ?? 1}`;
+      applyState('connected', 'vừa xong', null);
+    } else {
+      popTestRes.className = 'test-box fail';
+      popTestRes.textContent = `✗ HTTP ${resp.status}`;
+    }
+  } catch (e) {
+    popTestRes.className = 'test-box fail';
+    popTestRes.textContent = `✗ ${e?.message || 'Lỗi kết nối cổng 4000'}`;
+  }
+});
+
+resolveStatus();
+setInterval(resolveStatus, 3_000);
+
+btnOptions.addEventListener('click', () => {
+  chrome.runtime.openOptionsPage();
+  window.close();
+});
+
+btnSidePanel.addEventListener('click', async () => {
+  try {
+    const [tab] = await chrome.tabs.query({ active: true, currentWindow: true });
+    if (tab && chrome.sidePanel?.open) {
+      await chrome.sidePanel.open({ windowId: tab.windowId });
+      window.close();
+      return;
+    }
+  } catch (_) {}
+  chrome.runtime.openOptionsPage();
+  window.close();
+});
+
+btnFlow.addEventListener('click', () => {
+  chrome.tabs.create({ url: 'https://flow.google.com/' });
+  window.close();
 });

@@ -2,10 +2,11 @@
 """
 Generator cho Template "Nhà Xưởng" (Template/Nhà Xưởng/generator.py)
 Tự động phân tích thông tin sản phẩm (info.json + ảnh trong product_images/)
-và sinh ra prompts.json + spec_v*.json chuẩn cho pipeline tạo ảnh 2K & video 1080p.
+và sinh ra prompts.json + spec_v*.json chuẩn Hyper-Photorealistic 2K Ref Image & 1080p Video.
 """
 import os
 import re
+import sys
 import glob
 import json
 import math
@@ -13,6 +14,47 @@ from PIL import Image
 
 TEMPLATE_DIR = os.path.dirname(os.path.abspath(__file__))
 CONFIG_PATH = os.path.join(TEMPLATE_DIR, "template_config.json")
+WS_ROOT = os.path.abspath(os.path.join(TEMPLATE_DIR, "..", ".."))
+SCRIPTS_DIR = os.path.join(WS_ROOT, "flow_final_pipeline", "scripts")
+if SCRIPTS_DIR not in sys.path:
+    sys.path.insert(0, SCRIPTS_DIR)
+
+try:
+    import engine_settings_manager as _esm
+    from video_fx_and_broll_engine import (
+        build_credible_environment_ref_prompt,
+        build_scene_video_prompt_with_broll,
+        DEFAULT_CAMERA_BROLL_SETTINGS,
+        DEFAULT_VIDEO_EDIT_FX_SETTINGS,
+    )
+except Exception:
+    _esm = None
+    build_credible_environment_ref_prompt = None
+    build_scene_video_prompt_with_broll = None
+    DEFAULT_CAMERA_BROLL_SETTINGS = {}
+    DEFAULT_VIDEO_EDIT_FX_SETTINGS = {}
+
+
+def _load_cam_broll_settings() -> dict:
+    if _esm is not None:
+        try:
+            cfg = _esm.load_engine_settings()
+            if isinstance(cfg.get("camera_broll_settings"), dict):
+                return cfg["camera_broll_settings"]
+        except Exception:
+            pass
+    return dict(DEFAULT_CAMERA_BROLL_SETTINGS) if DEFAULT_CAMERA_BROLL_SETTINGS else {}
+
+
+def _load_video_fx_settings() -> dict:
+    if _esm is not None:
+        try:
+            cfg = _esm.load_engine_settings()
+            if isinstance(cfg.get("video_edit_fx_settings"), dict):
+                return cfg["video_edit_fx_settings"]
+        except Exception:
+            pass
+    return dict(DEFAULT_VIDEO_EDIT_FX_SETTINGS) if DEFAULT_VIDEO_EDIT_FX_SETTINGS else {}
 
 
 def load_template_config() -> dict:
@@ -40,15 +82,29 @@ def _parse_price_k(price_raw) -> tuple:
 
 
 def _extract_short_vn_name(title: str) -> str:
-    """Rút gọn tên sản phẩm tiếng Việt để đọc thoại tự nhiên (khoảng 5-8 từ)."""
+    """Rút gọn tên sản phẩm tiếng Việt để đọc thoại tự nhiên (khoảng 5-8 từ, không cắt cụt từ ghép)."""
     t = (title or "").strip()
     t = re.sub(r"\[[^\]]*\]|\([^\)]*\)", " ", t)
     t = re.sub(r"-\s*[A-Za-z0-9_]+$", " ", t)
+    # Bỏ các thông số kích thước dạng 20x20cm, 15x20cm để câu thoại mượt tự nhiên
+    t = re.sub(r"\b\d+\s*[xX×]\s*\d+\s*(cm|mm|m)\b", " ", t)
+    # Ưu tiên lấy cụm chính trước dấu phẩy hoặc gạch chéo nếu đủ độ dài
+    first_clause = re.split(r"[,;/|]+", t)[0].strip()
+    if len(first_clause.split()) >= 4:
+        t = first_clause
     t = re.sub(r"\s+", " ", t).strip()
     if not t:
         return "sản phẩm chính hãng tại xưởng"
     words = t.split()
-    short = " ".join(words[:7])
+    max_w = 7
+    # Nếu từ thứ 7 là tiền tố của từ ghép 2 âm tiết phổ biến thì lấy thêm từ thứ 8 để không bị cụt chữ
+    incomplete_prefixes = {
+        "đa", "thông", "tự", "chính", "cao", "chống", "không", "siêu",
+        "nhà", "điện", "kim", "rửa", "cổ", "dây", "khóa", "in", "ba",
+    }
+    if len(words) > max_w and words[max_w - 1].lower() in incomplete_prefixes:
+        max_w = 8
+    short = " ".join(words[:max_w])
     short_lower = short.lower()
     short_lower = re.sub(r"\b304\b", "ba lẻ tư", short_lower)
     short_lower = re.sub(r"\b5kg\b", "năm ký", short_lower)
@@ -57,27 +113,195 @@ def _extract_short_vn_name(title: str) -> str:
 
 
 def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
-    """Suy luận mô tả loại sản phẩm và kích thước cầm tay bằng tiếng Anh cho Prompt Ảnh Ref 2K."""
+    """Suy luận mô tả loại sản phẩm và kích thước cầm tay chuẩn xác bằng tiếng Anh cho Prompt Ảnh Ref 2K."""
     text = f"{title} {desc}".lower()
     mapping = [
-        (["cân tiểu ly", "cân điện tử", "cân nhà bếp"], "compact digital kitchen scale", "true-to-life compact 18x14cm hand-held scale relative to her hands and body"),
-        (["thắt lưng", "dây nịt", "belt"], "coiled men's belt", "true-to-life palm-sized coiled belt scale relative to her hands and body"),
-        (["kính", "mắt kính", "gọng kính"], "folded eyeglasses frame", "true-to-life palm-sized eyewear frame relative to her hands and body"),
-        (["ví", "bóp", "wallet"], "compact leather wallet", "true-to-life palm-sized wallet relative to her hands and body"),
-        (["túi", "balo", "cặp"], "handbag / backpack", "true-to-life natural bag proportion relative to her hands and body"),
-        (["đồng hồ", "watch"], "wristwatch", "true-to-life compact wristwatch scale relative to her hands and body"),
-        (["tai nghe", "loa", "bluetooth"], "compact audio device", "true-to-life palm-sized gadget scale relative to her hands and body"),
-        (["bình giữ nhiệt", "cốc", "ly"], "insulated tumbler cup", "true-to-life hand-held tumbler size relative to her hands and body"),
-        (["máy cạo râu", "tông đơ", "máy sấy", "bàn chải"], "compact personal care appliance", "true-to-life compact hand-held device relative to her hands and body"),
-        (["áo", "quần", "váy", "đầm"], "neatly folded garment item", "true-to-life natural clothing item proportion relative to her hands and body"),
-        (["giày", "dép", "sandal"], "single footwear item", "true-to-life natural shoe size relative to her hands and body"),
-        (["nồi", "chảo", "bếp", "máy xay"], "kitchen appliance item", "true-to-life realistic household appliance size relative to her hands and body"),
-        (["kem", "serum", "sữa rửa mặt", "nước hoa", "son", "mỹ phẩm"], "cosmetic bottle / skincare item", "true-to-life palm-sized cosmetic container relative to her hands and body"),
+        (
+            ["khăn lưới", "khăn rửa chén", "khăn lau bếp", "miếng rửa chén", "miếng cọ", "bùi nhùi"],
+            "20x20cm silver diamond-weave metal mesh dishwashing cloth",
+            "true-to-life 20x20cm palm-sized flexible mesh dishcloth held naturally between both hands",
+        ),
+        (
+            ["khăn tắm", "khăn mặt", "khăn lau"],
+            "soft folded fabric towel",
+            "true-to-life hand-held folded towel size relative to the hands and body",
+        ),
+        (
+            ["cân tiểu ly", "cân điện tử", "cân nhà bếp"],
+            "compact stainless-steel digital kitchen scale",
+            "true-to-life compact 18x14cm hand-held digital scale relative to the hands and body",
+        ),
+        (
+            ["thắt lưng", "dây nịt", "belt"],
+            "men's belt with metal buckle",
+            "true-to-life palm-sized coiled belt and gift box scale relative to the hands and body",
+        ),
+        (
+            ["kính", "mắt kính", "gọng kính"],
+            "eyeglasses frame",
+            "true-to-life palm-sized eyewear frame relative to the hands and body",
+        ),
+        (
+            ["ví", "bóp", "wallet"],
+            "compact leather wallet",
+            "true-to-life palm-sized wallet relative to the hands and body",
+        ),
+        (
+            ["túi", "balo", "cặp"],
+            "handbag / backpack",
+            "true-to-life natural bag proportion relative to the hands and body",
+        ),
+        (
+            ["đồng hồ", "watch"],
+            "wristwatch",
+            "true-to-life compact wristwatch scale relative to the hands and body",
+        ),
+        (
+            ["tai nghe", "loa", "bluetooth"],
+            "compact audio device",
+            "true-to-life palm-sized gadget scale relative to the hands and body",
+        ),
+        (
+            ["bình giữ nhiệt", "cốc", "ly"],
+            "insulated tumbler cup",
+            "true-to-life hand-held tumbler size relative to the hands and body",
+        ),
+        (
+            ["máy cạo râu", "tông đơ", "máy sấy", "bàn chải"],
+            "compact personal care appliance",
+            "true-to-life compact hand-held device relative to the hands and body",
+        ),
+        (
+            ["bộ vẽ", "dụng cụ vẽ", "bút màu", "màu vẽ"],
+            "art & drawing supply kit box",
+            "true-to-life hand-held stationery case proportion relative to the hands and body",
+        ),
+        (
+            ["tinh dầu", "nước hoa", "kem", "serum", "sữa rửa mặt", "son", "mỹ phẩm"],
+            "cosmetic / fragrance bottle set",
+            "true-to-life palm-sized cosmetic bottle / gift box relative to the hands and body",
+        ),
+        (
+            ["kho quẹt", "bánh pía", "bánh", "kẹo", "hạt sen", "hạt", "khô gà", "khô bò", "trà"],
+            "packaged food specialty item",
+            "true-to-life hand-held food jar / retail pack size relative to the hands and body",
+        ),
+        (
+            ["áo", "quần", "váy", "đầm"],
+            "neatly folded garment item",
+            "true-to-life natural clothing item proportion relative to the hands and body",
+        ),
+        (
+            ["giày", "dép", "sandal"],
+            "single footwear item",
+            "true-to-life natural shoe size relative to the hands and body",
+        ),
+        (
+            ["nồi", "chảo", "bếp từ", "bếp điện", "bếp ga", "máy xay", "ấm siêu tốc"],
+            "kitchen appliance / cookware item",
+            "true-to-life realistic household cookware size relative to the hands and body",
+        ),
     ]
     for keywords, prod_en, scale_en in mapping:
         if any(kw in text for kw in keywords):
             return prod_en, scale_en
-    return "product item", "true-to-life natural hand-held scale relative to her hands and body"
+    return "authentic product item", "true-to-life natural hand-held scale relative to the hands and body"
+
+
+def build_hyper_realistic_ref_prompt(
+    ck: str,
+    appearance_en: str,
+    outfit_en: str,
+    setting_en: str,
+    prod_type_en: str,
+    prod_scale_en: str,
+    gender: str = "female",
+) -> str:
+    """
+    Xây dựng Prompt tạo Ảnh Reference 2K (1536x2752) theo cấu trúc Hyper-Photorealistic Portrait:
+      1. Subject & Identity Lock (Close-medium upper-body 9:16 portrait at 1.2m distance)
+      2. Skin Pores, Douyin Glass-Skin & Makeup
+      3. Hair & Adult Physique (90-60-90 / Athletic)
+      4. Expression, Relaxed Asymmetrical Pose & 100% Product Lock
+      5. Camera, Lens & Lighting Physics (Sony A7R V 50mm f/1.4 GM + natural iPhone 16 Pro realism)
+      6. Strict Anti-AI Negative Prompt
+    """
+    is_male = (gender or "").lower() == "male" or "nv3" in (ck or "").lower()
+    app_low = (appearance_en or "").lower()
+    has_glasses = (
+        ("nv1" in (ck or "").lower())
+        or ("framed glasses" in app_low and "no glasses" not in app_low and "without glasses" not in app_low)
+    )
+
+    if is_male:
+        skin_and_details = (
+            "Detailed visible natural skin pores and authentic masculine epidermal micro-texture (zero plastic or waxy smoothing), "
+            "healthy warm-fair complexion with subtle natural light reflection on the bridge of the nose, cheekbones, and forehead; "
+            "matching skin tone across face, neck, forearms, and hands. Sharp masculine jawline, naturally groomed eyebrows, "
+            "and expressive dark eyes with crisp dual catchlights."
+        )
+        physique_block = (
+            "PHYSIQUE: Athletic, mature adult masculine proportions with broad shoulders, toned chest, V-taper torso, and natural confident posture."
+        )
+        pose_block = (
+            "Expression / Pose: Warm, charismatic, approachable smile toward the camera, lips gently parted as if speaking naturally, "
+            "subtle head tilt, torso turned slightly (5-8 degrees) for relaxed masculine asymmetry rather than a stiff frontal pose."
+        )
+    else:
+        glasses_clause = (
+            " She wears thin, lightweight black-framed glasses with crystal-clear anti-reflective lenses — zero white glare or distortion over her eyes."
+            if has_glasses
+            else ""
+        )
+        skin_and_details = (
+            "Detailed visible natural skin pores and lifelike epidermal micro-texture (absolutely zero plastic or airbrushed doll skin), "
+            "radiant rosy dewy Douyin glass-skin finish with subtle specular light reflection on the bridge of her nose, cheeks, and forehead. "
+            "Her face, neck, and hands match in the same fair, radiant skin tone without any unevenness. "
+            "Makeup: Fresh Korean soft-glam luminous makeup, soft pink blush across the cheeks and a touch of blush on the nose tip for a youthful look, "
+            "subtle aegyosal under bright expressive dark-brown eyes with crisp catchlights, wispy curled eyelashes, thin defined winged eyeliner, "
+            "naturally brushed eyebrows, and glossy ombré lips with a nude-pink base blending into cherry-blossom red lip tint in the center."
+            + glasses_clause
+        )
+        physique_block = (
+            "PHYSIQUE: Full, mature adult feminine proportions with natural womanly curves, C-cup natural bust, using 90-60-90 proportions, "
+            "natural upper-body volume, relatively slender waist, and graceful feminine posture."
+        )
+        pose_block = (
+            "Expression / Pose: Warm, charming, friendly smile looking directly into the camera lens, lips gently parted, "
+            "subtle head tilt, torso turned slightly (5-10 degrees three-quarter angle), gently relaxed neck and one shoulder slightly closer to the camera "
+            "for relaxed feminine asymmetry (NOT a stiff frontal mannequin pose)."
+        )
+
+    if build_credible_environment_ref_prompt is not None:
+        return build_credible_environment_ref_prompt(
+            ck=ck,
+            appearance_en=appearance_en,
+            outfit_en=outfit_en,
+            setting_en=setting_en,
+            prod_type_en=prod_type_en,
+            prod_scale_en=prod_scale_en,
+            gender=gender,
+            cam_settings=_load_cam_broll_settings(),
+        )
+
+    return (
+        "Subject & Identity: A hyper-photorealistic vertical 9:16 MEDIUM-FULL ENVIRONMENTAL SHOT (framed from mid-thigh/hips up with natural headroom, "
+        f"camera at 2.2 meters distance with 35mm wide-environmental perspective so the presenter occupies ~45% of the frame width and the credible background behind them is clearly visible) of the exact same person from the attached character reference image "
+        f"({appearance_en}), preserving their original facial identity, bone structure, and features 100% without altering facial identity. "
+        f"Outfit & Credible Background Setting: {outfit_en}, {setting_en}. "
+        f"Skin & Makeup: {skin_and_details} "
+        f"{physique_block} "
+        f"{pose_block} "
+        f"Product Action & Lock: Clean, natural hands holding and presenting the exact {prod_type_en} from the attached product reference image "
+        f"at chest-to-waist level facing the camera ({prod_scale_en}, NOT oversized), with neat authentic retail packages on the foreground table. "
+        "Keep the product 100% identical to the product reference image (preserve exact shape, material texture, weave, color, logo, and labels without redesigning). "
+        "Camera & Lighting: Shot on Sony A7R V full-frame camera with 35mm f/1.4 GM prime lens stopped down to f/4.5 for deep environmental depth of field, "
+        "soft diffused key lighting from the front-left combined with natural overhead facility lighting, keeping the background racks, production line, and facility architecture clearly recognizable behind the presenter. "
+        "Ultra-high resolution 2K (1536x2752), indistinguishable from a genuine photograph, zero AI-generated appearance. "
+        "Negative prompt: AI look, CGI, 3D render, plastic skin, waxy airbrushed face, doll face, stiff pose, frontal passport pose, unnatural symmetry, "
+        "dead eyes, crossed eyes, blurry eyes, opaque glasses glare, altered facial identity, giant oversized product, redesigned product, "
+        "extra fingers, deformed hands, extreme close-up cropping out background, random text, watermark."
+    )
 
 
 def _split_into_karaoke_phrases(text: str, max_chars: int = 28) -> list:
@@ -123,20 +347,39 @@ def _split_into_karaoke_phrases(text: str, max_chars: int = 28) -> list:
 
 
 def _extract_usp_lines(title: str, desc: str, short_name: str) -> list:
-    """Trích xuất 3 câu USP ngắn gọn từ mô tả sản phẩm cho Cảnh 3."""
+    """Trích xuất 3 cặp câu USP ngắn gọn, giàu thông tin thực tế và luôn nhắc đầy đủ tên sản phẩm cho Cảnh 3."""
+    sn = (short_name or "sản phẩm chính hãng").strip()
+    text_low = f"{title or ''} {desc or ''}".lower()
+
+    if any(k in text_low for k in ("khăn lưới", "khăn rửa chén", "miếng cọ", "khăn lau bếp")):
+        return [
+            (
+                f"Mẫu {sn} cọ sạch xoong nồi chén bát không làm trầy xước.",
+                "Sợi lưới kim loại đan kim cương bền chắc, đánh bay vết bẩn cực nhanh.",
+            ),
+            (
+                f"Dùng {sn} lau bếp thoát nước nhanh, không bám dầu mỡ.",
+                "Hàng xuất trực tiếp từ nhà máy, kiểm tra kỹ từng đường viền trước khi giao.",
+            ),
+            (
+                f"Combo {sn} dệt dày dặn, tái sử dụng bền gấp chục lần.",
+                "Mua dùng cho bếp gia đình hay quán ăn đều cực kỳ sạch sẽ tiết kiệm.",
+            ),
+        ]
+
     raw_text = f"{desc or ''}. {title or ''}"
     sents = [s.strip() for s in re.split(r"[.\n•\-]+", raw_text) if len(s.strip()) > 15]
     usp_pairs = [
         (
-            "Hàng chuẩn xưởng chất lượng cao, gia công tỉ mỉ bền đẹp từng chi tiết.",
+            f"Mẫu {sn} chuẩn xưởng chất lượng cao, gia công tỉ mỉ từng chi tiết.",
             "Đóng gói kỹ lưỡng đầy đủ phụ kiện, các bác chốt ngay giúp em.",
         ),
         (
-            "Thiết kế chắc chắn hiện đại, sử dụng tiện lợi và cực kỳ bền bỉ.",
+            f"Dòng {sn} thiết kế chắc chắn hiện đại, sử dụng tiện lợi bền bỉ.",
             "Hàng xuất trực tiếp từ nhà máy, kiểm tra kỹ từng sản phẩm trước khi giao.",
         ),
         (
-            "Chất liệu cao cấp chọn lọc kỹ, hoàn thiện sắc nét chuẩn hàng chính hãng.",
+            f"Siêu phẩm {sn} chất liệu cao cấp chọn lọc kỹ, hoàn thiện sắc nét.",
             "Mua dùng hay làm quà đều rất hợp lý, cam kết y hình từ nhà xưởng.",
         ),
     ]
@@ -199,26 +442,46 @@ def _adapt_dialect_lines(timed_lines: list, region: str) -> list:
     return out
 
 
-def make_video_prompt(scene_idx: int, timed_lines: list, scene_actions: dict, voice_prompt_en: str = "") -> str:
+def make_video_prompt(
+    scene_idx: int,
+    timed_lines: list,
+    scene_actions: dict,
+    voice_prompt_en: str = "",
+    prod_type_en: str = "authentic product",
+    style_label: str = "Nhà Xưởng & Tổng Kho Xuất Hàng",
+) -> str:
+    if build_scene_video_prompt_with_broll is not None:
+        return build_scene_video_prompt_with_broll(
+            scene_idx=scene_idx,
+            timed_lines=timed_lines,
+            scene_actions=scene_actions or {},
+            prod_type_en=prod_type_en,
+            setting_en=style_label,
+            voice_prompt_en=voice_prompt_en,
+            cam_settings=_load_cam_broll_settings(),
+            fx_settings=_load_video_fx_settings(),
+        )
     action_str = scene_actions.get(str(scene_idx)) or scene_actions.get(1) or (
-        "The woman looks directly at the camera with a confident, energetic expression, "
-        "naturally speaking while holding the exact product from the reference image steady at waist level, "
-        "tilting it slightly toward the camera to showcase it, then keeping the presenting pose at the end."
+        "The presenter looks directly into the camera lens with a warm, charming, energetic smile and lifelike eye contact "
+        "(natural eye blinking and crisp catchlights), speaking naturally with accurate Vietnamese lip-sync while holding the exact product "
+        "from the reference image steady at chest-to-waist level, tilting it slightly toward the camera to showcase it, then keeping the presenting pose at the end."
     )
     voice_block = "\n".join(timed_lines)
     voice_dir = f" ({voice_prompt_en})" if voice_prompt_en else ""
     return (
-        "A 10-second vertical 9:16 video starting directly from the provided reference image, "
-        "one continuous medium shot, front-facing camera. Keep the character, the exact product in her hands, "
-        "the items on the table, and the background 100% unchanged from the reference image — "
-        "do not alter, redesign, or replace the product's shape, color, pattern, or logo.\n\n"
+        "A hyper-photorealistic 10-second vertical 9:16 video starting directly from the provided 2K reference image, "
+        "shot on Sony A7R V 35mm f/1.4 GM lens at f/4.5, one continuous medium-full environmental shot, front-facing eye-level camera. "
+        "Preserve 100% of the character's exact facial identity, visible natural skin pores, rosy dewy glass-skin texture, "
+        "clear eyes with crisp catchlights (and clear anti-reflective glasses if worn), the exact product in hand, "
+        "the items on the table, and the background warehouse/factory layout from the reference image — "
+        "do not alter, smooth, or re-synthesize the face, and do not redesign or replace the product's shape, weave, color, or logo.\n\n"
         f"ACTION: {action_str}\n\n"
         f"VOICE{voice_dir} — read the dialogue in 3 timed segments exactly as marked. Keep a steady, even pace so each segment "
         "fills its time window. Finish the last word exactly at 10.0 seconds. Read each word exactly once — "
         "no repetition, no looping, no added words, then stay silent:\n"
         f"{voice_block}\n\n"
         "No background music, no watermark.\n"
-        "Negative: changed product, altered product design, repeating voice, looping dialogue, second voice pass, rushed reading, changed face"
+        "Negative: AI plastic skin, waxy face, altered face, crossed or blurry eyes, glasses glare, warped mouth, changed product, altered product design, repeating voice, looping dialogue, second voice pass, rushed reading"
     )
 
 
@@ -348,13 +611,14 @@ def generate_project_from_template(
         voice_id = cval.get("voice_id") or v_obj.get("voice_id", "")
         voice_name = cval.get("voice_name") or v_obj.get("name", "")
         voice_region = cval.get("voice_region") or v_obj.get("region", "north")
+        voice_gender = cval.get("voice_gender") or v_obj.get("gender", "female")
         voice_prompt_en = cval.get("voice_prompt_en") or v_obj.get("voice_prompt_en", "")
         char_id = cval.get("character_id", "")
         proj_id = cval.get("project_id", "")
         appearance_en = cval.get("appearance_en") or (
-            "shoulder-length layered black hair, black-framed glasses, identical face"
+            "beautiful 23-year-old Vietnamese/East Asian woman with refined symmetrical facial features, fair rosy dewy Douyin glass-skin with visible natural pores, expressive dark-brown eyes, thin black-framed anti-reflective glasses, voluminous shoulder-length layered glossy black hair with airy see-through bangs"
             if "nv1" in ck.lower()
-            else "long wavy dark-brown hair in a high ponytail with colourful pastel hair clips, identical face, no glasses"
+            else "gorgeous 23-year-old Vietnamese/East Asian woman with refined symmetrical V-line face, radiant fair rosy dewy Douyin glass-skin with visible natural pores, wavy dark-brown hair in a high ponytail with pastel hair clips, no glasses"
         )
 
         presets = char_presets_map.get(ck) or char_presets_map.get("nv1" if char_idx % 2 == 0 else "nv2", [])
@@ -372,16 +636,17 @@ def generate_project_from_template(
             char_v = f"{ck}_v{v_idx}"
             hook_title = preset.get("hook_title") or f"{ck.upper()} - Kịch bản {v_idx}"
             style_label = preset.get("style") or "Xưởng sản xuất & Kiểm định chất lượng"
-            outfit_en = preset.get("outfit_en") or "wearing a polite professional blazer over a collared shirt and dark trousers"
-            setting_en = preset.get("setting_en") or "standing behind a display worktable in a modern manufacturing and inspection facility"
+            outfit_en = preset.get("outfit_en") or "wearing a chic open tailored blazer over a fitted soft ribbed knit top"
+            setting_en = preset.get("setting_en") or "standing behind a clean display worktable in a bright modern manufacturing and inspection facility with creamy background bokeh"
 
-            ref_img_prompt = (
-                "Photorealistic vertical 9:16 medium-wide standing photo (framed from head to hips, camera at 2 meters distance, NOT a close-up): "
-                f"the exact same woman from the character reference ({appearance_en}), "
-                f"{outfit_en}, {setting_en}. "
-                f"She looks directly at the camera with a warm, friendly, confident smile while holding and presenting the exact {prod_type_en} from the product reference image in her hands at waist level facing the camera "
-                f"({prod_scale_en}, NOT oversized), with neat retail packaging boxes on the worktable beside her. "
-                "Keep the product 100% identical as shown in the product reference image (keep all original product details, prints, logos, and true size intact, do not redesign or alter the product in any way), and keep her face identical."
+            ref_img_prompt = build_hyper_realistic_ref_prompt(
+                ck=ck,
+                appearance_en=appearance_en,
+                outfit_en=outfit_en,
+                setting_en=setting_en,
+                prod_type_en=prod_type_en,
+                prod_scale_en=prod_scale_en,
+                gender=voice_gender,
             )
 
             h_seg1, h_seg2, h_seg3 = hook_templates[(global_var_counter - 1) % len(hook_templates)]
@@ -406,12 +671,20 @@ def generate_project_from_template(
                 )
                 phrases = _split_into_karaoke_phrases(joined_dialogue, max_chars=28)
                 total_w = sum(w for _, w in phrases)
-                v_prompt = make_video_prompt(sc_num, timed_lines, scene_actions, voice_prompt_en=voice_prompt_en)
+                v_prompt = make_video_prompt(
+                    sc_num,
+                    timed_lines,
+                    scene_actions,
+                    voice_prompt_en=voice_prompt_en,
+                    prod_type_en=prod_type_en,
+                    style_label=style_label,
+                )
                 scenes_list.append({
                     "id": sc_id,
                     "file": sc_file,
                     "words": total_w,
                     "prompt": v_prompt,
+                    "include_prod_uuid_in_video": True,
                 })
                 spec_scenes.append({
                     "file": sc_file,
@@ -462,4 +735,3 @@ def generate_project_from_template(
         json.dump(prompts_obj, f, ensure_ascii=False, indent=2)
 
     return prompts_obj
-

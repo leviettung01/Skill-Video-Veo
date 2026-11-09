@@ -5,18 +5,18 @@
   "voices": {
     "nv1": {
       "key": "nv1",
-      "name": "Nữ Bắc • Tư Vấn Xưởng & QC (NV1)",
+      "name": "Nhân Vật 1 Affi Giọng Bắc (NV1)",
       "voice_id": "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
       "flow_slug": "erinome",
       "gender": "female",
       "region": "north",
       "region_label": "Miền Bắc (Hà Nội)",
-      "tone_style": "trustworthy_expert",
-      "tone_label": "🛡️ Uy tín • Tư vấn Xưởng & QC",
-      "speed_wpm": "42-46 từ / 10s (Tốc độ Chuẩn)",
+      "tone_style": "energetic_sale",
+      "tone_label": "🔥 Năng lượng cao • Affi Giọng Bắc (NV1)",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Erinome.wav",
-      "voice_prompt_en": "clear, trustworthy young Northern Vietnamese female voice (Hanoi accent), professional factory consultant tone, steady confident articulation, 4.4 words/sec",
-      "dialect_markers_vn": "các bác ơi, nhé, đấy ạ, chuẩn chỉnh tận xưởng, kiểm định kỹ càng",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, bright and friendly, mid-to-high pitch, clear forward projection, natural Vietnamese pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
+      "dialect_markers_vn": "các bác ơi, nhé, đấy ạ, chuẩn chỉnh tận xưởng, miễn phí ship, cực kỳ rẻ",
       "recommended_templates": [
         "001",
         "002"
@@ -28,7 +28,7 @@
         "Dụng cụ nhà bếp",
         "Sức khoẻ"
       ],
-      "description": "Giọng nữ miền Bắc chuẩn Hà Nội, phát âm tròn vành rõ chữ, tạo độ tin cậy cao khi giới thiệu hàng xuất xưởng, báo giá bậc thang và kiểm định chất lượng.",
+      "description": "Giọng nữ miền Bắc chuẩn Hà Nội (Nhân Vật 1 Affi Giọng Bắc), phát âm tròn vành rõ chữ, nhấn giá cực chuẩn khi giới thiệu hàng xuất xưởng, báo giá bậc thang và miễn phí ship.",
       "sample_vn_file": "voice_samples/nv1_flow.mp3",
       "sample_dialogue_vn": "30k miễn phí ship tới tận nhà cho nguyên một thắt lưng nam tặng thêm đồng hồ này. Ở đâu bán cái giá đó thì em cũng đến",
       "flow_synced": true
@@ -42,10 +42,10 @@
       "region": "north",
       "region_label": "Miền Bắc (Hà Nội)",
       "tone_style": "energetic_sale",
-      "tone_label": "🔥 Năng lượng cao • Chốt Sale",
+      "tone_label": "🔥 Năng lượng cao • Chốt Sale (NV2)",
       "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Zephyr.wav",
-      "voice_prompt_en": "high-energy, enthusiastic young Northern Vietnamese female voice (Hanoi accent), fast-paced livestream flash-sale tone, persuasive and bright delivery, 4.6 words/sec",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, bright and enthusiastic, mid-to-high pitch, clear forward projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic TikTok Shop flash-sale livestream delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
       "dialect_markers_vn": "mọi người ơi, săn ngay nhé, xả kho sập sàn, mỗi tài khoản một giá, chốt liền tay",
       "recommended_templates": [
         "001",
@@ -64,6 +64,124 @@
       "sample_dialogue_vn": "Mọi người ơi xả kho trực tiếp tại xưởng chỉ ba mươi cành miễn phí ship tới tận nhà! Săn ngay kẻo hết nhé!",
       "flow_synced": true
     },
+    "v5_nam_bac_chuyen_gia": {
+      "key": "v5_nam_bac_chuyen_gia",
+      "name": "Nam Bắc • Chốt Sale Năng Lượng Affi (NV3)",
+      "voice_id": "a5f4e862-16ec-4900-a435-76b37b495f94",
+      "flow_slug": "fenrir",
+      "gender": "male",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "energetic_sale",
+      "tone_label": "🔥 Năng lượng cao • Nam Affi Chốt Sale (NV3)",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Fenrir.wav",
+      "sample_vn_file": "voice_samples/v5_nam_bac_chuyen_gia_flow.mp3",
+      "sample_dialogue_vn": "30k miễn phí ship tới tận nhà cho nguyên một thắt lưng nam tặng thêm đồng hồ này. Ở đâu bán cái giá đó thì em cũng đến",
+      "flow_synced": true,
+      "voice_prompt_en": "Vietnamese male commercial presenter, young adult masculine voice, bright and energetic baritone-tenor pitch, clear forward chest projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm confident smile audible in the voice, charismatic and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi ka”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery.",
+      "dialect_markers_vn": "các bác ơi, mọi người nhé, đấy ạ, chuẩn chỉnh tận xưởng, miễn phí ship, săn ngay",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Phụ kiện Nam (Thắt lưng, Ví, Đồng hồ)",
+        "Thời trang Nam",
+        "Đồ cơ khí / Dụng cụ",
+        "Công nghệ & Điện tử",
+        "Ô tô - Xe máy"
+      ],
+      "description": "Giọng nam miền Bắc trẻ trung, nam tính, năng lượng cao (Fenrir), nhấn nhá giá tiền và ưu đãi cực bốc như giọng Nữ Affi, chuyên chốt đơn đồ Nam & gia dụng."
+    },
+    "v6_nam_nam_reviewer": {
+      "key": "v6_nam_nam_reviewer",
+      "name": "Nam Miền Nam • Chốt Sale & Review Năng Lượng",
+      "voice_id": "f216db87-54f1-42b7-bd98-582a7cd777b5",
+      "flow_slug": "puck",
+      "gender": "male",
+      "region": "south",
+      "region_label": "Miền Nam (Sài Gòn)",
+      "tone_style": "energetic_sale",
+      "tone_label": "🔥 Năng lượng cao • Nam Sài Gòn Chốt Đơn",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Puck.wav",
+      "voice_prompt_en": "Vietnamese male commercial presenter, young adult masculine voice, upbeat and friendly mid-low baritone pitch, clear forward chest projection, natural Southern Vietnamese (Saigon accent) pronunciation, energetic TikTok Shop sales and review delivery, persuasive and relatable, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “hai trăm”, “mỗi tài khoản một giá”, “xịn xò”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery.",
+      "dialect_markers_vn": "anh chị em ơi, xịn xò từng chi tiết, ba mươi cành, miễn phí ship, hốt lẹ liền tay nghen",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Đồ ăn vặt",
+        "Đồ nhắm / Khô bò / Khô gà",
+        "Gia dụng thông minh",
+        "Phụ kiện Nam",
+        "Đồ thể thao"
+      ],
+      "description": "Giọng nam miền Nam (Sài Gòn - Puck) hào hứng, nam tính, tốc độ nhanh vừa phải, cực bắt tai khi chốt sale xả kho và review đồ ăn, gia dụng.",
+      "sample_vn_file": "voice_samples/v6_nam_nam_reviewer_flow.mp3",
+      "sample_dialogue_vn": "Anh chị em ơi xả kho tận xưởng chỉ ba mươi cành miễn phí ship tới tận nhà! Xịn xò từng chi tiết, hốt lẹ liền tay nghen!",
+      "flow_synced": true
+    },
+    "v9_nam_bac_chot_sale": {
+      "key": "v9_nam_bac_chot_sale",
+      "name": "Nam Bắc • Chuyên Gia Đồ Nam & Xưởng QC",
+      "voice_id": "5708dfe9-d9a1-4bdb-bc2c-eee5938bac67",
+      "flow_slug": "alnilam",
+      "gender": "male",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "trustworthy_expert",
+      "tone_label": "🛡️ Uy tín • Chuyên Gia Đồ Da & Kỹ Thuật",
+      "speed_wpm": "42-46 từ / 10s (Tốc độ Chuẩn)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Alnilam.wav",
+      "voice_prompt_en": "Vietnamese male commercial presenter, young adult masculine voice, firm and trustworthy mid-low baritone pitch, resonant chest projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic and authoritative TikTok Shop factory direct sales delivery, persuasive and confident, warm reassurance audible in the voice, fast moderately paced speech with crisp consonants. Emphasize important words, materials and prices such as “da bò nguyên tấm”, “khoá hợp kim chống gỉ”, “ba mươi ka”, “bốn trăm ka”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery.",
+      "dialect_markers_vn": "các bác nhìn kỹ, da bò nguyên tấm, khoá hợp kim chống gỉ, giá tại xưởng cực kỳ rẻ, miễn phí ship",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Thắt lưng / Ví da Nam",
+        "Đồng hồ / Kính mắt Nam",
+        "Sơ mi / Quần âu / Polo Nam",
+        "Dụng cụ cơ khí & Điện tử"
+      ],
+      "description": "Giọng nam miền Bắc trầm đĩnh đạc, quyết đoán (Alnilam), chuyên phân tích chất liệu da bò, hợp kim, thông số kỹ thuật tại xưởng cực kỳ uy tín.",
+      "sample_vn_file": "voice_samples/v9_nam_bac_chot_sale_flow.mp3",
+      "sample_dialogue_vn": "Các bác nhìn kỹ chất da bò nguyên tấm và khoá hợp kim chống gỉ này nhé, giá tại xưởng cực kỳ rẻ lại miễn phí ship tận nhà!",
+      "flow_synced": true
+    },
+    "v10_nam_bac_flash_sale": {
+      "key": "v10_nam_bac_flash_sale",
+      "name": "Nam Bắc • Livestream Xả Kho Sôi Động",
+      "voice_id": "6cbec782-0211-4f64-bbac-6c13c0a578a5",
+      "flow_slug": "sadachbia",
+      "gender": "male",
+      "region": "north",
+      "region_label": "Miền Bắc (Hà Nội)",
+      "tone_style": "energetic_sale",
+      "tone_label": "⚡ Sôi động • Nam Livestream Flash Sale",
+      "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
+      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Sadachbia.wav",
+      "voice_prompt_en": "Vietnamese male commercial presenter, young adult masculine voice, lively and high-energy tenor-baritone pitch, clear forward chest projection, natural Northern Vietnamese (Hanoi accent) pronunciation, fast-paced TikTok Shop flash-sale livestream delivery, persuasive and exciting, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “không phải hai trăm”, “ba mươi ka”, “bốn trăm ka”, “trợ giá sập sàn”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery.",
+      "dialect_markers_vn": "mọi người ơi, không phải hai trăm đâu, trợ giá sập sàn, miễn phí ship tận nơi, bấm giỏ hàng săn ngay",
+      "recommended_templates": [
+        "001",
+        "002"
+      ],
+      "recommended_categories": [
+        "Xả kho tận xưởng",
+        "Gia dụng nhà bếp",
+        "Phụ kiện Nam Nữ",
+        "Combo Mua 1 Tặng 1"
+      ],
+      "description": "Giọng nam miền Bắc sôi động, tiết tấu nhanh dồn dập (Sadachbia), nhấn mạnh câu 'không phải hai trăm đâu' tạo hiệu ứng chốt đơn tức thì.",
+      "sample_vn_file": "voice_samples/v10_nam_bac_flash_sale_flow.mp3",
+      "sample_dialogue_vn": "Mọi người ơi không phải hai trăm đâu, hôm nay tại xưởng trợ giá sập sàn miễn phí ship tận nơi, bấm giỏ hàng săn ngay nhé!",
+      "flow_synced": true
+    },
     "v3_nu_nam_foodie": {
       "key": "v3_nu_nam_foodie",
       "name": "Nữ Nam • Review Ẩm Thực & Mỹ Phẩm",
@@ -76,7 +194,7 @@
       "tone_label": "🍲 Ngọt ngào • Review Đồ Ăn / Mỹ Phẩm",
       "speed_wpm": "38-42 từ / 10s (Tốc độ Vừa)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Leda.wav",
-      "voice_prompt_en": "sweet, cheerful young Southern Vietnamese female voice (Saigon accent), warm appetizing food-reviewer and beauty vlogger tone, lively and friendly expression, 4.0 words/sec",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, sweet and cheerful, mid-to-high pitch, clear forward projection, natural Southern Vietnamese (Saigon accent) pronunciation, appetizing TikTok Shop food and beauty reviewer delivery, persuasive and friendly, warm smile audible in the voice, confident and conversational, moderately fast speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “thơm nức mũi”, “cuốn xỉu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
       "dialect_markers_vn": "mấy bà ơi, nha, nghen, thiệt sự cuốn xỉu, thơm nức mũi luôn nè, bấm giỏ hàng liền nha",
       "recommended_templates": [
         "002",
@@ -107,7 +225,7 @@
       "tone_label": "🔥 Năng lượng cao • Chốt đơn Sài Gòn",
       "speed_wpm": "44-48 từ / 10s (Tốc độ Nhanh)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Laomedeia.wav",
-      "voice_prompt_en": "upbeat, energetic young Southern Vietnamese female voice (Saigon accent), fast-paced enthusiastic shopping host tone, bright and catchy delivery, 4.6 words/sec",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, upbeat and energetic, mid-to-high pitch, clear forward projection, natural Southern Vietnamese (Saigon accent) pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “xịn xò từng chi tiết”, “trợ giá sâu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
       "dialect_markers_vn": "cả nhà ơi, hốt lẹ nha, deal hời chấn động luôn, chạm giỏ hàng góc trái liền tay nghen",
       "recommended_templates": [
         "001",
@@ -125,63 +243,6 @@
       "sample_dialogue_vn": "Trời ơi cả nhà coi cái chất lượng của nó nè, xịn xò từng chi tiết mà hôm nay trợ giá sâu dữ lắm, hốt lẹ liền tay nghen",
       "flow_synced": true
     },
-    "v5_nam_bac_chuyen_gia": {
-      "key": "v5_nam_bac_chuyen_gia",
-      "name": "Nam Bắc • Chuyên Gia Đồ Nam & Kỹ Thuật",
-      "voice_id": "0bc0cb6a-81e7-437c-a790-66fc4c4a58b6",
-      "flow_slug": "orus",
-      "gender": "male",
-      "region": "north",
-      "region_label": "Miền Bắc (Hà Nội)",
-      "tone_style": "trustworthy_expert",
-      "tone_label": "👔 Trầm ấm • Chuyên gia Kỹ thuật / Đồ Nam",
-      "speed_wpm": "38-42 từ / 10s (Tốc độ Vừa)",
-      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Orus.wav",
-      "voice_prompt_en": "deep, authoritative, trustworthy Northern Vietnamese male voice (Hanoi accent), technical expert and luxury menswear reviewer tone, calm and firm delivery, 4.0 words/sec",
-      "dialect_markers_vn": "anh em nhé, các bác nhìn kỹ chi tiết này, hàng chuẩn đét, bền bỉ theo năm tháng",
-      "recommended_templates": [
-        "001"
-      ],
-      "recommended_categories": [
-        "Phụ kiện Nam (Thắt lưng, Ví, Đồng hồ)",
-        "Đồ cơ khí / Dụng cụ",
-        "Công nghệ",
-        "Ô tô - Xe máy"
-      ],
-      "description": "Giọng nam miền Bắc trầm ấm, đĩnh đạc, phân tích thông số kỹ thuật và chất liệu cực kỳ thuyết phục cho các sản phẩm dành cho phái mạnh.",
-      "sample_vn_file": "voice_samples/v5_nam_bac_chuyen_gia_flow.mp3",
-      "sample_dialogue_vn": "Anh em nhìn kỹ bề mặt da bò nguyên tấm và khoá hợp kim chống gỉ này nhé, độ bền cực cao, bảo hành mười hai tháng!",
-      "flow_synced": true
-    },
-    "v6_nam_nam_reviewer": {
-      "key": "v6_nam_nam_reviewer",
-      "name": "Nam Nam • Vlog Ẩm Thực & Đời Sống",
-      "voice_id": "d35052d3-703c-4a98-985d-35df63ed121e",
-      "flow_slug": "puck",
-      "gender": "male",
-      "region": "south",
-      "region_label": "Miền Nam (Sài Gòn)",
-      "tone_style": "sweet_foodie",
-      "tone_label": "🍔 Hào hứng • Vlogger Ẩm thực / Đời sống",
-      "speed_wpm": "40-44 từ / 10s (Tốc độ Chuẩn)",
-      "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Puck.wav",
-      "voice_prompt_en": "upbeat, friendly young Southern Vietnamese male voice (Saigon accent), enthusiastic food and lifestyle reviewer tone, natural relatable cadence, 4.2 words/sec",
-      "dialect_markers_vn": "anh chị em ơi, ngon bá cháy luôn nha, ăn một miếng là ghiền liền, thử ngay nghen",
-      "recommended_templates": [
-        "002",
-        "001"
-      ],
-      "recommended_categories": [
-        "Đồ ăn vặt",
-        "Đồ nhắm / Khô bò / Khô gà",
-        "Gia dụng thông minh",
-        "Đồ thể thao"
-      ],
-      "description": "Giọng nam miền Nam trẻ trung, gần gũi như bạn bè rủ rê thưởng thức món ngon hoặc review đồ dùng tiện ích.",
-      "sample_vn_file": "voice_samples/v6_nam_nam_reviewer_flow.mp3",
-      "sample_dialogue_vn": "Anh chị em ơi món này ăn kèm cơm nóng hay lai rai cuối tuần là ngon bá cháy luôn nha, thử một miếng là ghiền liền nghe",
-      "flow_synced": true
-    },
     "v7_nu_bac_genz_foodie": {
       "key": "v7_nu_bac_genz_foodie",
       "name": "Nữ Bắc • GenZ Review Ăn Vặt",
@@ -194,7 +255,7 @@
       "tone_label": "🧋 GenZ Trẻ trung • Review Đồ Ăn Vặt",
       "speed_wpm": "40-44 từ / 10s (Tốc độ Chuẩn)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Autonoe.wav",
-      "voice_prompt_en": "cheerful, expressive Gen-Z Northern Vietnamese female voice (Hanoi accent), appetizing food reviewer tone with mouth-watering inflection, 4.2 words/sec",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young Gen-Z adult voice, cheerful and expressive, mid-to-high pitch, clear forward projection, natural Northern Vietnamese (Hanoi accent) pronunciation, appetizing TikTok Shop food reviewer delivery with mouth-watering inflection, warm smile audible in the voice, confident and conversational, moderately fast speech with crisp consonants. Emphasize important words and prices such as “ba mươi ka”, “sốt sánh kẹo”, “hết nước chấm”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
       "dialect_markers_vn": "mọi người nha, nhìn phần sốt sánh kẹo mê chữ ê kéo dài, ăn kèm cơm nóng thì hết nước chấm",
       "recommended_templates": [
         "002",
@@ -223,7 +284,7 @@
       "tone_label": "🌿 Dịu dàng • Đặc sản & Quà tặng",
       "speed_wpm": "36-40 từ / 10s (Tốc độ Thư thả)",
       "sample_url": "https://www.gstatic.com/aitestkitchen/voices/samples/Sulafat.wav",
-      "voice_prompt_en": "warm, gentle Central Vietnamese female voice, sincere storytelling tone for traditional specialties and health gifts, smooth and clear articulation, 3.8 words/sec",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, warm and gentle, mid pitch, clear forward projection, natural Central Vietnamese (Hue/Da Nang accent) pronunciation, sincere TikTok Shop storytelling and specialty gift delivery, persuasive and trustworthy, warm smile audible in the voice, smooth conversational speech with crisp consonants. Emphasize important words and prices such as “đặc sản quê hương”, “chế biến thủ công”, “làm quà biếu rất quý”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
       "dialect_markers_vn": "mọi người ơi, hương vị quê nhà đậm đà khó quên, làm quà biếu hay dùng trong gia đình đều quý",
       "recommended_templates": [
         "002",
@@ -253,12 +314,12 @@
       "default_voice": "nv1",
       "lock_voice_to_character": true,
       "voice_id": "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
-      "voice_name": "Nữ Bắc • Tư Vấn Xưởng & QC (NV1)",
+      "voice_name": "Nhân Vật 1 Affi Giọng Bắc (NV1)",
       "voice_region": "north",
       "voice_gender": "female",
-      "voice_tone": "trustworthy_expert",
-      "voice_prompt_en": "clear, trustworthy young Northern Vietnamese female voice (Hanoi accent), professional factory consultant tone, steady confident articulation, 4.4 words/sec",
-      "appearance_en": "shoulder-length layered black hair, black-framed glasses, identical face",
+      "voice_tone": "energetic_sale",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, bright and friendly, mid-to-high pitch, clear forward projection, natural Vietnamese pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
+      "appearance_en": "beautiful 23-year-old Vietnamese/East Asian woman with refined symmetrical facial features, fair rosy dewy Douyin glass-skin with visible natural skin pores and subtle light reflection on her nasal bridge, cheekbones, and forehead, expressive bright dark-brown eyes with crisp catchlights, subtle aegyosal, wispy curled eyelashes, thin winged eyeliner, soft pink blush on cheeks and nose tip, glossy ombré cherry-pink lips, wearing thin lightweight black-framed glasses with crystal-clear anti-reflective lenses (zero glare over eyes), voluminous shoulder-length layered glossy black hair with airy see-through bangs and natural strands framing her cheeks; full mature adult feminine physique (90-60-90 proportions, natural C-cup bust, slender waist, graceful posture)",
       "preferred_image_model": "nano_banana",
       "sheet_template_id": "sheet_6panel_studio",
       "subtitle": "Tóc ngang vai • Kính đen"
@@ -278,8 +339,8 @@
       "voice_region": "north",
       "voice_gender": "female",
       "voice_tone": "energetic_sale",
-      "voice_prompt_en": "high-energy, enthusiastic young Northern Vietnamese female voice (Hanoi accent), fast-paced livestream flash-sale tone, persuasive and bright delivery, 4.6 words/sec",
-      "appearance_en": "long wavy dark-brown hair in a high ponytail with colourful pastel hair clips, identical face, no glasses",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, bright and enthusiastic, mid-to-high pitch, clear forward projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic TikTok Shop flash-sale livestream delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
+      "appearance_en": "gorgeous 23-year-old Vietnamese/East Asian woman with refined symmetrical V-line face, radiant fair rosy dewy Douyin glass-skin with visible natural skin pores and subtle specular highlights on her nose bridge, cheeks, and forehead, sparkling dark-brown eyes with natural catchlights, subtle aegyosal, long wispy curled eyelashes, thin defined winged eyeliner, fresh Korean soft-glam pink blush, glossy cherry-blossom ombré lip tint, no glasses, voluminous wavy dark-brown hair styled in a lively high ponytail with lifted roots, colourful pastel hair clips on the sides, and soft wispy tendrils framing her cheeks; full mature adult feminine physique (90-60-90 proportions, natural C-cup bust, slender waist, graceful feminine posture)",
       "preferred_image_model": "nano_banana",
       "sheet_template_id": "sheet_6panel_studio",
       "subtitle": "Tóc buộc cao • Kẹp màu"
@@ -287,23 +348,67 @@
     "nv3": {
       "key": "nv3",
       "name": "Nam Mẫu Thời Trang",
-      "enabled": true,
+      "enabled": false,
       "videos_per_character": 3,
       "character_id": "",
       "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
       "ref_image_file": "characters/nv3_ref.jpg",
       "default_voice": "v5_nam_bac_chuyen_gia",
       "lock_voice_to_character": true,
-      "voice_id": "0bc0cb6a-81e7-437c-a790-66fc4c4a58b6",
-      "voice_name": "Nam Bắc • Chuyên Gia Đồ Nam & Kỹ Thuật",
+      "voice_id": "a5f4e862-16ec-4900-a435-76b37b495f94",
+      "voice_name": "Nam Bắc • Chốt Sale Năng Lượng Affi (NV3)",
       "voice_region": "north",
       "voice_gender": "male",
-      "voice_tone": "trustworthy_expert",
-      "voice_prompt_en": "deep, authoritative, trustworthy Northern Vietnamese male voice (Hanoi accent), technical expert and luxury menswear reviewer tone, calm and firm delivery, 4.0 words/sec",
-      "appearance_en": "handsome 25-year-old Vietnamese male fashion model with sharp jawline, short textured black hair with neat fade, crisp white linen shirt rolled sleeves, gold pendant necklace, dark brown leather belt, beige pleated linen shorts, silver steel wristwatch",
+      "voice_tone": "energetic_sale",
+      "voice_prompt_en": "Vietnamese male commercial presenter, young adult masculine voice, bright and energetic baritone-tenor pitch, clear forward chest projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm confident smile audible in the voice, charismatic and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi ka”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery.",
+      "appearance_en": "handsome 25-year-old Vietnamese/East Asian male fashion model with sharp masculine jawline, high nasal bridge, realistic masculine skin texture with visible natural pores and healthy warm-fair complexion, expressive dark eyes with crisp catchlights, naturally groomed thick eyebrows, short textured black hair with neat modern fade and parted bangs; athletic well-proportioned adult masculine physique with broad shoulders, toned chest, V-taper torso, wearing a crisp white linen shirt with rolled sleeves, thin gold pendant necklace, and silver steel wristwatch",
       "preferred_image_model": "nano_banana",
       "sheet_template_id": "sheet_portrait_3body_menswear",
       "subtitle": "Sơ mi Linen • Đồ Nam cao cấp"
+    },
+    "nv4": {
+      "key": "nv4",
+      "name": "Nữ Luxury Thời Trang & Phụ Kiện (NV4)",
+      "enabled": false,
+      "videos_per_character": 3,
+      "character_id": "",
+      "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
+      "ref_image_file": "characters/nv4_ref.jpg",
+      "default_voice": "v4_nu_nam_sale",
+      "lock_voice_to_character": true,
+      "voice_id": "d346e94f-810e-4031-9368-ca1740558bcd",
+      "voice_name": "Nữ Nam • Livestream Chốt Đơn",
+      "voice_region": "south",
+      "voice_gender": "female",
+      "voice_tone": "energetic_sale",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, upbeat and energetic, mid-to-high pitch, clear forward projection, natural Southern Vietnamese (Saigon accent) pronunciation, energetic TikTok Shop sales delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “xịn xò từng chi tiết”, “trợ giá sâu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
+      "appearance_en": "elegant 24-year-old Vietnamese/East Asian luxury fashion & jewelry presenter, refined symmetrical V-line face, luminous dewy porcelain skin with visible natural pores, expressive dark-brown eyes, soft glam makeup with rose-gold eyeshadow and glossy coral-red lips, sleek dark hair styled with pearl barrette, wearing a tailored cream-white tweed blazer dress, dainty gold clover necklace, pearl drop earrings, and luxury leather watch",
+      "preferred_image_model": "nano_banana",
+      "sheet_template_id": "sheet_fullbody_5detail_zoom",
+      "subtitle": "Blazer Tweed • Trang sức & Phụ kiện Luxury"
+    },
+    "nv5": {
+      "key": "nv5",
+      "name": "Nữ Mẫu Thời Trang Lookbook 2K (NV5)",
+      "enabled": true,
+      "videos_per_character": 3,
+      "character_id": "",
+      "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
+      "ref_image_file": "characters/nv5_ref.png",
+      "bedroom_ref_file": "characters/nv5_bedroom_2k.png",
+      "wardrobe_sheet_file": "characters/nv5_wardrobe_4looks_2k.png",
+      "default_voice": "nv2",
+      "lock_voice_to_character": true,
+      "voice_id": "75a3d14a-ed10-4bdc-862c-44adb02a5562",
+      "voice_name": "Nữ Bắc • Chốt Sale Năng Lượng (NV2)",
+      "voice_region": "north",
+      "voice_gender": "female",
+      "voice_tone": "energetic_sale",
+      "voice_prompt_en": "Vietnamese female commercial presenter, young adult voice, bright and enthusiastic, mid-to-high pitch, clear forward projection, natural Northern Vietnamese (Hanoi accent) pronunciation, energetic TikTok Shop flash-sale livestream delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants. Emphasize important words and prices such as “ba mươi cành”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”. Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery.",
+      "appearance_en": "ultra-photorealistic 22-year-old Vietnamese/East Asian female fashion lookbook model, oval V-line face with delicate symmetrical features, porcelain-fair rosy dewy Douyin/Korean glass-skin with visible natural pores and soft specular highlights on her nose bridge and cheekbones, expressive warm dark-brown almond eyes with subtle aegyosal, wispy curled lashes, soft coral-pink blush across cheeks and nose tip, natural plump rose-pink glossy lips, long voluminous chestnut-brown wavy hair parted on the side and cascading over her shoulders; slender hourglass fashion model physique (168cm tall proportion, long toned legs, slender waist, graceful posture), wearing a fitted white crew-neck baby tee, high-waisted light-beige tailored shorts, and cream ballet flats",
+      "preferred_image_model": "nano_banana",
+      "sheet_template_id": "sheet_fashion_model_turnaround_5poses",
+      "subtitle": "Tóc xoăn sóng nâu hạt dẻ • Chuyên Thời Trang & Biến Hình 2K"
     }
   }
 }

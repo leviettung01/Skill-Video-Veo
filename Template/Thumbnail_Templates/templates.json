@@ -1,0 +1,955 @@
+{
+  "version": "2.0",
+  "categories": [
+    {
+      "id": "gia_dung",
+      "name": "🏠 Gia Dụng, Nhà Bếp & Đời Sống",
+      "short_name": "Gia Dụng & Bếp",
+      "default_template": "gia_dung_3grid_pro",
+      "rotation_templates": [
+        "gia_dung_3grid_pro",
+        "gia_dung_cookware_4set_bar",
+        "gia_dung_multicooker_3tabs",
+        "gia_dung_infographic_tech",
+        "gia_dung_shield_5pills"
+      ],
+      "keywords": [
+        "khăn lưới",
+        "rửa chén",
+        "rửa bát",
+        "xoong",
+        "nồi",
+        "chảo",
+        "bếp",
+        "gia dụng",
+        "nhà bếp",
+        "lau bếp",
+        "vệ sinh",
+        "cọ nồi",
+        "dao",
+        "thớt",
+        "kệ",
+        "hộp đựng",
+        "bình giữ nhiệt",
+        "máy xay",
+        "nồi chiên",
+        "ấm đun",
+        "chổi",
+        "cây lau",
+        "thùng rác",
+        "móc treo",
+        "nhà tắm",
+        "nhà cửa",
+        "cân tiểu ly",
+        "lồng bàn",
+        "đĩa",
+        "bát",
+        "ly",
+        "cốc"
+      ]
+    },
+    {
+      "id": "giay_dep",
+      "name": "👟 Giày Dép, Clog, Sandal & Cao Gót",
+      "short_name": "Giày Dép & Clog",
+      "default_template": "giay_dep_kawaii_sticker",
+      "rotation_templates": [
+        "giay_dep_kawaii_sticker",
+        "giay_dep_slides_4pills_3scenes",
+        "giay_dep_leya_check_inset",
+        "giay_dep_luxury_zoom",
+        "giay_dep_flatlay_colors"
+      ],
+      "keywords": [
+        "giày",
+        "dép",
+        "sandal",
+        "sục",
+        "clog",
+        "cao gót",
+        "sneaker",
+        "boot",
+        "tất",
+        "vớ",
+        "đế êm",
+        "chống trượt",
+        "giày da",
+        "giày lười",
+        "dép lê",
+        "dép quai",
+        "giày thể thao"
+      ]
+    },
+    {
+      "id": "quan_ao_nu",
+      "name": "👗 Quần Áo & Thời Trang Nữ",
+      "short_name": "Thời Trang Nữ",
+      "default_template": "thoi_trang_lookbook_3zoom",
+      "rotation_templates": [
+        "thoi_trang_lookbook_3zoom",
+        "thoi_trang_model_flatlay_swatch",
+        "thoi_trang_mannequin_cottagecore",
+        "thoi_trang_pastel_cta"
+      ],
+      "keywords": [
+        "váy",
+        "đầm",
+        "chân váy",
+        "áo kiểu",
+        "áo trễ vai",
+        "set bộ nữ",
+        "cardigan",
+        "áo sơ mi nữ",
+        "áo khoác nữ",
+        "pijama",
+        "đồ ngủ",
+        "đồ bộ mặc nhà",
+        "áo hai dây",
+        "croptop",
+        "babydoll",
+        "thời trang nữ",
+        "áo len",
+        "blazer"
+      ]
+    },
+    {
+      "id": "nam_nu_unisex",
+      "name": "👔 Thời Trang Nam, Giày Tây & Unisex",
+      "short_name": "Nam/Nữ & Đồ Nam VIP",
+      "default_template": "giay_tay_nam_classy_gold",
+      "rotation_templates": [
+        "giay_tay_nam_classy_gold",
+        "streetwear_unisex_flashsale",
+        "thoi_trang_lookbook_3zoom"
+      ],
+      "keywords": [
+        "quần ống rộng",
+        "baggy",
+        "unisex",
+        "áo thun",
+        "áo phông",
+        "hoodie",
+        "sweater",
+        "quần jean",
+        "quần kaki",
+        "quần đùi",
+        "quần short",
+        "áo polo",
+        "sơ mi nam",
+        "đồ tập",
+        "jogger",
+        "thể thao",
+        "nam nữ",
+        "streetwear",
+        "áo khoác dù",
+        "thắt lưng nam",
+        "giày tây"
+      ]
+    },
+    {
+      "id": "genz_cute",
+      "name": "✨ Phong Cách GenZ, Cute & Kawaii",
+      "short_name": "GenZ & Cute",
+      "default_template": "genz_mirror_polaroid",
+      "rotation_templates": [
+        "genz_mirror_polaroid",
+        "genz_influencer_3zoom_vertical",
+        "giay_dep_kawaii_sticker"
+      ],
+      "keywords": [
+        "genz",
+        "cute",
+        "dễ thương",
+        "kawaii",
+        "gấu bông",
+        "kẹp tóc",
+        "băng đô",
+        "sticker",
+        "charm",
+        "đáng yêu",
+        "pastel",
+        "hàn quốc",
+        "ulzzang",
+        "nơ"
+      ]
+    },
+    {
+      "id": "tui_xach",
+      "name": "👜 Túi Xách, Balo & Ví Thời Trang",
+      "short_name": "Túi Xách & Ví",
+      "default_template": "tui_xach_korean_scrapbook",
+      "rotation_templates": [
+        "tui_xach_korean_scrapbook",
+        "tui_xach_mega_8grid_2tier",
+        "giay_dep_luxury_zoom"
+      ],
+      "keywords": [
+        "túi xách",
+        "túi đeo chéo",
+        "túi tote",
+        "balo",
+        "ví da",
+        "bóp",
+        "túi kẹp nách",
+        "túi vải",
+        "túi canvas"
+      ]
+    },
+    {
+      "id": "my_pham",
+      "name": "💄 Mỹ Phẩm, Skincare & Chăm Sóc Cá Nhân",
+      "short_name": "Mỹ Phẩm & Làm Đẹp",
+      "default_template": "my_pham_beauty_glow",
+      "rotation_templates": [
+        "my_pham_beauty_glow",
+        "thoi_trang_pastel_cta",
+        "genz_mirror_polaroid"
+      ],
+      "keywords": [
+        "kem dưỡng",
+        "serum",
+        "sữa rửa mặt",
+        "son",
+        "chống nắng",
+        "dầu gội",
+        "sữa tắm",
+        "nước hoa",
+        "dưỡng thể",
+        "lotion",
+        "mặt nạ",
+        "tẩy trang",
+        "skincare",
+        "mỹ phẩm",
+        "trắng da",
+        "mụn",
+        "collagen",
+        "xịt thơm"
+      ]
+    },
+    {
+      "id": "phu_kien",
+      "name": "🔍 Phụ Kiện Nhỏ, Kẹp Tóc POV & Trang Sức",
+      "short_name": "Phụ Kiện & POV",
+      "default_template": "phu_kien_macro_3cards",
+      "rotation_templates": [
+        "phu_kien_macro_3cards",
+        "phu_kien_pov_mui_ten_pastel",
+        "gia_dung_3grid_pro"
+      ],
+      "keywords": [
+        "bông tai",
+        "khuyên tai",
+        "dây chuyền",
+        "vòng tay",
+        "nhẫn",
+        "mắt kính",
+        "đồng hồ",
+        "tai nghe",
+        "cáp sạc",
+        "ốp lưng",
+        "phụ kiện",
+        "dụng cụ",
+        "móc khoá",
+        "buộc tóc",
+        "scrunchie"
+      ]
+    },
+    {
+      "id": "dien_tu_y_te",
+      "name": "🩺 Thiết Bị Y Tế, Điện Tử & Đèn Decor",
+      "short_name": "Y Tế, Điện Tử & Decor",
+      "default_template": "thiet_bi_y_te_5metrics",
+      "rotation_templates": [
+        "thiet_bi_y_te_5metrics",
+        "gia_dung_multicooker_3tabs",
+        "gia_dung_infographic_tech"
+      ],
+      "keywords": [
+        "spo2",
+        "máy đo",
+        "nhiệt kế",
+        "huyết áp",
+        "y tế",
+        "sức khỏe",
+        "điện tử",
+        "cân điện tử",
+        "cân tiểu ly",
+        "đèn",
+        "đèn ngủ",
+        "đèn sàn",
+        "decor",
+        "cây thông",
+        "trang trí",
+        "máy massage"
+      ]
+    }
+  ],
+  "default_category_map": {
+    "gia_dung": "gia_dung_3grid_pro",
+    "giay_dep": "giay_dep_kawaii_sticker",
+    "quan_ao_nu": "thoi_trang_lookbook_3zoom",
+    "nam_nu_unisex": "giay_tay_nam_classy_gold",
+    "genz_cute": "genz_mirror_polaroid",
+    "tui_xach": "tui_xach_korean_scrapbook",
+    "my_pham": "my_pham_beauty_glow",
+    "phu_kien": "phu_kien_macro_3cards",
+    "dien_tu_y_te": "thiet_bi_y_te_5metrics"
+  },
+  "templates": [
+    {
+      "id": "gia_dung_3grid_pro",
+      "aliases": [
+        "tiktok_shop_pro",
+        "tiktok_viral_sale",
+        "gia_dung_3grid_pro"
+      ],
+      "name": "🏠 Gia Dụng & Bếp: Nhân Vật + 3 Ảnh Chi Tiết SP & Trợ Giá Xưởng",
+      "short_name": "Gia Dụng • 3 Ảnh Chi Tiết SP",
+      "category": "gia_dung",
+      "category_label": "🏠 Gia Dụng & Nhà Bếp",
+      "style_badge": "+3 Ảnh SP Thật • Lưới Bo Góc",
+      "layout_type": "grid_3_bottom",
+      "sample_image": "Template/Thumbnail_Templates/samples/gia_dung_3grid_pro.jpg",
+      "recommended_for": "Khăn lưới kim loại rửa chén, Xoong nồi, Dụng cụ bếp, Đồ vệ sinh nhà cửa, Gia dụng tiện ích",
+      "description": "Nhân vật cầm sản phẩm ở 2/3 trên kết hợp 3 khung ảnh sản phẩm thực tế (prod_1, prod_2, prod_3) bo góc viền trắng-vàng sắc nét bên dưới kèm nhãn công dụng & thanh 4 cam kết.",
+      "master_prompt": "Render a high-converting 9:16 vertical TikTok Shop household & kitchenware commercial poster thumbnail (2K 1536x2752), ultra-sharp studio advertisement photography. Use Reference Image 1 (character holding product) and Reference Image 2-3 (original product closeups) as strict visual anchors: Position the character ({character_desc}) in the UPPER-MIDDLE zone (top 68% of the frame), smiling warmly and holding the exact product ({product_name}) clearly toward the camera. Place a bold 3D Vietnamese commercial headline at the very top for \"{hook_text}\" and a vibrant factory-direct price badge ({price}) beside the character. Preserve 100% authentic product texture, weave, shape, and color. Product USP: {product_info}. Keep the bottom 30% of the frame clean worktable space for the 3-photo product detail showcase grid.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\gia_dung_3grid_pro.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet2_xmas_fashion_home_r1c3.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet2_xmas_fashion_home_r1c3.jpg",
+      "recommended_products": [
+        "Khăn lưới kim loại rửa chén",
+        "Xoong nồi",
+        "Dụng cụ bếp",
+        "Đồ vệ sinh nhà cửa",
+        "Gia dụng tiện ích"
+      ]
+    },
+    {
+      "id": "gia_dung_infographic_tech",
+      "aliases": [
+        "factory_qc_trust",
+        "gia_dung_infographic_tech"
+      ],
+      "name": "⚡ Gia Dụng & Thiết Bị: Infographic Trước/Sau + Cụm Ảnh SP Thực Tế",
+      "short_name": "Gia Dụng • Infographic Trước/Sau",
+      "category": "gia_dung",
+      "category_label": "🏠 Gia Dụng & Thiết Bị",
+      "style_badge": "+1 Ảnh Lớn Trước/Sau + 2 Ảnh Phụ",
+      "layout_type": "infographic_tech_3cards",
+      "sample_image": "Template/Thumbnail_Templates/samples/gia_dung_infographic_tech.jpg",
+      "recommended_for": "Khăn lưới cọ xoong nồi, Nồi điện đa năng, Bình đun, Cân điện tử, Dụng cụ cơ khí & Nhà xưởng",
+      "description": "Bố cục Infographic chuẩn Mall: Nhân vật kiểm định tại xưởng + 1 khung lớn đối chiếu Trước/Sau hoặc Ứng dụng bên trái + 2 khung ảnh chi tiết sản phẩm bên phải + Thanh thông số.",
+      "master_prompt": "Render a photorealistic 2K 9:16 vertical factory-direct QC & kitchen appliance infographic thumbnail poster (1536x2752). Combine Reference Image 1 (character holding product) and Reference Image 2 (original product photo): Feature the supervisor character ({character_desc}) in the upper 68% of the frame in a bright modern workshop/kitchen ({style}), presenting the exact product ({product_name}) close to the lens. Include bold 3D commercial Vietnamese title \"{hook_text}\" at the top and a high-contrast price callout ({price}). Product specifications & USP: {product_info}. Leave the lower 30% clean for the multi-angle product infographic dock.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\gia_dung_infographic_tech.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r2c2.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r2c2.jpg",
+      "recommended_products": [
+        "Khăn lưới cọ xoong nồi",
+        "Nồi điện đa năng",
+        "Bình đun",
+        "Cân điện tử",
+        "Dụng cụ cơ khí & Nhà xưởng"
+      ]
+    },
+    {
+      "id": "phu_kien_macro_3cards",
+      "aliases": [
+        "phu_kien_macro_3cards"
+      ],
+      "name": "🔍 Tiện Ích & Phụ Kiện: Cận Cảnh SP + 3 Thẻ Vuông & 5 Huy Hiệu Tròn",
+      "short_name": "Tiện Ích • 3 Thẻ + 5 Icon Tròn",
+      "category": "phu_kien",
+      "category_label": "🔍 Tiện Ích & Phụ Kiện Nhỏ",
+      "style_badge": "+3 Thẻ Ảnh Vuông + 5 Icon Đáy",
+      "layout_type": "macro_3cards_5icons",
+      "sample_image": "Template/Thumbnail_Templates/samples/phu_kien_macro_3cards.jpg",
+      "recommended_for": "Khăn lưới đa năng, Đồ gia dụng nhỏ, Trang sức, Bông tai, Phụ kiện điện thoại, Đồ dùng thông minh",
+      "description": "Lấy cảm hứng từ mẫu 792917470: Nền kem-xanh sang trọng, 3 khung vuông bo góc trưng bày 3 góc cận cảnh sản phẩm thực tế kèm nhãn xanh + 5 huy hiệu icon tròn cam kết dưới đáy.",
+      "master_prompt": "Render an ultra-detailed 2K 9:16 vertical product-focused commercial poster thumbnail (1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (macro product closeup), showcase the presenter ({character_desc}) in the upper 68% holding the exact product ({product_name}) with crisp studio rim lighting. Highlight Vietnamese hook \"{hook_text}\" and price ({price}) with clean emerald-and-gold typography. Product highlights: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\phu_kien_macro_3cards.jpg",
+      "reference_image": "ảnh mẫu thumbnail/792917470_1091161583776436_3796032225107330466_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\792917470_1091161583776436_3796032225107330466_n.jpg",
+      "recommended_products": [
+        "Khăn lưới đa năng",
+        "Đồ gia dụng nhỏ",
+        "Trang sức",
+        "Bông tai",
+        "Phụ kiện điện thoại",
+        "Đồ dùng thông minh"
+      ]
+    },
+    {
+      "id": "giay_dep_kawaii_sticker",
+      "aliases": [
+        "giay_dep_kawaii_sticker"
+      ],
+      "name": "👟 Giày Dép & Clog: Kawaii Pastel Sticker Trắng & Chú Thích Điểm Nhấn",
+      "short_name": "Giày Dép • Kawaii Pastel Sticker",
+      "category": "giay_dep",
+      "category_label": "👟 Giày Dép & Clog",
+      "style_badge": "+3 Sticker SP Viền Trắng • Pastel",
+      "layout_type": "kawaii_sticker_callouts",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_dep_kawaii_sticker.jpg",
+      "recommended_for": "Dép sục Clog, Sandal nữ, Dép bánh mì, Giày búp bê, Phụ kiện Cute, Đồ trẻ em",
+      "description": "Lấy cảm hứng từ mẫu BloomStep/SoftStep (705693507): Tông hồng-kem Pastel ngọt ngào, 3 ảnh sản phẩm cắt viền Sticker trắng dày nổi khối kèm nhãn ưu điểm dễ thương & thanh 4 icon đế êm.",
+      "master_prompt": "Render a cute pastel Kawaii 9:16 vertical TikTok Shop commercial thumbnail poster (2K 1536x2752). Using Reference Image 1 (character with product) and Reference Image 2 (product closeup), feature the presenter ({character_desc}) in the upper 68% cheerfully showcasing the exact product ({product_name}) with soft pastel studio lighting and 3D bubble headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_dep_kawaii_sticker.jpg",
+      "reference_image": "ảnh mẫu thumbnail/705693507_2437213620075949_7774279751475897985_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\705693507_2437213620075949_7774279751475897985_n.jpg",
+      "recommended_products": [
+        "Dép sục Clog",
+        "Sandal nữ",
+        "Dép bánh mì",
+        "Giày búp bê",
+        "Phụ kiện Cute",
+        "Đồ trẻ em"
+      ]
+    },
+    {
+      "id": "giay_dep_luxury_zoom",
+      "aliases": [
+        "giay_dep_luxury_zoom"
+      ],
+      "name": "👠 Giày Cao Gót & Giày Da: Chân Dung Sang Trọng + 3 Vòng Tròn Zoom SP",
+      "short_name": "Giày Da/Cao Gót • 3 Vòng Zoom Vàng",
+      "category": "giay_dep",
+      "category_label": "👠 Giày Cao Gót & Giày Da",
+      "style_badge": "+3 Vòng Tròn Zoom Viền Vàng Kim",
+      "layout_type": "circle_zoom_left",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_dep_luxury_zoom.jpg",
+      "recommended_for": "Giày cao gót, Giày tây nam, Giày da công sở, Boot nữ, Túi da cao cấp, Đồng hồ",
+      "description": "Lấy cảm hứng từ mẫu 3-Inches High Heels (791143612): Tông Nâu Espresso & Vàng Champagne sang trọng, 3 Vòng Tròn Zoom viền vàng kim phóng to chất liệu/kiểu dáng thực tế của sản phẩm.",
+      "master_prompt": "Render a luxury champagne-and-espresso 9:16 vertical commercial thumbnail poster (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product closeup), feature the elegant presenter ({character_desc}) in the upper 68% showcasing the exact product ({product_name}) under warm golden studio lighting with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_dep_luxury_zoom.jpg",
+      "reference_image": "ảnh mẫu thumbnail/791143612_122195457512856813_2866929608561976047_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\791143612_122195457512856813_2866929608561976047_n.jpg",
+      "recommended_products": [
+        "Giày cao gót",
+        "Giày tây nam",
+        "Giày da công sở",
+        "Boot nữ",
+        "Túi da cao cấp",
+        "Đồng hồ"
+      ]
+    },
+    {
+      "id": "giay_dep_flatlay_colors",
+      "aliases": [
+        "giay_dep_flatlay_colors"
+      ],
+      "name": "🩴 Dép Lê & Sản Phẩm Nhiều Phân Loại: So Sánh Phối Màu + Tem Giá Đứt Nét",
+      "short_name": "Đa Phân Loại • So Sánh + Tem Giá",
+      "category": "giay_dep",
+      "category_label": "🩴 Dép & SP Nhiều Phân Loại",
+      "style_badge": "+2 Khung So Sánh Lớn + 1 Vòng Tròn",
+      "layout_type": "split_flash_deal",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_dep_flatlay_colors.jpg",
+      "recommended_for": "Dép lê nhiều màu, Combo khăn nhiều cỡ, Tất vớ theo lố, Quần áo nhiều màu, Đồ gia dụng theo bộ",
+      "description": "Lấy cảm hứng từ mẫu Rubber Flip Flop (784426838): Trưng bày 2 khung ảnh lớn đối xứng so sánh các phân loại/ứng dụng của sản phẩm + 1 vòng tròn cận cảnh ở giữa + Khung giá giảm nét đứt.",
+      "master_prompt": "Render a vibrant multi-variant commercial 9:16 vertical thumbnail poster (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product variations), position the presenter ({character_desc}) in the upper 68% presenting the exact product ({product_name}) with bold commercial headline \"{hook_text}\" and dashed discount price tag ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_dep_flatlay_colors.jpg",
+      "reference_image": "ảnh mẫu thumbnail/784426838_1851177525913688_5829303496852567401_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\784426838_1851177525913688_5829303496852567401_n.jpg",
+      "recommended_products": [
+        "Dép lê nhiều màu",
+        "Combo khăn nhiều cỡ",
+        "Tất vớ theo lố",
+        "Quần áo nhiều màu",
+        "Đồ gia dụng theo bộ"
+      ]
+    },
+    {
+      "id": "thoi_trang_lookbook_3zoom",
+      "aliases": [
+        "luxury_fashion_lookbook",
+        "fashion_editorial_lookbook",
+        "thoi_trang_lookbook_3zoom"
+      ],
+      "name": "👗 Thời Trang Nữ Lookbook: 3 Vòng Tròn Zoom Chất Vải + Ảnh Rời SP",
+      "short_name": "Thời Trang Nữ • 3 Vòng Zoom Chất Vải",
+      "category": "quan_ao_nu",
+      "category_label": "👗 Quần Áo & Thời Trang Nữ",
+      "style_badge": "+3 Vòng Tròn Zoom Đường May/Chất Vải",
+      "layout_type": "circle_zoom_left",
+      "sample_image": "Template/Thumbnail_Templates/samples/thoi_trang_lookbook_3zoom.jpg",
+      "recommended_for": "Set bộ nữ, Váy đầm thiết kế, Áo kiểu Hàn Quốc, Áo sơ mi, Blazer nữ, Đồ mặc nhà cao cấp",
+      "description": "Lấy cảm hứng từ mẫu Ely Aesthetic Co-ord Set (705693510): Tông Kem-Mocha Hàn Quốc, 3 vòng tròn phóng to chất liệu vải/đường kim mũi chỉ lấy trực tiếp từ ảnh sản phẩm thực tế.",
+      "master_prompt": "Render a Korean lookbook fashion editorial 9:16 vertical commercial thumbnail poster (2K 1536x2752). Using Reference Image 1 (character with product) and Reference Image 2 (product closeup), feature the model ({character_desc}) in the upper 68% posing gracefully with the exact product ({product_name}) in a bright aesthetic studio ({style}) with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\thoi_trang_lookbook_3zoom.jpg",
+      "reference_image": "ảnh mẫu thumbnail/705693510_2437213950075916_2420653896667694433_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\705693510_2437213950075916_2420653896667694433_n.jpg",
+      "recommended_products": [
+        "Set bộ nữ",
+        "Váy đầm thiết kế",
+        "Áo kiểu Hàn Quốc",
+        "Áo sơ mi",
+        "Blazer nữ",
+        "Đồ mặc nhà cao cấp"
+      ]
+    },
+    {
+      "id": "genz_mirror_polaroid",
+      "aliases": [
+        "genz_mirror_polaroid"
+      ],
+      "name": "✨ GenZ & Cute: 2 Khung Ảnh Polaroid Dán Băng Dính + Thẻ Note Checklist",
+      "short_name": "GenZ & Cute • Polaroid + Checklist",
+      "category": "genz_cute",
+      "category_label": "✨ Phong Cách GenZ & Cute",
+      "style_badge": "+2 Ảnh Polaroid Nghiêng + Bảng Note",
+      "layout_type": "polaroid_collage",
+      "sample_image": "Template/Thumbnail_Templates/samples/genz_mirror_polaroid.jpg",
+      "recommended_for": "Đồ ngủ Pijama, Đồ bộ GenZ, Quần Jogger, Phụ kiện dễ thương, Kẹp tóc, Đồ dùng học tập & Decor",
+      "description": "Lấy cảm hứng từ mẫu Sweet Dream (706091452) & Jogger Set (707210154): 2 khung ảnh Polaroid nghiêng dán băng dính trưng bày ảnh thật của sản phẩm kèm tờ giấy Note 3 dấu tích ưu điểm.",
+      "master_prompt": "Render a trendy Gen-Z aesthetic 9:16 vertical TikTok Shop thumbnail poster (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product closeup), feature the young presenter ({character_desc}) in the upper 68% with vibrant natural lighting, playful Gen-Z typography for \"{hook_text}\" and price badge ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\genz_mirror_polaroid.jpg",
+      "reference_image": "ảnh mẫu thumbnail/706091452_2437213876742590_8675074229038497605_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\706091452_2437213876742590_8675074229038497605_n.jpg",
+      "recommended_products": [
+        "Đồ ngủ Pijama",
+        "Đồ bộ GenZ",
+        "Quần Jogger",
+        "Phụ kiện dễ thương",
+        "Kẹp tóc",
+        "Đồ dùng học tập & Decor"
+      ]
+    },
+    {
+      "id": "streetwear_unisex_flashsale",
+      "aliases": [
+        "streetwear_unisex_flashsale"
+      ],
+      "name": "🔥 Nam/Nữ Unisex & Xả Kho: 2 Khung Ảnh SP Lớn Đối Xứng + Deal Đỏ Rực",
+      "short_name": "Unisex & Xả Kho • 2 Ảnh Lớn Deal Đỏ",
+      "category": "nam_nu_unisex",
+      "category_label": "👫 Nam/Nữ Unisex & Deal Sốc",
+      "style_badge": "+2 Ảnh SP Cực Lớn + Tem Flash Sale",
+      "layout_type": "split_flash_deal",
+      "sample_image": "Template/Thumbnail_Templates/samples/streetwear_unisex_flashsale.jpg",
+      "recommended_for": "Quần ống rộng Nam/Nữ, Áo thun Unisex, Đồ thể thao, Xả kho Gia dụng tận xưởng, Combo Mua 1 Tặng 1",
+      "description": "Lấy cảm hứng từ mẫu Buy 1 Get 1 (786069942) & Racing Baggy Pants (784197617): Tương phản Đỏ-Vàng-Đen cực mạnh, ghép 2 khung ảnh sản phẩm lớn đối xứng + Vòng tròn phụ ở giữa + Thanh lượt bán khủng.",
+      "master_prompt": "Render a high-impact Flash Sale 9:16 vertical TikTok Shop commercial poster thumbnail (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product closeup), feature the energetic presenter ({character_desc}) in the upper 68% holding the exact product ({product_name}), with bold red-and-yellow brush-stroke headline \"{hook_text}\" and explosive factory deal badge ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\streetwear_unisex_flashsale.jpg",
+      "reference_image": "ảnh mẫu thumbnail/786069942_1851177709247003_2167877908667997277_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\786069942_1851177709247003_2167877908667997277_n.jpg",
+      "recommended_products": [
+        "Quần ống rộng Nam/Nữ",
+        "Áo thun Unisex",
+        "Đồ thể thao",
+        "Xả kho Gia dụng tận xưởng",
+        "Combo Mua 1 Tặng 1"
+      ]
+    },
+    {
+      "id": "thoi_trang_pastel_cta",
+      "aliases": [
+        "thoi_trang_pastel_cta"
+      ],
+      "name": "👚 Thời Trang Dạo Phố: 3 Khung Ảnh SP Bo Tròn + Băng Rôn Giỏ Hàng Hồng",
+      "short_name": "Thời Trang • 3 Khung Tròn + CTA Hồng",
+      "category": "quan_ao_nu",
+      "category_label": "👚 Váy Đầm & Dạo Phố",
+      "style_badge": "+3 Ảnh SP Bo Góc + Băng Rôn CTA",
+      "layout_type": "grid_3_bottom",
+      "sample_image": "Template/Thumbnail_Templates/samples/thoi_trang_pastel_cta.jpg",
+      "recommended_for": "Chân váy, Quần suông nữ, Áo kiểu công sở, Đồ dạo phố, Phụ kiện thời trang nữ",
+      "description": "Lấy cảm hứng từ mẫu Ang Gandang Palda (790791873) & Must-Have Pants (790826330): Tông Hồng Berry & Trắng sáng, 3 khung ảnh chi tiết sản phẩm kèm dải băng CTA 'THÊM VÀO GIỎ HÀNG NGAY!' nổi bật.",
+      "master_prompt": "Render a bright feminine street-style 9:16 vertical commercial thumbnail poster (2K 1536x2752). Using Reference Image 1 (character with product) and Reference Image 2 (product closeup), feature the stylish presenter ({character_desc}) in the upper 68% showcasing the exact product ({product_name}) with vibrant pink-and-white commercial typography \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\thoi_trang_pastel_cta.jpg",
+      "reference_image": "ảnh mẫu thumbnail/790791873_122195457446856813_3303216790783442356_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\790791873_122195457446856813_3303216790783442356_n.jpg",
+      "recommended_products": [
+        "Chân váy",
+        "Quần suông nữ",
+        "Áo kiểu công sở",
+        "Đồ dạo phố",
+        "Phụ kiện thời trang nữ"
+      ]
+    },
+    {
+      "id": "tui_xach_korean_scrapbook",
+      "aliases": [
+        "tui_xach_korean_scrapbook"
+      ],
+      "name": "👜 Túi Xách & Phụ Kiện: Scrapbook Giấy Xé Hàn Quốc + Ảnh Polaroid SP",
+      "short_name": "Túi Xách • Scrapbook Giấy Xé Hàn Quốc",
+      "category": "tui_xach",
+      "category_label": "👜 Túi Xách & Phụ Kiện",
+      "style_badge": "+Scrapbook Giấy Kraft + Polaroid SP",
+      "layout_type": "polaroid_collage",
+      "sample_image": "Template/Thumbnail_Templates/samples/tui_xach_korean_scrapbook.jpg",
+      "recommended_for": "Túi xách nữ, Túi đeo chéo, Túi Tote vải, Balo đi học, Ví cầm tay, Sandal Hàn Quốc",
+      "description": "Lấy cảm hứng từ bộ mẫu Korean Style Bag (772510888, 772604380): Nền giấy Kraft/Kem xé viền nghệ thuật, ghép 2 khung ảnh Polaroid sản phẩm thực tế có dán băng dính + Giấy note kẻ ngang ghi ưu điểm.",
+      "master_prompt": "Render a warm Korean vintage scrapbook aesthetic 9:16 vertical commercial poster thumbnail (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product closeup), feature the presenter ({character_desc}) in the upper 68% in warm cream-and-espresso tones presenting the exact product ({product_name}) with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\tui_xach_korean_scrapbook.jpg",
+      "reference_image": "ảnh mẫu thumbnail/772510888_122250363626100760_3887054691644325587_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\772510888_122250363626100760_3887054691644325587_n.jpg",
+      "recommended_products": [
+        "Túi xách nữ",
+        "Túi đeo chéo",
+        "Túi Tote vải",
+        "Balo đi học",
+        "Ví cầm tay",
+        "Sandal Hàn Quốc"
+      ]
+    },
+    {
+      "id": "my_pham_beauty_glow",
+      "aliases": [
+        "food_asmr_vivid",
+        "foodie_closeup_appetizing",
+        "my_pham_beauty_glow"
+      ],
+      "name": "💄 Mỹ Phẩm & Chăm Sóc Cá Nhân: Beauty Glow + 3 Vòng Zoom Kết Cấu SP",
+      "short_name": "Mỹ Phẩm • Beauty Glow + 3 Vòng Zoom",
+      "category": "my_pham",
+      "category_label": "💄 Mỹ Phẩm & Làm Đẹp",
+      "style_badge": "+3 Vòng Tròn Zoom SP • Rose Gold",
+      "layout_type": "circle_zoom_left",
+      "sample_image": "Template/Thumbnail_Templates/samples/my_pham_beauty_glow.jpg",
+      "recommended_for": "Kem dưỡng thể, Serum, Sữa rửa mặt, Son môi, Nước hoa, Dầu gội, Thực phẩm chức năng & Đồ ăn",
+      "description": "Lấy cảm hứng từ mẫu Labn' Care Body Lotion (790540836): Tôn làn da căng bóng của nhân vật cầm sản phẩm + 3 vòng tròn viền Rose Gold phóng to cận cảnh bao bì/kết cấu sản phẩm thực tế + Huy hiệu Chính Hãng.",
+      "master_prompt": "Render a radiant beauty & skincare commercial 9:16 vertical thumbnail poster (2K 1536x2752). Using Reference Image 1 (character holding product) and Reference Image 2 (product closeup), feature the glowing presenter ({character_desc}) in the upper 68% holding the exact product ({product_name}) near the camera with luminous beauty lighting, rose-gold headline \"{hook_text}\" and price badge ({price}). Product highlights: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\my_pham_beauty_glow.jpg",
+      "reference_image": "ảnh mẫu thumbnail/790540836_122195457434856813_3166816566274811932_n.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\790540836_122195457434856813_3166816566274811932_n.jpg",
+      "recommended_products": [
+        "Kem dưỡng thể",
+        "Serum",
+        "Sữa rửa mặt",
+        "Son môi",
+        "Nước hoa",
+        "Dầu gội",
+        "Thực phẩm chức năng & Đồ ăn"
+      ]
+    },
+    {
+      "id": "gia_dung_cookware_4set_bar",
+      "aliases": [
+        "gia_dung_cookware_4set_bar",
+        "cookware_5piece_set"
+      ],
+      "name": "🍳 Gia Dụng & Bộ Nồi/Bếp: 4 Pill Ưu Điểm Trái + 4 Khung Phân Tích Từng Món Đáy",
+      "short_name": "Bộ Gia Dụng • 4 Pill + 4 Ô Từng Món",
+      "category": "gia_dung",
+      "category_label": "🏠 Gia Dụng & Nhà Bếp",
+      "style_badge": "+4 Pill Trái + 4 Ô Chi Tiết Bộ SP",
+      "layout_type": "cookware_set_4breakdown",
+      "sample_image": "Template/Thumbnail_Templates/samples/gia_dung_cookware_4set_bar.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r1c2.jpg",
+      "recommended_for": "Bộ nồi chảo Inox, Bộ dao thớt nhà bếp, Khay kệ 3 tầng, Nồi hâm thức ăn, Combo khăn lưới đa năng",
+      "description": "Phân tích từ mẫu '5-Piece Stainless Steel Cookware Set' (Ảnh 1 H1C2) & '3-Tier Serve In Style' (Ảnh 2 H4C1): Cột 4 Pill ưu điểm bên trái + Thanh 4 ô Oval phân tích từng món/kích cỡ của bộ sản phẩm dưới đáy.",
+      "master_prompt": "Render a bright pastel kitchenware set commercial 9:16 vertical thumbnail poster (2K 1536x2752). Showcase the complete cookware/kitchen product set ({product_name}) on a warm wooden/marble kitchen counter in the upper 68% with 3D commercial headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\gia_dung_cookware_4set_bar.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r1c2.jpg",
+      "recommended_products": [
+        "Bộ nồi chảo Inox",
+        "Bộ dao thớt nhà bếp",
+        "Khay kệ 3 tầng",
+        "Nồi hâm thức ăn",
+        "Combo khăn lưới đa năng"
+      ]
+    },
+    {
+      "id": "gia_dung_multicooker_3tabs",
+      "aliases": [
+        "gia_dung_multicooker_3tabs",
+        "stackable_multicooker"
+      ],
+      "name": "🍲 Thiết Bị Bếp Đa Năng: 4 Thông Số Trái + 3 Khung Ảnh Kết Quả Có Tab Màu (Hấp/Nấu/Ủ)",
+      "short_name": "Thiết Bị Bếp • 3 Tab Màu Hấp/Nấu/Ủ",
+      "category": "gia_dung",
+      "category_label": "🏠 Gia Dụng & Thiết Bị",
+      "style_badge": "+4 Pill Thông Số + 3 Khung Tab Màu",
+      "layout_type": "multicooker_3food_tabs",
+      "sample_image": "Template/Thumbnail_Templates/samples/gia_dung_multicooker_3tabs.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r3c2.jpg",
+      "recommended_for": "Nồi điện đa năng, Nồi lẩu hấp 2 tầng, Ấm siêu tốc giữ nhiệt, Nồi chiên không dầu, Máy xay đa năng",
+      "description": "Phân tích từ mẫu 'Tough Mama Stackable Multicooker' (Ảnh 1 H3C2): Cột 4 thông số kỹ thuật bên trái + 3 khung ảnh món ăn/ứng dụng thực tế dưới đáy có 3 Tab màu phân biệt 3 công năng (Xanh Blue / Xanh Lá / Tím).",
+      "master_prompt": "Render a vibrant multi-function kitchen appliance 9:16 vertical commercial thumbnail poster (2K 1536x2752). Feature the appliance ({product_name}) in the upper 68% with appetizing food results and bold headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\gia_dung_multicooker_3tabs.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r3c2.jpg",
+      "recommended_products": [
+        "Nồi điện đa năng",
+        "Nồi lẩu hấp 2 tầng",
+        "Ấm siêu tốc giữ nhiệt",
+        "Nồi chiên không dầu",
+        "Máy xay đa năng"
+      ]
+    },
+    {
+      "id": "gia_dung_shield_5pills",
+      "aliases": [
+        "gia_dung_shield_5pills",
+        "food_cover_multilayer"
+      ],
+      "name": "🛡️ Gia Dụng Bảo Quản: 5 Pill Tính Năng + Vòng Tròn Thao Tác Tay & 2 Ảnh Chi Tiết",
+      "short_name": "Bảo Quản & Lồng Bàn • 5 Pill + Vòng Tròn",
+      "category": "gia_dung",
+      "category_label": "🏠 Gia Dụng & Nhà Bếp",
+      "style_badge": "+5 Pill Trái + 1 Vòng Tròn + 2 Thẻ SP",
+      "layout_type": "fresh_shield_5layers",
+      "sample_image": "Template/Thumbnail_Templates/samples/gia_dung_shield_5pills.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r4c2.jpg",
+      "recommended_for": "Lồng bàn đậy thức ăn nhiều tầng, Hộp bảo quản thực phẩm, Kệ úp chén chống bụi, Túi hút chân không, Khăn lau bếp",
+      "description": "Phân tích từ mẫu 'Keep Food Fresh & Protected Multi-Layer Food Cover' (Ảnh 1 H4C2): 5 Pill tính năng bảo vệ bên trái + 1 Vòng tròn thao tác tay bên dưới + 2 Khung ảnh chi tiết từng tầng.",
+      "master_prompt": "Render a clean hygienic kitchen storage & protection 9:16 vertical commercial thumbnail poster (2K 1536x2752). Feature the transparent multi-layer food cover / household organizer ({product_name}) in the upper 68% with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\gia_dung_shield_5pills.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r4c2.jpg",
+      "recommended_products": [
+        "Lồng bàn đậy thức ăn nhiều tầng",
+        "Hộp bảo quản thực phẩm",
+        "Kệ úp chén chống bụi",
+        "Túi hút chân không",
+        "Khăn lau bếp"
+      ]
+    },
+    {
+      "id": "giay_dep_slides_4pills_3scenes",
+      "aliases": [
+        "giay_dep_slides_4pills_3scenes",
+        "cute_comfy_slides"
+      ],
+      "name": "🩴 Dép Nữ & Sneaker Êm Chân: 4 Pill Ưu Điểm Trái + Huy Hiệu 100% + 3 Ô Đế/Chất Liệu",
+      "short_name": "Dép & Sneaker • 4 Pill + 3 Ô Chất Liệu",
+      "category": "giay_dep",
+      "category_label": "👟 Giày Dép & Sandal",
+      "style_badge": "+4 Pill Trái + Huy Hiệu + 3 Ô Cận Đế",
+      "layout_type": "left_pills_3scene_bar",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_dep_slides_4pills_3scenes.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r1c1.jpg",
+      "recommended_for": "Dép quai ngang nữ, Dép bánh mì, Giày chạy bộ nữ hồng, Giày búp bê đế mềm, Dép đi trong nhà",
+      "description": "Phân tích từ bộ mẫu 'Cute, Comfy & Stylish Slides' (Ảnh 1 H1C1, H3C1, H3C3): Cột dọc 4 Pill icon hồng/xanh bên trái + Đôi dép đặt trên bục gỗ bên phải + Huy hiệu 100% kèm 3 ô cận cảnh quai/đế chống trượt dưới đáy.",
+      "master_prompt": "Render a warm pastel footwear commercial 9:16 vertical thumbnail poster (2K 1536x2752). Showcase the stylish comfortable slides/shoes ({product_name}) on a natural wooden pedestal in the upper-right 68% with 3D headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_dep_slides_4pills_3scenes.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r1c1.jpg",
+      "recommended_products": [
+        "Dép quai ngang nữ",
+        "Dép bánh mì",
+        "Giày chạy bộ nữ hồng",
+        "Giày búp bê đế mềm",
+        "Dép đi trong nhà"
+      ]
+    },
+    {
+      "id": "giay_dep_leya_check_inset",
+      "aliases": [
+        "giay_dep_leya_check_inset",
+        "leya_cute_comfy"
+      ],
+      "name": "👡 Sandal & Giày Bệt Hàn Quốc: Vòng Tròn Mang Thực Tế Lên Chân + 2 Khung Cận Cảnh",
+      "short_name": "Sandal Hàn Quốc • Vòng Tròn Lên Chân",
+      "category": "giay_dep",
+      "category_label": "👟 Giày Dép & Sandal",
+      "style_badge": "+1 Vòng Tròn Lên Chân + 2 Thẻ Cận Cảnh",
+      "layout_type": "fresh_shield_5layers",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_dep_leya_check_inset.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r4c3.jpg",
+      "recommended_for": "Sandal quai chéo, Giày búp bê đính nơ, Giày Mary Jane, Dép cói đi biển, Guốc nữ",
+      "description": "Phân tích từ mẫu 'Leya Cute & Comfy' (Ảnh 1 H4C3) & 'VDEN Cute Comfy Everyday' (Ảnh 2 H2C3): Kết hợp 5 ưu điểm êm nhẹ bên trái với 1 vòng tròn chụp thực tế khi mang lên chân và 2 khung cận cảnh quai/đế.",
+      "master_prompt": "Render an elegant feminine sandal & flat shoe 9:16 vertical commercial thumbnail poster (2K 1536x2752). Feature the sandals/flats ({product_name}) in warm cream-and-pink studio light in the upper 68% with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_dep_leya_check_inset.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r4c3.jpg",
+      "recommended_products": [
+        "Sandal quai chéo",
+        "Giày búp bê đính nơ",
+        "Giày Mary Jane",
+        "Dép cói đi biển",
+        "Guốc nữ"
+      ]
+    },
+    {
+      "id": "thoi_trang_model_flatlay_swatch",
+      "aliases": [
+        "thoi_trang_model_flatlay_swatch",
+        "vneck_knit_sweater"
+      ],
+      "name": "🧶 Thời Trang Hàn Quốc: Mẫu Mặc + Ảnh Trải Sàn SP Rời + Vòng Zoom Vải & 5 Chấm Màu",
+      "short_name": "Thời Trang • Mẫu Mặc + Trải Sàn + 5 Màu",
+      "category": "quan_ao_nu",
+      "category_label": "👗 Quần Áo & Thời Trang Nữ",
+      "style_badge": "+Ảnh SP Rời + Zoom Sợi Vải + 5 Chấm Màu",
+      "layout_type": "model_flatlay_swatch_dots",
+      "sample_image": "Template/Thumbnail_Templates/samples/thoi_trang_model_flatlay_swatch.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet2_xmas_fashion_home_r2c2.jpg",
+      "recommended_for": "Áo len cổ tim, Cardigan Hàn Quốc, Set Blazer nữ, Áo thun nhiều màu, Chân váy xếp ly",
+      "description": "Phân tích từ mẫu 'JNN V-Neck Knit Sweater' (Ảnh 2 H2C2): Kết hợp người mẫu mặc thực tế ở trên với 1 khung ảnh sản phẩm trải sàn phẳng phiu, 1 vòng tròn phóng to chất vải len/dệt và 5 chấm tròn bảng màu phân loại.",
+      "master_prompt": "Render a cozy Korean fashion lookbook 9:16 vertical commercial thumbnail poster (2K 1536x2752). Feature the female model ({character_desc}) wearing the exact garment ({product_name}) in the upper 68% with warm studio lighting and headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\thoi_trang_model_flatlay_swatch.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet2_xmas_fashion_home_r2c2.jpg",
+      "recommended_products": [
+        "Áo len cổ tim",
+        "Cardigan Hàn Quốc",
+        "Set Blazer nữ",
+        "Áo thun nhiều màu",
+        "Chân váy xếp ly"
+      ]
+    },
+    {
+      "id": "thoi_trang_mannequin_cottagecore",
+      "aliases": [
+        "thoi_trang_mannequin_cottagecore",
+        "petal_dreams_dress"
+      ],
+      "name": "🎀 Váy Đầm Thiết Kế & Manocanh: 4 Mũi Tên Chỉ Chi Tiết Ren/Nơ + 3 Ảnh Cận Cảnh Vải",
+      "short_name": "Váy Thiết Kế • Manocanh + 4 Mũi Tên",
+      "category": "quan_ao_nu",
+      "category_label": "👗 Váy Đầm & Thiết Kế",
+      "style_badge": "+4 Mũi Tên Chỉ Nơ/Ren + 3 Ảnh Cận Vải",
+      "layout_type": "pov_hands_pointer_arrows",
+      "sample_image": "Template/Thumbnail_Templates/samples/thoi_trang_mannequin_cottagecore.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet3_pov_coquette_hands_r4c1.jpg",
+      "recommended_for": "Váy công chúa, Đầm dự tiệc, Áo hai dây Gingham, Đồng phục học sinh, Váy bầu thiết kế, Đồ trẻ em",
+      "description": "Phân tích từ bộ mẫu 'Petal Dreams Dress / Blossom Boutique / Gingham Joy Cami' (Ảnh 3 H4C1..C3): Trưng bày váy đầm trên Manocanh cổ điển kèm 4 mũi tên nét đứt chỉ thẳng vào cổ áo, nơ ngực, chất ren và đường may.",
+      "master_prompt": "Render a dreamy Cottagecore & Coquette boutique dress 9:16 vertical commercial thumbnail poster (2K 1536x2752). Showcase the dress/garment ({product_name}) on a vintage cream mannequin bust in warm sunlight in the upper 68% with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\thoi_trang_mannequin_cottagecore.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet3_pov_coquette_hands_r4c1.jpg",
+      "recommended_products": [
+        "Váy công chúa",
+        "Đầm dự tiệc",
+        "Áo hai dây Gingham",
+        "Đồng phục học sinh",
+        "Váy bầu thiết kế",
+        "Đồ trẻ em"
+      ]
+    },
+    {
+      "id": "giay_tay_nam_classy_gold",
+      "aliases": [
+        "giay_tay_nam_classy_gold",
+        "mens_dress_shoes_gold"
+      ],
+      "name": "👞 Đồ Nam Lịch Lãm (Giày Tây / Thắt Lưng / Boot): Đen-Vàng Kim + 2 Khung Lớn Fullbox",
+      "short_name": "Đồ Nam VIP • Đen Vàng Kim + Fullbox",
+      "category": "nam_nu_unisex",
+      "category_label": "👔 Thời Trang & Phụ Kiện Nam",
+      "style_badge": "+4 Pill Đen Vàng + 2 Khung VIP Fullbox",
+      "layout_type": "mens_luxury_dark_gold",
+      "sample_image": "Template/Thumbnail_Templates/samples/giay_tay_nam_classy_gold.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r4c1.jpg",
+      "recommended_for": "Giày tây nam, Giày da Oxford, Boot da Combat, Thắt lưng nam khóa tự động, Ví da nam, Đồng hồ nam",
+      "description": "Phân tích từ mẫu 'Classy Every Step Men's Dress Shoes' (Ảnh 1 H4C1) & 'Classic Combat Boots' (Ảnh 2 H3C2): Tông Đen-Vàng Kim nam tính quyền lực, cột 4 Pill thông số da thật bên trái + 2 khung lớn Fullbox & Cận cảnh đế dưới đáy.",
+      "master_prompt": "Render a classy masculine luxury black-and-gold 9:16 vertical commercial thumbnail poster (2K 1536x2752). Showcase the men's leather shoes/belt/accessory ({product_name}) with its premium box on a dark walnut pedestal in the upper 68% with bold gold headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\giay_tay_nam_classy_gold.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r4c1.jpg",
+      "recommended_products": [
+        "Giày tây nam",
+        "Giày da Oxford",
+        "Boot da Combat",
+        "Thắt lưng nam khóa tự động",
+        "Ví da nam",
+        "Đồng hồ nam"
+      ]
+    },
+    {
+      "id": "genz_influencer_3zoom_vertical",
+      "aliases": [
+        "genz_influencer_3zoom_vertical",
+        "kids_jogger_3zoom"
+      ],
+      "name": "🎵 GenZ Creator Mặc Thử: Cột Dọc 3 Vòng Tròn Zoom Bên Trái + 2 Ảnh Đáy & Giỏ Hàng Vàng",
+      "short_name": "GenZ OOTD • 3 Vòng Zoom Dọc Trái",
+      "category": "genz_cute",
+      "category_label": "✨ Phong Cách GenZ & Creator",
+      "style_badge": "+3 Vòng Zoom Dọc Trái + 2 Khung Đáy",
+      "layout_type": "influencer_3circle_left_music",
+      "sample_image": "Template/Thumbnail_Templates/samples/genz_influencer_3zoom_vertical.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet4_creator_ootd_zoom_r2c1.jpg",
+      "recommended_for": "Quần Jogger ống rộng, Đồ bộ mặc nhà Pijama, Set đồ đi chơi GenZ, Bình giữ nhiệt Cute, Túi Tote bông",
+      "description": "Phân tích từ bộ mẫu 'Kids Jogger Pants / Pajama Set / Trendy Co-ord Set' (Ảnh 4 H2C1, H2C2, H3C1): Creator mặc thử toàn thân bên phải + Cột dọc 3 vòng tròn phóng to dây rút/nơ/gấu quần bên trái + 2 khung ảnh đáy.",
+      "master_prompt": "Render a viral TikTok Gen-Z creator OOTD 9:16 vertical commercial thumbnail poster (2K 1536x2752). Position the cheerful young creator ({character_desc}) on the right side of the frame showcasing the exact product ({product_name}) in a bright aesthetic room with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\genz_influencer_3zoom_vertical.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet4_creator_ootd_zoom_r2c1.jpg",
+      "recommended_products": [
+        "Quần Jogger ống rộng",
+        "Đồ bộ mặc nhà Pijama",
+        "Set đồ đi chơi GenZ",
+        "Bình giữ nhiệt Cute",
+        "Túi Tote bông"
+      ]
+    },
+    {
+      "id": "tui_xach_mega_8grid_2tier",
+      "aliases": [
+        "tui_xach_mega_8grid_2tier",
+        "everyday_essential_bag_grid"
+      ],
+      "name": "👜 Túi Xách & Balo Đa Ngăn: Lưới 6 Ô Chi Tiết Mọi Ngăn Khóa Xếp 2 Tầng Dưới Đáy",
+      "short_name": "Túi Xách • Lưới 6 Ô Chi Tiết 2 Tầng",
+      "category": "tui_xach",
+      "category_label": "👜 Túi Xách & Balo",
+      "style_badge": "+4 Pill Trái + Lưới 6 Ô Chi Tiết 2 Tầng",
+      "layout_type": "mega_6grid_bag_showcase",
+      "sample_image": "Template/Thumbnail_Templates/samples/tui_xach_mega_8grid_2tier.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet5_itsjessa_bags_shoes_r3c2.jpg",
+      "recommended_for": "Túi đeo chéo phao, Túi Tote da công sở, Balo đi học nhiều ngăn, Túi kẹp nách, Bộ dụng cụ nhiều chi tiết",
+      "description": "Phân tích từ mẫu 'The Everyday Essential Bag' (Ảnh 5 H3C2) & 'The Cutest Mini Bag' (Ảnh 5 H2C3): Túi xách lớn ở trên kèm cột 4 Pill ưu điểm + Lưới 6 ô ảnh chi tiết xếp 2 tầng soi rõ từng ngăn khóa, lòng túi, dây đeo.",
+      "master_prompt": "Render a trendy fashion bag & backpack showcase 9:16 vertical commercial thumbnail poster (2K 1536x2752). Feature the hero bag/product ({product_name}) on a warm wooden studio table in the upper 65% with bold headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\tui_xach_mega_8grid_2tier.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet5_itsjessa_bags_shoes_r3c2.jpg",
+      "recommended_products": [
+        "Túi đeo chéo phao",
+        "Túi Tote da công sở",
+        "Balo đi học nhiều ngăn",
+        "Túi kẹp nách",
+        "Bộ dụng cụ nhiều chi tiết"
+      ]
+    },
+    {
+      "id": "phu_kien_pov_mui_ten_pastel",
+      "aliases": [
+        "phu_kien_pov_mui_ten_pastel",
+        "smile_cherry_pouch_pov"
+      ],
+      "name": "🤲 Phụ Kiện Cầm Tay POV: Đôi Tay Cầm SP Giữa Khung + 4 Mũi Tên Chỉ Điểm Nhấn Đắt Giá",
+      "short_name": "Phụ Kiện POV • Đôi Tay + 4 Mũi Tên",
+      "category": "phu_kien",
+      "category_label": "🔍 Phụ Kiện & Đồ Cute POV",
+      "style_badge": "+4 Mũi Tên Chỉ Điểm Nhấn + 3 Ảnh Đáy",
+      "layout_type": "pov_hands_pointer_arrows",
+      "sample_image": "Template/Thumbnail_Templates/samples/phu_kien_pov_mui_ten_pastel.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet3_pov_coquette_hands_r3c2.jpg",
+      "recommended_for": "Túi đựng mỹ phẩm, Dây buộc tóc Scrunchie, Kẹp tóc hoa, Ví mini, Hộp bút học tập, Nước hoa mini",
+      "description": "Phân tích từ bộ mẫu 'Smile Cherry Makeup Pouch / Pastel Paradise / Sugar & Bow Co.' (Ảnh 3 H1..H3): Góc chụp POV đôi tay nâng niu sản phẩm trên nền lụa kem kèm 4 mũi tên nét đứt chỉ vào khóa kéo, chất liệu, nơ đính.",
+      "master_prompt": "Render a Coquette Pastel POV hands-holding product 9:16 vertical commercial thumbnail poster (2K 1536x2752). Show graceful female hands holding the exact product ({product_name}) in the center-upper frame over soft cream satin fabric with headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\phu_kien_pov_mui_ten_pastel.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet3_pov_coquette_hands_r3c2.jpg",
+      "recommended_products": [
+        "Túi đựng mỹ phẩm",
+        "Dây buộc tóc Scrunchie",
+        "Kẹp tóc hoa",
+        "Ví mini",
+        "Hộp bút học tập",
+        "Nước hoa mini"
+      ]
+    },
+    {
+      "id": "thiet_bi_y_te_5metrics",
+      "aliases": [
+        "thiet_bi_y_te_5metrics",
+        "decor_size_lineup_comparison",
+        "medical_spo2_5metrics"
+      ],
+      "name": "🩺 Thiết Bị Y Tế, Cân Điện Tử & Đèn Decor: 5 Huy Hiệu Thông Số Kỹ Thuật + 3 Khung Đo Thực Tế",
+      "short_name": "Y Tế & Điện Tử • 5 Chỉ Số + 3 Ảnh Đo",
+      "category": "dien_tu_y_te",
+      "category_label": "🩺 Thiết Bị Y Tế, Điện Tử & Decor",
+      "style_badge": "+5 Huy Hiệu Chỉ Số Kỹ Thuật + 3 Khung SP",
+      "layout_type": "medical_tech_5metrics",
+      "sample_image": "Template/Thumbnail_Templates/samples/thiet_bi_y_te_5metrics.jpg",
+      "reference_image": "Template/Thumbnail_Templates/samples/cropped_refs/sheet1_pastel_appliances_r2c1.jpg",
+      "recommended_for": "Máy đo SpO2, Máy đo huyết áp, Cân tiểu ly điện tử Inox, Ấm đun hiển thị nhiệt độ, Đèn sàn Wave Lamp",
+      "description": "Phân tích từ mẫu 'Check Your Health In Seconds SPO2 Medical' (Ảnh 1 H2C1) & 'Dreepor Digital Kettle 98°C' (Ảnh 1 H2C2): Cột dọc 5 huy hiệu tròn mã hóa thông số kỹ thuật bên trái + Màn hình LED/OLED sắc nét + 3 khung chi tiết.",
+      "master_prompt": "Render a clinical & smart-tech infographic 9:16 vertical commercial thumbnail poster (2K 1536x2752). Showcase the digital device/scale/lamp ({product_name}) with a crisp glowing screen in the upper-right 68% and bold headline \"{hook_text}\" ({price}). Product details: {product_info}.",
+      "sample_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\thiet_bi_y_te_5metrics.jpg",
+      "reference_image_abs": "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\Template\\Thumbnail_Templates\\samples\\cropped_refs\\sheet1_pastel_appliances_r2c1.jpg",
+      "recommended_products": [
+        "Máy đo SpO2",
+        "Máy đo huyết áp",
+        "Cân tiểu ly điện tử Inox",
+        "Ấm đun hiển thị nhiệt độ",
+        "Đèn sàn Wave Lamp"
+      ]
+    }
+  ]
+}

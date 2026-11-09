@@ -1,0 +1,702 @@
+{
+  "id": "wf_factory_2k_3scenes_standard",
+  "_wf_id": "wf_factory_2k_3scenes_standard",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:55:41.000Z",
+  "workflow": {
+    "name": "Workflow - Nhà Xưởng Chuẩn 2K (Ảnh NV + Ảnh SP ➔ Ảnh Ref 2K ➔ 3 Video Phân Cảnh 1080p)",
+    "description": "Quy trình chuẩn tạo Video Nhà Xưởng trên Google Flow: Kết hợp Ảnh Nhân Vật (NV1/NV2) + Ảnh Sản Phẩm Gốc để tạo Ảnh Ref Nhân Vật Cầm Sản Phẩm chuẩn 2K (Nano Banana 2.1 2K), sau đó nối Ảnh Ref 2K + Ảnh Sản Phẩm vào 3 Node tạo Video Phân Cảnh 1, 2, 3 chạy song song và Upscale 1080p.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 2,
+      "timeout_per_node": 180,
+      "retry_on_error": 1,
+      "stop_on_error": false,
+      "max_parallel": 2,
+      "run_count": 1
+    },
+    "nodes": [
+      {
+        "node_id": "node_char_nv1",
+        "node_type": "image",
+        "node_name": "Character Sheet (NV1)",
+        "pos_x": 100.0,
+        "pos_y": -160.0,
+        "enabled": true,
+        "slug": "char_nv1",
+        "slug_auto": true,
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cflow_final_pipeline%5Ccharacters%5Cnv1_ref.jpg",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg"
+          }
+        ],
+        "id": "node_char_nv1",
+        "label": "Character Sheet (NV1)",
+        "config": {
+          "slug": "char_nv1",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg",
+          "reference_images": [
+            "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg"
+          ],
+          "auto_download": false,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg"
+          ],
+          "error": ""
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\flow_final_pipeline\\characters\\nv1_ref.jpg",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cflow_final_pipeline%5Ccharacters%5Cnv1_ref.jpg"
+        }
+      },
+      {
+        "node_id": "node_prod_img",
+        "node_type": "image",
+        "node_name": "Product Image (SP Gốc)",
+        "pos_x": 100.0,
+        "pos_y": 240.0,
+        "enabled": true,
+        "slug": "product_img",
+        "slug_auto": true,
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cprojects%5C1736467481808438427%5Cproduct_images%5Cprod_1.jpg",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg"
+          }
+        ],
+        "id": "node_prod_img",
+        "label": "Product Image (SP Gốc)",
+        "config": {
+          "slug": "product_img",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg",
+          "reference_images": [
+            "C:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\05_Product_Sheet_Quan_Sooc_Trang_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg"
+          ],
+          "error": ""
+        },
+        "media_type": "Image",
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\projects\\1736467481808438427\\product_images\\prod_1.jpg",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5Cprojects%5C1736467481808438427%5Cproduct_images%5Cprod_1.jpg"
+        }
+      },
+      {
+        "node_id": "node_prompt_ref2k",
+        "node_type": "prompt",
+        "node_name": "Prompt - Tạo Ảnh Ref 2K",
+        "pos_x": 100.0,
+        "pos_y": 580.0,
+        "enabled": true,
+        "slug": "prompt_ref_2k",
+        "slug_auto": true,
+        "prompt": "Hyper-photorealistic vertical 9:16 medium-full shot (framed from head to hips/thighs, 35mm f/2.0 lens) of the exact same Vietnamese female presenter from IMAGE 01 standing inside a busy, authentic factory warehouse with tall steel pallet racks and stacked cartons in the background. She holds and presents the exact product from IMAGE 02 at chest-to-waist level with a warm, energetic smile. Detailed natural skin pores, rosy dewy glass-skin, crisp 2K resolution, 100% identical product shape and details.",
+        "use_ai": false,
+        "id": "node_prompt_ref2k",
+        "label": "Prompt - Tạo Ảnh Ref 2K",
+        "config": {
+          "slug": "prompt_ref_2k",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Hyper-photorealistic vertical 9:16 medium-full shot (framed from head to hips/thighs, 35mm f/2.0 lens) of the exact same Vietnamese female presenter from IMAGE 01 standing inside a busy, authentic factory warehouse with tall steel pallet racks and stacked cartons in the background. She holds and presents the exact product from IMAGE 02 at chest-to-waist level with a warm, energetic smile. Detailed natural skin pores, rosy dewy glass-skin, crisp 2K resolution, 100% identical product shape and details.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done",
+          "result_text": "Hyper-photorealistic vertical 9:16 medium-full shot (framed from head to hips/thighs, 35mm f/2.0 lens) of the exact same Vietnamese female presenter from IMAGE 01 standing inside a busy, authentic factory warehouse with tall steel pallet racks and stacked cartons in the background. She holds and presents the exact product from IMAGE 02 at chest-to-waist level with a warm, energetic smile. Detailed natural skin pores, rosy dewy glass-skin, crisp 2K resolution, 100% identical product shape and details."
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "Hyper-photorealistic vertical 9:16 medium-full shot (framed from head to hips/thighs, 35mm f/2.0 lens) of the exact same Vietnamese female presenter from IMAGE 01 standing inside a busy, authentic factory warehouse with tall steel pallet racks and stacked cartons in the background. She holds and presents the exact product from IMAGE 02 at chest-to-waist level with a warm, energetic smile. Detailed natural skin pores, rosy dewy glass-skin, crisp 2K resolution, 100% identical product shape and details."
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_gen_ref2k",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "Flow - Tạo Ảnh Ref Cầm SP (2K)",
+        "pos_x": 600.0,
+        "pos_y": 40.0,
+        "enabled": true,
+        "slug": "flow_ref_image_2k",
+        "slug_auto": true,
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "2k",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "id": "node_gen_ref2k",
+        "label": "Flow - Tạo Ảnh Ref Cầm SP (2K)",
+        "video_download_resolution": "1080p",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_ref_image_2k",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg"
+          ],
+          "auto_download": true,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg"
+          ],
+          "error": ""
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_ref2k_nv1_khan_luoi_2K.jpg",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg"
+          }
+        ],
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "image",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_ref2k_nv1_khan_luoi_2K.jpg",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_ref2k_nv1_khan_luoi_2K.jpg"
+        }
+      },
+      {
+        "node_id": "node_prompt_s1",
+        "node_type": "prompt",
+        "node_name": "Prompt - Phân Cảnh 1 (Hook Báo Giá)",
+        "pos_x": 600.0,
+        "pos_y": 440.0,
+        "enabled": true,
+        "slug": "prompt_scene_1",
+        "slug_auto": true,
+        "prompt": "A 10-second vertical 9:16 video starting directly from IMAGE 01 (the 2K reference image) and keeping the product 100% identical to IMAGE 02. Medium-full eye-level 35mm shot in the busy warehouse. The presenter speaks with high energy, holding the product steady and gesturing toward the camera.",
+        "use_ai": false,
+        "id": "node_prompt_s1",
+        "label": "Prompt - Phân Cảnh 1 (Hook Báo Giá)",
+        "config": {
+          "slug": "prompt_scene_1",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "A 10-second vertical 9:16 video starting directly from IMAGE 01 (the 2K reference image) and keeping the product 100% identical to IMAGE 02. Medium-full eye-level 35mm shot in the busy warehouse. The presenter speaks with high energy, holding the product steady and gesturing toward the camera.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done",
+          "result_text": "A 10-second vertical 9:16 video starting directly from IMAGE 01 (the 2K reference image) and keeping the product 100% identical to IMAGE 02. Medium-full eye-level 35mm shot in the busy warehouse. The presenter speaks with high energy, holding the product steady and gesturing toward the camera."
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "A 10-second vertical 9:16 video starting directly from IMAGE 01 (the 2K reference image) and keeping the product 100% identical to IMAGE 02. Medium-full eye-level 35mm shot in the busy warehouse. The presenter speaks with high energy, holding the product steady and gesturing toward the camera."
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_prompt_s2",
+        "node_type": "prompt",
+        "node_name": "Prompt - Phân Cảnh 2 (Macro B-Roll & Công Năng)",
+        "pos_x": 600.0,
+        "pos_y": 680.0,
+        "enabled": true,
+        "slug": "prompt_scene_2",
+        "slug_auto": true,
+        "prompt": "SHOT 1 (0.0-1.5s): Medium-full 35mm shot from IMAGE 01 in the warehouse. SHOT 2 (1.5-5.5s): Hard cut to a 50mm macro product insert showcasing the exact texture and details of IMAGE 02. SHOT 3 (5.5-10.0s): Cut back to the presenter holding the product and smiling.",
+        "use_ai": false,
+        "id": "node_prompt_s2",
+        "label": "Prompt - Phân Cảnh 2 (Macro B-Roll & Công Năng)",
+        "config": {
+          "slug": "prompt_scene_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "SHOT 1 (0.0-1.5s): Medium-full 35mm shot from IMAGE 01 in the warehouse. SHOT 2 (1.5-5.5s): Hard cut to a 50mm macro product insert showcasing the exact texture and details of IMAGE 02. SHOT 3 (5.5-10.0s): Cut back to the presenter holding the product and smiling.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done",
+          "result_text": "SHOT 1 (0.0-1.5s): Medium-full 35mm shot from IMAGE 01 in the warehouse. SHOT 2 (1.5-5.5s): Hard cut to a 50mm macro product insert showcasing the exact texture and details of IMAGE 02. SHOT 3 (5.5-10.0s): Cut back to the presenter holding the product and smiling."
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "SHOT 1 (0.0-1.5s): Medium-full 35mm shot from IMAGE 01 in the warehouse. SHOT 2 (1.5-5.5s): Hard cut to a 50mm macro product insert showcasing the exact texture and details of IMAGE 02. SHOT 3 (5.5-10.0s): Cut back to the presenter holding the product and smiling."
+        },
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_gen_vid_s1",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "Flow - Video Phân Cảnh 01",
+        "pos_x": 1140.0,
+        "pos_y": -120.0,
+        "enabled": true,
+        "slug": "flow_video_s1",
+        "slug_auto": true,
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Veo 3.1 - Fast",
+        "character_key": "nv1",
+        "voice_key": "nv1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "video_download_resolution": "1080p",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "id": "node_gen_vid_s1",
+        "label": "Flow - Video Phân Cảnh 01",
+        "download_resolution": "2k",
+        "config": {
+          "slug": "flow_video_s1",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Veo 3.1 - Fast",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4"
+          ],
+          "auto_download": true,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4"
+          ],
+          "error": ""
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s1_1080p.mp4",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4"
+          }
+        ],
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "video",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s1_1080p.mp4"
+        }
+      },
+      {
+        "node_id": "node_gen_vid_s2",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "Flow - Video Phân Cảnh 02",
+        "pos_x": 1140.0,
+        "pos_y": 360.0,
+        "enabled": true,
+        "slug": "flow_video_s2",
+        "slug_auto": true,
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Veo 3.1 - Fast",
+        "character_key": "nv1",
+        "voice_key": "nv1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "video_download_resolution": "1080p",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "id": "node_gen_vid_s2",
+        "label": "Flow - Video Phân Cảnh 02",
+        "download_resolution": "2k",
+        "config": {
+          "slug": "flow_video_s2",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Veo 3.1 - Fast",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4"
+          ],
+          "auto_download": true,
+          "status": "done",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4"
+          ],
+          "error": ""
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s2_1080p.mp4",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4"
+          }
+        ],
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "video",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s2_1080p.mp4"
+        }
+      },
+      {
+        "node_id": "node_prompt_s3",
+        "id": "node_prompt_s3",
+        "node_type": "prompt",
+        "node_name": "Prompt - Phân Cảnh 3 (CTA Chốt Đơn Giỏ Hàng)",
+        "label": "Prompt - Phân Cảnh 3 (CTA Chốt Đơn Giỏ Hàng)",
+        "pos_x": 600.0,
+        "pos_y": 940.0,
+        "enabled": true,
+        "slug": "prompt_scene_3",
+        "prompt": "A 10-second vertical 9:16 medium-full 35mm shot in the busy factory warehouse starting from IMAGE 01 and keeping the product 100% identical to IMAGE 02. The presenter smiles warmly, holds the stainless steel mesh dishcloth at waist level, and points enthusiastically toward the bottom-left yellow shopping cart.",
+        "use_ai": false,
+        "config": {
+          "prompt": "A 10-second vertical 9:16 medium-full 35mm shot in the busy factory warehouse starting from IMAGE 01 and keeping the product 100% identical to IMAGE 02. The presenter smiles warmly, holds the stainless steel mesh dishcloth at waist level, and points enthusiastically toward the bottom-left yellow shopping cart.",
+          "result_text": "A 10-second vertical 9:16 medium-full 35mm shot in the busy factory warehouse starting from IMAGE 01 and keeping the product 100% identical to IMAGE 02. The presenter smiles warmly, holds the stainless steel mesh dishcloth at waist level, and points enthusiastically toward the bottom-left yellow shopping cart.",
+          "status": "done",
+          "slug": "prompt_scene_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "text": "A 10-second vertical 9:16 medium-full 35mm shot in the busy factory warehouse starting from IMAGE 01 and keeping the product 100% identical to IMAGE 02. The presenter smiles warmly, holds the stainless steel mesh dishcloth at waist level, and points enthusiastically toward the bottom-left yellow shopping cart."
+        },
+        "slug_auto": true,
+        "media_type": "Image"
+      },
+      {
+        "node_id": "node_gen_vid_s3",
+        "id": "node_gen_vid_s3",
+        "node_type": "generate",
+        "provider": "flow",
+        "node_name": "Flow - Video Phân Cảnh 03",
+        "label": "Flow - Video Phân Cảnh 03",
+        "pos_x": 1140.0,
+        "pos_y": 820.0,
+        "enabled": true,
+        "slug": "flow_video_s3",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Veo 3.1 - Fast",
+        "character_key": "nv1",
+        "voice_key": "nv1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "video_download_resolution": "1080p",
+        "prompt_source": "upstream_node",
+        "auto_download": true,
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+        "ref_images": [
+          {
+            "thumbnail": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s3_1080p.mp4",
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4"
+          }
+        ],
+        "config": {
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+          "result_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4"
+          ],
+          "status": "done",
+          "error": "",
+          "slug": "flow_video_s3",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Veo 3.1 - Fast",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4"
+          ],
+          "auto_download": true
+        },
+        "last_output": {
+          "ok": true,
+          "status": "done",
+          "media_type": "video",
+          "media_paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+          "media_url": "/api/media?path=c%3A%5CUsers%5CADMIN%5CDesktop%5CPython%5CVeo%203%20Tool%5CAutoVeo3Pro_v6%5CAuto_Veo_3_Pro%5CGrok%5CSkill%20Video%20Veo%5CWorkFlow%5Cworkflow_outputs%5Cwf_factory_2k_3scenes_standard%5Cnode_gen_vid_s3_1080p.mp4"
+        },
+        "slug_auto": true,
+        "download_resolution": "2k"
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "e_char_to_ref2k",
+        "source_node_id": "node_char_nv1",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_ref2k",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_prod_to_ref2k",
+        "source_node_id": "node_prod_img",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_ref2k",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_prompt_to_ref2k",
+        "source_node_id": "node_prompt_ref2k",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_gen_ref2k",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "e_ref2k_to_v1",
+        "source_node_id": "node_gen_ref2k",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s1",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_prod_to_v1",
+        "source_node_id": "node_prod_img",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s1",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_ps1_to_v1",
+        "source_node_id": "node_prompt_s1",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_gen_vid_s1",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "e_ref2k_to_v2",
+        "source_node_id": "node_gen_ref2k",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s2",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_prod_to_v2",
+        "source_node_id": "node_prod_img",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s2",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_ps2_to_v2",
+        "source_node_id": "node_prompt_s2",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_gen_vid_s2",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "e_ref2k_to_v3",
+        "source_node_id": "node_gen_ref2k",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s3",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_prod_to_v3",
+        "source_node_id": "node_prod_img",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_gen_vid_s3",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "e_ps3_to_v3",
+        "source_node_id": "node_prompt_s3",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_gen_vid_s3",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_s1",
+        "node_id": "node_gen_vid_s1",
+        "label": "Flow - Video Phân Cảnh 01",
+        "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s1_1080p.mp4",
+        "duration": 10
+      },
+      {
+        "clip_id": "clip_s2",
+        "node_id": "node_gen_vid_s2",
+        "label": "Flow - Video Phân Cảnh 02",
+        "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s2_1080p.mp4",
+        "duration": 10
+      },
+      {
+        "clip_id": "clip_s3",
+        "node_id": "node_gen_vid_s3",
+        "label": "Flow - Video Phân Cảnh 03",
+        "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\wf_factory_2k_3scenes_standard\\node_gen_vid_s3_1080p.mp4",
+        "duration": 10
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\Workflow_Nha_Xuong_Chuan_2K_3Scenes_Final.mp4"
+  }
+}

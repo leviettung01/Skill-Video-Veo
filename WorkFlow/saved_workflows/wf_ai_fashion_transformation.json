@@ -1,0 +1,433 @@
+{
+  "id": "wf_ai_fashion_transformation",
+  "_wf_id": "wf_ai_fashion_transformation",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T08:26:38.000Z",
+  "workflow": {
+    "name": "👗 AI Fashion Transformation – Biến Hình Trang Phục Dù Xoay",
+    "description": "Tạo video biến hình thời trang từ 2 ảnh nhân vật tham chiếu. Sử dụng hiệu ứng che khuất bằng ô để chuyển đổi trang phục mượt mà qua 2 video 4 giây, giữ nguyên nhân vật, bối cảnh và góc quay.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2
+    },
+    "nodes": [
+      {
+        "node_id": "node_5yYjOUQW",
+        "node_type": "image",
+        "node_name": "👤 Ảnh Tham Chiếu Nhân Vật Gốc (IMAGE 01)",
+        "pos_x": 134.0,
+        "pos_y": -73.0,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          }
+        ],
+        "id": "node_5yYjOUQW",
+        "label": "👤 Ảnh Tham Chiếu Nhân Vật Gốc (IMAGE 01)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "config": {
+          "slug": "image_video",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_mVwOo8cs",
+        "node_type": "image",
+        "node_name": "👗 Ảnh Tham Chiếu Bộ Đồ Biến Hình (IMAGE 02)",
+        "pos_x": 1040.0,
+        "pos_y": 800.36964685666,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png"
+          }
+        ],
+        "id": "node_mVwOo8cs",
+        "label": "👗 Ảnh Tham Chiếu Bộ Đồ Biến Hình (IMAGE 02)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png",
+        "config": {
+          "slug": "image_video_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\04_Product_Sheet_Vay_Vang_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_3g9kcI1I",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video 01 — Kết Quả Tung Dù Đổi Đồ (1080p)",
+        "pos_x": 964.0,
+        "pos_y": -94.630353143338,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "4s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_3g9kcI1I",
+        "label": "🎬 Google Flow Video 01 — Kết Quả Tung Dù Đổi Đồ (1080p)",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_image_video_generate",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "4s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_EQHAg3F6",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Khóa Phong Cách Điện Ảnh",
+        "pos_x": 125.0,
+        "pos_y": 970.30151414293,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Ultra-clean high-definition photorealistic fashion cinematography. Prioritize maximum native image clarity, fine-detail preservation, sharp subject rendering, and temporal consistency in every frame. Preserve precise clothing seams, stitching, fabric weave, garment edges, folds, footwear details, hair strands, umbrella ribs, and realistic asphalt microtextures. Crisp natural textures with controlled fine-grain detail, accurate material definition, balanced exposure, realistic skin texture, and clean edge separation. Maintain consistent sharpness across the entire 4-second sequence, including during movement. Use a high-quality professional camera aesthetic, natural optical sharpness, minimal motion blur, stable focus, no artificial skin smoothing, no watercolor-like textures, no excessive denoising, no compression artifacts, no pixelation, no ghosting, no flickering, no frame-to-frame detail loss, no over-sharpening halos. Render at the highest supported native resolution and quality setting. Preserve original reference image details without stylization or reinterpretation.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_EQHAg3F6",
+        "label": "📝 Prompt Khóa Phong Cách Điện Ảnh",
+        "config": {
+          "slug": "prompt",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Ultra-clean high-definition photorealistic fashion cinematography. Prioritize maximum native image clarity, fine-detail preservation, sharp subject rendering, and temporal consistency in every frame. Preserve precise clothing seams, stitching, fabric weave, garment edges, folds, footwear details, hair strands, umbrella ribs, and realistic asphalt microtextures. Crisp natural textures with controlled fine-grain detail, accurate material definition, balanced exposure, realistic skin texture, and clean edge separation. Maintain consistent sharpness across the entire 4-second sequence, including during movement. Use a high-quality professional camera aesthetic, natural optical sharpness, minimal motion blur, stable focus, no artificial skin smoothing, no watercolor-like textures, no excessive denoising, no compression artifacts, no pixelation, no ghosting, no flickering, no frame-to-frame detail loss, no over-sharpening halos. Render at the highest supported native resolution and quality setting. Preserve original reference image details without stylization or reinterpretation.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_SUjlH7CG",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Video 01 (Tung Dù Đổi Sang Bộ Đồ Mới)",
+        "pos_x": 126.0,
+        "pos_y": 663.0,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use IMAGE_1 as the STRICT PRIMARY CHARACTER AND INITIAL OUTFIT REFERENCE. Create a realistic cinematic overhead fashion transition video, designed to connect seamlessly with Video 2.\n\n**CHARACTER IDENTITY LOCK:** Preserve the exact character identity, facial features, hairstyle, skin tone, body proportions, and physical appearance from IMAGE_1. The character must wear the exact sleepwear outfit shown in IMAGE_1, preserving its original design, colors, fabric texture, silhouette, and details. Do not modify or redesign the sleepwear.\n\n**SCENE AND CAMERA LOCK:** A realistic outdoor gray asphalt street with subtle natural surface texture, soft daylight, and physically accurate shadows. Camera positioned directly overhead at a fixed 90-degree top-down angle, looking vertically downward. Full-body character visible initially, positioned near the center of the vertical 9:16 frame. The camera remains completely stationary throughout the video. No zoom, pan, tilt, rotation, or perspective changes.\n\n**PROP LOCK:** One realistic large black umbrella with a circular canopy, dark fabric, natural radial ribs, and a straight handle. The umbrella must maintain consistent size, shape, color, and physical structure throughout the entire sequence.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** The character wearing the exact sleepwear from IMAGE_1 walks naturally into the center of the frame on the gray asphalt street, holding a folded black umbrella. Movement is relaxed, fluid, and realistic. Maintain a clear overhead view of the initial outfit.\n\n**0.8–1.8s:** The character slows down and smoothly raises the black umbrella above the head. The umbrella begins opening naturally with realistic mechanical motion. The character's body movements remain coordinated and anatomically correct.\n\n**1.8–3.0s:** The black umbrella fully opens into a wide circular canopy. From the fixed overhead camera perspective, the expanding umbrella progressively covers the character's head, torso, arms, legs, and entire outfit. The umbrella must move into the direct line of sight between the camera and the character.\n\n**3.0–4.0s:** The fully opened black umbrella completely conceals the entire character underneath it. The canopy is centered in the frame, with no visible body parts, clothing, shoes, or accessories extending beyond its edges. Maintain subtle natural umbrella movement, as if preparing for a smooth sideways reveal in the next video.\n\n**CRITICAL END FRAME REQUIREMENT:** At exactly 4.0 seconds, the final frame must show the fully opened black umbrella completely hiding the character and original sleepwear. The umbrella must occupy the central composition, with sufficient surrounding asphalt visible. The camera angle, lighting, shadows, umbrella geometry, and background must remain stable. This exact final frame will be extracted and used as FIRST_FRAME for Video 2.\n\n**CONTINUITY REQUIREMENT:** Design the ending specifically for an occlusion-based outfit transformation. The character must be completely invisible behind the umbrella at the final frame so that Video 2 can reveal the character wearing the new fashion outfit from IMAGE_2 without visible clothing morphing or discontinuity.\n\n**CRITICAL CONSTRAINTS:** No outfit transformation in Video 1, no appearance of the final fashion outfit, no character identity drift, no facial changes, no extra characters, no duplicated limbs, no distorted hands, no warped umbrella, no floating objects, no background changes, no camera movement, no jump cuts, no flickering, no magical effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, photorealistic cinematic fashion video, smooth continuous motion, realistic umbrella mechanics, accurate character reference fidelity, natural daylight, 30 fps.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_SUjlH7CG",
+        "label": "📝 Prompt Video 01 (Tung Dù Đổi Sang Bộ Đồ Mới)",
+        "config": {
+          "slug": "prompt_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Use IMAGE_1 as the STRICT PRIMARY CHARACTER AND INITIAL OUTFIT REFERENCE. Create a realistic cinematic overhead fashion transition video, designed to connect seamlessly with Video 2.\n\n**CHARACTER IDENTITY LOCK:** Preserve the exact character identity, facial features, hairstyle, skin tone, body proportions, and physical appearance from IMAGE_1. The character must wear the exact sleepwear outfit shown in IMAGE_1, preserving its original design, colors, fabric texture, silhouette, and details. Do not modify or redesign the sleepwear.\n\n**SCENE AND CAMERA LOCK:** A realistic outdoor gray asphalt street with subtle natural surface texture, soft daylight, and physically accurate shadows. Camera positioned directly overhead at a fixed 90-degree top-down angle, looking vertically downward. Full-body character visible initially, positioned near the center of the vertical 9:16 frame. The camera remains completely stationary throughout the video. No zoom, pan, tilt, rotation, or perspective changes.\n\n**PROP LOCK:** One realistic large black umbrella with a circular canopy, dark fabric, natural radial ribs, and a straight handle. The umbrella must maintain consistent size, shape, color, and physical structure throughout the entire sequence.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** The character wearing the exact sleepwear from IMAGE_1 walks naturally into the center of the frame on the gray asphalt street, holding a folded black umbrella. Movement is relaxed, fluid, and realistic. Maintain a clear overhead view of the initial outfit.\n\n**0.8–1.8s:** The character slows down and smoothly raises the black umbrella above the head. The umbrella begins opening naturally with realistic mechanical motion. The character's body movements remain coordinated and anatomically correct.\n\n**1.8–3.0s:** The black umbrella fully opens into a wide circular canopy. From the fixed overhead camera perspective, the expanding umbrella progressively covers the character's head, torso, arms, legs, and entire outfit. The umbrella must move into the direct line of sight between the camera and the character.\n\n**3.0–4.0s:** The fully opened black umbrella completely conceals the entire character underneath it. The canopy is centered in the frame, with no visible body parts, clothing, shoes, or accessories extending beyond its edges. Maintain subtle natural umbrella movement, as if preparing for a smooth sideways reveal in the next video.\n\n**CRITICAL END FRAME REQUIREMENT:** At exactly 4.0 seconds, the final frame must show the fully opened black umbrella completely hiding the character and original sleepwear. The umbrella must occupy the central composition, with sufficient surrounding asphalt visible. The camera angle, lighting, shadows, umbrella geometry, and background must remain stable. This exact final frame will be extracted and used as FIRST_FRAME for Video 2.\n\n**CONTINUITY REQUIREMENT:** Design the ending specifically for an occlusion-based outfit transformation. The character must be completely invisible behind the umbrella at the final frame so that Video 2 can reveal the character wearing the new fashion outfit from IMAGE_2 without visible clothing morphing or discontinuity.\n\n**CRITICAL CONSTRAINTS:** No outfit transformation in Video 1, no appearance of the final fashion outfit, no character identity drift, no facial changes, no extra characters, no duplicated limbs, no distorted hands, no warped umbrella, no floating objects, no background changes, no camera movement, no jump cuts, no flickering, no magical effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, photorealistic cinematic fashion video, smooth continuous motion, realistic umbrella mechanics, accurate character reference fidelity, natural daylight, 30 fps.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_nZZtoTrI",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video 02 — Kết Quả Catwalk (1080p)",
+        "pos_x": 1733.0,
+        "pos_y": -43.630353143338,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "6s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_nZZtoTrI",
+        "label": "🎬 Google Flow Video 02 — Kết Quả Catwalk (1080p)",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_image_video_generate_1",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "6s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_vCRlfDCe",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Video 02 (Bước Đi Catwalk Trong Đồ Mới)",
+        "pos_x": 1736.0,
+        "pos_y": 827.0,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use FIRST_FRAME (the exact last frame of Video 1) as the PRIMARY VISUAL AND CONTINUITY REFERENCE. Use IMAGE_2 as the STRICT CHARACTER IDENTITY AND FINAL FASHION OUTFIT REFERENCE.\n\nCreate a seamless 4-second continuation of Video 1, featuring a cinematic overhead fashion transformation reveal.\n\n**SCENE AND CAMERA LOCK:** Preserve the exact 90-degree top-down camera angle, fixed camera position, framing, character scale, gray asphalt texture, natural lighting, shadows, black umbrella design, and spatial composition from FIRST_FRAME. The camera must remain completely stationary throughout the video. No zooming, panning, rotating, or perspective changes.\n\n**CHARACTER AND OUTFIT LOCK:** The revealed character must match IMAGE_2 precisely, including facial identity, hairstyle, body proportions, skin tone, complete clothing design, colors, fabric textures, layering, footwear, and accessories. Do not redesign, simplify, recolor, or invent any outfit details. Maintain one consistent character throughout.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** Begin with the exact composition of FIRST_FRAME. The black umbrella completely conceals the character and outfit. Continue the umbrella's natural motion from Video 1 without any visible jump or reset. The character is already wearing the complete outfit from IMAGE_2 underneath the umbrella.\n\n**0.8–1.8s:** The character smoothly tilts and moves the black umbrella sideways, progressively revealing the complete fashion outfit from IMAGE_2. The reveal must happen naturally through the umbrella's movement. No clothing morphing, no magical transformation effects, no body distortion, and no abrupt visual replacement.\n\n**1.8–3.2s:** The umbrella moves far enough aside to clearly reveal the complete outfit. The character performs subtle, confident street-fashion movements, including a small natural step, gentle body rotation, and relaxed arm movement. Clothing follows realistic fabric physics. Maintain the original overhead composition.\n\n**3.2–4.0s:** The character completes a stylish, confident fashion pose, showcasing the outfit from IMAGE_2. Hold the pose briefly for a clean, visually satisfying ending while maintaining natural micro-movements.\n\n**TRANSITION CONTINUITY:** Video 2 must feel like the uninterrupted continuation of Video 1. The opening frame must visually match the final frame of Video 1 exactly. Preserve umbrella position, movement direction, lighting, background, camera perspective, and character placement. The outfit change occurs exclusively while the character is fully hidden behind the umbrella.\n\n**CRITICAL CONSTRAINTS:** No visible clothing transformation, no identity drift, no outfit hallucination, no facial changes, no duplicated limbs, no extra characters, no background changes, no camera movement, no jump cuts, no flickering, no warped umbrella, no artificial transition effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, realistic cinematic fashion video, smooth continuous movement, natural fabric physics, precise reference fidelity, seamless transition, 30 fps.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_vCRlfDCe",
+        "label": "📝 Prompt Video 02 (Bước Đi Catwalk Trong Đồ Mới)",
+        "config": {
+          "slug": "prompt_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Use FIRST_FRAME (the exact last frame of Video 1) as the PRIMARY VISUAL AND CONTINUITY REFERENCE. Use IMAGE_2 as the STRICT CHARACTER IDENTITY AND FINAL FASHION OUTFIT REFERENCE.\n\nCreate a seamless 4-second continuation of Video 1, featuring a cinematic overhead fashion transformation reveal.\n\n**SCENE AND CAMERA LOCK:** Preserve the exact 90-degree top-down camera angle, fixed camera position, framing, character scale, gray asphalt texture, natural lighting, shadows, black umbrella design, and spatial composition from FIRST_FRAME. The camera must remain completely stationary throughout the video. No zooming, panning, rotating, or perspective changes.\n\n**CHARACTER AND OUTFIT LOCK:** The revealed character must match IMAGE_2 precisely, including facial identity, hairstyle, body proportions, skin tone, complete clothing design, colors, fabric textures, layering, footwear, and accessories. Do not redesign, simplify, recolor, or invent any outfit details. Maintain one consistent character throughout.\n\n**TIMELINE AND ACTION:**\n\n**0.0–0.8s:** Begin with the exact composition of FIRST_FRAME. The black umbrella completely conceals the character and outfit. Continue the umbrella's natural motion from Video 1 without any visible jump or reset. The character is already wearing the complete outfit from IMAGE_2 underneath the umbrella.\n\n**0.8–1.8s:** The character smoothly tilts and moves the black umbrella sideways, progressively revealing the complete fashion outfit from IMAGE_2. The reveal must happen naturally through the umbrella's movement. No clothing morphing, no magical transformation effects, no body distortion, and no abrupt visual replacement.\n\n**1.8–3.2s:** The umbrella moves far enough aside to clearly reveal the complete outfit. The character performs subtle, confident street-fashion movements, including a small natural step, gentle body rotation, and relaxed arm movement. Clothing follows realistic fabric physics. Maintain the original overhead composition.\n\n**3.2–4.0s:** The character completes a stylish, confident fashion pose, showcasing the outfit from IMAGE_2. Hold the pose briefly for a clean, visually satisfying ending while maintaining natural micro-movements.\n\n**TRANSITION CONTINUITY:** Video 2 must feel like the uninterrupted continuation of Video 1. The opening frame must visually match the final frame of Video 1 exactly. Preserve umbrella position, movement direction, lighting, background, camera perspective, and character placement. The outfit change occurs exclusively while the character is fully hidden behind the umbrella.\n\n**CRITICAL CONSTRAINTS:** No visible clothing transformation, no identity drift, no outfit hallucination, no facial changes, no duplicated limbs, no extra characters, no background changes, no camera movement, no jump cuts, no flickering, no warped umbrella, no artificial transition effects, no text, no logos, no slow motion.\n\n**OUTPUT:** 4 seconds, vertical 9:16, realistic cinematic fashion video, smooth continuous movement, natural fabric physics, precise reference fidelity, seamless transition, 30 fps.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_3_input_1",
+        "source_node_id": "node_5yYjOUQW",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_2_output_1_6_input_1",
+        "source_node_id": "node_mVwOo8cs",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_3_output_2_6_input_1",
+        "source_node_id": "node_3g9kcI1I",
+        "source_handle": "output_2",
+        "source_port": "frame",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "video",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_4_output_1_6_input_2",
+        "source_node_id": "node_EQHAg3F6",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_4_output_1_3_input_2",
+        "source_node_id": "node_EQHAg3F6",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_5_output_1_3_input_2",
+        "source_node_id": "node_SUjlH7CG",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_3g9kcI1I",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_7_output_1_6_input_2",
+        "source_node_id": "node_vCRlfDCe",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_nZZtoTrI",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_node_3g9kcI1I",
+        "node_id": "node_3g9kcI1I",
+        "label": "🎬 Google Flow Video 01 — Kết Quả Tung Dù Đổi Đồ (1080p)",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene1_1080p.mp4",
+        "duration": "4s"
+      },
+      {
+        "clip_id": "clip_node_nZZtoTrI",
+        "node_id": "node_nZZtoTrI",
+        "label": "🎬 Google Flow Video 02 — Kết Quả Catwalk (1080p)",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_umbrella_scene2_1080p.mp4",
+        "duration": "6s"
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\wf_ai_fashion_transformation_final_1080p.mp4",
+    "batch_history": []
+  }
+}

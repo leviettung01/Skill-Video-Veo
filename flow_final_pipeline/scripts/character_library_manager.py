@@ -160,16 +160,18 @@ def load_sheet_templates() -> list:
                 "aspect_ratio": "3:2",
                 "description": f"Mẫu Character Sheet tự động nạp từ file {fn}",
                 "character_sheet_prompt": (
-                    "Photorealistic 6-panel character reference turnaround sheet arranged in a clean 2x3 grid with thin white borders on a neutral light-grey studio background. "
-                    "Top row: full-body standing views (Front, Back, Side) of ({character_description}). "
-                    "Bottom row: close-up portrait views (Front, 3/4 angle, Side profile) of the exact same person. "
-                    "Consistent studio lighting, identical face across all panels, 8k photorealistic."
+                    "Hyper-photorealistic 6-panel character reference turnaround sheet arranged in a clean 2x3 grid with thin white borders on a neutral light-grey studio background. "
+                    "Top row: full-body standing views (Front, Back, Side) of ({character_description}) with full mature adult proportions. "
+                    "Bottom row: close-up portrait views (Front, 3/4 angle, Side profile) of the exact same person with detailed visible natural skin pores, rosy dewy Douyin glass-skin glow, and expressive eyes with crisp catchlights. "
+                    "Shot on Sony A7R V 85mm f/1.4 GM lens, consistent soft studio lighting, identical face across all panels, 8k photorealistic, zero AI plastic look."
                 ),
                 "product_with_character_prompt": (
-                    "Photorealistic vertical 9:16 medium-wide standing photo (framed from head to hips, camera at 2 meters distance, NOT a close-up): "
-                    "the exact same person from the character reference ({character_description}), {outfit_en}, {setting_en}, "
-                    "holding and presenting the exact product from the product reference image at waist level facing the camera "
-                    "(true-to-life natural hand-held scale, NOT oversized). Keep the product 100% identical and keep the face identical."
+                    "Subject & Identity: A hyper-photorealistic vertical 9:16 close-medium upper-body portrait (framed from top of head with natural headroom to waist/hips, camera at 1.2 meters distance) "
+                    "of the exact same person from the character reference ({character_description}), {outfit_en}, {setting_en}. "
+                    "Skin & Makeup: Detailed visible natural skin pores, radiant rosy dewy Douyin glass-skin finish with subtle light reflection on the nose bridge, cheeks, and forehead, matching fair skin tone across face, neck, and hands, expressive eyes with crisp catchlights, wispy eyelashes, thin winged liner, soft pink blush, and glossy ombré cherry-pink lips. "
+                    "PHYSIQUE: Full, mature adult proportions with natural curves (90-60-90 proportions, C-cup natural bust, slender waist). "
+                    "Expression / Pose: Warm, charming smile toward the camera, subtle head tilt, torso turned slightly (5-10 degrees) for relaxed natural asymmetry, holding and presenting the exact product from the product reference image at chest-to-waist level facing the camera (true-to-life natural hand-held scale, NOT oversized). "
+                    "Keep the product 100% identical to the product reference image. Shot on Sony A7R V 50mm f/1.4 GM at f/2.0, soft diffused key lighting, creamy background bokeh, 2K (1536x2752), zero AI look."
                 ),
             })
             known_files.add(fn)
@@ -237,6 +239,13 @@ def get_character_library_state() -> dict:
         v_item["sample_vn_abs"] = abs_vn
         v_item["has_flow_vn_audio"] = bool(abs_vn)
         v_item["flow_synced"] = bool(v_item.get("flow_synced") or abs_vn)
+        owner_prof = str(v_item.get("owner_profile") or "leviettung04").strip() or "leviettung04"
+        v_item["owner_profile"] = owner_prof
+        acc_vids = dict(v_item.get("account_voice_ids") or {})
+        vid_cur = str(v_item.get("voice_id") or "").strip()
+        if len(vid_cur) == 36 and "-" in vid_cur and owner_prof not in acc_vids:
+            acc_vids[owner_prof] = vid_cur
+        v_item["account_voice_ids"] = acc_vids
         if not v_item.get("sample_dialogue_vn"):
             if v_item["region"] == "south":
                 v_item["sample_dialogue_vn"] = COMMON_VN_DIALOGUE_PRESETS[2]["text"]
@@ -261,6 +270,15 @@ def get_character_library_state() -> dict:
         item = dict(cval)
         item["key"] = ck
         item["ref_image_abs"] = abs_img
+
+        rel_bed = cval.get("bedroom_ref_file", "")
+        abs_bed = os.path.join(PIPELINE_DIR, rel_bed.replace("/", os.sep)) if rel_bed else ""
+        item["bedroom_ref_abs"] = abs_bed if (abs_bed and os.path.exists(abs_bed)) else abs_img
+
+        rel_ward = cval.get("wardrobe_sheet_file", "")
+        abs_ward = os.path.join(PIPELINE_DIR, rel_ward.replace("/", os.sep)) if rel_ward else ""
+        item["wardrobe_sheet_abs"] = abs_ward if (abs_ward and os.path.exists(abs_ward)) else abs_img
+
         item["videos_per_character"] = int(cval.get("videos_per_character", cfg.get("default_videos_per_character", 3)))
         item["enabled"] = bool(cval.get("enabled", True))
         item["preferred_image_model"] = cval.get("preferred_image_model", cfg.get("default_image_model", "nano_banana"))
@@ -296,24 +314,43 @@ def get_character_library_state() -> dict:
 
 
 def build_voice_prompt_en(gender: str, region: str, tone_style: str, speed_wpm: str = "") -> str:
-    g_en = "male" if gender == "male" else "female"
+    is_male = (gender or "").lower() == "male"
     if region == "south":
         r_en = "Southern Vietnamese (Saigon accent)"
+        price_words = "“ba mươi cành”, “bốn trăm ka”, “năm triệu”, “hai triệu rưỡi”, “hai trăm”, “xịn xò”, “cực kỳ rẻ” and “miễn phí ship”"
     elif region == "central":
         r_en = "Central Vietnamese (Hue/Da Nang accent)"
+        price_words = "“ba mươi ka”, “bốn trăm ka”, “năm triệu”, “hai triệu rưỡi”, “đậm đà chuẩn vị”, “cực kỳ rẻ” and “miễn phí ship”"
     else:
         r_en = "Northern Vietnamese (Hanoi accent)"
+        price_words = "“ba mươi ka”, “bốn trăm ka”, “năm triệu”, “bốn triệu”, “ba triệu”, “hai triệu rưỡi”, “hai triệu”, “cực kỳ rẻ” and “miễn phí ship”"
 
     if tone_style == "energetic_sale":
-        t_en = "high-energy, enthusiastic livestream flash-sale host tone, persuasive, bright and fast-paced delivery (4.6 words/sec)"
+        delivery_en = "energetic TikTok Shop sales delivery, persuasive but not aggressive, warm smile audible in the voice, confident and conversational, fast moderately paced speech with crisp consonants"
     elif tone_style == "sweet_foodie":
-        t_en = "cheerful, appetizing food-reviewer and lifestyle vlogger tone, warm mouth-watering inflection, friendly cadence (4.1 words/sec)"
+        delivery_en = "cheerful and appetizing TikTok Shop food and lifestyle reviewer delivery, warm mouth-watering inflection, friendly smile audible in the voice, confident and conversational, moderately fast speech with crisp consonants"
     elif tone_style == "chill_story":
-        t_en = "warm, gentle, sincere storytelling tone for traditional specialties and gifts, smooth and calm articulation (3.8 words/sec)"
+        delivery_en = "warm, sincere and reassuring TikTok Shop storytelling and specialty consultant delivery, gentle smile audible in the voice, smooth and conversational articulation with crisp consonants"
     else:
-        t_en = "clear, trustworthy professional factory & QC consultant tone, steady confident articulation (4.4 words/sec)"
+        delivery_en = "energetic and authoritative TikTok Shop factory direct & QC expert sales delivery, persuasive and trustworthy, warm confident smile audible in the voice, fast moderately paced speech with crisp consonants"
 
-    return f"{t_en}, young {r_en} {g_en} voice"
+    if is_male:
+        return (
+            f"Vietnamese male commercial presenter, young adult masculine voice, bright and energetic baritone-tenor pitch, "
+            f"clear forward chest projection, natural {r_en} pronunciation, {delivery_en}. "
+            f"Emphasize important words and prices such as {price_words}. "
+            f"Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. "
+            f"Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. "
+            f"No announcer voice, no radio voice, no singing, no whispering, no shouting, no female resonance, no high-pitched female voice, no English accent, no robotic delivery."
+        )
+    return (
+        f"Vietnamese female commercial presenter, young adult voice, bright and friendly, mid-to-high pitch, "
+        f"clear forward projection, natural {r_en} pronunciation, {delivery_en}. "
+        f"Emphasize important words and prices such as {price_words}. "
+        f"Use short natural pauses after each price, slight playful disbelief when saying “không phải”, and an excited reassuring lift at the end of promotional sentences. "
+        f"Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. "
+        f"No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery."
+    )
 
 
 def save_character_library_settings(payload: dict) -> dict:
@@ -502,10 +539,18 @@ def save_voice_profile(payload: dict) -> dict:
         else:
             sample_dialogue_vn = COMMON_VN_DIALOGUE_PRESETS[0]["text"]
 
+    owner_prof = str(payload.get("owner_profile") or existing_v.get("owner_profile") or "leviettung04").strip() or "leviettung04"
+    acc_vids = dict(existing_v.get("account_voice_ids") or {})
+    if isinstance(payload.get("account_voice_ids"), dict):
+        acc_vids.update(payload["account_voice_ids"])
+    eff_vid = (payload.get("voice_id") or existing_v.get("voice_id") or flow_slug or "27f51973-e290-4a38-bd7a-9d6fbe81b2f6").strip()
+    if len(eff_vid) == 36 and "-" in eff_vid:
+        acc_vids.setdefault(owner_prof, eff_vid)
+
     voice_entry = {
         "key": vkey,
         "name": (payload.get("name") or f"Giọng {region_labels.get(region, 'Việt Nam')} ({vkey})").strip(),
-        "voice_id": (payload.get("voice_id") or existing_v.get("voice_id") or flow_slug or "27f51973-e290-4a38-bd7a-9d6fbe81b2f6").strip(),
+        "voice_id": eff_vid,
         "flow_slug": flow_slug,
         "gender": gender,
         "region": region,
@@ -517,6 +562,8 @@ def save_voice_profile(payload: dict) -> dict:
         "sample_vn_file": payload.get("sample_vn_file") or existing_v.get("sample_vn_file") or f"voice_samples/{vkey}_flow.mp3",
         "sample_dialogue_vn": sample_dialogue_vn,
         "flow_synced": bool(payload.get("flow_synced", existing_v.get("flow_synced", False))),
+        "owner_profile": owner_prof,
+        "account_voice_ids": acc_vids,
         "voice_prompt_en": voice_prompt_en,
         "dialect_markers_vn": dialect_markers,
         "recommended_templates": rec_tpls,
@@ -535,6 +582,24 @@ def save_voice_profile(payload: dict) -> dict:
             cval["voice_gender"] = voice_entry["gender"]
             cval["voice_tone"] = voice_entry["tone_style"]
             cval["voice_prompt_en"] = voice_entry["voice_prompt_en"]
+
+    # Đồng bộ danh sách custom_voices để các module CLI / Đa tài khoản đọc trực tiếp
+    cfg["custom_voices"] = [
+        {
+            "key": k,
+            "voice_id": v.get("voice_id", ""),
+            "name": v.get("name", k),
+            "gender": v.get("gender", "female"),
+            "region": v.get("region", "north"),
+            "flow_slug": v.get("flow_slug", ""),
+            "owner_profile": v.get("owner_profile", "leviettung04"),
+            "account_voice_ids": v.get("account_voice_ids", {}),
+            "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+            "description": v.get("description", ""),
+        }
+        for k, v in cfg.get("voices", {}).items()
+        if isinstance(v, dict)
+    ]
 
     with open(VOICES_CHARS_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
@@ -556,15 +621,462 @@ def delete_voice_profile(voice_key: str) -> dict:
     return get_character_library_state()
 
 
+def resolve_voice_id_for_account(voice_id_or_key: str, profile_name: str = "") -> str:
+    """
+    Khi chạy Đa Tài Khoản Google Flow (Round-Robin):
+    Mỗi tài khoản có thể có mã UUID Custom Voice riêng trong `account_voice_ids[profile_name]`.
+    - Nếu tài khoản `profile_name` đã có UUID riêng trong `account_voice_ids[profile_name]` -> trả về UUID đó.
+    - Nếu `profile_name` là tài khoản gốc (`owner_profile`, mặc định `leviettung04`) -> trả về `voice_id` gốc.
+    - Nếu `profile_name` là tài khoản phụ chưa đồng bộ/nhân bản UUID Custom Voice -> trả về `account_voice_ids.get(profile_name)` hoặc `voice_id` / `flow_slug`.
+    """
+    raw = str(voice_id_or_key or "").strip()
+    if not raw:
+        return ""
+    prof = str(profile_name or "").strip()
+    if not os.path.isfile(VOICES_CHARS_PATH):
+        return raw
+    try:
+        with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for vk, v in (cfg.get("voices") or {}).items():
+            if not isinstance(v, dict):
+                continue
+            vid = str(v.get("voice_id") or "").strip()
+            if raw.lower() in (vk.lower(), vid.lower(), str(v.get("name") or "").strip().lower()):
+                acc_map = v.get("account_voice_ids") or {}
+                if prof and prof in acc_map and acc_map[prof]:
+                    return str(acc_map[prof]).strip()
+                owner = str(v.get("owner_profile") or "leviettung04").strip()
+                if not prof or prof.lower() == owner.lower():
+                    return vid or raw
+                # Nếu tài khoản phụ chưa nhân bản UUID riêng, kiểm tra bất kỳ UUID nào đã map hoặc trả về vid
+                return str(acc_map.get(prof) or vid or v.get("flow_slug") or raw).strip()
+    except Exception:
+        pass
+    return raw
+
+
+def _list_flow_accounts_with_cookies(target_profile: str = "") -> list:
+    """Liệt kê tất cả các tài khoản Google Flow đang có file Cookie hợp lệ để đồng bộ hoặc nhân bản Voice đa tài khoản."""
+    target_clean = str(target_profile or "").strip().lower()
+    if target_clean == "all":
+        target_clean = ""
+    results = []
+    seen = set()
+
+    acc_grok_json = os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "accounts.json")
+    default_proj = "932bc2a1-07ea-4199-b147-80ab0018d41c"
+    if os.path.isfile(acc_grok_json):
+        try:
+            rows = json.loads(open(acc_grok_json, "r", encoding="utf-8").read())
+            if isinstance(rows, list):
+                for r in rows:
+                    if not isinstance(r, dict):
+                        continue
+                    prof = str(r.get("profile_name") or "").strip()
+                    if not prof or prof in seen:
+                        continue
+                    if target_clean and prof.lower() != target_clean:
+                        continue
+                    ck = _load_clean_flow_cookies(prof)
+                    if ck:
+                        proj = str(r.get("proxy_url") or default_proj).strip()
+                        if proj.startswith("http") or len(proj) < 20:
+                            proj = default_proj
+                        seen.add(prof)
+                        results.append({
+                            "profile_name": prof,
+                            "name": str(r.get("name") or f"Google_{prof}"),
+                            "project_id": proj,
+                            "cookies": ck,
+                        })
+        except Exception:
+            pass
+
+    if not results:
+        fallback_prof = str(target_profile or "leviettung04").strip()
+        if fallback_prof.lower() == "all":
+            fallback_prof = "leviettung04"
+        ck = _load_clean_flow_cookies(fallback_prof)
+        if ck:
+            results.append({
+                "profile_name": fallback_prof,
+                "name": f"Google_{fallback_prof}",
+                "project_id": default_proj,
+                "cookies": ck,
+            })
+    return results
+
+
 def scan_and_sync_flow_voices(payload: dict = None) -> dict:
     """
-    Quét toàn bộ các `voice_id` và `character_id` từ:
-      1. Các dự án đã tạo trong `projects/*/prompts.json`
-      2. File cấu hình `voices_and_characters.json`
-      3. Danh sách 30 Giọng Built-in chất lượng cao của Google Flow (`BUILTIN_FLOW_VOICES`)
-    và trả về báo cáo chi tiết để người dùng sử dụng ngay.
+    Đồng bộ 2 chiều Danh Sách Giọng Đọc Custom giữa Google Flow và Tool (Hỗ trợ Đa Tài Khoản):
+      1. Quét trực tiếp trên tài khoản Google Flow (`live_flow_sync=True`) tất cả các Custom Voice người dùng đã tạo thủ công
+         trong mục `Giọng nói` (`.asset-item` có icon `settings_2`), tự động lấy Tên Giọng, Hội Thoại Mẫu Tiếng Việt,
+         Prompt Chỉ Dẫn (`voice_prompt_en`), Mã `voice_id` UUID và tải file âm thanh `.mp3` về kho `voice_samples/`.
+      2. Nếu bật `clone_to_all_accounts=True`, tự động nhân bản (clone) các giọng Custom sang toàn bộ các tài khoản Google Flow
+         khác đang có Cookie hợp lệ và lưu bảng ánh xạ `account_voice_ids: {profile_name: voice_uuid}` để khi chạy Đa Luồng
+         xoay vòng nhiều tài khoản, tài khoản nào cũng dùng đúng mã Voice UUID của tài khoản đó!
     """
     payload = payload or {}
+    live_flow_sync = bool(payload.get("live_flow_sync", True))
+    clone_to_all = bool(payload.get("clone_to_all_accounts", False))
+    target_profile = str(payload.get("profile_name") or "").strip()
+    download_missing_audio = bool(payload.get("download_missing_audio", True))
+
+    ensure_dirs_and_default_sheet()
+    imported_names = []
+    updated_names = []
+    cloned_accounts_summary = []
+    live_sync_errors = []
+
+    if live_flow_sync:
+        accounts_to_scan = _list_flow_accounts_with_cookies(target_profile if not clone_to_all else "")
+        if accounts_to_scan:
+            try:
+                scripts_dir = os.path.join(PIPELINE_DIR, "scripts")
+                if scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+                if WORKSPACE_DIR not in sys.path:
+                    sys.path.insert(0, WORKSPACE_DIR)
+                import re as _re
+                import unicodedata as _ud
+                import grok_video_tool as gvt
+                from playwright.sync_api import sync_playwright
+
+                def _slugify_vn(text_val: str) -> str:
+                    s = _ud.normalize("NFKD", str(text_val or "")).encode("ascii", "ignore").decode("ascii").lower()
+                    s = _re.sub(r"[^a-z0-9]+", "_", s).strip("_")
+                    return s[:36] or "flow_custom"
+
+                with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+                    cfg_live = json.load(f)
+                voices_map = cfg_live.setdefault("voices", {})
+
+                with sync_playwright() as pw:
+                    browser = pw.chromium.launch(
+                        channel="chrome",
+                        headless=False,
+                        args=[
+                            "--disable-blink-features=AutomationControlled",
+                            "--window-position=-2000,-2000",
+                            "--window-size=1280,800",
+                        ],
+                    )
+                    try:
+                        # Bước 1: Quét toàn bộ Custom Voice có trên tài khoản nguồn (hoặc các tài khoản đã chọn)
+                        primary_accs = accounts_to_scan if not clone_to_all else accounts_to_scan[:1]
+                        for acc_info in primary_accs:
+                            prof_name = acc_info["profile_name"]
+                            proj_id = acc_info["project_id"]
+                            ctx = browser.new_context()
+                            ctx.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
+                            ctx.add_cookies(acc_info["cookies"])
+                            pg = ctx.new_page()
+                            audio_captured = []
+
+                            def _make_on_resp(bucket):
+                                def _on_resp(r):
+                                    if "flow-content.google/audio/" in r.url and r.status == 200:
+                                        try:
+                                            b = r.body()
+                                            if len(b) > 1000:
+                                                m = _re.search(r"flow-content\.google/audio/([0-9a-f\-]{36})", r.url)
+                                                vid = m.group(1) if m else ""
+                                                bucket.append((vid, r.url, b))
+                                        except Exception:
+                                            pass
+                                return _on_resp
+
+                            pg.on("response", _make_on_resp(audio_captured))
+                            try:
+                                pg.goto(f"https://flow.google.com/project/{proj_id}", wait_until="domcontentloaded", timeout=40000)
+                                pg.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
+                                pg.wait_for_function(
+                                    "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e",
+                                    timeout=25000,
+                                )
+                                pg.wait_for_timeout(1500)
+                                pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
+                                pg.wait_for_timeout(1200)
+                                pg.locator("text=MUSE").first.click(force=True, timeout=6000)
+                                pg.wait_for_timeout(1200)
+                                pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
+                                pg.wait_for_timeout(1600)
+
+                                # Thu thập danh sách tất cả Custom Voice (có icon settings_2) ở đầu danh sách Giọng nói
+                                custom_titles_seen = []
+                                for scroll_step in range(6):
+                                    pg.evaluate(
+                                        """(step) => {
+                                            const v = document.querySelector('.cdk-overlay-container cdk-virtual-scroll-viewport.asset-list-viewport');
+                                            if (v) v.scrollTop = step * 180;
+                                        }""",
+                                        scroll_step,
+                                    )
+                                    pg.wait_for_timeout(250)
+                                    items_meta = pg.evaluate(
+                                        """() => {
+                                            const els = Array.from(document.querySelectorAll('.cdk-overlay-container .asset-item'));
+                                            return els.map(e => {
+                                                const txt = (e.innerText || '').trim();
+                                                const lines = txt.split(/\\r?\\n/).map(s => s.trim()).filter(Boolean);
+                                                const isCustom = lines.includes('settings_2');
+                                                const cleanLines = lines.filter(l => l !== 'graphic_eq' && l !== 'settings_2');
+                                                return {
+                                                    isCustom,
+                                                    titleLine: cleanLines[0] || '',
+                                                    subLine: cleanLines[1] || ''
+                                                };
+                                            }).filter(x => x.isCustom && x.titleLine);
+                                        }"""
+                                    )
+                                    for im in items_meta:
+                                        if im["titleLine"] not in custom_titles_seen:
+                                            custom_titles_seen.append(im["titleLine"])
+                                    # Nếu đã cuộn tới giọng gốc Achernar thì dừng
+                                    has_builtin = pg.locator(".cdk-overlay-container .asset-item:has-text('Achernar')").count() > 0
+                                    if has_builtin and scroll_step >= 1:
+                                        break
+
+                                # Cuộn lại lên đầu và đọc chi tiết từng Custom Voice
+                                pg.evaluate(
+                                    """() => {
+                                        const v = document.querySelector('.cdk-overlay-container cdk-virtual-scroll-viewport.asset-list-viewport');
+                                        if (v) v.scrollTop = 0;
+                                    }"""
+                                )
+                                pg.wait_for_timeout(300)
+
+                                for short_title in custom_titles_seen:
+                                    # Tìm và click vào item custom voice đó
+                                    loc_item = pg.locator(".cdk-overlay-container .asset-item").filter(has_text=short_title[:18]).first
+                                    if loc_item.count() == 0:
+                                        continue
+                                    loc_item.click(force=True, timeout=4000)
+                                    pg.wait_for_timeout(550)
+
+                                    full_name = ""
+                                    if pg.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
+                                        full_name = pg.locator(".cdk-overlay-container input.voice-name-input").first.input_value().strip()
+                                    if not full_name:
+                                        full_name = short_title.strip()
+
+                                    sample_dlg = ""
+                                    if pg.locator(".cdk-overlay-container textarea.sample-dialogue-input").count() > 0:
+                                        sample_dlg = pg.locator(".cdk-overlay-container textarea.sample-dialogue-input").first.input_value().strip()
+
+                                    perf_prompt = ""
+                                    if pg.locator(".cdk-overlay-container textarea.performance-input").count() > 0:
+                                        perf_prompt = pg.locator(".cdk-overlay-container textarea.performance-input").first.input_value().strip()
+
+                                    # Kiểm tra xem giọng này đã có trong voices_and_characters.json chưa
+                                    matched_vk = None
+                                    norm_full = full_name.lower().replace("(nv1)", "").replace("(nv2)", "").replace("(nv3)", "").strip()
+                                    for vk_cand, v_cand in voices_map.items():
+                                        if not isinstance(v_cand, dict):
+                                            continue
+                                        c_name = str(v_cand.get("name") or "").lower().replace("(nv1)", "").replace("(nv2)", "").replace("(nv3)", "").strip()
+                                        if c_name == norm_full or norm_full in c_name or c_name in norm_full:
+                                            matched_vk = vk_cand
+                                            break
+
+                                    is_new_manual_voice = False
+                                    if not matched_vk:
+                                        is_new_manual_voice = True
+                                        matched_vk = f"v_flow_{_slugify_vn(full_name)}"
+                                        idx_dup = 2
+                                        base_vk = matched_vk
+                                        while matched_vk in voices_map:
+                                            matched_vk = f"{base_vk}_{idx_dup}"
+                                            idx_dup += 1
+
+                                    cur_entry = dict(voices_map.get(matched_vk) or {})
+                                    comb_txt = f"{full_name} {perf_prompt}".lower()
+                                    is_male_v = ("male" in comb_txt and "female" not in comb_txt) or ("nam " in full_name.lower() and "nữ" not in full_name.lower() and "miền nam" not in full_name.lower()) or ("giọng nam" in full_name.lower()) or ("nam miền" in full_name.lower()) or ("nam bắc" in full_name.lower())
+                                    gender_v = cur_entry.get("gender") or ("male" if is_male_v else "female")
+                                    region_v = cur_entry.get("region") or (
+                                        "south" if any(k in comb_txt for k in ("miền nam", "southern", "saigon", "sài gòn"))
+                                        else ("central" if any(k in comb_txt for k in ("miền trung", "central", "hue")) else "north")
+                                    )
+                                    tone_v = cur_entry.get("tone_style") or (
+                                        "sweet_foodie" if any(k in comb_txt for k in ("ngọt ngào", "foodie", "ẩm thực", "ăn vặt"))
+                                        else ("chill_story" if any(k in comb_txt for k in ("dịu dàng", "kể chuyện", "gentle")) else "energetic_sale")
+                                    )
+                                    slug_v = cur_entry.get("flow_slug") or _resolve_base_speaker_title(gender_v, "", tone_v, region_v).lower()
+
+                                    out_rel = cur_entry.get("sample_vn_file") or f"voice_samples/{matched_vk}_flow.mp3"
+                                    out_abs = os.path.join(PIPELINE_DIR, out_rel.replace("/", os.sep))
+                                    cur_vid = str(cur_entry.get("voice_id") or "").strip()
+                                    acc_vids = dict(cur_entry.get("account_voice_ids") or {})
+
+                                    need_preview_capture = (
+                                        is_new_manual_voice
+                                        or (download_missing_audio and not os.path.isfile(out_abs))
+                                        or (len(cur_vid) != 36 and prof_name not in acc_vids)
+                                    )
+                                    got_vid = acc_vids.get(prof_name) or (cur_vid if len(cur_vid) == 36 else "")
+
+                                    if need_preview_capture:
+                                        audio_captured.clear()
+                                        prev_btn = pg.locator(".cdk-overlay-container button:has-text('Xem trước')").first
+                                        if prev_btn.count() > 0:
+                                            prev_btn.click(force=True, timeout=5000)
+                                            for _ in range(18):
+                                                pg.wait_for_timeout(700)
+                                                if audio_captured:
+                                                    cap_vid, _, cap_bytes = audio_captured[-1]
+                                                    if cap_vid:
+                                                        got_vid = cap_vid
+                                                    with open(out_abs, "wb") as f_mp3:
+                                                        f_mp3.write(cap_bytes)
+                                                    break
+
+                                    if got_vid:
+                                        acc_vids[prof_name] = got_vid
+                                    eff_vid = cur_vid if (matched_vk in ("nv1", "nv2") and len(cur_vid) == 36) else (got_vid or cur_vid or slug_v)
+
+                                    cur_entry.update({
+                                        "key": matched_vk,
+                                        "name": cur_entry.get("name") or full_name,
+                                        "voice_id": eff_vid,
+                                        "flow_slug": slug_v,
+                                        "gender": gender_v,
+                                        "region": region_v,
+                                        "region_label": "Miền Nam (Sài Gòn)" if region_v == "south" else ("Miền Trung (Huế / Đà Nẵng)" if region_v == "central" else "Miền Bắc (Hà Nội)"),
+                                        "tone_style": tone_v,
+                                        "tone_label": cur_entry.get("tone_label") or ("🔥 Năng lượng cao • Chốt Sale" if tone_v == "energetic_sale" else ("🍯 Ngọt ngào • Review Ẩm Thực" if tone_v == "sweet_foodie" else "🛡️ Uy tín • Tư vấn")),
+                                        "speed_wpm": cur_entry.get("speed_wpm") or "44-48 từ / 10s (Tốc độ Nhanh)",
+                                        "sample_url": cur_entry.get("sample_url") or f"https://www.gstatic.com/aitestkitchen/voices/samples/{slug_v.capitalize()}.wav",
+                                        "sample_vn_file": out_rel,
+                                        "sample_dialogue_vn": sample_dlg or cur_entry.get("sample_dialogue_vn") or COMMON_VN_DIALOGUE_PRESETS[0]["text"],
+                                        "voice_prompt_en": perf_prompt or cur_entry.get("voice_prompt_en") or build_voice_prompt_en(gender_v, region_v, tone_v),
+                                        "dialect_markers_vn": cur_entry.get("dialect_markers_vn") or "các bác ơi, nhé, miễn phí ship, cực kỳ rẻ",
+                                        "recommended_templates": cur_entry.get("recommended_templates") or ["001", "002"],
+                                        "recommended_categories": cur_entry.get("recommended_categories") or ["Đa ngành hàng", "TikTok Affiliate"],
+                                        "description": cur_entry.get("description") or f"Giọng {'Nam' if gender_v == 'male' else 'Nữ'} đồng bộ trực tiếp từ Google Flow ({prof_name}).",
+                                        "flow_synced": True,
+                                        "owner_profile": cur_entry.get("owner_profile") or prof_name,
+                                        "account_voice_ids": acc_vids,
+                                    })
+                                    voices_map[matched_vk] = cur_entry
+                                    if is_new_manual_voice:
+                                        imported_names.append(full_name)
+                                    else:
+                                        updated_names.append(cur_entry["name"])
+                            except Exception as e_acc:
+                                live_sync_errors.append(f"{prof_name}: {str(e_acc)[:120]}")
+                            finally:
+                                try:
+                                    ctx.close()
+                                except Exception:
+                                    pass
+
+                        # Bước 2: Nếu bật `clone_to_all_accounts=True`, nhân bản các giọng Custom sang các tài khoản Google Flow phụ
+                        if clone_to_all and len(accounts_to_scan) > 1:
+                            for sec_acc in accounts_to_scan[1:]:
+                                sec_prof = sec_acc["profile_name"]
+                                sec_proj = sec_acc["project_id"]
+                                cloned_cnt = 0
+                                ctx2 = browser.new_context()
+                                ctx2.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
+                                ctx2.add_cookies(sec_acc["cookies"])
+                                pg2 = ctx2.new_page()
+                                sec_audio = []
+                                pg2.on("response", _make_on_resp(sec_audio))
+                                try:
+                                    pg2.goto(f"https://flow.google.com/project/{sec_proj}", wait_until="domcontentloaded", timeout=40000)
+                                    pg2.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
+                                    pg2.wait_for_function("() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e", timeout=25000)
+                                    pg2.wait_for_timeout(1500)
+                                    pg2.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
+                                    pg2.wait_for_timeout(1200)
+                                    pg2.locator("text=MUSE").first.click(force=True, timeout=6000)
+                                    pg2.wait_for_timeout(1200)
+                                    pg2.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
+                                    pg2.wait_for_timeout(1600)
+
+                                    for vk_c, v_c in voices_map.items():
+                                        if not isinstance(v_c, dict):
+                                            continue
+                                        acc_vids = dict(v_c.get("account_voice_ids") or {})
+                                        if sec_prof in acc_vids and len(str(acc_vids[sec_prof])) == 36:
+                                            continue
+                                        base_sp = _resolve_base_speaker_title(
+                                            v_c.get("gender", "female"),
+                                            v_c.get("flow_slug", ""),
+                                            v_c.get("tone_style", ""),
+                                            v_c.get("region", ""),
+                                        )
+                                        for step in range(16):
+                                            pg2.evaluate(
+                                                """(step) => {
+                                                    const v = document.querySelector('.cdk-overlay-container cdk-virtual-scroll-viewport.asset-list-viewport');
+                                                    if (v) v.scrollTop = step * 200;
+                                                }""",
+                                                step,
+                                            )
+                                            pg2.wait_for_timeout(200)
+                                            sp_l = pg2.locator(f".cdk-overlay-container .asset-item:has-text('{base_sp}')")
+                                            if sp_l.count() > 0:
+                                                sp_l.first.click(force=True)
+                                                pg2.wait_for_timeout(500)
+                                                break
+                                        sec_audio.clear()
+                                        pg2.locator(".cdk-overlay-container textarea.sample-dialogue-input").first.fill(str(v_c.get("sample_dialogue_vn") or "")[:118], force=True)
+                                        pg2.locator(".cdk-overlay-container textarea.performance-input").first.fill(str(v_c.get("voice_prompt_en") or ""), force=True)
+                                        if pg2.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
+                                            pg2.locator(".cdk-overlay-container input.voice-name-input").first.fill(str(v_c.get("name") or vk_c), force=True)
+                                        pg2.wait_for_timeout(400)
+                                        pg2.locator(".cdk-overlay-container button:has-text('Xem trước')").first.click(force=True, timeout=5000)
+                                        for _ in range(22):
+                                            pg2.wait_for_timeout(800)
+                                            if sec_audio:
+                                                new_sec_vid, _, _ = sec_audio[-1]
+                                                if new_sec_vid:
+                                                    acc_vids[sec_prof] = new_sec_vid
+                                                    v_c["account_voice_ids"] = acc_vids
+                                                    cloned_cnt += 1
+                                                break
+                                        save_b = pg2.locator(".cdk-overlay-container button:has-text('Lưu giọng nói mới')").first
+                                        if save_b.count() > 0 and not save_b.is_disabled():
+                                            save_b.click(force=True, timeout=4000)
+                                            pg2.wait_for_timeout(1600)
+                                    cloned_accounts_summary.append(f"{sec_prof} ({cloned_cnt} voice)")
+                                except Exception as e_sec:
+                                    live_sync_errors.append(f"Clone {sec_prof}: {str(e_sec)[:100]}")
+                                finally:
+                                    try:
+                                        ctx2.close()
+                                    except Exception:
+                                        pass
+                    finally:
+                        try:
+                            browser.close()
+                        except Exception:
+                            pass
+
+                cfg_live["custom_voices"] = [
+                    {
+                        "key": k,
+                        "voice_id": v.get("voice_id", ""),
+                        "name": v.get("name", k),
+                        "gender": v.get("gender", "female"),
+                        "region": v.get("region", "north"),
+                        "flow_slug": v.get("flow_slug", ""),
+                        "owner_profile": v.get("owner_profile", "leviettung04"),
+                        "account_voice_ids": v.get("account_voice_ids", {}),
+                        "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+                        "description": v.get("description", ""),
+                    }
+                    for k, v in voices_map.items()
+                    if isinstance(v, dict)
+                ]
+                with open(VOICES_CHARS_PATH, "w", encoding="utf-8") as f:
+                    json.dump(cfg_live, f, ensure_ascii=False, indent=2)
+            except Exception as e_outer:
+                live_sync_errors.append(str(e_outer)[:160])
+
     state = get_character_library_state()
     cfg_voices = state.get("voices", {})
     discovered_uuids = {}
@@ -577,6 +1089,7 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                 "name": v.get("name", vk),
                 "source": "voices_and_characters.json",
                 "key": vk,
+                "account_voice_ids": v.get("account_voice_ids", {}),
             }
 
     if os.path.isdir(PROJECTS_DIR):
@@ -599,10 +1112,23 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                     pass
 
     state["discovered_flow_voices"] = list(discovered_uuids.values())
+    state["imported_new_voices"] = imported_names
+    state["updated_voices"] = updated_names
+    state["cloned_accounts_summary"] = cloned_accounts_summary
+    state["live_sync_errors"] = live_sync_errors
+
+    extra_parts = []
+    if imported_names:
+        extra_parts.append(f"vừa nhập mới {len(imported_names)} giọng tạo thủ công từ Google Flow ({', '.join(imported_names[:4])})")
+    if updated_names:
+        extra_parts.append(f"cập nhật/xác minh {len(updated_names)} giọng Custom trên Google Flow")
+    if cloned_accounts_summary:
+        extra_parts.append(f"nhân bản đa tài khoản: {', '.join(cloned_accounts_summary)}")
+
     state["scan_message"] = (
-        f"Đã đồng bộ {len(state.get('voices_list', []))} giọng đọc Việt Nam đã Custom trên Google Flow, "
-        f"{len(discovered_uuids)} mã Voice UUID thực tế và "
-        f"{len(BUILTIN_FLOW_VOICES)} giọng gốc Google Flow."
+        f"🔄 Đã đồng bộ {len(state.get('voices_list', []))} giọng đọc Việt Nam trên Google Flow"
+        + (f" — {'; '.join(extra_parts)}" if extra_parts else "")
+        + f"! (Hỗ trợ ánh xạ UUID tự động theo từng tài khoản trong account_voice_ids)."
     )
     return state
 
@@ -610,10 +1136,10 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
 def preview_vietnamese_voice(payload: dict) -> dict:
     """
     Nghe thử Giọng Đọc bằng Tiếng Việt với các lời thoại Affiliate hay dùng:
-      1. Nếu là giọng đã Custom trên Google Flow và chưa đổi lời thoại khác mặc định -> phát ngay file `.mp3` thực tế từ Google Flow (`voice_samples/<key>_flow.mp3`).
-      2. Nếu người dùng chọn lời thoại Tiếng Việt bất kỳ trong 7 lời thoại mẫu hoặc tự gõ lời thoại mới:
-         - Kiểm tra xem đã có lời thoại trùng với 1 trong 8 file Google Flow `.mp3` có sẵn chưa (ưu tiên chất lượng Gemini TTS của Google Flow).
-         - Hoặc tổng hợp nhanh file `.mp3` Tiếng Việt qua `gTTS` + `ffmpeg` tinh chỉnh tốc độ/cao độ theo Nam/Nữ/Vùng miền để nghe thử tức thì.
+      1. Ưu tiên tuyệt đối phát file âm thanh thực tế từ Google Flow (`models/gemini-v4s-tts-flow`, `voice_samples/<key>_flow.mp3`)
+         đúng giới tính Nam/Nữ và vùng miền của giọng đọc để tránh lỗi `gTTS` luôn đọc bằng giọng Nữ Google Translate.
+      2. Nếu người dùng chọn lời thoại Tiếng Việt trùng với 1 trong các giọng Google Flow đã tải sẵn cùng giới tính -> phát ngay bản Google Flow đó.
+      3. Nếu giọng đọc hiện tại đã có file Google Flow thực tế (`sample_vn_abs`) -> phát trực tiếp bản thu Google Flow chuẩn của giọng đó.
     """
     ensure_dirs_and_default_sheet()
     state = get_character_library_state()
@@ -622,7 +1148,6 @@ def preview_vietnamese_voice(payload: dict) -> dict:
     vkey = (payload.get("voice_key") or "").strip()
     flow_slug = (payload.get("flow_slug") or "").strip().lower()
     sample_text_vn = (payload.get("sample_text_vn") or payload.get("dialogue_vn") or "").strip()
-    prefer_flow_file = bool(payload.get("prefer_flow_file", False)) and not bool(payload.get("force_regenerate", False))
 
     v_obj = next((x for x in voices_list if x["key"] == vkey), None)
     gender = (payload.get("gender") or (v_obj or {}).get("gender") or "female").lower()
@@ -635,104 +1160,191 @@ def preview_vietnamese_voice(payload: dict) -> dict:
 
     import urllib.parse as _urlparse
 
-    # 1. Nếu bấm nghe thử trực tiếp giọng Custom đã có sẵn file từ Google Flow (hoặc câu thoại trùng khớp)
-    if v_obj and v_obj.get("sample_vn_abs") and os.path.isfile(v_obj["sample_vn_abs"]):
-        saved_dlg = (v_obj.get("sample_dialogue_vn") or "").strip()
-        if prefer_flow_file or not sample_text_vn or sample_text_vn[:60] == saved_dlg[:60]:
-            abs_p = v_obj["sample_vn_abs"]
-            return {
-                "ok": True,
-                "source": "Google Flow (gemini-v4s-tts-flow)",
-                "voice_key": vkey,
-                "voice_label": voice_label,
-                "sample_text_vn": saved_dlg or sample_text_vn,
-                "dialogue_vn": saved_dlg or sample_text_vn,
-                "audio_path": abs_p,
-                "audio_url": f"/api/media?path={_urlparse.quote(abs_p)}",
-            }
-
-    # 2. Nếu câu thoại người dùng chọn trùng với 1 trong 8 file Google Flow `.mp3` đã tải sẵn và cùng giới tính -> ưu tiên dùng bản Google Flow chuẩn
-    for cand_v in voices_list:
-        c_abs = cand_v.get("sample_vn_abs")
-        c_dlg = (cand_v.get("sample_dialogue_vn") or "").strip()
-        if c_abs and os.path.isfile(c_abs) and cand_v.get("gender") == gender and sample_text_vn[:55] == c_dlg[:55]:
-            return {
-                "ok": True,
-                "source": f"Google Flow ({cand_v.get('name')})",
-                "voice_key": vkey or cand_v["key"],
-                "voice_label": voice_label,
-                "sample_text_vn": sample_text_vn,
-                "dialogue_vn": sample_text_vn,
-                "audio_path": c_abs,
-                "audio_url": f"/api/media?path={_urlparse.quote(c_abs)}",
-            }
-
-    # 3. Sinh nhanh file preview Tiếng Việt cho câu thoại tuỳ ý bằng gTTS + ffmpeg chỉnh tốc độ/pitch theo Nam/Nữ/Năng lượng
-    import hashlib
-    import subprocess
-    h = hashlib.md5(f"{gender}|{region}|{tone_style}|{sample_text_vn}".encode("utf-8")).hexdigest()[:12]
-    out_mp3 = os.path.join(VOICE_SAMPLES_DIR, f"preview_{h}.mp3")
-    if not os.path.isfile(out_mp3):
-        raw_mp3 = os.path.join(VOICE_SAMPLES_DIR, f"_raw_{h}.mp3")
-        try:
-            from gtts import gTTS
-            tts = gTTS(text=sample_text_vn, lang="vi", slow=False)
-            tts.save(raw_mp3)
-            # Tinh chỉnh pitch & tốc độ bằng ffmpeg để phân biệt Nam/Nữ và Năng lượng
-            if gender == "male":
-                af_filter = "asetrate=24000*0.84,aresample=24000,atempo=1.28"
-            elif tone_style == "energetic_sale":
-                af_filter = "asetrate=24000*1.05,aresample=24000,atempo=1.22"
-            elif tone_style == "chill_story":
-                af_filter = "asetrate=24000*0.98,aresample=24000,atempo=1.10"
-            else:
-                af_filter = "asetrate=24000*1.02,aresample=24000,atempo=1.16"
-            subprocess.run(
-                ["ffmpeg", "-y", "-i", raw_mp3, "-af", af_filter, out_mp3],
-                stdout=subprocess.DEVNULL,
-                stderr=subprocess.DEVNULL,
-                timeout=15,
-            )
-            if not os.path.isfile(out_mp3) and os.path.isfile(raw_mp3):
-                shutil.copy2(raw_mp3, out_mp3)
-        except Exception as e:
-            # Fallback về file âm thanh Tiếng Việt Google Flow có sẵn cùng giới tính/vùng miền
-            fallback_v = v_obj or next((x for x in voices_list if x.get("gender") == gender and x.get("sample_vn_abs")), None)
-            if fallback_v and fallback_v.get("sample_vn_abs") and os.path.isfile(fallback_v["sample_vn_abs"]):
-                fb_abs = fallback_v["sample_vn_abs"]
+    # 1. Nếu câu thoại người dùng chọn trùng với 1 trong các file Google Flow `.mp3` đã tải sẵn và CÙNG GIỚI TÍNH -> phát ngay bản Google Flow đó
+    if sample_text_vn:
+        for cand_v in voices_list:
+            c_abs = cand_v.get("sample_vn_abs")
+            c_dlg = (cand_v.get("sample_dialogue_vn") or "").strip()
+            if c_abs and os.path.isfile(c_abs) and cand_v.get("gender") == gender and c_dlg and sample_text_vn[:45] == c_dlg[:45]:
                 return {
                     "ok": True,
-                    "source": f"Google Flow ({fallback_v.get('name')})",
-                    "voice_key": vkey,
+                    "source": f"Google Flow ({cand_v.get('name')})",
+                    "voice_key": vkey or cand_v["key"],
                     "voice_label": voice_label,
-                    "sample_text_vn": fallback_v.get("sample_dialogue_vn") or sample_text_vn,
-                    "dialogue_vn": fallback_v.get("sample_dialogue_vn") or sample_text_vn,
-                    "audio_path": fb_abs,
-                    "audio_url": f"/api/media?path={_urlparse.quote(fb_abs)}",
+                    "sample_text_vn": c_dlg,
+                    "dialogue_vn": c_dlg,
+                    "audio_path": c_abs,
+                    "audio_url": f"/api/media?path={_urlparse.quote(c_abs)}",
                 }
-            return {"ok": False, "error": f"Không tạo được bản nghe thử Tiếng Việt: {e}"}
-        finally:
-            if os.path.isfile(raw_mp3):
-                try:
-                    os.remove(raw_mp3)
-                except Exception:
-                    pass
 
-    return {
-        "ok": True,
-        "source": "Tự động tổng hợp Tiếng Việt (Instant Preview)",
-        "voice_key": vkey,
-        "voice_label": voice_label,
-        "sample_text_vn": sample_text_vn,
-        "dialogue_vn": sample_text_vn,
-        "audio_path": out_mp3,
-        "audio_url": f"/api/media?path={_urlparse.quote(out_mp3)}",
+    # 2. Nếu giọng đọc hiện tại (`v_obj`) có sẵn file âm thanh Google Flow thực tế (`sample_vn_abs`) và đúng giới tính -> phát luôn bản Google Flow chuẩn của giọng này
+    if v_obj and v_obj.get("sample_vn_abs") and os.path.isfile(v_obj["sample_vn_abs"]) and v_obj.get("gender") == gender:
+        abs_p = v_obj["sample_vn_abs"]
+        saved_dlg = (v_obj.get("sample_dialogue_vn") or "").strip()
+        return {
+            "ok": True,
+            "source": "Google Flow (gemini-v4s-tts-flow)",
+            "voice_key": vkey,
+            "voice_label": voice_label,
+            "sample_text_vn": saved_dlg or sample_text_vn,
+            "dialogue_vn": saved_dlg or sample_text_vn,
+            "audio_path": abs_p,
+            "audio_url": f"/api/media?path={_urlparse.quote(abs_p)}",
+        }
+
+    # 3. Nếu đang tạo giọng mới trong Modal hoặc đổi giới tính Nam/Nữ sang giọng khác -> chọn file Google Flow `.mp3` chuẩn cùng giới tính + vùng miền / slug
+    same_gender_voices = [
+        x for x in voices_list
+        if x.get("gender") == gender and x.get("sample_vn_abs") and os.path.isfile(x["sample_vn_abs"])
+    ]
+    if same_gender_voices:
+        best_match = (
+            next((x for x in same_gender_voices if x.get("flow_slug") == flow_slug), None)
+            or next((x for x in same_gender_voices if x.get("region") == region and x.get("tone_style") == tone_style), None)
+            or next((x for x in same_gender_voices if x.get("region") == region), None)
+            or same_gender_voices[0]
+        )
+        fb_abs = best_match["sample_vn_abs"]
+        fb_dlg = best_match.get("sample_dialogue_vn") or sample_text_vn
+        return {
+            "ok": True,
+            "source": f"Google Flow ({best_match.get('name')})",
+            "voice_key": vkey or best_match["key"],
+            "voice_label": voice_label,
+            "sample_text_vn": fb_dlg,
+            "dialogue_vn": fb_dlg,
+            "audio_path": fb_abs,
+            "audio_url": f"/api/media?path={_urlparse.quote(fb_abs)}",
+        }
+
+    return {"ok": False, "error": "Chưa có file mẫu âm thanh Google Flow cho giới tính này. Hãy bấm 'Tự Custom Lên Google Flow & Lấy Về Kho' để tổng hợp giọng mới!"}
+
+
+def _load_clean_flow_cookies(profile_name: str = "") -> list:
+    """
+    Đọc cookies phiên Google Flow từ `cookies/<profile_name>.json` hoặc tài khoản đang active
+    mà KHÔNG mở `launch_persistent_context` trên thư mục profile đang mở (tránh lỗi Target page, context or browser has been closed).
+    """
+    scripts_dir = os.path.join(PIPELINE_DIR, "scripts")
+    if scripts_dir not in sys.path:
+        sys.path.insert(0, scripts_dir)
+    if WORKSPACE_DIR not in sys.path:
+        sys.path.insert(0, WORKSPACE_DIR)
+
+    prof_clean = str(profile_name or "").strip()
+    cookie_candidates = []
+    if prof_clean:
+        for cand_p in (
+            os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "cookies", f"{prof_clean}.json"),
+            os.path.join(WORKSPACE_DIR, "cookies", f"{prof_clean}.json"),
+        ):
+            if os.path.isfile(cand_p) and cand_p not in cookie_candidates:
+                cookie_candidates.append(cand_p)
+
+    if not prof_clean:
+        for def_p in (
+            os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "cookies", "leviettung04.json"),
+            os.path.join(WORKSPACE_DIR, "cookies", "leviettung04.json"),
+        ):
+            if os.path.isfile(def_p) and def_p not in cookie_candidates:
+                cookie_candidates.append(def_p)
+        try:
+            import run_all_7_videos_mt as mt
+            if getattr(mt, "cookie_file", None) and os.path.isfile(str(mt.cookie_file)):
+                cookie_candidates.append(str(mt.cookie_file))
+        except Exception:
+            pass
+
+        acc_json = os.path.join(WORKSPACE_DIR, "data", "google_flow_accounts.json")
+        if os.path.isfile(acc_json):
+            try:
+                with open(acc_json, "r", encoding="utf-8") as f:
+                    adata = json.load(f)
+                for acc in adata.get("accounts", []):
+                    if acc.get("enabled", True) and acc.get("cookie_file") and os.path.isfile(acc["cookie_file"]):
+                        if acc["cookie_file"] not in cookie_candidates:
+                            cookie_candidates.append(acc["cookie_file"])
+            except Exception:
+                pass
+
+    for cpath in cookie_candidates:
+        try:
+            with open(cpath, "r", encoding="utf-8") as f:
+                raw = json.load(f)
+            cookies = raw.get("cookies", raw) if isinstance(raw, dict) else raw
+            if isinstance(cookies, list) and len(cookies) > 0:
+                clean = [c for c in cookies if isinstance(c, dict) and "GRECAPTCHA" not in str(c.get("name", "")).upper()]
+                if clean:
+                    return clean
+        except Exception:
+            pass
+    return []
+
+
+def _resolve_base_speaker_title(gender: str, flow_slug: str, tone_style: str = "", region: str = "") -> str:
+    """
+    Chọn đúng tên Giọng Gốc (TitleCase) trên Google Flow (`Fenrir`, `Puck`, `Alnilam`, `Sadachbia`, `Orus`, `Achird`, `Zephyr`, `Erinome`, `Leda`...)
+    để `no0P6` truyền đúng `[[BaseSpeakerName, CustomDisplayName]]` xuống `gemini_v4s_tts_flow`.
+    Đảm bảo tuyệt đối giọng Nam không bao giờ bị gán nhầm vào giọng gốc Nữ (`Zephyr`...).
+    """
+    male_speakers = {
+        "fenrir": "Fenrir",
+        "puck": "Puck",
+        "alnilam": "Alnilam",
+        "sadachbia": "Sadachbia",
+        "orus": "Orus",
+        "achird": "Achird",
+        "algenib": "Algenib",
+        "algieba": "Algieba",
+        "charon": "Charon",
+        "enceladus": "Enceladus",
+        "iapetus": "Iapetus",
+        "rasalgethi": "Rasalgethi",
+        "schedar": "Schedar",
+        "umbriel": "Umbriel",
+        "zubenelgenubi": "Zubenelgenubi",
     }
+    female_speakers = {
+        "zephyr": "Zephyr",
+        "erinome": "Erinome",
+        "leda": "Leda",
+        "laomedeia": "Laomedeia",
+        "aoede": "Aoede",
+        "kore": "Kore",
+        "callirrhoe": "Callirrhoe",
+        "autonoe": "Autonoe",
+        "despina": "Despina",
+        "achernar": "Achernar",
+        "gacrux": "Gacrux",
+        "pulcherrima": "Pulcherrima",
+        "sulafat": "Sulafat",
+        "vindemiatrix": "Vindemiatrix",
+    }
+    slug_low = (flow_slug or "").strip().lower()
+    if (gender or "").lower() == "male":
+        if slug_low in male_speakers:
+            return male_speakers[slug_low]
+        if region == "south" or tone_style == "sweet_foodie":
+            return "Puck"
+        if tone_style == "trustworthy_expert":
+            return "Alnilam"
+        if tone_style == "chill_story":
+            return "Orus"
+        return "Fenrir"
+    else:
+        if slug_low in female_speakers:
+            return female_speakers[slug_low]
+        if tone_style == "sweet_foodie":
+            return "Leda"
+        if tone_style == "chill_story":
+            return "Aoede"
+        return "Zephyr"
 
 
 def create_custom_voice_on_flow(payload: dict) -> dict:
     """
-    Tự động mở Google Flow (`flow.google.com/project/<project_id>`), điền:
+    Tự động mở Google Flow (`flow.google.com/project/<project_id>`) bằng phiên Cookie độc lập (không khóa Chrome profile đang mở),
+    chọn đúng Giọng Gốc Nam/Nữ (`Fenrir`, `Puck`, `Alnilam`, `Sadachbia`, `Zephyr`...), điền:
       - Lời thoại mẫu Tiếng Việt (`textarea.sample-dialogue-input`, tối đa 120 ký tự)
       - Chỉ dẫn đặc điểm giọng đọc (`textarea.performance-input` — `voice_prompt_en`)
       - Tên hiển thị giọng đọc (`input.voice-name-input`)
@@ -741,7 +1353,6 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
     bấm `Lưu giọng nói mới` trên Google Flow và cập nhật vào `voices_and_characters.json`.
     """
     ensure_dirs_and_default_sheet()
-    # Lưu cấu hình cơ bản trước
     save_voice_profile(payload)
     state = get_character_library_state()
 
@@ -751,10 +1362,22 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
     if not v_obj:
         return {"ok": False, "error": f"Không tìm thấy cấu hình giọng đọc #{vkey}"}
 
+    gender = (payload.get("gender") or v_obj.get("gender") or "female").lower()
+    region = (payload.get("region") or v_obj.get("region") or "north").lower()
+    tone_style = (payload.get("tone_style") or v_obj.get("tone_style") or "energetic_sale").lower()
+    flow_slug = (payload.get("flow_slug") or v_obj.get("flow_slug") or "").strip().lower()
+    base_speaker = _resolve_base_speaker_title(gender, flow_slug, tone_style, region)
+
     v_name = v_obj.get("name") or f"Custom Voice {vkey}"
     v_prompt_en = (payload.get("voice_prompt_en") or v_obj.get("voice_prompt_en") or "").strip()
-    if v_obj.get("gender") == "male" and "male" not in v_prompt_en.lower():
-        v_prompt_en = f"Adult male baritone voice, {v_prompt_en}. Strictly male resonance."
+    if not v_prompt_en or len(v_prompt_en) < 120:
+        v_prompt_en = build_voice_prompt_en(gender, region, tone_style, v_obj.get("speed_wpm", ""))
+    elif gender == "male" and "no female resonance" not in v_prompt_en.lower():
+        v_prompt_en = (
+            f"Vietnamese male commercial presenter, young adult masculine baritone-tenor voice, {v_prompt_en}. "
+            "Keep the same male voice, masculine pitch, accent, loudness, speaking speed and emotional style across every clip. "
+            "No female resonance, no high-pitched female voice, no robotic delivery."
+        )
 
     sample_vn = (payload.get("sample_dialogue_vn") or v_obj.get("sample_dialogue_vn") or COMMON_VN_DIALOGUE_PRESETS[0]["text"]).strip()
     sample_vn_118 = sample_vn[:118]
@@ -764,19 +1387,27 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
         scripts_dir = os.path.join(PIPELINE_DIR, "scripts")
         if scripts_dir not in sys.path:
             sys.path.insert(0, scripts_dir)
+        if WORKSPACE_DIR not in sys.path:
+            sys.path.insert(0, WORKSPACE_DIR)
         import re as _re
-        import run_all_7_videos_mt as mt
+        import grok_video_tool as gvt
         from playwright.sync_api import sync_playwright
+
+        clean_cookies = _load_clean_flow_cookies()
+        if not clean_cookies:
+            return {"ok": False, "error": "Chưa tìm thấy Cookie phiên đăng nhập Google Flow. Hãy mở tab Tài Khoản & Flow để đăng nhập hoặc lấy Cookie!"}
 
         audio_captured = []
         with sync_playwright() as pw:
-            p_ctx = pw.chromium.launch_persistent_context(
-                str(mt.profile_dir),
+            browser = pw.chromium.launch(
                 channel="chrome",
                 headless=False,
                 args=["--disable-blink-features=AutomationControlled", "--window-position=-2000,-2000", "--window-size=1280,800"],
             )
-            pg = p_ctx.pages[0] if p_ctx.pages else p_ctx.new_page()
+            ctx = browser.new_context()
+            ctx.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
+            ctx.add_cookies(clean_cookies)
+            pg = ctx.new_page()
 
             def on_resp(r):
                 if "flow-content.google/audio/" in r.url and r.status == 200:
@@ -791,23 +1422,44 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
 
             pg.on("response", on_resp)
             pg.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=45000)
-            pg.wait_for_timeout(4200)
-
-            pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(timeout=6000)
-            pg.wait_for_timeout(1400)
-            pg.locator("text=MUSE Nhân vật 1").first.click(timeout=6000)
-            pg.wait_for_timeout(1400)
-            pg.locator(".voice-card-start-btn").first.click(timeout=6000)
+            pg.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
+            pg.wait_for_function(
+                "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise",
+                timeout=35000,
+            )
             pg.wait_for_timeout(1800)
 
+            pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
+            pg.wait_for_timeout(1400)
+            pg.locator("text=MUSE Nhân vật 1").first.click(force=True, timeout=6000)
+            pg.wait_for_timeout(1400)
+            pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
+            pg.wait_for_timeout(1800)
+
+            # Cuộn danh sách giọng đọc trong `.cdk-overlay-container` để chọn đúng Giọng Gốc (`Fenrir`, `Puck`, `Alnilam`, `Zephyr`...)
+            for step in range(16):
+                pg.evaluate(
+                    """(step) => {
+                        const v = document.querySelector('.cdk-overlay-container cdk-virtual-scroll-viewport.asset-list-viewport');
+                        if (v) v.scrollTop = step * 200;
+                    }""",
+                    step,
+                )
+                pg.wait_for_timeout(250)
+                sp_loc = pg.locator(f".cdk-overlay-container .asset-item:has-text('{base_speaker}')")
+                if sp_loc.count() > 0:
+                    sp_loc.first.click(force=True)
+                    pg.wait_for_timeout(700)
+                    break
+
             audio_captured.clear()
-            pg.locator("textarea.sample-dialogue-input").first.fill(sample_vn_118)
-            pg.locator("textarea.performance-input").first.fill(v_prompt_en)
-            if pg.locator("input.voice-name-input").count() > 0:
-                pg.locator("input.voice-name-input").first.fill(v_name)
+            pg.locator(".cdk-overlay-container textarea.sample-dialogue-input").first.fill(sample_vn_118, force=True)
+            pg.locator(".cdk-overlay-container textarea.performance-input").first.fill(v_prompt_en, force=True)
+            if pg.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
+                pg.locator(".cdk-overlay-container input.voice-name-input").first.fill(v_name, force=True)
             pg.wait_for_timeout(600)
 
-            pg.locator(".cdk-overlay-container button:has-text('Xem trước')").first.click(timeout=6000)
+            pg.locator(".cdk-overlay-container button:has-text('Xem trước')").first.click(force=True, timeout=6000)
             got_vid = ""
             out_rel = f"voice_samples/{vkey}_flow.mp3"
             out_abs = os.path.join(PIPELINE_DIR, out_rel.replace("/", os.sep))
@@ -821,14 +1473,16 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
                     break
 
             if got_vid:
-                if pg.locator("input.voice-name-input").count() > 0:
-                    pg.locator("input.voice-name-input").first.fill(v_name)
+                if pg.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
+                    pg.locator(".cdk-overlay-container input.voice-name-input").first.fill(v_name, force=True)
+                    pg.wait_for_timeout(300)
                 save_btn = pg.locator(".cdk-overlay-container button:has-text('Lưu giọng nói mới')").first
                 if save_btn.count() > 0 and not save_btn.is_disabled():
-                    save_btn.click(timeout=5000)
+                    save_btn.click(force=True, timeout=5000)
                     pg.wait_for_timeout(2500)
 
-            p_ctx.close()
+            ctx.close()
+            browser.close()
 
         if not got_vid or not os.path.isfile(out_abs):
             return {
@@ -839,6 +1493,8 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
         # Cập nhật voice_id mới & đường dẫn file âm thanh Tiếng Việt vào voices_and_characters.json
         updated_payload = dict(payload)
         updated_payload["key"] = vkey
+        updated_payload["flow_slug"] = base_speaker.lower()
+        updated_payload["voice_prompt_en"] = v_prompt_en
         if vkey not in ("nv1", "nv2") or payload.get("overwrite_default_uuid"):
             updated_payload["voice_id"] = got_vid
         updated_payload["sample_vn_file"] = out_rel
@@ -847,11 +1503,11 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
         import urllib.parse as _urlparse
         new_state = save_voice_profile(updated_payload)
         new_state["created_voice_id"] = got_vid
-        new_state["created_voice"] = {"key": vkey, "name": v_name, "voice_id": got_vid}
+        new_state["created_voice"] = {"key": vkey, "name": v_name, "voice_id": got_vid, "base_speaker": base_speaker}
         new_state["audio_path"] = out_abs
         new_state["audio_url"] = f"/api/media?path={_urlparse.quote(out_abs)}"
         new_state["sample_dialogue_vn"] = sample_vn_118
-        msg = f"Đã tự động Custom giọng '{v_name}' trên Google Flow (UUID: {got_vid}) và tải mẫu âm thanh Tiếng Việt về máy!"
+        msg = f"Đã tự động Custom giọng '{v_name}' (Giọng gốc: {base_speaker}, UUID: {got_vid}) trên Google Flow và tải mẫu âm thanh Tiếng Việt về máy!"
         new_state["message"] = msg
         new_state["flow_sync_message"] = msg
         return new_state
@@ -1191,19 +1847,13 @@ def generate_character_or_product_image(payload: dict) -> dict:
         project_id = (char_entry or {}).get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
         char_uuid = (char_entry or {}).get("character_id") or "208606a7-a345-48b2-af32-9fd3c37d0c9a"
 
-        with sync_playwright() as pw:
-            p_ctx = pw.chromium.launch_persistent_context(
-                str(mt.profile_dir),
-                channel="chrome",
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--window-position=-2000,-2000", "--window-size=1280,800"],
-            )
-            raw_cookies = p_ctx.cookies(["https://flow.google.com", "https://google.com", "https://www.google.com", "https://accounts.google.com"])
-            p_ctx.close()
-            clean_cookies = [c for c in raw_cookies if "GRECAPTCHA" not in c.get("name", "").upper()]
-            cookie_map = {c["name"]: c["value"] for c in clean_cookies}
-            cookie_hdr = "; ".join(f"{k}={v}" for k, v in cookie_map.items())
+        clean_cookies = _load_clean_flow_cookies()
+        if not clean_cookies:
+            return {"ok": False, "error": "Chưa tìm thấy Cookie phiên đăng nhập Google Flow. Hãy mở tab Tài Khoản & Flow để đăng nhập hoặc lấy Cookie!", "prompt": final_prompt}
+        cookie_map = {c["name"]: c["value"] for c in clean_cookies}
+        cookie_hdr = "; ".join(f"{k}={v}" for k, v in cookie_map.items())
 
+        with sync_playwright() as pw:
             browser = pw.chromium.launch(
                 channel="chrome",
                 headless=False,

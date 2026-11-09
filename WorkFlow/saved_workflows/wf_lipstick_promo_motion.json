@@ -1,0 +1,595 @@
+{
+  "id": "wf_lipstick_promo_motion",
+  "_wf_id": "wf_lipstick_promo_motion",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T08:26:38.000Z",
+  "workflow": {
+    "name": "💄 Quảng Cáo Son Môi Cao Cấp (Ảnh NV + Ảnh Son + Video Ref ➔ Video Mới)",
+    "description": "Workflow AI chuyên dụng để sản xuất video quảng cáo son môi. Hệ thống sẽ tự động bắt chuyển động (motion tracking) khẩu hình, biểu cảm và cử chỉ tay từ một video mẫu bất kỳ, sau đó áp dụng mượt mà lên nhân vật hoặc người mẫu của bạn. Giải pháp tối ưu để làm video marketing mỹ phẩm chân thực, đồng bộ và tiết kiệm thời gian!\n\nA specialized AI workflow for producing lipstick promo videos. It automatically tracks and transfers lip movements, expressions, and hand gestures from any source video seaml",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2
+    },
+    "nodes": [
+      {
+        "node_id": "node_rmj87NEM",
+        "node_type": "image",
+        "node_name": "👤 Ảnh Tham Chiếu Người Mẫu Beauty Gốc (Face Ref)",
+        "pos_x": -143.47570142631,
+        "pos_y": 10.0,
+        "enabled": true,
+        "slug": "image_video",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          }
+        ],
+        "id": "node_rmj87NEM",
+        "label": "👤 Ảnh Tham Chiếu Người Mẫu Beauty Gốc (Face Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "config": {
+          "slug": "image_video",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_eMEsQwCt",
+        "node_type": "generate",
+        "node_name": "🖼️ Google Flow Ảnh 2K — Character Sheet Người Mẫu",
+        "pos_x": 478.68577056694,
+        "pos_y": 431.0,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_eMEsQwCt",
+        "label": "🖼️ Google Flow Ảnh 2K — Character Sheet Người Mẫu",
+        "provider": "flow",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_image_video_generate",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\01_Character_Sheet_4_Outfits_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_kQUNcMj5",
+        "node_type": "image",
+        "node_name": "💄 Ảnh Tham Chiếu Sản Phẩm Son Môi (Product Ref)",
+        "pos_x": -128.21440127417,
+        "pos_y": 756.0,
+        "enabled": true,
+        "slug": "image_video_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg"
+          }
+        ],
+        "id": "node_kQUNcMj5",
+        "label": "💄 Ảnh Tham Chiếu Sản Phẩm Son Môi (Product Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg",
+        "config": {
+          "slug": "image_video_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_alt_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_EGZEzA2o",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Character Sheet Beauty 4 Góc",
+        "pos_x": 452.38570490551,
+        "pos_y": 93.0,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "\"GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.\"",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_EGZEzA2o",
+        "label": "📝 Prompt Tạo Character Sheet Beauty 4 Góc",
+        "config": {
+          "slug": "prompt",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "\"GENERATE A COMPLETE 4-PANEL CHARACTER REFERENCE SHEET\n\nCreate a complete, photorealistic character reference sheet using the provided reference assets. Combine all referenced elements into ONE SINGLE, visually consistent character, presented in a strictly controlled 2×2 studio reference sheet layout.\n\n## 1. INPUT REFERENCE ASSETS\n\n- **CHARACTER ASSET:** [CHARACTER_REFERENCE]\n- **OUTFIT / ACCESSORIES ASSET:** [OUTFIT_ACCESSORY_REFERENCE]\n- **NAIL ASSET (OPTIONAL):** [NAIL_REFERENCE]\n\n### REFERENCE SOURCE PRIORITY\n\nEach asset has a strictly defined purpose:\n\n- **CHARACTER ASSET:** Authoritative source for facial identity, facial structure, hairstyle, hair color, skin tone, body shape, height impression, and anatomical proportions.\n- **OUTFIT / ACCESSORIES ASSET:** Authoritative source for clothing, footwear, handbags, jewelry, accessories, fabric materials, garment construction, and styling.\n- **NAIL ASSET:** Authoritative source for nail shape, length, color, finish, and nail art, if provided.\n\nIntegrate these references into ONE complete character.\n\nNever mix facial identities, invent alternative outfits, or generate different-looking individuals across panels.\n\n---\n\n## 2. STRICT 2×2 LAYOUT LOCK\n\nCreate ONE single image divided into exactly FOUR equally sized rectangular panels arranged in a fixed 2×2 grid.\n\n- Equal panel widths and heights.\n- Perfectly aligned panel boundaries.\n- Thin white or light-gray dividing lines.\n- Clean, minimalist neutral-gray studio background.\n- Identical background color and lighting across all four panels.\n- No additional panels, inset images, or decorative elements.\n\n### PANEL 1 — TOP LEFT: FRONT FACIAL PORTRAIT\n\n- Close-up frontal portrait.\n- Character facing directly or almost directly toward the camera.\n- Clearly display facial identity, facial structure, hairstyle, expression, neck, and upper shoulders.\n- Natural, relaxed, neutral facial expression.\n- Accurate eyes, nose, lips, jawline, skin texture, and hairline.\n- Preserve the exact recognizable identity from the CHARACTER ASSET.\n\n### PANEL 2 — TOP RIGHT: SIDE PROFILE PORTRAIT\n\n- Close-up side-profile portrait of the SAME character.\n- Head turned approximately 90 degrees to the left or right.\n- Clearly display the nose bridge, chin, jawline, forehead, hairstyle, and visible ear.\n- Maintain the same facial structure, hair length, hair color, and skin tone as Panel 1.\n- No facial identity changes or reinterpretation.\n\n### PANEL 3 — BOTTOM LEFT: FRONT FULL-BODY VIEW\n\n- Complete head-to-toe frontal view.\n- Character standing naturally upright.\n- Entire body visible, including hair, footwear, and accessories.\n- Arms resting naturally beside the body or positioned in a very subtle neutral pose.\n- Clearly display the complete outfit, garment fit, silhouette, footwear, and accessories.\n- Handbags and wearable accessories must appear in their correct positions according to the OUTFIT / ACCESSORIES ASSET.\n- Maintain realistic, tall, slender, elongated body proportions.\n\n### PANEL 4 — BOTTOM RIGHT: REAR FULL-BODY VIEW\n\n- Complete head-to-toe rear view.\n- Character facing directly away from the camera.\n- Clearly display the back of the hairstyle, clothing construction, garment silhouette, skirt or pants, footwear, and accessories.\n- Maintain identical body height, proportions, clothing fit, and styling as Panel 3.\n- Any visible shoulder bags, straps, or rear accessories must remain anatomically and spatially consistent.\n- Do not invent decorative back details absent from the reference assets.\n\nAll four panels MUST depict the exact same character.\n\n---\n\n## 3. STRICT CHARACTER IDENTITY LOCK\n\nPreserve the character's recognizable identity from the CHARACTER ASSET with maximum possible accuracy.\n\nMaintain:\n\n- Exact facial structure and facial proportions.\n- Eye shape, nose structure, lips, chin, and jawline.\n- Hairstyle, hair length, hair color, hair texture, and hairline.\n- Skin tone and natural skin characteristics.\n- Body shape, anatomical structure, and proportions.\n- Consistent apparent age and overall appearance.\n\nThe character must look like the SAME individual in every panel, regardless of viewing angle.\n\nDo not beautify, redesign, stylize, age, de-age, or alter the character's identity.\n\n---\n\n## 4. STRICT BODY PROPORTION LOCK\n\nThe female character must maintain tall, slender, naturally elongated proportions across all four panels.\n\nTarget anatomical characteristics:\n\n- Approximately 7.5–8 head-to-body height ratio.\n- Long, naturally proportioned legs, approximately 52–55% of total body height.\n- High natural waist placement.\n- Small, proportional head relative to the body.\n- Slim arms and legs with realistic anatomical structure.\n- Balanced shoulder, waist, and hip proportions.\n- Naturally elongated silhouette without artificial stretching.\n\nPreserve the CHARACTER ASSET's recognizable body shape while maintaining the intended tall, slender appearance.\n\n**STRICT PROPORTION RESTRICTIONS:**\n\n- Do NOT shorten the character.\n- Do NOT shorten the legs.\n- Do NOT enlarge the head.\n- Do NOT widen the waist, torso, hips, or shoulders.\n- Do NOT make the body stockier, heavier, or disproportionate.\n- Do NOT alter body dimensions between the front and rear views.\n- Do NOT create different body proportions across panels.\n\nThe front and rear full-body views must have identical apparent height, body dimensions, and anatomical proportions.\n\n---\n\n## 5. STRICT OUTFIT & ACCESSORY LOCK\n\nUse the OUTFIT / ACCESSORIES ASSET as the ONLY authoritative source for the complete outfit.\n\nPreserve with maximum visual accuracy:\n\n- Exact top, shirt, blouse, jacket, or outerwear design.\n- Exact skirt, pants, shorts, or dress design.\n- Garment silhouette, fit, and proportions.\n- Fabric type, texture, thickness, weave, and drape.\n- Original garment colors and color combinations.\n- Patterns, prints, embroidery, logos, and existing lettering.\n- Collar, neckline, sleeves, cuffs, pockets, and buttons.\n- Seams, stitching, zippers, waistbands, and hemlines.\n- Garment lengths and layering arrangement.\n- Exact footwear design, color, material, and proportions.\n- Handbags, shoulder straps, belts, jewelry, watches, bracelets, eyewear, and other visible accessories.\n- Correct accessory placement and wearing orientation.\n\n**ABSOLUTE OUTFIT RESTRICTIONS:**\n\n- No redesign.\n- No recoloring.\n- No fabric substitution.\n- No silhouette modification.\n- No added or removed garment details.\n- No invented accessories.\n- No altered patterns, logos, or construction elements.\n- No inconsistent outfits between panels.\n\nWhen a garment detail is not visible in the reference, use the simplest physically plausible continuation consistent with the visible design.\n\nDo not invent decorative details or introduce creative styling.\n\n---\n\n## 6. OPTIONAL NAIL DESIGN LOCK\n\nIf a NAIL ASSET is provided, reproduce the nail design accurately.\n\nPreserve:\n\n- Exact nail shape.\n- Exact nail length.\n- Original nail colors.\n- Nail art, patterns, and decorations.\n- Glossy, matte, or other surface finish.\n- Consistent design across both hands wherever visible.\n\nApply the nail design naturally to the character's hands with realistic anatomy and correct scale.\n\nIf nails are partially visible, maintain consistency with the NAIL ASSET.\n\nIf NO NAIL ASSET is provided, use clean, short, natural-looking nails without prominent nail polish or decoration.\n\n---\n\n## 7. STUDIO BACKGROUND LOCK\n\nUse a clean, seamless, neutral-gray studio background across all four panels.\n\n- Uniform neutral-gray color.\n- Minimalist professional reference-sheet environment.\n- No furniture.\n- No props unrelated to the outfit.\n- No outdoor scenery.\n- No additional characters.\n- No background decorations.\n- No text, captions, labels, or watermarks.\n- No added logos or branding.\n\nOnly logos or printed text already present on the referenced clothing or accessories may remain.\n\n---\n\n## 8. POSE & PRESENTATION LOCK\n\nUse standardized character reference-sheet poses rather than fashion editorial poses.\n\n- Neutral standing posture.\n- Relaxed shoulders.\n- Natural arm placement.\n- Balanced body weight.\n- Minimal gestures.\n- No exaggerated posing.\n- No walking, dancing, or complex actions.\n- No dynamic camera angles.\n\nThe purpose is to document the character's appearance and outfit accurately, not to create a fashion campaign photograph.\n\n---\n\n## 9. CAMERA & FRAMING LOCK\n\nUse a professional studio reference-sheet camera setup.\n\n**For the two portrait panels:**\n\n- Consistent portrait framing and subject scale.\n- Eye-level camera placement.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Accurate facial geometry without perspective distortion.\n- Clear visibility of the head, hairstyle, neck, and upper shoulders.\n\n**For the two full-body panels:**\n\n- Camera positioned approximately at waist-to-hip height.\n- Natural 70–85mm full-frame equivalent lens perspective.\n- Sufficient camera distance to preserve natural body proportions.\n- Camera kept level without excessive upward or downward tilt.\n- Entire body visible from the top of the head to the bottom of the shoes.\n- Identical camera distance, apparent subject scale, and framing for front and rear views.\n- Consistent head and foot alignment across both bottom panels.\n- Adequate margin around the silhouette.\n- No cropped hair, hands, accessories, or footwear.\n\nMaintain a clean, orthographic-like reference-sheet appearance while preserving realistic photographic perspective.\n\nAvoid wide-angle distortion, high-angle views, exaggerated foreshortening, and artificial body stretching.\n\n---\n\n## 10. LIGHTING LOCK\n\nUse soft, even, professional studio lighting.\n\n- Diffused frontal and ambient illumination.\n- Neutral white balance.\n- Accurate skin tone reproduction.\n- Faithful garment and accessory colors.\n- Soft, natural contact shadows.\n- Balanced exposure.\n- Consistent lighting across all four panels.\n- Clear visibility of fabric textures and construction details.\n\nNo dramatic lighting, cinematic color grading, harsh contrast, colored light effects, or heavy shadows.\n\n---\n\n## 11. IMAGE QUALITY & CONSISTENCY\n\nGenerate a photorealistic, ultra-clean, high-resolution character reference sheet.\n\nPrioritize:\n\n- Highly recognizable facial identity.\n- Realistic skin texture.\n- Detailed individual hair strands.\n- Accurate anatomical proportions.\n- Realistic hands and fingers.\n- High-fidelity fabric textures and folds.\n- Precise garment construction.\n- Detailed footwear and accessories.\n- Consistent color reproduction.\n- Sharp, clean studio photography.\n\nAvoid:\n\n- Facial identity drift.\n- Different-looking characters between panels.\n- Inconsistent body proportions.\n- Clothing changes.\n- Missing or duplicated accessories.\n- Distorted anatomy.\n- Extra fingers or limbs.\n- Incorrect garment details.\n- Inconsistent lighting or camera perspective.\n- Cropped body parts.\n- Unnecessary creative interpretation.\n\n---\n\n## 12. ABSOLUTE FINAL PRIORITY\n\nFollow this strict priority hierarchy:\n\n1. **CHARACTER IDENTITY:** Preserve the exact recognizable character from the CHARACTER ASSET.\n2. **OUTFIT & ACCESSORIES:** Reproduce the outfit and accessories from the OUTFIT / ACCESSORIES ASSET with maximum fidelity.\n3. **NAIL DESIGN:** Preserve the NAIL ASSET accurately if provided.\n4. **FIXED LAYOUT:** Exactly four equally sized panels in a 2×2 grid.\n5. **CHARACTER CONSISTENCY:** The same character, body proportions, hairstyle, outfit, and accessories across all four panels.\n6. **BODY PROPORTIONS:** Tall, slender, elongated, realistic anatomy with consistent front and rear dimensions.\n7. **STUDIO PRESENTATION:** Neutral-gray background, standardized poses, soft lighting, and clean reference-sheet framing.\n8. **NO INVENTION:** Do not add, remove, redesign, recolor, or creatively reinterpret referenced elements.\n\n**FINAL OUTPUT:**\n\nGenerate ONE complete, photorealistic 2×2 character reference sheet containing exactly FOUR panels:\n\nTOP LEFT: Front facial close-up.\n\nTOP RIGHT: 90-degree side-profile facial close-up.\n\nBOTTOM LEFT: Full-body front view.\n\nBOTTOM RIGHT: Full-body rear view.\n\nAll four panels must represent ONE identical character wearing ONE identical outfit, faithfully assembled from the provided reference assets.\n\nNo captions, no panel labels, no added text, no watermark, no decorative graphics.\n\nThe final image must function as a reliable master character reference sheet for maintaining character identity, outfit accuracy, and body consistency in subsequent AI image and video generation.\"",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_bHPJVAjL",
+        "node_type": "image",
+        "node_name": "🖼️ Ảnh Tham Chiếu Bối Cảnh Studio (Scene Ref)",
+        "pos_x": 1132.0,
+        "pos_y": 322.0,
+        "enabled": true,
+        "slug": "image_video_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg"
+          }
+        ],
+        "id": "node_bHPJVAjL",
+        "label": "🖼️ Ảnh Tham Chiếu Bối Cảnh Studio (Scene Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+        "config": {
+          "slug": "image_video_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_MAvZio8D",
+        "node_type": "generate",
+        "node_name": "🖼️ Google Flow Ảnh 2K — Người Mẫu Đang Cầm Son Môi",
+        "pos_x": 1579.69,
+        "pos_y": 212.837,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_MAvZio8D",
+        "label": "🖼️ Google Flow Ảnh 2K — Người Mẫu Đang Cầm Son Môi",
+        "provider": "flow",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_image_video_generate_1",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\lipstick_model_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_da1Fxu0d",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Ghép Người Mẫu Cầm Thỏi Son Môi 2K",
+        "pos_x": 1112.69,
+        "pos_y": 11.1633,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Create a premium photorealistic 3D product reference sheet of the lipstick shown in IMAGE_1.\n\nDisplay the EXACT SAME lipstick in 4 consistent views: front view, side view, back view, and 3/4 perspective view, arranged in a clean 2×2 grid.\n\nStrictly preserve the original product's shape, proportions, dimensions, cap design, lipstick casing, colors, materials, surface finish, logo, and every distinctive detail. All four views must represent ONE identical product with accurate 3D geometry.\n\nUltra-realistic product photography, physically accurate PBR materials, realistic reflections, soft professional studio lighting, sharp details, neutral light-gray background, subtle contact shadows, consistent scale and spacing.\n\n100% photorealistic 3D rendering, premium commercial product visualization.\n\nNO sketches, NO illustrations, NO wireframes, NO technical drawings, NO labels, NO captions, NO added text, NO watermarks, NO decorative elements, NO invented details, NO product redesign.\n\nPreserve existing branding on the product itself exactly as shown in IMAGE_1.\n\nOutput: High-resolution 16:9 product sheet.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_da1Fxu0d",
+        "label": "📝 Prompt Ghép Người Mẫu Cầm Thỏi Son Môi 2K",
+        "config": {
+          "slug": "prompt_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "Create a premium photorealistic 3D product reference sheet of the lipstick shown in IMAGE_1.\n\nDisplay the EXACT SAME lipstick in 4 consistent views: front view, side view, back view, and 3/4 perspective view, arranged in a clean 2×2 grid.\n\nStrictly preserve the original product's shape, proportions, dimensions, cap design, lipstick casing, colors, materials, surface finish, logo, and every distinctive detail. All four views must represent ONE identical product with accurate 3D geometry.\n\nUltra-realistic product photography, physically accurate PBR materials, realistic reflections, soft professional studio lighting, sharp details, neutral light-gray background, subtle contact shadows, consistent scale and spacing.\n\n100% photorealistic 3D rendering, premium commercial product visualization.\n\nNO sketches, NO illustrations, NO wireframes, NO technical drawings, NO labels, NO captions, NO added text, NO watermarks, NO decorative elements, NO invented details, NO product redesign.\n\nPreserve existing branding on the product itself exactly as shown in IMAGE_1.\n\nOutput: High-resolution 16:9 product sheet.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_8iTCxpKa",
+        "node_type": "video",
+        "node_name": "📹 Video Tham Chiếu Chuyển Động Gốc (Motion Ref 8s)",
+        "pos_x": 1130.69,
+        "pos_y": 955.0,
+        "enabled": true,
+        "slug": "image_video_4",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          }
+        ],
+        "id": "node_8iTCxpKa",
+        "label": "📹 Video Tham Chiếu Chuyển Động Gốc (Motion Ref 8s)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+        "config": {
+          "slug": "image_video_4",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\fashion_motion_projects\\fashion_motion_demo_7anh_2k\\ref_clips\\ref_clip_s1_8s.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_KOJ8ABAr",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video — Kết Quả Quảng Cáo Son Môi Mới (1080p)",
+        "pos_x": 2166.96,
+        "pos_y": 741.896,
+        "enabled": true,
+        "slug": "flow_image_video_generate_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "video_resolution": "720p",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "16:9",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_KOJ8ABAr",
+        "label": "🎬 Google Flow Video — Kết Quả Quảng Cáo Son Môi Mới (1080p)",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_image_video_generate_2",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "16:9",
+          "count": 1,
+          "duration": "10s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_SZCUeKbI",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Chuyển Giao Chuyển Động Sang Người Mẫu Cầm Son",
+        "pos_x": 2160.0,
+        "pos_y": 413.62336809592,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "TASK: STRICT CHARACTER AND LIPSTICK PRODUCT REPLACEMENT WITH EXACT REFERENCE-VIDEO MOTION TRANSFER\n\nREFERENCE INPUTS\n\nIMAGE_1 = Authoritative replacement model reference.\nIMAGE_2 = Authoritative lipstick product sheet.\nVIDEO_1 = Original reference video and absolute source of motion, choreography, camera, environment, product animation, and timing.\n\nPRIMARY OBJECTIVE\n\nReproduce VIDEO_1 as faithfully as possible while performing exactly TWO visual replacements:\n\n1. Replace the original female model with the model from IMAGE_1.\n2. Completely replace the original lipstick product with the exact lipstick from IMAGE_2.\n\nPreserve the original actions, hand movements, product handling, floating lipstick animation, camera behavior, background, focus transitions, scene composition, and timing.\n\nThis is a STRICT VISUAL REPLACEMENT AND MOTION TRANSFER task.\n\nIt is NOT a creative video recreation.\n\nREFERENCE PRIORITY\n\nIMAGE_1 CONTROLS ONLY:\nModel facial identity, facial structure, hairstyle, skin tone, body proportions, outfit, clothing materials, colors, accessories, and styling.\n\nIMAGE_2 CONTROLS ONLY:\nLipstick brand appearance, product design, packaging geometry, dimensions, colors, cap structure, lipstick casing, materials, surface finish, logo, typography, and distinctive product details.\n\nVIDEO_1 CONTROLS EVERYTHING ELSE:\nOriginal choreography, facial performance, body movements, hand gestures, product trajectories, rotation, floating animation, camera motion, focus changes, environment, scene transitions, and timing.\n\nCRITICAL PRODUCT REFERENCE RULE:\n\nVIDEO_1 must NEVER be used as a source of lipstick packaging design.\n\nThe original lipstick is a MOTION AND POSITIONAL PLACEHOLDER ONLY.\n\nIts visual identity must be completely replaced by IMAGE_2.\n\nSECTION 1 — STRICT MODEL IDENTITY & OUTFIT LOCK\n\nReplace the original model's appearance with IMAGE_1.\n\nPreserve the exact recognizable facial identity, eyes, nose, mouth, jawline, hairstyle, skin tone, body proportions, and clothing shown in IMAGE_1.\n\nMaintain the exact outfit design, colors, materials, textures, patterns, and accessories.\n\nApply IMAGE_1's appearance directly to the original model performance from VIDEO_1.\n\nDo not generate a new performance.\n\nDo not modify the original expressions, poses, head movements, body orientation, or timing.\n\nMaintain consistent identity during head turns, partial occlusion, changes in perspective, and focus transitions.\n\nDo not beautify, redesign, morph, or restyle the model.\n\nSECTION 2 — ABSOLUTE ORIGINAL MOTION LOCK\n\nVIDEO_1 is the authoritative motion source.\n\nPreserve the original:\n\n- Body posture and seated position.\n- Head orientation and head movements.\n- Shoulder and arm positions.\n- Hand gestures and finger articulation.\n- Wrist rotation.\n- Hand-to-product contact.\n- Product pickup and manipulation.\n- Object release timing.\n- Original movement speed and direction.\n- Facial expression timing.\n- Camera-relative movement.\n- Action sequence and temporal pacing.\n\nReproduce the observed movements from VIDEO_1 as closely as possible.\n\nDo not reinterpret, exaggerate, improve, smooth, or redesign the original choreography.\n\nDo not invent additional gestures, hand movements, poses, or facial expressions.\n\nSECTION 3 — STRICT LIPSTICK PRODUCT IDENTITY OVERRIDE\n\nHIGHEST PRIORITY FOR PRODUCT APPEARANCE.\n\nIMAGE_2 is the ONE AND ONLY authoritative source for lipstick design.\n\nCompletely discard the original lipstick's visual design from VIDEO_1.\n\nReconstruct the replacement lipstick entirely from IMAGE_2.\n\nPreserve the exact:\n\n- Product brand appearance.\n- Packaging silhouette.\n- Tube length and diameter.\n- Cap geometry and opening structure.\n- Lipstick casing design.\n- Product colors and material finishes.\n- Metallic, matte, glossy, or transparent surfaces.\n- Logo placement and orientation.\n- Typography and printed graphics.\n- Decorative elements.\n- Distinctive edges, trims, and product details.\n- Visible lipstick bullet shape and color, if applicable.\n\nTreat all views in IMAGE_2 as references for ONE consistent product.\n\nDo not mix the original lipstick design with IMAGE_2.\n\nDo not preserve the original product's shape, color, cap, trim, or logo unless independently shown in IMAGE_2.\n\nNO PRODUCT HYBRIDIZATION.\nNO DESIGN BLENDING.\nNO GENERIC LIPSTICK.\nNO INVENTED BRANDING.\nNO LOGO REPLACEMENT.\nNO PACKAGING REDESIGN.\n\nThe product must look like IMAGE_2 throughout every visible frame.\n\nSECTION 4 — STRICT PRODUCT GEOMETRY & SCALE LOCK\n\nPreserve IMAGE_2's authentic lipstick geometry, dimensions, and proportions.\n\nDo not stretch, compress, flatten, or distort the replacement product to match the original lipstick silhouette.\n\nVIDEO_1 determines the product's position, orientation, trajectory, and perspective.\n\nIMAGE_2 determines the product's actual shape, size proportions, and visual appearance.\n\nMaintain consistent cap-to-body proportions, casing shape, product thickness, and structural details.\n\nWhen the lipstick rotates, render its newly visible surfaces consistently with IMAGE_2.\n\nDo not reconstruct missing surfaces using the original lipstick from VIDEO_1.\n\nInfer unseen geometry conservatively from the product sheet.\n\nNever generate additional caps, duplicate tubes, extra lipstick bullets, or floating product components unless explicitly present in VIDEO_1.\n\nSECTION 5 — FRAME-ALIGNED PRODUCT HANDLING MOTION\n\nPreserve VIDEO_1's original product handling sequence.\n\nThe model must perform the same actions at the same reference moments.\n\nMaintain the original:\n\n- Hand movement toward the handbag.\n- Product retrieval.\n- Finger grip and contact.\n- Product inspection.\n- Hand positioning.\n- Wrist movement.\n- Product presentation.\n- Product release.\n- Hand position after release.\n\nThe lipstick must remain correctly attached to the model's fingers while being held.\n\nThe product may separate from the hand ONLY when the original VIDEO_1 shows the release or transition into floating motion.\n\nDo not invent an additional opening, closing, twisting, applying, or product demonstration sequence.\n\nDo not make the model apply lipstick to her lips unless this occurs in VIDEO_1.\n\nDo not change the original product handling choreography.\n\nSECTION 6 — CRITICAL FLOATING LIPSTICK MOTION LOCK\n\nHIGHEST MOTION-FIDELITY PRIORITY.\n\nThe original floating lipstick animation from VIDEO_1 must be reproduced as faithfully as possible.\n\nThis is a reference-driven product motion transfer, NOT a newly invented cinematic product reveal.\n\nTrack the original lipstick's:\n\n- Initial release position.\n- Initial orientation.\n- Forward movement.\n- Rotation direction.\n- Rotation speed.\n- Angular orientation.\n- Movement trajectory.\n- Camera-relative depth.\n- Apparent scale changes.\n- Foreground position.\n- Floating duration.\n- Original movement rhythm.\n- Exit trajectory.\n- Final movement toward the seat.\n\nPreserve the original product motion continuously across corresponding frames.\n\nDo not invent additional spins.\n\nDo not reverse the rotation direction.\n\nDo not add unnecessary 360-degree rotations.\n\nDo not change the floating duration.\n\nDo not introduce new product trajectories.\n\nDo not make the product bounce, vibrate, multiply, dissolve, or morph.\n\nDo not transform the product into another object.\n\nThe lipstick must maintain one stable physical identity throughout the animation.\n\nCRITICAL:\n\nOnly the IMAGE_2 lipstick may appear during the floating product sequence.\n\nThe original lipstick's design must never reappear.\n\nSECTION 7 — FOREGROUND PRODUCT & CAMERA FOCUS LOCK\n\nPreserve VIDEO_1's original camera framing, lens perspective, camera-relative product positioning, and focus behavior.\n\nDuring the floating product close-up, maintain the original foreground-background separation.\n\nPreserve the original transition in visual attention from the model to the floating lipstick.\n\nMatch the original shallow depth of field and background defocus.\n\nKeep the lipstick as the dominant foreground subject whenever VIDEO_1 shows it prominently.\n\nDo not create additional camera zooms, tracking shots, dramatic rotations, or newly invented product showcase angles.\n\nDo not change the camera to reveal more product details.\n\nFollow the original product's apparent size, screen position, and depth progression.\n\nMaintain natural perspective and consistent product geometry during the focus transition.\n\nSECTION 8 — PRODUCT LANDING & FINAL INTERACTION LOCK\n\nPreserve the original final sequence in VIDEO_1.\n\nThe replacement lipstick must follow the original trajectory toward the leather car seat.\n\nMaintain the original landing position, orientation, timing, and relationship to the seat surface.\n\nPreserve physically coherent contact, lighting, and shadows.\n\nDo not add bouncing, rolling, sliding, or additional rotation unless visible in VIDEO_1.\n\nPreserve the model's original hand movement toward the product.\n\nMaintain the original finger placement, reach direction, and final interaction timing.\n\nDo not invent an additional pickup, opening action, or product demonstration.\n\nDo not extend the ending beyond the original reference sequence.\n\nSECTION 9 — STRICT ENVIRONMENT & CAMERA LOCK\n\nPreserve VIDEO_1's original luxury car interior.\n\nRetain the original:\n\n- Rear passenger seating arrangement.\n- Leather seat design and stitching.\n- Headrests.\n- Door panels.\n- Windows.\n- Interior lighting.\n- Exterior urban background.\n- Camera viewpoint and framing.\n- Original camera movement.\n- Focus changes.\n- Scene atmosphere.\n\nDo not change the vehicle interior.\n\nDo not replace the background.\n\nDo not add props, people, lighting effects, or environmental objects.\n\nPreserve the original camera motion, shot order, composition, and perspective.\n\nSECTION 10 — ABSOLUTE NO-SPEECH & FACIAL MOTION LOCK\n\nCRITICAL PRIORITY: THE MODEL MUST NOT TALK.\n\nThis is a NON-SPEAKING visual performance.\n\nPreserve only the facial movements and expressions visibly present in VIDEO_1.\n\nDo not generate:\n\n- Dialogue.\n- Talking.\n- Lip-sync.\n- Narration.\n- Singing.\n- Whispering.\n- Speech-like mouth movements.\n- Invented facial reactions.\n- Additional smiles or expressions.\n\nDo not animate the lips as if forming words.\n\nDo not synchronize mouth movements to background music or sound effects.\n\nWhen the original mouth is closed, keep the replacement model's mouth naturally closed.\n\nPreserve only subtle nonverbal mouth movements if explicitly visible in VIDEO_1.\n\nMaintain the original gaze direction, blinking, head orientation, and facial performance.\n\nThe model must remain visually non-speaking throughout the entire video.\n\nSECTION 11 — AUDIO LOCK\n\nPreserve VIDEO_1's original audio track when supported.\n\nDo not generate new speech, voice-over, dialogue, narration, singing, whispering, or vocal sounds.\n\nDo not add new sound effects unless they already exist in VIDEO_1.\n\nIf original audio preservation is unavailable, generate a silent video rather than inventing new audio.\n\nSECTION 12 — STRICT TIMING & EDITING\n\nVIDEO_1 ORIGINAL DURATION = APPROXIMATELY 10.04 SECONDS.\n\nTARGET OUTPUT DURATION = 10 SECONDS.\n\nPreserve the original action sequence, speed, pauses, focus changes, and transition timing.\n\nREFERENCE MOTION PHASES:\n\n0.0–1.5s:\nOriginal seated model motion and product retrieval from handbag.\n\n1.5–3.0s:\nOriginal hand manipulation and product inspection.\n\n3.0–4.7s:\nOriginal product presentation and movement into the floating foreground animation.\n\n4.7–7.5s:\nOriginal floating lipstick trajectory, rotation, foreground position, and focus behavior.\n\n7.5–8.7s:\nOriginal product movement away from the foreground and transition toward the seat.\n\n8.7–10.0s:\nOriginal product landing and final hand interaction.\n\nThese intervals are approximate observational references.\n\nVIDEO_1 remains authoritative for exact event boundaries and movements.\n\nDo not force new motion to fit the approximate timestamps.\n\nDo not insert new scenes, pauses, slow motion, speed ramps, additional transitions, or extra actions.\n\nMaintain the original duration whenever generation settings allow.\n\nSECTION 13 — TEMPORAL CONSISTENCY\n\nMaintain TWO independent appearance locks.\n\nMODEL LOCK:\nIMAGE_1 facial identity, hairstyle, body proportions, outfit, and accessories.\n\nPRODUCT LOCK:\nIMAGE_2 lipstick geometry, colors, materials, packaging, cap, logo, and design details.\n\nPrevent:\n\n- Model identity drift.\n- Outfit changes.\n- Unwanted talking.\n- Speech-like mouth animation.\n- Modified hand choreography.\n- Incorrect finger-product contact.\n- Premature product release.\n- Additional product movement.\n- Incorrect rotation direction.\n- Product shape morphing.\n- Packaging redesign.\n- Logo distortion.\n- Product duplication.\n- Unnatural product scaling.\n- Inconsistent floating trajectory.\n- Incorrect seat contact.\n- Camera changes.\n- Unnecessary transitions.\n- Extended timing.\n- Temporal flickering.\n\nSECTION 14 — OUTPUT\n\nGenerate a high-quality photorealistic live-action video faithfully matching VIDEO_1.\n\nThe ONLY intended visual replacements are:\n\n1. The original model replaced by IMAGE_1.\n2. The original lipstick replaced by IMAGE_2.\n\nPreserve the original performance, product motion, camera behavior, environment, focus transitions, and timing.\n\nThe floating lipstick must maintain the exact IMAGE_2 product identity throughout its movement.\n\nFINAL ABSOLUTE PRIORITY\n\nIMAGE_1 = MODEL APPEARANCE ONLY.\n\nIMAGE_2 = COMPLETE LIPSTICK PRODUCT APPEARANCE AND GEOMETRY ONLY.\n\nVIDEO_1 = ALL MOTION, HAND CHOREOGRAPHY, PRODUCT TRAJECTORY, ROTATION, CAMERA, ENVIRONMENT, FOCUS, AND TIMING.\n\nMANDATORY HARD CONSTRAINTS:\n\n1. Preserve the original model's exact performance from VIDEO_1.\n2. Replace the model's appearance with IMAGE_1.\n3. Replace the original lipstick completely with IMAGE_2.\n4. Never blend the original lipstick design with IMAGE_2.\n5. Preserve the original product release and floating motion.\n6. Preserve the original lipstick rotation direction and timing.\n7. Preserve the original camera focus and foreground depth.\n8. Preserve the original landing and final interaction.\n9. Never generate speech or speech-like mouth movements.\n10. Do not invent new actions, camera movements, or transitions.\n11. Preserve the original approximately 10-second duration.\n\nCHANGE VISUAL IDENTITY, NOT PERFORMANCE.\n\nDO NOT RECREATE THE CHOREOGRAPHY.\nDO NOT REDESIGN THE PRODUCT.\nDO NOT MODIFY THE FLOATING MOTION.\nDO NOT INVENT SPEECH.\nDO NOT CHANGE CAMERA OR TIMING.\n\nThe final result must look like the original VIDEO_1 performed by the IMAGE_1 model, featuring the exact IMAGE_2 lipstick following the original floating product motion and landing sequence.",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": true,
+        "timeout_sec": 60,
+        "id": "node_SZCUeKbI",
+        "label": "📝 Prompt Chuyển Giao Chuyển Động Sang Người Mẫu Cầm Son",
+        "config": {
+          "slug": "prompt_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "TASK: STRICT CHARACTER AND LIPSTICK PRODUCT REPLACEMENT WITH EXACT REFERENCE-VIDEO MOTION TRANSFER\n\nREFERENCE INPUTS\n\nIMAGE_1 = Authoritative replacement model reference.\nIMAGE_2 = Authoritative lipstick product sheet.\nVIDEO_1 = Original reference video and absolute source of motion, choreography, camera, environment, product animation, and timing.\n\nPRIMARY OBJECTIVE\n\nReproduce VIDEO_1 as faithfully as possible while performing exactly TWO visual replacements:\n\n1. Replace the original female model with the model from IMAGE_1.\n2. Completely replace the original lipstick product with the exact lipstick from IMAGE_2.\n\nPreserve the original actions, hand movements, product handling, floating lipstick animation, camera behavior, background, focus transitions, scene composition, and timing.\n\nThis is a STRICT VISUAL REPLACEMENT AND MOTION TRANSFER task.\n\nIt is NOT a creative video recreation.\n\nREFERENCE PRIORITY\n\nIMAGE_1 CONTROLS ONLY:\nModel facial identity, facial structure, hairstyle, skin tone, body proportions, outfit, clothing materials, colors, accessories, and styling.\n\nIMAGE_2 CONTROLS ONLY:\nLipstick brand appearance, product design, packaging geometry, dimensions, colors, cap structure, lipstick casing, materials, surface finish, logo, typography, and distinctive product details.\n\nVIDEO_1 CONTROLS EVERYTHING ELSE:\nOriginal choreography, facial performance, body movements, hand gestures, product trajectories, rotation, floating animation, camera motion, focus changes, environment, scene transitions, and timing.\n\nCRITICAL PRODUCT REFERENCE RULE:\n\nVIDEO_1 must NEVER be used as a source of lipstick packaging design.\n\nThe original lipstick is a MOTION AND POSITIONAL PLACEHOLDER ONLY.\n\nIts visual identity must be completely replaced by IMAGE_2.\n\nSECTION 1 — STRICT MODEL IDENTITY & OUTFIT LOCK\n\nReplace the original model's appearance with IMAGE_1.\n\nPreserve the exact recognizable facial identity, eyes, nose, mouth, jawline, hairstyle, skin tone, body proportions, and clothing shown in IMAGE_1.\n\nMaintain the exact outfit design, colors, materials, textures, patterns, and accessories.\n\nApply IMAGE_1's appearance directly to the original model performance from VIDEO_1.\n\nDo not generate a new performance.\n\nDo not modify the original expressions, poses, head movements, body orientation, or timing.\n\nMaintain consistent identity during head turns, partial occlusion, changes in perspective, and focus transitions.\n\nDo not beautify, redesign, morph, or restyle the model.\n\nSECTION 2 — ABSOLUTE ORIGINAL MOTION LOCK\n\nVIDEO_1 is the authoritative motion source.\n\nPreserve the original:\n\n- Body posture and seated position.\n- Head orientation and head movements.\n- Shoulder and arm positions.\n- Hand gestures and finger articulation.\n- Wrist rotation.\n- Hand-to-product contact.\n- Product pickup and manipulation.\n- Object release timing.\n- Original movement speed and direction.\n- Facial expression timing.\n- Camera-relative movement.\n- Action sequence and temporal pacing.\n\nReproduce the observed movements from VIDEO_1 as closely as possible.\n\nDo not reinterpret, exaggerate, improve, smooth, or redesign the original choreography.\n\nDo not invent additional gestures, hand movements, poses, or facial expressions.\n\nSECTION 3 — STRICT LIPSTICK PRODUCT IDENTITY OVERRIDE\n\nHIGHEST PRIORITY FOR PRODUCT APPEARANCE.\n\nIMAGE_2 is the ONE AND ONLY authoritative source for lipstick design.\n\nCompletely discard the original lipstick's visual design from VIDEO_1.\n\nReconstruct the replacement lipstick entirely from IMAGE_2.\n\nPreserve the exact:\n\n- Product brand appearance.\n- Packaging silhouette.\n- Tube length and diameter.\n- Cap geometry and opening structure.\n- Lipstick casing design.\n- Product colors and material finishes.\n- Metallic, matte, glossy, or transparent surfaces.\n- Logo placement and orientation.\n- Typography and printed graphics.\n- Decorative elements.\n- Distinctive edges, trims, and product details.\n- Visible lipstick bullet shape and color, if applicable.\n\nTreat all views in IMAGE_2 as references for ONE consistent product.\n\nDo not mix the original lipstick design with IMAGE_2.\n\nDo not preserve the original product's shape, color, cap, trim, or logo unless independently shown in IMAGE_2.\n\nNO PRODUCT HYBRIDIZATION.\nNO DESIGN BLENDING.\nNO GENERIC LIPSTICK.\nNO INVENTED BRANDING.\nNO LOGO REPLACEMENT.\nNO PACKAGING REDESIGN.\n\nThe product must look like IMAGE_2 throughout every visible frame.\n\nSECTION 4 — STRICT PRODUCT GEOMETRY & SCALE LOCK\n\nPreserve IMAGE_2's authentic lipstick geometry, dimensions, and proportions.\n\nDo not stretch, compress, flatten, or distort the replacement product to match the original lipstick silhouette.\n\nVIDEO_1 determines the product's position, orientation, trajectory, and perspective.\n\nIMAGE_2 determines the product's actual shape, size proportions, and visual appearance.\n\nMaintain consistent cap-to-body proportions, casing shape, product thickness, and structural details.\n\nWhen the lipstick rotates, render its newly visible surfaces consistently with IMAGE_2.\n\nDo not reconstruct missing surfaces using the original lipstick from VIDEO_1.\n\nInfer unseen geometry conservatively from the product sheet.\n\nNever generate additional caps, duplicate tubes, extra lipstick bullets, or floating product components unless explicitly present in VIDEO_1.\n\nSECTION 5 — FRAME-ALIGNED PRODUCT HANDLING MOTION\n\nPreserve VIDEO_1's original product handling sequence.\n\nThe model must perform the same actions at the same reference moments.\n\nMaintain the original:\n\n- Hand movement toward the handbag.\n- Product retrieval.\n- Finger grip and contact.\n- Product inspection.\n- Hand positioning.\n- Wrist movement.\n- Product presentation.\n- Product release.\n- Hand position after release.\n\nThe lipstick must remain correctly attached to the model's fingers while being held.\n\nThe product may separate from the hand ONLY when the original VIDEO_1 shows the release or transition into floating motion.\n\nDo not invent an additional opening, closing, twisting, applying, or product demonstration sequence.\n\nDo not make the model apply lipstick to her lips unless this occurs in VIDEO_1.\n\nDo not change the original product handling choreography.\n\nSECTION 6 — CRITICAL FLOATING LIPSTICK MOTION LOCK\n\nHIGHEST MOTION-FIDELITY PRIORITY.\n\nThe original floating lipstick animation from VIDEO_1 must be reproduced as faithfully as possible.\n\nThis is a reference-driven product motion transfer, NOT a newly invented cinematic product reveal.\n\nTrack the original lipstick's:\n\n- Initial release position.\n- Initial orientation.\n- Forward movement.\n- Rotation direction.\n- Rotation speed.\n- Angular orientation.\n- Movement trajectory.\n- Camera-relative depth.\n- Apparent scale changes.\n- Foreground position.\n- Floating duration.\n- Original movement rhythm.\n- Exit trajectory.\n- Final movement toward the seat.\n\nPreserve the original product motion continuously across corresponding frames.\n\nDo not invent additional spins.\n\nDo not reverse the rotation direction.\n\nDo not add unnecessary 360-degree rotations.\n\nDo not change the floating duration.\n\nDo not introduce new product trajectories.\n\nDo not make the product bounce, vibrate, multiply, dissolve, or morph.\n\nDo not transform the product into another object.\n\nThe lipstick must maintain one stable physical identity throughout the animation.\n\nCRITICAL:\n\nOnly the IMAGE_2 lipstick may appear during the floating product sequence.\n\nThe original lipstick's design must never reappear.\n\nSECTION 7 — FOREGROUND PRODUCT & CAMERA FOCUS LOCK\n\nPreserve VIDEO_1's original camera framing, lens perspective, camera-relative product positioning, and focus behavior.\n\nDuring the floating product close-up, maintain the original foreground-background separation.\n\nPreserve the original transition in visual attention from the model to the floating lipstick.\n\nMatch the original shallow depth of field and background defocus.\n\nKeep the lipstick as the dominant foreground subject whenever VIDEO_1 shows it prominently.\n\nDo not create additional camera zooms, tracking shots, dramatic rotations, or newly invented product showcase angles.\n\nDo not change the camera to reveal more product details.\n\nFollow the original product's apparent size, screen position, and depth progression.\n\nMaintain natural perspective and consistent product geometry during the focus transition.\n\nSECTION 8 — PRODUCT LANDING & FINAL INTERACTION LOCK\n\nPreserve the original final sequence in VIDEO_1.\n\nThe replacement lipstick must follow the original trajectory toward the leather car seat.\n\nMaintain the original landing position, orientation, timing, and relationship to the seat surface.\n\nPreserve physically coherent contact, lighting, and shadows.\n\nDo not add bouncing, rolling, sliding, or additional rotation unless visible in VIDEO_1.\n\nPreserve the model's original hand movement toward the product.\n\nMaintain the original finger placement, reach direction, and final interaction timing.\n\nDo not invent an additional pickup, opening action, or product demonstration.\n\nDo not extend the ending beyond the original reference sequence.\n\nSECTION 9 — STRICT ENVIRONMENT & CAMERA LOCK\n\nPreserve VIDEO_1's original luxury car interior.\n\nRetain the original:\n\n- Rear passenger seating arrangement.\n- Leather seat design and stitching.\n- Headrests.\n- Door panels.\n- Windows.\n- Interior lighting.\n- Exterior urban background.\n- Camera viewpoint and framing.\n- Original camera movement.\n- Focus changes.\n- Scene atmosphere.\n\nDo not change the vehicle interior.\n\nDo not replace the background.\n\nDo not add props, people, lighting effects, or environmental objects.\n\nPreserve the original camera motion, shot order, composition, and perspective.\n\nSECTION 10 — ABSOLUTE NO-SPEECH & FACIAL MOTION LOCK\n\nCRITICAL PRIORITY: THE MODEL MUST NOT TALK.\n\nThis is a NON-SPEAKING visual performance.\n\nPreserve only the facial movements and expressions visibly present in VIDEO_1.\n\nDo not generate:\n\n- Dialogue.\n- Talking.\n- Lip-sync.\n- Narration.\n- Singing.\n- Whispering.\n- Speech-like mouth movements.\n- Invented facial reactions.\n- Additional smiles or expressions.\n\nDo not animate the lips as if forming words.\n\nDo not synchronize mouth movements to background music or sound effects.\n\nWhen the original mouth is closed, keep the replacement model's mouth naturally closed.\n\nPreserve only subtle nonverbal mouth movements if explicitly visible in VIDEO_1.\n\nMaintain the original gaze direction, blinking, head orientation, and facial performance.\n\nThe model must remain visually non-speaking throughout the entire video.\n\nSECTION 11 — AUDIO LOCK\n\nPreserve VIDEO_1's original audio track when supported.\n\nDo not generate new speech, voice-over, dialogue, narration, singing, whispering, or vocal sounds.\n\nDo not add new sound effects unless they already exist in VIDEO_1.\n\nIf original audio preservation is unavailable, generate a silent video rather than inventing new audio.\n\nSECTION 12 — STRICT TIMING & EDITING\n\nVIDEO_1 ORIGINAL DURATION = APPROXIMATELY 10.04 SECONDS.\n\nTARGET OUTPUT DURATION = 10 SECONDS.\n\nPreserve the original action sequence, speed, pauses, focus changes, and transition timing.\n\nREFERENCE MOTION PHASES:\n\n0.0–1.5s:\nOriginal seated model motion and product retrieval from handbag.\n\n1.5–3.0s:\nOriginal hand manipulation and product inspection.\n\n3.0–4.7s:\nOriginal product presentation and movement into the floating foreground animation.\n\n4.7–7.5s:\nOriginal floating lipstick trajectory, rotation, foreground position, and focus behavior.\n\n7.5–8.7s:\nOriginal product movement away from the foreground and transition toward the seat.\n\n8.7–10.0s:\nOriginal product landing and final hand interaction.\n\nThese intervals are approximate observational references.\n\nVIDEO_1 remains authoritative for exact event boundaries and movements.\n\nDo not force new motion to fit the approximate timestamps.\n\nDo not insert new scenes, pauses, slow motion, speed ramps, additional transitions, or extra actions.\n\nMaintain the original duration whenever generation settings allow.\n\nSECTION 13 — TEMPORAL CONSISTENCY\n\nMaintain TWO independent appearance locks.\n\nMODEL LOCK:\nIMAGE_1 facial identity, hairstyle, body proportions, outfit, and accessories.\n\nPRODUCT LOCK:\nIMAGE_2 lipstick geometry, colors, materials, packaging, cap, logo, and design details.\n\nPrevent:\n\n- Model identity drift.\n- Outfit changes.\n- Unwanted talking.\n- Speech-like mouth animation.\n- Modified hand choreography.\n- Incorrect finger-product contact.\n- Premature product release.\n- Additional product movement.\n- Incorrect rotation direction.\n- Product shape morphing.\n- Packaging redesign.\n- Logo distortion.\n- Product duplication.\n- Unnatural product scaling.\n- Inconsistent floating trajectory.\n- Incorrect seat contact.\n- Camera changes.\n- Unnecessary transitions.\n- Extended timing.\n- Temporal flickering.\n\nSECTION 14 — OUTPUT\n\nGenerate a high-quality photorealistic live-action video faithfully matching VIDEO_1.\n\nThe ONLY intended visual replacements are:\n\n1. The original model replaced by IMAGE_1.\n2. The original lipstick replaced by IMAGE_2.\n\nPreserve the original performance, product motion, camera behavior, environment, focus transitions, and timing.\n\nThe floating lipstick must maintain the exact IMAGE_2 product identity throughout its movement.\n\nFINAL ABSOLUTE PRIORITY\n\nIMAGE_1 = MODEL APPEARANCE ONLY.\n\nIMAGE_2 = COMPLETE LIPSTICK PRODUCT APPEARANCE AND GEOMETRY ONLY.\n\nVIDEO_1 = ALL MOTION, HAND CHOREOGRAPHY, PRODUCT TRAJECTORY, ROTATION, CAMERA, ENVIRONMENT, FOCUS, AND TIMING.\n\nMANDATORY HARD CONSTRAINTS:\n\n1. Preserve the original model's exact performance from VIDEO_1.\n2. Replace the model's appearance with IMAGE_1.\n3. Replace the original lipstick completely with IMAGE_2.\n4. Never blend the original lipstick design with IMAGE_2.\n5. Preserve the original product release and floating motion.\n6. Preserve the original lipstick rotation direction and timing.\n7. Preserve the original camera focus and foreground depth.\n8. Preserve the original landing and final interaction.\n9. Never generate speech or speech-like mouth movements.\n10. Do not invent new actions, camera movements, or transitions.\n11. Preserve the original approximately 10-second duration.\n\nCHANGE VISUAL IDENTITY, NOT PERFORMANCE.\n\nDO NOT RECREATE THE CHOREOGRAPHY.\nDO NOT REDESIGN THE PRODUCT.\nDO NOT MODIFY THE FLOATING MOTION.\nDO NOT INVENT SPEECH.\nDO NOT CHANGE CAMERA OR TIMING.\n\nThe final result must look like the original VIDEO_1 performed by the IMAGE_1 model, featuring the exact IMAGE_2 lipstick following the original floating product motion and landing sequence.",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_2_input_1",
+        "source_node_id": "node_rmj87NEM",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_eMEsQwCt",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_2_output_1_9_input_1",
+        "source_node_id": "node_eMEsQwCt",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KOJ8ABAr",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_3_output_1_2_input_1",
+        "source_node_id": "node_kQUNcMj5",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_eMEsQwCt",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_4_output_1_2_input_2",
+        "source_node_id": "node_EGZEzA2o",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_eMEsQwCt",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_5_output_1_6_input_1",
+        "source_node_id": "node_bHPJVAjL",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_MAvZio8D",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_6_output_1_9_input_1",
+        "source_node_id": "node_MAvZio8D",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KOJ8ABAr",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_7_output_1_6_input_2",
+        "source_node_id": "node_da1Fxu0d",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_MAvZio8D",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_8_output_1_9_input_3",
+        "source_node_id": "node_8iTCxpKa",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KOJ8ABAr",
+        "target_handle": "input_3",
+        "target_port": "video_ref",
+        "data_type": "video",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_10_output_1_9_input_2",
+        "source_node_id": "node_SZCUeKbI",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_KOJ8ABAr",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_node_KOJ8ABAr",
+        "node_id": "node_KOJ8ABAr",
+        "label": "🎬 Google Flow Video — Kết Quả Quảng Cáo Son Môi Mới (1080p)",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_lipstick_promo_1080p.mp4",
+        "duration": "10s"
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\wf_lipstick_promo_motion_final_1080p.mp4",
+    "batch_history": []
+  }
+}

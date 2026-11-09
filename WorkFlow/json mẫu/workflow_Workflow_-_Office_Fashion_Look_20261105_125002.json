@@ -1,0 +1,373 @@
+{
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T05:50:02.001Z",
+  "workflow": {
+    "name": "Workflow - Office Fashion Lookbook Video (Video lookbook thời trang công sở) (copy)",
+    "description": "A TobyFlow Workflow that chains AI Models to build a multi-frame office-fashion storyboard and video, keeping the same face and outfit consistent across every shot. Perfect for workwear lookbooks and OOTD reels — automated from reference photo to finished video.\n\nWorkflow TobyFlow nối các AI Model để dựng storyboard và video thời trang công sở nhiều khung, giữ nguyên khuôn mặt và trang phục nhất quán qua mọi cảnh. Hợp lookbook đồ công sở và reels OOTD — tự động từ ảnh tham chiếu đến video hoàn chỉnh.",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true
+    },
+    "nodes": [
+      {
+        "node_id": "node_M6Tbx3eF",
+        "node_type": "image",
+        "node_name": "Image",
+        "pos_x": -104,
+        "pos_y": -149,
+        "enabled": true,
+        "slug": "image",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/05/a4c879e8-259d-44de-ab49-0b8acbf5b5c2.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_FtLGMBRX",
+        "node_type": "image",
+        "node_name": "Image 2",
+        "pos_x": 398,
+        "pos_y": -94.277624309392,
+        "enabled": true,
+        "slug": "image_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/dd553522-419f-4e4c-92b6-f880c45b616c.jpg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_CIAFftGn",
+        "node_type": "image",
+        "node_name": "Image 3",
+        "pos_x": 398,
+        "pos_y": 631,
+        "enabled": true,
+        "slug": "image_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/35c27568-39b1-4fc7-a2af-635e22f7fbca.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_Eg8uHTyw",
+        "node_type": "image",
+        "node_name": "Image 4",
+        "pos_x": -94.277624309392,
+        "pos_y": 583,
+        "enabled": true,
+        "slug": "image_4",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "thumbnail": "https://labs.toby.vn/storage/media/2026/06/b956529f-ccb6-4f52-b2ca-121fa72289f0.jpeg"
+          }
+        ]
+      },
+      {
+        "node_id": "node_D5DRmw70",
+        "node_type": "generate",
+        "node_name": "Flow - Images/Videos Generate",
+        "pos_x": 1050,
+        "pos_y": -148.57648401826,
+        "enabled": true,
+        "slug": "flow_images_videos_genera",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_WwGtDxqc",
+        "node_type": "generate",
+        "node_name": "Flow - Images/Videos Generate 2",
+        "pos_x": 1667,
+        "pos_y": -275.27762430939,
+        "enabled": true,
+        "slug": "flow_images_videos_genera_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_KA81mCpy",
+        "node_type": "generate",
+        "node_name": "Flow - Images/Videos Generate 3",
+        "pos_x": 1053,
+        "pos_y": 603,
+        "enabled": true,
+        "slug": "flow_images_videos_genera_2",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_859Lq0d6",
+        "node_type": "generate",
+        "node_name": "Flow - Images/Videos Generate 4",
+        "pos_x": 1678.4235159817,
+        "pos_y": 601.57648401826,
+        "enabled": true,
+        "slug": "flow_images_videos_genera_3",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "10s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false
+      },
+      {
+        "node_id": "node_XG3KhMz3",
+        "node_type": "prompt",
+        "node_name": "Prompt",
+        "pos_x": 401.72237569061,
+        "pos_y": -367,
+        "enabled": true,
+        "slug": "prompt",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use the attached reference images in this exact role order:\n\nImage 1 = FACE REFERENCE / face_reference_image\n\nUse Image 1 only as the facial identity source.\n\nThe final woman in all 5 storyboard frames must preserve the same real facial identity from Image 1.\n\nSince the woman wears a black face mask, prioritize preserving:\n\neye shape\neyelids\neyebrows\nforehead structure\nupper-face proportions\nskin tone consistency\noverall recognizable upper-face identity\n\nThe woman must still feel like the same real person from Image 1, not a generic AI woman.\n\nDo not copy:\n\nhairstyle\npose\noutfit\nlighting\nbackground\n\nfrom Image 1.\n\nBLACK MASK REQUIREMENT\n\nThe woman must wear a realistic black face mask in all 5 storyboard frames.\n\nThe black mask must:\n\nfully cover the nose and mouth naturally\nfit tightly and realistically around the face\nhave premium realistic black fabric texture\nshow natural folds, seams, and fabric tension\nremain visually identical in all frames\nreact naturally with lighting and movement\nlook physically worn and realistic\n\nDo not generate:\n\nfloating masks\ntransparent masks\nwarped masks\ndeformed masks\nmask clipping\nunstable mask position\nmask morphing between frames\n\nEven with the mask, preserve realistic upper-face identity consistency across all frames.\n\nImage 2 = OUTFIT REFERENCE\n\nUse Image 2 only as the clothing source.\n\nThe woman in all 5 storyboard frames must wear the exact outfit from Image 2.\n\nRecreate the outfit faithfully and consistently across all frames, including:\n\ngarment design\ncolor\nfabric texture\nsilhouette\nlayering\nfit and proportions\ncollar\nsleeves\nseams\nwaistband\nbelt\naccessories\nfabric folds\nwrinkles\nall visible styling details\n\nImage 2 overrides all clothing that would otherwise appear in the scene.\n\nDo not:\n\nkeep clothing from the scene references\nmix outfits\nredesign clothing\nsimplify outfit details\nbeautify the outfit\nchange outfit structure\n\nImage 3 = ROOM DECOR / SCENE / CAMERA REFERENCE\n\nUse Image 3 only as the room decor, office environment, furniture, camera setup, and composition reference.\n\nPreserve the same office atmosphere and visual layout:\n\ngray office chair\nwhite desk on the right side\nlaptop on the desk\ntakeaway coffee cup\nbag or personal item on the desk\nlarge floor-to-ceiling glass windows\nvisible exterior office building\nclean modern office floor\nbright minimalist office mood\n\nKeep the same overall camera direction and framing style inspired by Image 3.\n\nDo not use Image 3 for facial identity or outfit.\n\nCreate a single ultra-realistic storyboard image with 5 separate frames arranged as a premium editorial contact sheet.\n\nAll 5 frames must show:\n\nthe same woman\nthe same upper-face identity from Image 1\nthe same black mask\nthe same exact outfit from Image 2\nthe same office room decor from Image 3\n\nNO TEXT REQUIREMENT\n\nDo not include any:\n\ntext\nletters\ncaptions\nweekday labels\nnumbers\nlogos\nwatermarks\nsigns\ntypography\n\nThe storyboard must remain purely visual.\n\nGLOBAL CAMERA LOCK\n\nAll 5 storyboard frames must use the same camera language and visually consistent camera setup.\n\nKeep:\n\nthe same vertical 9:16 composition feeling\nthe same front-facing office composition\nthe same subject placement\nthe same desk placement on the right side\nthe same chair placement on the left side\nthe same room perspective\n\nThe storyboard should feel like one fixed camera positioned in the office while the woman changes pose naturally from frame to frame.\n\nDo not drastically change:\n\ncamera angle\nlens feeling\nroom perspective\nsubject scale\ncamera height\n\nGLOBAL SCENE CONSISTENCY\n\nThe room decor must remain visually consistent in all 5 frames:\n\ngray office chair\nwhite desk on the right\nlaptop on the desk\ntakeaway coffee cup\nbag or personal item on the desk\nlarge glass windows\nvisible office building outside\nclean modern office floor\nbright minimalist corporate atmosphere\n\nDo not remove main furniture.\n\nDo not add unnecessary objects.\n\nKeep:\n\nobject scale realistic\nobject spacing consistent\ndesk reflections stable\nwindow lighting natural\nchair perspective accurate\n\nGLOBAL CHARACTER CONSISTENCY\n\nThe woman must remain visually consistent in all 5 frames:\n\nsame upper-face identity from Image 1\nsame black mask\nsame outfit from Image 2\nsame body proportions\nsame skin tone\nsame hairstyle style adapted naturally to the office environment\nsame photorealistic appearance\n\nFRAME-BY-FRAME ACTIONS\n\nFrame 1\n\nThe woman is seated in the gray office chair in a relaxed elegant pose.\n\nHer back rests lightly against the chair.\n\nHer legs are crossed naturally.\n\nOne arm rests on the chair armrest while the other hand rests near her lap or hip.\n\nHer head turns slightly to the left away from the desk.\n\nHer eyes feel calm, slightly tired, and contemplative.\n\nFrame 2\n\nThe woman sits more upright in the chair angled slightly toward the desk.\n\nHer body posture feels more alert.\n\nHer legs extend naturally forward.\n\nOne hand adjusts her sleeve or makes a subtle outfit-adjusting gesture.\n\nThe other arm remains relaxed.\n\nHer head turns slightly more toward the camera.\n\nHer eyes feel focused and ready to work.\n\nFrame 3\n\nThe woman sits in the chair interacting with work materials.\n\nShe reads or holds a document, paper, or slim item while seated near the desk.\n\nThe laptop remains visible.\n\nHer legs remain elegantly crossed.\n\nHer eyes feel composed, professional, and focused.\n\nThe frame should feel calm, polished, and work-oriented.\n\nFrame 4\n\nThe woman leans back comfortably in the office chair.\n\nShe holds a smartphone raised in front of her as if checking her phone or taking a relaxed selfie.\n\nHer posture feels relaxed and slightly playful.\n\nHer legs remain elegantly crossed or naturally extended.\n\nHer eyes feel soft, relaxed, fashionable, and refined.\n\nFrame 5\n\nThe woman sits at the desk working with the laptop.\n\nHer body faces the desk with a poised seated posture.\n\nOne hand interacts with the laptop while the other rests naturally.\n\nHer eyes feel focused yet relaxed like the end of a productive workday.\n\nThe frame should feel professional, polished, calm, and editorial.\n\nREALISM REQUIREMENTS\n\nThe final storyboard must look like real fashion editorial photography, not AI-generated.\n\nKeep:\n\nnatural skin texture\nrealistic forehead detail\nrealistic eyes and eyelashes\nrealistic fingers and hands\nrealistic body proportions\nrealistic black mask fabric\nrealistic outfit drape\nauthentic fabric folds\nrealistic chair and desk perspective\nnatural window lighting\nsoft realistic shadows\nauthentic office atmosphere\n\nDo not generate:\n\nplastic skin\nwaxy skin\nglossy skin\ndoll-like appearance\nover-smoothed face\nfake eyes\nwarped anatomy\ndeformed fingers\nCGI-looking rendering\n\nDo not let:\n\nthe upper-face identity drift between frames\nthe mask deform between frames\nthe outfit change between frames\nthe office perspective change between frames\n\nNEGATIVE PROMPT\n\ntext, letters, captions, weekday labels, Monday, Tuesday, Wednesday, Thursday, Friday, numbers, logos, watermark, typography, misspelled text, generic AI woman, drifting upper-face identity, changed forehead structure, plastic skin, waxy skin, glossy skin, doll-like face, over-smoothed skin, fake eyes, distorted hands, extra fingers, broken fingers, deformed mask, floating mask, transparent mask, warped mask, asymmetrical mask, unstable mask position, wrong outfit, mixed outfit, simplified outfit, missing outfit details, changed office layout, changed desk placement, changed chair placement, changed camera angle, inconsistent framing, different room perspective, missing laptop, missing coffee cup, missing bag, missing windows, cartoon, CGI, 3D render, anime, illustration, low resolution, blur, compression artifacts, obvious AI generation\n\nImportant priority order:\n\nupper-face identity consistency from Image 1 is highest priority\nblack mask realism and stability is second priority\noutfit fidelity from Image 2 is third priority\nroom decor from Image 3 is fourth priority",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_trKVnzZH",
+        "node_type": "prompt",
+        "node_name": "Prompt 2",
+        "pos_x": 398,
+        "pos_y": 1346,
+        "enabled": true,
+        "slug": "prompt_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Image 1 = FACE REFERENCE\nUse Image 1 only as the facial identity source. The final woman in all storyboard frames must preserve the exact real facial identity from Image 1 as accurately as possible, including face shape, forehead, cheekbones, cheeks, jawline, chin, eyes, eyelids, eyebrows, nose shape, lips, mouth shape, skin tone, and overall facial proportions. The final face must look like the same real person from Image 1, not a similar person and not a generic AI face. Prioritize facial resemblance over beautification. Keep the face natural and photographic. Do not copy hairstyle, clothing, pose, lighting, or background from Image 1.\n\nIMPORTANT — BLACK MASK REQUIREMENT\nThe woman must wear a realistic black face mask in all 5 storyboard frames.\nThe black mask must:\n\nfully cover the nose and mouth naturally\nfit tightly and realistically around the face\nhave realistic fabric texture and folds\nremain consistent in all frames\nnot hide the upper-face identity accuracy\npreserve visible identity through eyes, eyebrows, forehead, cheek structure, and facial proportions\nlook like a real premium black medical/fashion mask, not CGI or stylized\n\nThe mask must integrate naturally with the lighting, shadows, and skin contact.\nDo not generate floating masks, distorted masks, transparent masks, or badly fitted masks.\n\nImage 2 = OUTFIT REFERENCE\nUse Image 2 only as the clothing source. The woman in all 5 storyboard frames must wear the exact outfit from Image 2. Recreate the outfit faithfully, including garment design, color, fabric texture, silhouette, layering, fit, proportions, sleeves, collar, seams, buttons, waistband, belt, accessories, folds, wrinkles, and all visible styling details. Image 2 overrides all clothing seen in Image 3. Do not keep, copy, or mix any clothing from Image 3.\n\nImage 3 = SCENE / BACKGROUND / CAMERA REFERENCE\nUse Image 3 only for the office environment, camera angle, room layout, furniture, desk arrangement, and overall visual composition. Preserve the same high-angle top-down editorial camera feeling, gray leather office chair, desk surface, silver laptop, white mouse, books, newspaper, gray floor, spacing, perspective, and modern office atmosphere. Do not use Image 3 for facial identity or outfit.\n\nCreate a single ultra-realistic storyboard image with 5 separate frames, arranged as a clean premium fashion editorial contact sheet. All 5 frames must show the same woman, with the same face identity from Image 1, the exact outfit from Image 2, and a realistic black face mask, inside the office environment from Image 3.\n\nGLOBAL CAMERA LOCK — applies to all 5 frames\n\nAll 5 storyboard frames must use the exact same camera angle, exact same camera height, exact same overhead top-down perspective, exact same framing style, and exact same lens feeling.\nThe camera must remain visually locked and consistent across all 5 frames.\nDo not change the shooting angle between frames.\nDo not rotate, tilt, zoom dramatically, or reposition the camera.\nDo not switch to a side angle, eye-level angle, lower angle, or different perspective.\nKeep the same high-angle top-down editorial office camera view in every frame.\nThe storyboard should feel like the same camera is fixed in one position above the subject, while the woman changes pose within the same office setup.\n\nGLOBAL SCENE CONSISTENCY\n\nAll 5 frames must preserve the same office environment and same object layout:\n\ngray leather office chair\ndesk in the same position\nsilver laptop\nwhite mouse\nbooks / notebook\nnewspaper\ngray floor\nsame room layout\nsame object scale and spacing\n\nDo not change the environment between frames.\nDo not remove or add unnecessary props.\nKeep the scene visually consistent like a continuous photo sequence shot in the same place.\n\nGLOBAL CHARACTER CONSISTENCY\n\nThe woman must remain the same person in all 5 frames:\n\nsame facial identity from Image 1\nsame hairstyle style based on the scene reference\nsame glasses\nsame realistic black face mask\nsame outfit from Image 2\nsame body proportions\nsame skin tone\nsame realistic appearance\n\nFRAME ACTIONS\n\nFrame 1:\nThe woman is seated in the gray office chair, reading a newspaper. One hand holds the newspaper and the other hand is lifted near her face in a thoughtful gesture. Expression through the eyes is calm, focused, and natural.\n\nFrame 2:\nThe woman remains seated in the same chair and stretches both arms upward above her head. Expression through the eyes is relaxed, refreshed, and soft.\n\nFrame 3:\nThe woman stands beside the desk and chair. One hand is in her pocket. Expression through the eyes is confident, elegant, and composed.\n\nFrame 4:\nThe woman leans back in the office chair in a relaxed diagonal posture, with one arm extended toward the desk. Expression through the eyes is calm, reflective, and slightly tired in a natural way.\n\nFrame 5:\nThe woman stands confidently near the chair and desk, facing toward the camera with elegant eye expression. Expression through the eyes is polished, poised, and engaging.\n\nREALISM REQUIREMENTS\n\nThe final storyboard must look like a real luxury fashion editorial photo sequence, not AI-generated.\n\nKeep:\n\nnatural skin texture\nvisible pores and soft imperfections\nrealistic forehead and eye-area detail\nrealistic hands and fingers\nrealistic eyes and eyelashes\nrealistic black fabric mask texture\nrealistic fabric folds and clothing tension\nnatural shadows\nclean premium office lighting\nrealistic reflections on the desk and laptop\nrealistic depth and lens compression\n\nThe black mask must look physically worn and naturally integrated with the face structure.\n\nDo not make the face glossy, waxy, plastic, overly smooth, or doll-like.\n\nLIGHTING\n\nUse soft, natural, balanced editorial office lighting.\nKeep the lighting direction and mood consistent across all 5 frames.\n\nNegative prompt\n\ndifferent identity, generic AI face, inaccurate face swap, drifting face across frames, plastic skin, waxy skin, glossy skin, over-smoothed skin, doll-like face, fake eyes, distorted hands, extra fingers, broken fingers, deformed mask, floating mask, transparent mask, asymmetrical mask, unrealistic mask, missing mask, wrong outfit, mixed outfit, original clothing from Image 3, simplified outfit, missing outfit details, changed room layout, changed camera angle, different perspective, inconsistent framing, inconsistent camera height, zoom changes, tilted camera, missing chair, missing desk, missing laptop, missing mouse, missing books, missing newspaper, cartoon, CGI, 3D render, anime, illustration, low resolution, blur, obvious AI generation",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_oA1AU38Y",
+        "node_type": "prompt",
+        "node_name": "Prompt 3",
+        "pos_x": 1048,
+        "pos_y": -413,
+        "enabled": true,
+        "slug": "prompt_3",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Use the attached reference images in this exact role order:\n\nImage 1 = FACE REFERENCE / face_reference_image\n\nUse Image 1 only as the facial identity source.\n\nThe woman in the entire video must preserve the same real facial identity from Image 1.\n\nSince the woman wears a black face mask, prioritize preserving:\n\neye shape\neyelids\neyebrows\nforehead structure\nupper-face proportions\nskin tone consistency\nrecognizable upper-face identity\n\nThe woman must still feel like the same real person from Image 1, not a generic AI woman.\n\nDo not copy:\n\nhairstyle\noutfit\npose\nlighting\nbackground\n\nfrom Image 1.\n\nBLACK MASK REQUIREMENT\n\nThe woman must wear a realistic black face mask during the entire video.\n\nThe black mask must:\n\nfully cover the nose and mouth naturally\nfit tightly and realistically around the face\nhave premium realistic black fabric texture\nshow natural folds, seams, and fabric tension\nremain visually stable in every frame\nreact naturally with movement and lighting\nlook physically worn and realistic\n\nDo not generate:\n\nfloating masks\ntransparent masks\nwarped masks\ndeformed masks\nmask clipping\nunstable mask position\nmask morphing between frames\n\nEven with the mask, preserve stable upper-face identity consistency during the entire video.\n\nImage 2 = OUTFIT REFERENCE\n\nUse Image 2 only as the wardrobe source.\n\nThe woman must wear the exact outfit from Image 2 during the entire video.\n\nPreserve the outfit faithfully, including:\n\ngarment design\ncolor\nfabric texture\nsilhouette\nlayering\nfit and proportions\ncollar\nsleeves\nseams\nbuttons\nwaistband\nbelt\naccessories\nfabric folds\nwrinkles\nall visible styling details\n\nThe outfit must remain perfectly stable across all movements.\n\nImage 2 overrides any clothing shown in the storyboard reference.\n\nDo not:\n\nmix outfits\npreserve storyboard clothing\nredesign outfit details\nsimplify the outfit\nbeautify the clothing structure\nallow outfit morphing between frames\n\nImage 3 = STORYBOARD REFERENCE\n\nUse Image 3 as the main storyboard reference for the video.\n\nFollow the storyboard for:\n\noffice layout\nroom decor\nfixed camera composition\npose progression\nbody language\ngestures\nchair position\ndesk position\nwindow background\nfashion editorial mood\n\nCreate a cinematic ultra-realistic vertical 9:16 office fashion video, 10 seconds long.\n\nHARD CAMERA CONSTRAINT\n\nThe camera is permanently locked in one fixed office position during the entire video.\n\nThe camera must behave like a physically mounted luxury editorial camera.\n\nNo cinematic camera movement is allowed.\n\nDo not generate:\n\ncamera drift\ncamera shake\ncamera orbit\ncamera push-in\ncamera pull-back\nhandheld feeling\nlens breathing\nauto reframing\nsubject tracking\nperspective shifting\nfocal length change\ndynamic reframing\npan movement\ntilt movement\ncamera zoom\n\nThe woman moves naturally inside the frame while the camera remains completely static.\n\nEvery second of the video must preserve:\n\nthe exact same camera height\nthe exact same framing\nthe exact same room perspective\nthe exact same desk placement\nthe exact same chair placement\nthe exact same object alignment\nthe exact same lens compression\n\nThe video should feel like a locked luxury fashion editorial camera.\n\nGLOBAL ROOM DECOR CONSISTENCY\n\nKeep the same room decor and materials throughout the entire video:\n\ngray leather office chair with realistic leather grain and seams\nwhite office desk on the right side\nsilver laptop on the desk\ntakeaway coffee cup\nbooks or stacked documents\nbag or personal item on the desk\nlarge floor-to-ceiling glass windows\nbright office building visible outside\nclean reflective office floor\nsoft daylight\nminimal corporate office atmosphere\n\nThe chair, desk, laptop, coffee cup, books, bag, windows, exterior building, and floor must remain perfectly stable in:\n\nposition\nscale\nspacing\nperspective\nlighting direction\n\nDo not remove main objects.\n\nDo not add unnecessary props.\n\nKeep:\n\nrealistic desk reflections\nrealistic leather texture\nstable laptop geometry\nrealistic paper texture\nstable room perspective\nrealistic daylight reflections\n\nThe environment must feel like one continuous real video shoot.\n\nNO TEXT REQUIREMENT\n\nDo not generate:\n\ntext\nletters\ncaptions\nweekday labels\nnumbers\nlogos\nwatermarks\nsigns\ntypography\nUI overlays\n\nGLOBAL CHARACTER CONSISTENCY\n\nThe woman must remain visually consistent during the entire video:\n\nsame upper-face identity from Image 1\nsame black mask\nsame exact outfit from Image 2\nsame body proportions\nsame skin tone\nsame hairstyle style\nsame photorealistic appearance\nsame luxury editorial mood\n\nDo not allow identity drift between movements.\n\nMOVEMENT TIMELINE\n\n0s–2s\n\nBegin with the woman seated elegantly in the gray office chair.\n\nHer legs are crossed naturally in a relaxed editorial fashion pose.\n\nOne arm rests on the chair armrest while the other rests naturally near her lap or waist.\n\nShe turns her head slightly to the side away from the desk.\n\nHer eyes feel calm, thoughtful, elegant, and stylish.\n\nSubtle breathing and realistic blinking.\n\n2s–4s\n\nShe subtly changes posture and sits more upright while angling her body slightly toward the desk.\n\nOne hand makes a small sleeve-adjusting or outfit-adjusting gesture.\n\nThe movement feels slow, cinematic, graceful, and natural.\n\nHer eyes become more focused and work-oriented.\n\nThe black mask remains perfectly stable and realistic.\n\n4s–6s\n\nShe interacts with a document, paper, tablet, or laptop near the desk.\n\nHer body leans slightly toward the work surface.\n\nHer legs remain elegantly positioned.\n\nHer eyes feel composed, professional, and concentrated.\n\nKeep all room decor perfectly stable.\n\nFabric folds and mask tension react naturally with movement.\n\n6s–8s\n\nShe leans back comfortably in the chair and raises a smartphone naturally in front of her.\n\nThe gesture feels relaxed, elegant, and lightly playful.\n\nHand anatomy and wrist angles must remain realistic.\n\nHer eyes soften naturally while still feeling refined and fashionable.\n\n8s–10s\n\nShe returns to a polished working pose with the laptop.\n\nHer posture feels calm, composed, professional, and luxurious.\n\nOne hand rests naturally near the laptop while the other rests near her lap or chair armrest.\n\nEnd with subtle breathing, a natural blink, and a soft composed eye expression.\n\nThe final moment should feel like a luxury office fashion commercial frame.\n\nREALISM REQUIREMENTS\n\nThe final video must look like real camera footage, not AI-generated.\n\nKeep:\n\nnatural skin texture\nrealistic forehead detail\nrealistic eyes and eyelashes\nrealistic fingers and hands\nbelievable body movement\nrealistic black mask fabric\nrealistic outfit drape\nauthentic fabric folds\nrealistic chair leather texture\nsoft daylight through windows\nrealistic desk reflections\nstable object geometry\nauthentic office atmosphere\n\nDo not generate:\n\nplastic skin\nwaxy skin\nglossy skin\ndoll-like appearance\nover-smoothed face\nfake eyes\nwarped anatomy\ndeformed fingers\nAI-looking motion\nCGI-looking rendering\n\nDo not let:\n\nidentity drift between frames\nmask deform between movements\noutfit morph between poses\nbackground perspective shift\nprops move randomly\n\nSTYLE\n\nultra-realistic cinematic office lifestyle video\nluxury fashion editorial\nclean modern glass office\nsoft daylight\npremium Korean fashion commercial aesthetic\nelegant body language\nslow cinematic movement\nstable locked camera\nhigh-resolution detail\nluxury campaign realism\nstatic editorial framing\nfixed-camera aesthetic\n\nNEGATIVE PROMPT\n\ntext, letters, captions, weekday labels, numbers, logos, watermark, typography, generic AI woman, drifting upper-face identity, changed forehead structure, plastic skin, waxy skin, glossy skin, doll-like face, over-smoothed skin, fake eyes, distorted hands, extra fingers, broken fingers, deformed mask, floating mask, transparent mask, warped mask, asymmetrical mask, unstable mask position, warped arms, unnatural movement, unrealistic motion, wrong outfit, outfit morphing, simplified outfit, missing outfit details, changed clothing, camera movement, changing angle, zooming camera, rotating camera, shaky camera, inconsistent room perspective, changed chair position, changed desk position, missing laptop, missing coffee cup, missing books, missing bag, missing glass windows, warped window frames, unstable background, distorted building outside, cartoon, CGI, 3D render, anime, illustration, low resolution, blur, compression artifacts, obvious AI generation",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60
+      },
+      {
+        "node_id": "node_SSsabIOz",
+        "node_type": "prompt",
+        "node_name": "Prompt 4",
+        "pos_x": 1059,
+        "pos_y": 1326.5764840183,
+        "enabled": true,
+        "slug": "prompt_4",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "Image 1 = OUTFIT REFERENCE\nUse Image 1 only as the outfit source.\n\nThe woman in the entire video must wear the exact outfit from Image 1. Preserve all outfit details faithfully, including:\n\ngarment design\ncolor\nfabric texture\nfabric thickness\nsilhouette\nlayering\ncollar\nsleeves\nbuttons\nseams\nwaist details\nbelt and accessories\nwrinkles and folds\nfit and proportions\nall visible styling details\n\nThe outfit must remain perfectly stable and consistent throughout the entire video.\nDo not redesign, simplify, beautify, replace, or morph the outfit.\n\nThe woman must also wear a realistic black face mask throughout the entire video.\n\nBLACK MASK REQUIREMENT\n\nThe black mask must:\n\nfully cover the nose and mouth naturally\nfit tightly and realistically around the face\nhave premium realistic black fabric texture\nshow natural folds and stitching\nremain visually stable in all shots\nbehave naturally with movement and lighting\nlook like a real fashion or medical black mask\n\nDo not generate:\n\nfloating mask\ntransparent mask\nwarped mask\ndeformed mask\nmask clipping through skin\nunstable mask shape\n\nSince there is no face reference image, do not prioritize identity recreation.\nInstead, prioritize:\n\nbeautiful realistic eyes\nconsistent hairstyle\nnatural forehead proportions\nrealistic skin texture\nstable upper-face appearance\nluxury editorial realism\n\nImage 2 = STORYBOARD REFERENCE\nUse Image 2 as the main video storyboard reference.\n\nFollow the storyboard for:\n\ncamera angle\noffice environment\npose progression\nbody language\nmovement timing\nlighting mood\ndesk layout\nfurniture placement\noverall composition\n\nThe video must feel like the storyboard has been brought to life naturally.\n\nCreate a cinematic ultra-realistic vertical 9:16 fashion office video, 10 seconds long.\n\nGLOBAL CAMERA LOCK\n\nThe camera must remain fixed in the same high-angle top-down office perspective throughout the entire video.\n\nDo not:\n\nchange camera angle\nswitch perspective\nrotate camera\nshake camera\nzoom dramatically\nmove into close-up shots\nchange lens feeling\n\nThe video should feel like a single fixed overhead editorial camera filming the woman naturally moving inside the office setup.\n\nGLOBAL SCENE CONSISTENCY\n\nKeep the same office environment throughout the entire video:\n\ngray leather office chair\nneutral office desk\nsilver laptop\nwhite mouse\nbooks or notebook\nnewspaper or magazine\ngray marble-like office floor\nclean modern office atmosphere\n\nPreserve the exact same:\n\nobject positions\nobject scale\nspacing\nperspective\nlighting direction\noffice composition\n\nDo not remove important objects.\nDo not add unnecessary props.\nKeep all materials realistic and stable.\n\nGLOBAL CHARACTER CONSISTENCY\n\nThe woman must remain visually consistent throughout the video:\n\nsame black face mask\nsame hairstyle\nsame body proportions\nsame skin tone\nsame exact outfit from Image 1\nsame elegant office fashion mood\nsame realistic upper-face appearance\n\nMOVEMENT TIMELINE\n\n0s–2s\n\nThe woman sits in the gray leather office chair reading a newspaper or magazine at the desk.\nOne hand holds the paper while the other hand lifts naturally near her face.\nSubtle breathing, blinking, and gentle paper movement.\nMood feels calm, elegant, and thoughtful.\n\n2s–4s\n\nShe slowly relaxes back into the chair and transitions into a gentle stretch.\nHer shoulders loosen naturally while her arms rise softly upward.\nThe office environment remains perfectly unchanged.\nMovement is slow, realistic, and cinematic.\n\n4s–6s\n\nShe leans diagonally in the chair in a relaxed office pose.\nOne arm extends naturally toward the desk or laptop.\nHer gaze lowers softly toward the desk area.\nClothing folds and fabric tension react naturally with body movement.\n\n6s–8s\n\nShe transitions into a more confident posture inspired by the storyboard.\nOne hand may move toward the pocket or waist area while she subtly turns toward the camera.\nThe mood becomes more polished and editorial.\n\n8s–10s\n\nFinal pose:\nShe stands or poses elegantly near the chair and desk while looking softly toward the camera or slightly off-camera.\nEnd with subtle breathing and gentle eye movement.\nThe final frame should feel like a luxury fashion editorial photo.\n\nREALISM REQUIREMENTS\n\nThe video must look like real camera footage.\n\nKeep:\n\nnatural skin texture\nrealistic eyes and eyelashes\nrealistic forehead detail\nrealistic hands and fingers\nrealistic body proportions\nrealistic black mask fabric\nauthentic outfit texture\nnatural fabric folds\nsoft realistic shadows\nrealistic desk reflections\nstable object geometry\nclean cinematic office lighting\n\nDo not generate:\n\nplastic skin\nwaxy skin\nglossy forehead\ndoll-like appearance\nover-smoothed skin\nfake eyes\ndeformed fingers\nwarped anatomy\nAI-looking motion\n\nSTYLE\n\nultra-realistic cinematic fashion office video\npremium editorial aesthetic\nsoft natural office light\nminimal luxury office mood\nelegant Korean fashion commercial feeling\nslow realistic movement\nstable overhead camera\nhigh-resolution detail\nluxury campaign realism\n\nNEGATIVE PROMPT\n\ngeneric AI woman, plastic skin, waxy skin, glossy skin, doll-like appearance, distorted eyes, fake eyelashes, deformed mask, floating mask, transparent mask, warped mask, asymmetrical mask, unstable mask position, distorted hands, extra fingers, broken fingers, warped arms, unnatural movement, outfit morphing, simplified outfit, missing outfit details, changed clothing, changed camera angle, camera shake, zoom change, rotating camera, wrong perspective, changed office layout, missing chair, missing desk, missing laptop, missing mouse, missing books, missing newspaper, unstable props, warped laptop, distorted paper text, cartoon, CGI, anime, 3D render, illustration, low resolution, blur, compression artifacts, obvious AI generation",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_7_input_1",
+        "source_node_id": "node_M6Tbx3eF",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KA81mCpy",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_1_output_1_5_input_1",
+        "source_node_id": "node_M6Tbx3eF",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_D5DRmw70",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_6_input_1",
+        "source_node_id": "node_FtLGMBRX",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WwGtDxqc",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_5_input_1",
+        "source_node_id": "node_FtLGMBRX",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_D5DRmw70",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_8_input_1",
+        "source_node_id": "node_FtLGMBRX",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_859Lq0d6",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_2_output_1_7_input_1",
+        "source_node_id": "node_FtLGMBRX",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KA81mCpy",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_3_output_1_7_input_1",
+        "source_node_id": "node_CIAFftGn",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_KA81mCpy",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_4_output_1_5_input_1",
+        "source_node_id": "node_Eg8uHTyw",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_D5DRmw70",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_5_output_1_6_input_1",
+        "source_node_id": "node_D5DRmw70",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_WwGtDxqc",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_7_output_1_8_input_1",
+        "source_node_id": "node_KA81mCpy",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_859Lq0d6",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image"
+      },
+      {
+        "edge_id": "edge_9_output_1_5_input_2",
+        "source_node_id": "node_XG3KhMz3",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_D5DRmw70",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_10_output_1_7_input_2",
+        "source_node_id": "node_trKVnzZH",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_KA81mCpy",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_11_output_1_6_input_2",
+        "source_node_id": "node_oA1AU38Y",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_WwGtDxqc",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      },
+      {
+        "edge_id": "edge_12_output_1_8_input_2",
+        "source_node_id": "node_SSsabIOz",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_859Lq0d6",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text"
+      }
+    ]
+  }
+}

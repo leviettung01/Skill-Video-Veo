@@ -1,372 +1,99 @@
 <!DOCTYPE html>
 <html lang="vi">
 <head>
-  <meta charset="utf-8">
-  <title>LeVietTung_autoveo — Lê Việt Tùng</title>
+  <meta charset="utf-8" />
+  <title>LeVietTung_autoveo — Captcha Bridge</title>
   <style>
-    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
-
     :root {
-      --bg:         #080a0f;
-      --surface:    #0f141e;
-      --card:       #161e2e;
-      --border:     #2a3347;
-      --border-gold: rgba(245, 158, 11, 0.35);
-      --accent:     #f59e0b;
-      --accent-lt:  #fbbf24;
-      --accent-dim: #d97706;
-      --green:      #10b981;
-      --red:        #ef4444;
-      --yellow:     #fbbf24;
-      --text:       #f8fafc;
-      --muted:      #94a3b8;
-      --font:       'Inter', 'Segoe UI Variable Text', 'Segoe UI', system-ui, sans-serif;
-      --mono:       'JetBrains Mono', 'Cascadia Code', 'Consolas', monospace;
+      --bg: #0f172a; --surface: #1e293b; --fg: #f8fafc; --fg-muted: #94a3b8;
+      --border: #334155; --accent: #6366f1; --radius: 8px;
+      --c-green: #4ade80; --c-green-bg: #14532d; --c-green-ring: rgba(74,222,128,.2);
+      --c-amber: #fbbf24; --c-amber-bg: #451a03;
+      --c-red: #f87171; --c-red-bg: #450a0a;
+      --c-slate: #94a3b8; --c-slate-bg: #1e293b;
     }
-
-    html, body {
-      width: 390px;
-      min-height: 240px;
-      background: var(--bg);
-      color: var(--text);
-      font-family: var(--font);
-      font-size: 11.5px;
-      line-height: 1.45;
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+    body {
+      font-family: system-ui, -apple-system, 'Segoe UI', Roboto, sans-serif;
+      width: 340px; background: var(--bg); color: var(--fg); overflow: hidden;
     }
-
-    /* ── Brand Header ── */
-    header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 10px;
-      padding: 10px 12px;
-      border-bottom: 1px solid var(--border-gold);
-      background: linear-gradient(135deg, #121826 0%, #1c160d 100%);
+    .status-banner {
+      padding: 14px 14px 12px; display: flex; align-items: flex-start; gap: 10px;
+      border-bottom: 1px solid var(--border); transition: background 200ms ease;
     }
-
-    .brand-left {
-      display: flex;
-      align-items: center;
-      gap: 9px;
-      min-width: 0;
+    .status-banner[data-state="connected"] { background: var(--c-green-bg); }
+    .status-banner[data-state="stale"] { background: var(--c-amber-bg); }
+    .status-banner[data-state="offline"] { background: var(--c-red-bg); }
+    .status-banner[data-state="noconfig"] { background: var(--c-slate-bg); }
+    .dot {
+      width: 13px; height: 13px; border-radius: 50%; flex-shrink: 0; margin-top: 4px;
     }
-
-    .brand-badge {
-      width: 30px;
-      height: 30px;
-      border-radius: 8px;
-      background: linear-gradient(135deg, #f59e0b 0%, #d97706 55%, #10b981 100%);
-      display: flex;
-      align-items: center;
-      justify-content: center;
-      font-size: 15px;
-      box-shadow: 0 2px 10px rgba(245, 158, 11, 0.38);
-      flex-shrink: 0;
+    .dot[data-state="connected"] {
+      background: var(--c-green); box-shadow: 0 0 0 4px var(--c-green-ring);
     }
-
-    .header-title {
-      font-size: 13px;
-      font-weight: 800;
-      letter-spacing: 0.02em;
-      color: #fff;
-      line-height: 1.2;
+    .dot[data-state="stale"] { background: var(--c-amber); }
+    .dot[data-state="offline"] { background: var(--c-red); }
+    .dot[data-state="noconfig"] { background: var(--c-slate); }
+    .status-label { font-size: 14px; font-weight: 700; line-height: 1.3; }
+    .status-sub {
+      font-size: 11.5px; color: var(--fg-muted); margin-top: 2px;
+      font-family: 'Menlo', 'Consolas', monospace;
     }
-
-    .header-title span {
-      color: var(--accent-lt);
+    .quick-cfg {
+      padding: 10px 12px; border-bottom: 1px solid var(--border); background: #0b1120;
     }
-
-    .header-sub {
-      font-size: 10px;
-      color: #fcd34d;
-      font-weight: 600;
-      opacity: 0.9;
-      display: block;
-      margin-top: 1px;
+    .quick-cfg label { display: block; font-size: 11px; font-weight: 600; color: #cbd5e1; margin-bottom: 3px; }
+    .quick-cfg input {
+      width: 100%; padding: 6px 8px; font-size: 12px; font-family: Consolas, monospace;
+      background: #070a12; color: #fff; border: 1px solid var(--border); border-radius: 6px; margin-bottom: 7px;
     }
-
-    #btn-panel {
-      padding: 6px 11px;
-      font-family: var(--font);
-      font-size: 10px;
-      font-weight: 700;
-      letter-spacing: 0.04em;
-      text-transform: uppercase;
-      border: 1px solid rgba(251, 191, 36, 0.45);
-      border-radius: 6px;
-      background: linear-gradient(135deg, #f59e0b, #d97706);
-      color: #090d16;
-      cursor: pointer;
-      transition: all 0.15s;
-      flex-shrink: 0;
-      box-shadow: 0 2px 8px rgba(245, 158, 11, 0.25);
+    .test-box {
+      font-size: 11px; font-family: Consolas, monospace; padding: 6px 8px; border-radius: 6px; margin-top: 6px; display: none;
     }
-
-    #btn-panel:hover {
-      background: linear-gradient(135deg, #fbbf24, #f59e0b);
-      transform: translateY(-1px);
+    .test-box.ok { display: block; background: #14532d; color: #86efac; border: 1px solid #16a34a; }
+    .test-box.fail { display: block; background: #450a0a; color: #fca5a5; border: 1px solid #dc2626; }
+    .actions { padding: 10px 12px; display: flex; flex-direction: column; gap: 6px; }
+    .btn {
+      display: flex; align-items: center; justify-content: center; gap: 6px;
+      padding: 8px 12px; border-radius: var(--radius); font-size: 12.5px; font-weight: 600;
+      cursor: pointer; border: 1.5px solid var(--border);
+      background: var(--surface); color: var(--fg); width: 100%;
     }
-
-    /* ── Author Contact Strip ── */
-    .author-bar {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      gap: 6px;
-      padding: 6px 12px;
-      background: #0b1019;
-      border-bottom: 1px solid var(--border);
-      font-size: 10.5px;
-    }
-
-    .author-name {
-      font-weight: 700;
-      color: #e2e8f0;
-      display: flex;
-      align-items: center;
-      gap: 4px;
-    }
-
-    .author-links {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-    }
-
-    .social-pill {
-      display: inline-flex;
-      align-items: center;
-      gap: 4px;
-      padding: 2px 7px;
-      border-radius: 99px;
-      font-size: 10px;
-      font-weight: 700;
-      text-decoration: none;
-      transition: all 0.15s;
-    }
-
-    .social-pill.zalo {
-      background: rgba(0, 104, 255, 0.16);
-      color: #60a5fa;
-      border: 1px solid rgba(59, 130, 246, 0.4);
-    }
-
-    .social-pill.zalo:hover {
-      background: rgba(0, 104, 255, 0.28);
-      color: #93c5fd;
-    }
-
-    .social-pill.fb {
-      background: rgba(24, 119, 242, 0.16);
-      color: #38bdf8;
-      border: 1px solid rgba(56, 189, 248, 0.4);
-    }
-
-    .social-pill.fb:hover {
-      background: rgba(24, 119, 242, 0.28);
-      color: #7dd3fc;
-    }
-
-    /* ── Log Section ── */
-    .log-header {
-      display: flex;
-      align-items: center;
-      justify-content: space-between;
-      padding: 6px 12px 5px;
-      font-size: 9.5px;
-      font-weight: 700;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      background: var(--surface);
-      border-bottom: 1px solid var(--border);
-    }
-
-    #log-count {
-      background: rgba(245, 158, 11, 0.16);
-      border: 1px solid rgba(245, 158, 11, 0.35);
-      border-radius: 10px;
-      padding: 1px 7px;
-      font-size: 9.5px;
-      font-weight: 700;
-      color: var(--accent-lt);
-    }
-
-    #log-list {
-      max-height: 400px;
-      overflow-y: auto;
-      scrollbar-width: thin;
-      scrollbar-color: var(--border) transparent;
-    }
-
-    #log-list::-webkit-scrollbar { width: 4px; }
-    #log-list::-webkit-scrollbar-track { background: transparent; }
-    #log-list::-webkit-scrollbar-thumb { background: var(--border); border-radius: 2px; }
-
-    .log-empty {
-      padding: 24px 12px;
-      text-align: center;
-      color: var(--muted);
-      font-size: 11px;
-    }
-
-    .entry {
-      border-bottom: 1px solid rgba(42, 51, 71, 0.65);
-    }
-
-    .entry-row {
-      display: flex;
-      align-items: center;
-      gap: 6px;
-      padding: 6px 12px;
-      cursor: pointer;
-      transition: background 0.12s;
-      user-select: none;
-    }
-
-    .entry-row:hover { background: rgba(245, 158, 11, 0.07); }
-
-    .entry-id {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--muted);
-      min-width: 54px;
-      flex-shrink: 0;
-    }
-
-    .entry-type {
-      flex: 1;
-      font-family: var(--mono);
-      font-size: 10px;
-      font-weight: 700;
-      color: var(--accent-lt);
-      letter-spacing: 0.03em;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      white-space: nowrap;
-    }
-
-    .entry-time {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--muted);
-      flex-shrink: 0;
-      font-variant-numeric: tabular-nums;
-    }
-
-    .badge {
-      display: inline-flex;
-      align-items: center;
-      gap: 2px;
-      padding: 1px 6px;
-      border-radius: 4px;
-      font-size: 9px;
-      font-weight: 700;
-      flex-shrink: 0;
-    }
-
-    .badge-ok   { background: rgba(16, 185, 129, 0.15); color: var(--green); }
-    .badge-fail { background: rgba(239, 68, 68, 0.15);  color: var(--red); }
-    .badge-proc { background: rgba(245, 158, 11, 0.16); color: var(--yellow); }
-
-    .expand-icon {
-      font-size: 9px;
-      color: var(--muted);
-      flex-shrink: 0;
-      transition: transform 0.15s;
-    }
-
-    .entry.open .expand-icon { transform: rotate(90deg); }
-
-    .entry-details {
-      display: none;
-      padding: 0 12px 8px;
-      background: var(--surface);
-    }
-
-    .entry.open .entry-details { display: block; }
-
-    .detail-section { margin-top: 6px; }
-
-    .detail-label {
-      font-size: 9px;
-      text-transform: uppercase;
-      letter-spacing: 0.08em;
-      color: var(--muted);
-      margin-bottom: 2px;
-    }
-
-    .detail-value {
-      font-family: var(--mono);
-      font-size: 9.5px;
-      color: var(--text);
-      background: var(--card);
-      border: 1px solid var(--border);
-      border-radius: 4px;
-      padding: 4px 6px;
-      word-break: break-all;
-      white-space: pre-wrap;
-      max-height: 80px;
-      overflow-y: auto;
-    }
-
-    .detail-value.url {
-      color: var(--accent-lt);
-      white-space: nowrap;
-      overflow: hidden;
-      text-overflow: ellipsis;
-      max-height: none;
-    }
-
-    .detail-error { color: var(--red); }
-
+    .btn:hover { border-color: var(--accent); }
+    .btn-primary { background: #4f46e5; border-color: #6366f1; color: #fff; }
     .footer {
-      padding: 7px 12px;
-      border-top: 1px solid var(--border);
-      background: var(--surface);
-      font-size: 9.5px;
-      color: var(--muted);
-      text-align: center;
+      padding: 7px 12px; border-top: 1px solid var(--border);
+      font-size: 11px; color: var(--fg-muted); text-align: center;
     }
   </style>
 </head>
 <body>
-  <header>
-    <div class="brand-left">
-      <div class="brand-badge">⚡</div>
-      <div>
-        <div class="header-title"><span>LeVietTung</span>_autoveo</div>
-        <span class="header-sub">Lê Việt Tùng - SkillAutoVeo</span>
-      </div>
-    </div>
-    <button id="btn-panel">Mở Bảng Điều Khiển</button>
-  </header>
-
-  <div class="author-bar">
-    <div class="author-name">👑 Tác giả: Lê Việt Tùng</div>
-    <div class="author-links">
-      <a class="social-pill zalo" href="https://zalo.me/0915967790" target="_blank" title="Nhắn Zalo: 0915967790">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M12 2C6.48 2 2 6.03 2 11c0 2.87 1.5 5.43 3.83 7.08-.16.92-.59 2.31-1.46 3.31-.22.25-.03.65.3.61 1.79-.2 3.63-.95 4.77-1.62.82.21 1.68.32 2.56.32 5.52 0 10-4.03 10-9s-4.48-9-10-9z"/></svg>
-        Zalo: 0915967790
-      </a>
-      <a class="social-pill fb" href="https://www.facebook.com/tungbinh.38/" target="_blank" title="Facebook: Lê Việt Tùng">
-        <svg width="11" height="11" viewBox="0 0 24 24" fill="currentColor"><path d="M22 12c0-5.52-4.48-10-10-10S2 6.48 2 12c0 4.84 3.44 8.87 8 9.8V15H8v-3h2V9.5C10 7.57 11.57 6 13.5 6H16v3h-2c-.55 0-1 .45-1 1v2h3v3h-3v6.95c5.05-.5 9-4.76 9-9.95z"/></svg>
-        Facebook
-      </a>
+  <div class="status-banner" id="status-banner" data-state="noconfig">
+    <div class="dot" id="status-dot" data-state="noconfig"></div>
+    <div class="status-text">
+      <div class="status-label" id="status-label">Đang kiểm tra kết nối…</div>
+      <div class="status-sub" id="status-sub">—</div>
     </div>
   </div>
 
-  <div class="log-header">
-    Nhật Ký Captcha & Request Gần Đây
-    <span id="log-count">0</span>
+  <div class="quick-cfg">
+    <label>Bridge URL</label>
+    <input type="url" id="pop-url" value="http://127.0.0.1:4000" />
+    <label>Bridge Secret</label>
+    <input type="password" id="pop-secret" />
+    <div style="display:flex; gap:6px;">
+      <button id="btn-save-test" class="btn btn-primary" style="padding:6px 10px;">💾 Lưu & Test Kết Nối</button>
+    </div>
+    <div id="pop-test-res" class="test-box"></div>
   </div>
 
-  <div id="log-list">
-    <div class="log-empty">Chưa có request nào</div>
-  </div>
+  <nav class="actions">
+    <button id="btn-options" class="btn">⚙️ &nbsp;Mở Trang Cài Đặt Đầy Đủ</button>
+    <button id="btn-sidepanel" class="btn">📌 &nbsp;Mở Bảng Điều Khiển Side Panel</button>
+    <button id="btn-flow" class="btn">🎬 &nbsp;Mở Flow AI</button>
+  </nav>
 
-  <div class="footer">Bấm vào từng dòng để xem chi tiết • Đồng bộ cùng SkillAutoVeo</div>
+  <footer class="footer" id="footer">LeVietTung_autoveo — Lê Việt Tùng (0915967790)</footer>
 
   <script src="popup.js"></script>
 </body>

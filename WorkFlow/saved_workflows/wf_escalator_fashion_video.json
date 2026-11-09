@@ -1,0 +1,424 @@
+{
+  "id": "wf_escalator_fashion_video",
+  "_wf_id": "wf_escalator_fashion_video",
+  "version": "1.0",
+  "type": "workflow",
+  "exported_at": "2026-11-05T08:26:38.000Z",
+  "workflow": {
+    "name": "🎢 Escalator Fashion Video – Thời Trang Trên Thang Cuốn Luxury",
+    "description": "Escalator Fashion Video Workflow - Thời trang trên thanh cuốn",
+    "settings": {
+      "parallel": true,
+      "quantity": 1,
+      "delay_between_nodes": 3,
+      "timeout_per_node": 120,
+      "retry_on_error": 0,
+      "stop_on_error": true,
+      "max_parallel": 2
+    },
+    "nodes": [
+      {
+        "node_id": "node_ibmyTVtC",
+        "node_type": "image",
+        "node_name": "🎢 Ảnh Tham Chiếu Bối Cảnh Thang Cuốn (Scene Ref)",
+        "pos_x": 447.0,
+        "pos_y": 115.0,
+        "enabled": true,
+        "slug": "image",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg"
+          }
+        ],
+        "id": "node_ibmyTVtC",
+        "label": "🎢 Ảnh Tham Chiếu Bối Cảnh Thang Cuốn (Scene Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+        "config": {
+          "slug": "image",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_1xdE0hwA",
+        "node_type": "image",
+        "node_name": "👤 Ảnh Tham Chiếu Chân Dung Nhân Vật (Face Ref)",
+        "pos_x": 444.61051,
+        "pos_y": 629.61051,
+        "enabled": true,
+        "slug": "image_2",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          }
+        ],
+        "id": "node_1xdE0hwA",
+        "label": "👤 Ảnh Tham Chiếu Chân Dung Nhân Vật (Face Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "config": {
+          "slug": "image_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\ảnh mẫu thumbnail\\Tron_Bo_7_Anh_2K\\07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_Y0sUYhz9",
+        "node_type": "image",
+        "node_name": "👗 Ảnh Tham Chiếu Bộ Đồ Luxury (Outfit Ref)",
+        "pos_x": 450.0,
+        "pos_y": 1006.0,
+        "enabled": true,
+        "slug": "image_3",
+        "slug_auto": true,
+        "ref_images": [
+          {
+            "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+            "path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          }
+        ],
+        "id": "node_Y0sUYhz9",
+        "label": "👗 Ảnh Tham Chiếu Bộ Đồ Luxury (Outfit Ref)",
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+        "config": {
+          "slug": "image_3",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf1_input_outfit_flatlay_2k.png",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_F7cBJGtk",
+        "node_type": "generate",
+        "node_name": "🖼️ Google Flow Ảnh 2K — Nhân Vật Mặc Đồ Trên Thang Cuốn",
+        "pos_x": 1599.0,
+        "pos_y": 247.5937424601,
+        "enabled": true,
+        "slug": "flow_image_video_generate",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Image",
+        "model": "Nano Banana 2.1",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_F7cBJGtk",
+        "label": "🖼️ Google Flow Ảnh 2K — Nhân Vật Mặc Đồ Trên Thang Cuốn",
+        "provider": "flow",
+        "video_duration": "8s",
+        "video_input_type": "Ingredients",
+        "config": {
+          "slug": "flow_image_video_generate",
+          "mode": "image",
+          "provider": "flow",
+          "model": "Nano Banana 2.1",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+        "last_output": {
+          "status": "done",
+          "type": "image",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\escalator_2k.jpg",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_XUvLsR6q",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Ghép Nhân Vật + Bộ Đồ Lên Thang Cuốn 2K",
+        "pos_x": 937.0,
+        "pos_y": 1242.0,
+        "enabled": true,
+        "slug": "prompt_assistant",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "# MASTER REFERENCE COMPOSITION — IDENTITY LOCK + OUTFIT LOCK + SCENE LOCK\n\nUse exactly three reference images.\n\n## IMAGE 1 — FACE / IDENTITY REFERENCE (HIGHEST PRIORITY)\n\nImage 1 is the ONLY source of the person's identity.\n\nTreat Image 1 as immutable biometric identity data.\n\nThe person shown in Image 1 IS the final person.\n\nDo NOT create a similar-looking woman.\n\nDo NOT generate a new face.\n\nDo NOT reinterpret facial anatomy.\n\nDo NOT beautify.\n\nDo NOT stylize.\n\nDo NOT idealize.\n\nDo NOT average facial features across references.\n\nDo NOT borrow any facial characteristics from Image 2 or Image 3.\n\nImage 1 always has the highest priority.\n\nPreserve exactly:\n\n• face shape\n\n• facial proportions\n\n• natural facial asymmetry\n\n• forehead\n\n• forehead height\n\n• hairline\n\n• eyebrows\n\n• eyebrow thickness\n\n• eyebrow curvature\n\n• eyebrow spacing\n\n• eye shape\n\n• eye size\n\n• eye spacing\n\n• eyelids\n\n• eyelashes\n\n• iris size\n\n• eye corners\n\n• nose bridge\n\n• nose width\n\n• nostrils\n\n• philtrum\n\n• lips\n\n• lip thickness\n\n• mouth width\n\n• lip corners\n\n• chin\n\n• jawline\n\n• cheekbones\n\n• ears\n\n• skin tone\n\n• skin texture\n\n• pores\n\n• freckles\n\n• moles\n\n• natural wrinkles\n\n• facial volume\n\n• every visible identity feature\n\nThe generated face must look like another real photograph of the exact same person.\n\nNever regenerate or reinterpret the facial identity.\n\nIf the woman appears multiple times in the image, every appearance must have exactly the same face.\n\nThe viewer should immediately recognize both people as the exact same individual.\n\n---\n\n## IMAGE 2 — OUTFIT REFERENCE\n\nImage 2 defines ONLY the wardrobe.\n\nPreserve exactly:\n\n• every garment\n\n• cardigan\n\n• pants\n\n• handbag\n\n• shoes\n\n• jewelry\n\n• accessories\n\n• fabric\n\n• linen or knit texture\n\n• stitching\n\n• seams\n\n• silhouette\n\n• proportions\n\n• colors\n\n• wrinkles\n\n• folds\n\n• layering\n\n• styling\n\nDo NOT redesign any clothing.\n\nDo NOT change colors.\n\nDo NOT replace accessories.\n\nDo NOT inherit the face, hairstyle, skin tone or body shape from Image 2.\n\n---\n\n## IMAGE 3 — ESCALATOR REFERENCE\n\nImage 3 defines ONLY the scene, camera composition and environment.\n\nRecreate the scene with near-identical composition.\n\nModern shopping mall.\n\nDouble escalators.\n\nCentral glass divider.\n\nGrey escalator steps.\n\nMetal side panels.\n\nGlass handrails.\n\nSoft indoor daylight.\n\nNeutral grey color palette.\n\nReal architectural proportions.\n\nNo redesign of the location.\n\nMaintain the same camera position, framing, perspective and composition.\n\n---\n\n# REFERENCE PRIORITY\n\nPriority 1\n\nFace identity (Image 1)\n\nPriority 2\n\nOutfit (Image 2)\n\nPriority 3\n\nBackground (Image 3)\n\nIf any conflict exists, always preserve Image 1.\n\nNever sacrifice facial identity to match outfit or scene.\n\n---\n\n# COMPOSITION\n\nCreate one vertical 9:16 fashion editorial photograph.\n\nThe same woman appears twice.\n\nLEFT SIDE\n\nThe woman is standing on the descending escalator.\n\nFront three-quarter view.\n\nHead naturally turned toward the left.\n\nRelaxed smile.\n\nElegant posture.\n\nOne hand inside pocket.\n\nThe other hand holding the large handbag.\n\nRIGHT SIDE\n\nThe exact same woman is seen from behind.\n\nStanding on the opposite escalator.\n\nOne hand gently touching the handrail.\n\nHolding the same handbag.\n\nNatural relaxed posture.\n\nBoth figures must clearly be the same woman wearing the exact same outfit.\n\n---\n\n# CAMERA\n\nVertical 9:16\n\nApproximately 50 mm lens\n\nEye-level camera\n\nEditorial fashion photography\n\nNatural perspective\n\nHigh resolution\n\nExtremely sharp\n\nDeep focus\n\nNo exaggerated depth of field\n\n---\n\n# LIGHTING\n\nNatural indoor daylight\n\nSoft diffused lighting\n\nNeutral white balance\n\nSubtle realistic shadows\n\nNo studio flash\n\nNo dramatic lighting\n\nNatural mall ambience\n\n---\n\n# PHOTO REALISM\n\nCreate a photograph that is visually indistinguishable from a real camera photo.\n\nAuthentic skin pores.\n\nNatural facial texture.\n\nRealistic fabric behavior.\n\nCorrect gravity.\n\nNatural body proportions.\n\nReal handbag weight.\n\nCorrect reflections on metal and glass.\n\nNatural escalator perspective.\n\nPhysically accurate lighting.\n\nNo CGI appearance.\n\nNo synthetic rendering.\n\nNo artificial beauty filter.\n\nNo over-retouching.\n\nNo glossy plastic skin.\n\nNo unrealistic symmetry.\n\nNo AI-generated appearance.\n\n---\n\n# IDENTITY CONSISTENCY\n\nThe generated woman must be immediately recognizable as the exact same person shown in Image 1.\n\nThe result must NOT resemble:\n\n• a similar woman\n\n• a twin\n\n• a sister\n\n• another Asian woman\n\n• an AI recreation\n\n• a beautified version\n\n• a younger version\n\n• a stylized version\n\nIt must appear as though the original person from Image 1 was photographed wearing the clothing from Image 2 inside the location from Image 3.\n\n---\n\n# NEGATIVE PROMPT\n\nwrong identity\n\ndifferent face\n\nface drift\n\nidentity drift\n\nbeautified face\n\nAI face\n\nplastic skin\n\nCGI\n\n3D render\n\nanime\n\ncartoon\n\nbeauty filter\n\nairbrushed skin\n\ndifferent hairstyle\n\ndifferent eyebrows\n\ndifferent eyes\n\ndifferent nose\n\ndifferent lips\n\nincorrect outfit\n\nredesigned clothing\n\nwrong handbag\n\nincorrect colors\n\nwarped hands\n\nextra fingers\n\ndeformed body\n\nduplicate limbs\n\nincorrect escalator\n\nwarped architecture\n\nbad reflections\n\nlow resolution\n\nblurry face\n\ntext\n\nwatermark\n\nlogo\n\nartifacts\n\nuncanny valley\n\nsynthetic appearance",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60,
+        "id": "node_XUvLsR6q",
+        "label": "📝 Prompt Ghép Nhân Vật + Bộ Đồ Lên Thang Cuốn 2K",
+        "config": {
+          "slug": "prompt_assistant",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "# MASTER REFERENCE COMPOSITION — IDENTITY LOCK + OUTFIT LOCK + SCENE LOCK\n\nUse exactly three reference images.\n\n## IMAGE 1 — FACE / IDENTITY REFERENCE (HIGHEST PRIORITY)\n\nImage 1 is the ONLY source of the person's identity.\n\nTreat Image 1 as immutable biometric identity data.\n\nThe person shown in Image 1 IS the final person.\n\nDo NOT create a similar-looking woman.\n\nDo NOT generate a new face.\n\nDo NOT reinterpret facial anatomy.\n\nDo NOT beautify.\n\nDo NOT stylize.\n\nDo NOT idealize.\n\nDo NOT average facial features across references.\n\nDo NOT borrow any facial characteristics from Image 2 or Image 3.\n\nImage 1 always has the highest priority.\n\nPreserve exactly:\n\n• face shape\n\n• facial proportions\n\n• natural facial asymmetry\n\n• forehead\n\n• forehead height\n\n• hairline\n\n• eyebrows\n\n• eyebrow thickness\n\n• eyebrow curvature\n\n• eyebrow spacing\n\n• eye shape\n\n• eye size\n\n• eye spacing\n\n• eyelids\n\n• eyelashes\n\n• iris size\n\n• eye corners\n\n• nose bridge\n\n• nose width\n\n• nostrils\n\n• philtrum\n\n• lips\n\n• lip thickness\n\n• mouth width\n\n• lip corners\n\n• chin\n\n• jawline\n\n• cheekbones\n\n• ears\n\n• skin tone\n\n• skin texture\n\n• pores\n\n• freckles\n\n• moles\n\n• natural wrinkles\n\n• facial volume\n\n• every visible identity feature\n\nThe generated face must look like another real photograph of the exact same person.\n\nNever regenerate or reinterpret the facial identity.\n\nIf the woman appears multiple times in the image, every appearance must have exactly the same face.\n\nThe viewer should immediately recognize both people as the exact same individual.\n\n---\n\n## IMAGE 2 — OUTFIT REFERENCE\n\nImage 2 defines ONLY the wardrobe.\n\nPreserve exactly:\n\n• every garment\n\n• cardigan\n\n• pants\n\n• handbag\n\n• shoes\n\n• jewelry\n\n• accessories\n\n• fabric\n\n• linen or knit texture\n\n• stitching\n\n• seams\n\n• silhouette\n\n• proportions\n\n• colors\n\n• wrinkles\n\n• folds\n\n• layering\n\n• styling\n\nDo NOT redesign any clothing.\n\nDo NOT change colors.\n\nDo NOT replace accessories.\n\nDo NOT inherit the face, hairstyle, skin tone or body shape from Image 2.\n\n---\n\n## IMAGE 3 — ESCALATOR REFERENCE\n\nImage 3 defines ONLY the scene, camera composition and environment.\n\nRecreate the scene with near-identical composition.\n\nModern shopping mall.\n\nDouble escalators.\n\nCentral glass divider.\n\nGrey escalator steps.\n\nMetal side panels.\n\nGlass handrails.\n\nSoft indoor daylight.\n\nNeutral grey color palette.\n\nReal architectural proportions.\n\nNo redesign of the location.\n\nMaintain the same camera position, framing, perspective and composition.\n\n---\n\n# REFERENCE PRIORITY\n\nPriority 1\n\nFace identity (Image 1)\n\nPriority 2\n\nOutfit (Image 2)\n\nPriority 3\n\nBackground (Image 3)\n\nIf any conflict exists, always preserve Image 1.\n\nNever sacrifice facial identity to match outfit or scene.\n\n---\n\n# COMPOSITION\n\nCreate one vertical 9:16 fashion editorial photograph.\n\nThe same woman appears twice.\n\nLEFT SIDE\n\nThe woman is standing on the descending escalator.\n\nFront three-quarter view.\n\nHead naturally turned toward the left.\n\nRelaxed smile.\n\nElegant posture.\n\nOne hand inside pocket.\n\nThe other hand holding the large handbag.\n\nRIGHT SIDE\n\nThe exact same woman is seen from behind.\n\nStanding on the opposite escalator.\n\nOne hand gently touching the handrail.\n\nHolding the same handbag.\n\nNatural relaxed posture.\n\nBoth figures must clearly be the same woman wearing the exact same outfit.\n\n---\n\n# CAMERA\n\nVertical 9:16\n\nApproximately 50 mm lens\n\nEye-level camera\n\nEditorial fashion photography\n\nNatural perspective\n\nHigh resolution\n\nExtremely sharp\n\nDeep focus\n\nNo exaggerated depth of field\n\n---\n\n# LIGHTING\n\nNatural indoor daylight\n\nSoft diffused lighting\n\nNeutral white balance\n\nSubtle realistic shadows\n\nNo studio flash\n\nNo dramatic lighting\n\nNatural mall ambience\n\n---\n\n# PHOTO REALISM\n\nCreate a photograph that is visually indistinguishable from a real camera photo.\n\nAuthentic skin pores.\n\nNatural facial texture.\n\nRealistic fabric behavior.\n\nCorrect gravity.\n\nNatural body proportions.\n\nReal handbag weight.\n\nCorrect reflections on metal and glass.\n\nNatural escalator perspective.\n\nPhysically accurate lighting.\n\nNo CGI appearance.\n\nNo synthetic rendering.\n\nNo artificial beauty filter.\n\nNo over-retouching.\n\nNo glossy plastic skin.\n\nNo unrealistic symmetry.\n\nNo AI-generated appearance.\n\n---\n\n# IDENTITY CONSISTENCY\n\nThe generated woman must be immediately recognizable as the exact same person shown in Image 1.\n\nThe result must NOT resemble:\n\n• a similar woman\n\n• a twin\n\n• a sister\n\n• another Asian woman\n\n• an AI recreation\n\n• a beautified version\n\n• a younger version\n\n• a stylized version\n\nIt must appear as though the original person from Image 1 was photographed wearing the clothing from Image 2 inside the location from Image 3.\n\n---\n\n# NEGATIVE PROMPT\n\nwrong identity\n\ndifferent face\n\nface drift\n\nidentity drift\n\nbeautified face\n\nAI face\n\nplastic skin\n\nCGI\n\n3D render\n\nanime\n\ncartoon\n\nbeauty filter\n\nairbrushed skin\n\ndifferent hairstyle\n\ndifferent eyebrows\n\ndifferent eyes\n\ndifferent nose\n\ndifferent lips\n\nincorrect outfit\n\nredesigned clothing\n\nwrong handbag\n\nincorrect colors\n\nwarped hands\n\nextra fingers\n\ndeformed body\n\nduplicate limbs\n\nincorrect escalator\n\nwarped architecture\n\nbad reflections\n\nlow resolution\n\nblurry face\n\ntext\n\nwatermark\n\nlogo\n\nartifacts\n\nuncanny valley\n\nsynthetic appearance",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      },
+      {
+        "node_id": "node_oSpxhruC",
+        "node_type": "generate",
+        "node_name": "🎬 Google Flow Video — Kết Quả Thời Trang Thang Cuốn (1080p)",
+        "pos_x": 2559.0,
+        "pos_y": 161.0,
+        "enabled": true,
+        "slug": "flow_image_video_generate_1",
+        "slug_auto": true,
+        "prompt_mode": "all",
+        "ref_mode": "all",
+        "media_type": "Video",
+        "video_input_type": "Ingredients",
+        "video_duration": "6s",
+        "model": "Omni 1.1 Flash",
+        "quantity": 1,
+        "ratio": "9:16",
+        "download_resolution": "1k",
+        "video_download_resolution": "720p",
+        "prompt_source": "upstream_node",
+        "multi_prompt": false,
+        "id": "node_oSpxhruC",
+        "label": "🎬 Google Flow Video — Kết Quả Thời Trang Thang Cuốn (1080p)",
+        "provider": "flow",
+        "config": {
+          "slug": "flow_image_video_generate_1",
+          "mode": "video",
+          "provider": "flow",
+          "model": "Omni 1.1 Flash",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "6s",
+          "resolution": "720p",
+          "use_own_prompt": false,
+          "prompt": "",
+          "file_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4",
+          "result_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4",
+          "reference_images": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4"
+          ],
+          "auto_download": false,
+          "status": "done"
+        },
+        "local_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4",
+        "last_output": {
+          "status": "done",
+          "type": "video",
+          "paths": [
+            "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4"
+          ],
+          "primary_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4",
+          "completed_at": "2026-11-05T15:26:38"
+        }
+      },
+      {
+        "node_id": "node_b8uOaHpN",
+        "node_type": "prompt",
+        "node_name": "📝 Prompt Tạo Chuyển Động Thang Cuốn Đi Lên",
+        "pos_x": 1857.0,
+        "pos_y": 1296.4062575399,
+        "enabled": true,
+        "slug": "prompt_assistant_2",
+        "slug_auto": true,
+        "prompt_mode": "auto",
+        "ref_mode": "all",
+        "prompt": "# REFERENCE SETUP\n\nUse **Reference Image 1** as the ONLY visual reference.\n\nReference Image 1 is a fully locked Master Reference.\n\nIt defines:\n\n* the person's facial identity\n* hairstyle\n* body proportions\n* outfit\n* handbag\n* shoes\n* accessories\n* escalator\n* shopping mall environment\n* camera angle\n* framing\n* lighting\n* composition\n\nDo not reinterpret any element from the reference image.\n\nThe reference image must appear to become a live-action video.\n\n---\n\n# IDENTITY LOCK\n\nThe woman in Reference Image 1 is the final person.\n\nMaintain exactly the same facial identity in every frame.\n\nNever regenerate or reinterpret the face.\n\nNever beautify the face.\n\nNever change:\n\n* facial proportions\n* eyebrows\n* eyes\n* nose\n* lips\n* jawline\n* skin tone\n* hairstyle\n\nEvery frame must clearly depict the exact same individual.\n\n---\n\n# OUTFIT LOCK\n\nMaintain exactly the same outfit shown in Reference Image 1.\n\nDo not modify:\n\n* cardigan\n* pants\n* handbag\n* shoes\n* accessories\n* colors\n* materials\n* textures\n* stitching\n* folds\n* proportions\n\nThe outfit must remain identical throughout the entire video.\n\n---\n\n# SCENE LOCK\n\nMaintain exactly the same shopping mall escalator environment shown in Reference Image 1.\n\nKeep identical:\n\n* escalator structure\n* glass handrails\n* metal panels\n* escalator steps\n* lighting\n* shopping mall background\n* architectural perspective\n\nDo not redesign or replace the environment.\n\n---\n\n# CAMERA LOCK\n\nThe camera remains completely fixed.\n\nLocked tripod shot.\n\nNo zoom.\n\nNo pan.\n\nNo tilt.\n\nNo dolly.\n\nNo tracking.\n\nNo handheld movement.\n\nMaintain exactly the same framing as the reference image.\n\n---\n\n# VIDEO\n\nDuration: 10 seconds.\n\nThe escalators move continuously at a realistic constant speed.\n\nThe woman on the left slowly rides downward.\n\nShe naturally smiles.\n\nShe occasionally turns her head slightly.\n\nThe handbag gently swings with natural body movement.\n\nThe woman on the right slowly rides upward.\n\nSeen mostly from behind.\n\nOne hand lightly rests on the handrail.\n\nShe subtly shifts her posture.\n\nThe handbag naturally sways.\n\nHair and clothing move only slightly due to normal body movement.\n\nMovement should be smooth, elegant and realistic.\n\n---\n\n# STYLE\n\nUltra-realistic fashion video.\n\nLuxury shopping mall.\n\nNatural indoor lighting.\n\nProfessional fashion campaign quality.\n\nLooks like authentic live-action footage captured by a real camera.\n\nNo CGI.\n\nNo AI-generated appearance.\n\nNo beauty filter.\n\n---\n\n# NEGATIVE PROMPT\n\nidentity drift\n\ndifferent face\n\nchanging outfit\n\nchanging escalator\n\ncamera movement\n\ncamera shake\n\nzoom\n\npan\n\ntilt\n\ntracking\n\nplastic skin\n\nbeauty filter\n\nCGI\n\n3D render\n\nanime\n\nwarped hands\n\nextra fingers\n\nbody deformation\n\nflickering face\n\nflickering clothes\n\ntemporal inconsistency\n\nlow quality",
+        "use_ai": false,
+        "ai_fallback": true,
+        "ai_delete_after_run": false,
+        "timeout_sec": 60,
+        "id": "node_b8uOaHpN",
+        "label": "📝 Prompt Tạo Chuyển Động Thang Cuốn Đi Lên",
+        "config": {
+          "slug": "prompt_assistant_2",
+          "mode": "image",
+          "provider": "flow",
+          "model": "gpt-5.4",
+          "aspect_ratio": "9:16",
+          "count": 1,
+          "duration": "8s",
+          "resolution": "1080p",
+          "use_own_prompt": false,
+          "prompt": "# REFERENCE SETUP\n\nUse **Reference Image 1** as the ONLY visual reference.\n\nReference Image 1 is a fully locked Master Reference.\n\nIt defines:\n\n* the person's facial identity\n* hairstyle\n* body proportions\n* outfit\n* handbag\n* shoes\n* accessories\n* escalator\n* shopping mall environment\n* camera angle\n* framing\n* lighting\n* composition\n\nDo not reinterpret any element from the reference image.\n\nThe reference image must appear to become a live-action video.\n\n---\n\n# IDENTITY LOCK\n\nThe woman in Reference Image 1 is the final person.\n\nMaintain exactly the same facial identity in every frame.\n\nNever regenerate or reinterpret the face.\n\nNever beautify the face.\n\nNever change:\n\n* facial proportions\n* eyebrows\n* eyes\n* nose\n* lips\n* jawline\n* skin tone\n* hairstyle\n\nEvery frame must clearly depict the exact same individual.\n\n---\n\n# OUTFIT LOCK\n\nMaintain exactly the same outfit shown in Reference Image 1.\n\nDo not modify:\n\n* cardigan\n* pants\n* handbag\n* shoes\n* accessories\n* colors\n* materials\n* textures\n* stitching\n* folds\n* proportions\n\nThe outfit must remain identical throughout the entire video.\n\n---\n\n# SCENE LOCK\n\nMaintain exactly the same shopping mall escalator environment shown in Reference Image 1.\n\nKeep identical:\n\n* escalator structure\n* glass handrails\n* metal panels\n* escalator steps\n* lighting\n* shopping mall background\n* architectural perspective\n\nDo not redesign or replace the environment.\n\n---\n\n# CAMERA LOCK\n\nThe camera remains completely fixed.\n\nLocked tripod shot.\n\nNo zoom.\n\nNo pan.\n\nNo tilt.\n\nNo dolly.\n\nNo tracking.\n\nNo handheld movement.\n\nMaintain exactly the same framing as the reference image.\n\n---\n\n# VIDEO\n\nDuration: 10 seconds.\n\nThe escalators move continuously at a realistic constant speed.\n\nThe woman on the left slowly rides downward.\n\nShe naturally smiles.\n\nShe occasionally turns her head slightly.\n\nThe handbag gently swings with natural body movement.\n\nThe woman on the right slowly rides upward.\n\nSeen mostly from behind.\n\nOne hand lightly rests on the handrail.\n\nShe subtly shifts her posture.\n\nThe handbag naturally sways.\n\nHair and clothing move only slightly due to normal body movement.\n\nMovement should be smooth, elegant and realistic.\n\n---\n\n# STYLE\n\nUltra-realistic fashion video.\n\nLuxury shopping mall.\n\nNatural indoor lighting.\n\nProfessional fashion campaign quality.\n\nLooks like authentic live-action footage captured by a real camera.\n\nNo CGI.\n\nNo AI-generated appearance.\n\nNo beauty filter.\n\n---\n\n# NEGATIVE PROMPT\n\nidentity drift\n\ndifferent face\n\nchanging outfit\n\nchanging escalator\n\ncamera movement\n\ncamera shake\n\nzoom\n\npan\n\ntilt\n\ntracking\n\nplastic skin\n\nbeauty filter\n\nCGI\n\n3D render\n\nanime\n\nwarped hands\n\nextra fingers\n\nbody deformation\n\nflickering face\n\nflickering clothes\n\ntemporal inconsistency\n\nlow quality",
+          "file_path": "",
+          "result_path": "",
+          "reference_images": [],
+          "auto_download": false,
+          "status": "done"
+        }
+      }
+    ],
+    "edges": [
+      {
+        "edge_id": "edge_1_output_1_4_input_1",
+        "source_node_id": "node_ibmyTVtC",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_F7cBJGtk",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_2_output_1_4_input_1",
+        "source_node_id": "node_1xdE0hwA",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_F7cBJGtk",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_3_output_1_4_input_1",
+        "source_node_id": "node_Y0sUYhz9",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_F7cBJGtk",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_4_output_1_6_input_1",
+        "source_node_id": "node_F7cBJGtk",
+        "source_handle": "output_1",
+        "source_port": "media",
+        "target_node_id": "node_oSpxhruC",
+        "target_handle": "input_1",
+        "target_port": "image_ref",
+        "data_type": "image",
+        "edge_type": "image_ref"
+      },
+      {
+        "edge_id": "edge_5_output_1_4_input_2",
+        "source_node_id": "node_XUvLsR6q",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_F7cBJGtk",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      },
+      {
+        "edge_id": "edge_7_output_1_6_input_2",
+        "source_node_id": "node_b8uOaHpN",
+        "source_handle": "output_1",
+        "source_port": "text",
+        "target_node_id": "node_oSpxhruC",
+        "target_handle": "input_2",
+        "target_port": "text",
+        "data_type": "text",
+        "edge_type": "text"
+      }
+    ],
+    "groups": [],
+    "notes": [],
+    "timeline": [
+      {
+        "clip_id": "clip_node_oSpxhruC",
+        "node_id": "node_oSpxhruC",
+        "label": "🎬 Google Flow Video — Kết Quả Thời Trang Thang Cuốn (1080p)",
+        "video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\WorkFlow\\workflow_outputs\\demo_assets_2k\\wf_escalator_fashion_1080p.mp4",
+        "duration": "6s"
+      }
+    ],
+    "final_video_path": "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos\\wf_escalator_fashion_video_final_1080p.mp4",
+    "batch_history": []
+  }
+}

@@ -31,6 +31,11 @@ from playwright.sync_api import sync_playwright
 from curl_cffi import requests as cffi_requests
 from sync_web_ui_state import sync_web_ui, get_final_video_filename
 
+try:
+    import engine_settings_manager as _esm
+except Exception:
+    _esm = None
+
 ALL_PIDS = [
     "1738086213622335480",
     "1735109997221349342",
@@ -101,12 +106,12 @@ def find_img_url(obj):
     return None
 
 
-def upload_single_product_ref_in_page(page, wiz, project_id, img_path):
-    """Upload ONLY 1 single-variant product image via maseQ directly inside the clean Chrome context."""
+def upload_single_product_ref_in_page(page, wiz, project_id, img_path, quality=95):
+    """Upload ONLY 1 single-variant product or 2K reference image via maseQ directly inside the clean Chrome context."""
     with Image.open(img_path) as im:
         im_rgb = im.convert("RGB")
         tmp_jpg = img_path + ".upload_tmp.jpg"
-        im_rgb.save(tmp_jpg, format="JPEG", quality=92)
+        im_rgb.save(tmp_jpg, format="JPEG", quality=int(quality or 95))
     try:
         raw_bytes = open(tmp_jpg, "rb").read()
     finally:
@@ -237,12 +242,13 @@ def upsample_image_2k_in_page(page, wiz, project_id, img_uuid, out_file):
 
 
 def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
-    """Generate a unique 9:16 reference image (ogiZ0b / BELUGA) and download it at 2K (1536x2752) via SPrCad."""
+    """Generate a unique 9:16 reference image or AI Thumbnail (ogiZ0b / BELUGA) and download it at 2K (1536x2752) via SPrCad."""
     pid = task["pid"]
     v_key = task["v_key"]
     project_id = task["project_id"]
     char_id = task["char_id"]
-    prod_uuids = (task["prod_uuids"] or [])[:1]  # Strictly ONLY 1 single-variant product image!
+    max_refs = 4 if task.get("allow_multi_refs") else 1
+    prod_uuids = [u for u in (task.get("prod_uuids") or []) if u][:max_refs]
     prompt_str = task["prompt_str"]
     out_file = task["out_file"]
 
@@ -325,7 +331,7 @@ def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
         if not img_url:
             for _ in range(15):
                 time.sleep(2.5)
-                ok_p, inner_p, _ = call_flow_rpc_cffi(s, cookie_hdr, wiz, project_id, "as29s", [gen_uuid])
+                ok_p, inner_p, _ = call_flow_rpc_cffi(s, cookie_hdr, wiz, project_id, "as29s", [gen_uuid, None, [2]])
                 if ok_p:
                     img_url = find_img_url(inner_p)
                     if img_url:
@@ -333,28 +339,61 @@ def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
         if not img_url:
             return False, None, f"No image URL for {gen_uuid}"
 
-        # First attempt 2K (1536x2752) upsample & download via SPrCad (0 credits)
-        ok_2k, nbytes_2k, err_2k = upsample_image_2k_in_page(page, wiz, project_id, gen_uuid, out_file)
-        if ok_2k and nbytes_2k > 50000:
-            print(f"🖼️ [{pid} | {v_key.upper()}] Generated & downloaded 2K Ref Image (1536x2752) {os.path.basename(out_file)} ({nbytes_2k//1024} KB) -> uuid={gen_uuid}", flush=True)
-            return True, gen_uuid, None
+        # Step 2 (Standard Pipeline): Upsample & download at 2K (1536x2752) via SPrCad (0 credits) with up to 4 retries
+        ok_2k, nbytes_2k, err_2k = False, 0, "not_run"
+        for attempt_2k in range(1, 5):
+            ok_2k, nbytes_2k, err_2k = upsample_image_2k_in_page(page, wiz, project_id, gen_uuid, out_file)
+            if ok_2k and nbytes_2k > 50000:
+                break
+            if attempt_2k < 4:
+                time.sleep(3.0)
 
-        print(f"   [2K-FALLBACK {pid} | {v_key}] SPrCad returned {err_2k}, downloading standard ref image...", flush=True)
-        r_img = s.get(img_url, headers=dl_headers, timeout=60, allow_redirects=True)
-        if r_img.status_code != 200 or len(r_img.content) < 5000:
-            return False, None, f"Download HTTP {r_img.status_code}"
-        with open(out_file, "wb") as f:
-            f.write(r_img.content)
+        if not (ok_2k and nbytes_2k > 50000):
+            print(f"   [2K-FALLBACK {pid} | {v_key}] SPrCad returned {err_2k} after 4 tries, downloading & upscaling to 2K (1536x2752)...", flush=True)
+            r_img = s.get(img_url, headers=dl_headers, timeout=60, allow_redirects=True)
+            if r_img.status_code != 200 or len(r_img.content) < 5000:
+                return False, None, f"Download HTTP {r_img.status_code}"
+            with open(out_file, "wb") as f:
+                f.write(r_img.content)
+            try:
+                from PIL import ImageFilter
+                with Image.open(out_file) as im_fb:
+                    im_2k = im_fb.convert("RGB").resize((1536, 2752), Image.Resampling.LANCZOS)
+                    im_2k = im_2k.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=2))
+                    im_2k.save(out_file, format="JPEG", quality=98, subsampling=0)
+                nbytes_2k = os.path.getsize(out_file)
+            except Exception as e_up_fb:
+                print(f"   [WARN {pid} | {v_key}] Local 2K resize fallback warning: {e_up_fb}", flush=True)
+                nbytes_2k = len(r_img.content)
 
     refs_dir = os.path.join(os.path.dirname(out_file), "refs")
     os.makedirs(refs_dir, exist_ok=True)
     shutil.copy2(out_file, os.path.join(refs_dir, os.path.basename(out_file)))
-    print(f"🖼️ [{pid} | {v_key.upper()}] Generated unique Ref Image {os.path.basename(out_file)} ({len(r_img.content)//1024} KB) -> uuid={gen_uuid}", flush=True)
+
+    # Step 2b (Standard Pipeline): Upload the downloaded 2K (1536x2752) Ref Image back to Google Flow via maseQ
+    # so all 3 video scenes use the true 2K uploaded Reference Image + Product Image + Voice!
+    if not task.get("skip_reupload_2k"):
+        uploaded_2k_ok = False
+        for u2k_try in range(1, 4):
+            try:
+                ok_u2k, uuid_2k, err_u2k = upload_single_product_ref_in_page(page, wiz, project_id, out_file, quality=98)
+                if ok_u2k and uuid_2k:
+                    gen_uuid = uuid_2k
+                    uploaded_2k_ok = True
+                    break
+            except Exception as e_u2k:
+                err_u2k = str(e_u2k)
+            if u2k_try < 3:
+                time.sleep(2.0)
+        if not uploaded_2k_ok:
+            print(f"   [WARN {pid} | {v_key}] 2K re-upload fallback to gen_uuid", flush=True)
+
+    print(f"🖼️ [{pid} | {v_key.upper()}] Generated, downloaded 2K (1536x2752) & re-uploaded 2K Ref Image {os.path.basename(out_file)} ({nbytes_2k//1024} KB) -> uuid_2k={gen_uuid}", flush=True)
     return True, gen_uuid, None
 
 
 def submit_scene_in_page(page, wiz, task):
-    """Mint reCAPTCHA Enterprise token AND execute MZZa6b fetch with BOTH [ref_uuid, prod_uuid] directly inside Chrome page."""
+    """Mint reCAPTCHA Enterprise token AND execute MZZa6b fetch with ALL 3 ingredients: [2K ref_uuid, prod_uuid] + [voice_id]."""
     pid = task["pid"]
     sc = task["sc"]
     sc_id = sc["id"]
@@ -362,6 +401,16 @@ def submit_scene_in_page(page, wiz, task):
     ref_uuid = task["ref_uuid"]
     prod_uuid = task.get("prod_uuid")
     voice_id = task["voice_id"]
+    worker_prof = task.get("worker_profile") or ""
+    if voice_id and worker_prof:
+        try:
+            import character_library_manager as _clm_mt
+            voice_id = _clm_mt.resolve_voice_id_for_account(voice_id, worker_prof)
+        except Exception:
+            pass
+
+    if not prod_uuid or prod_uuid == ref_uuid:
+        return False, None, "Missing prod_uuid (Standard workflow requires [2K Ref Image + Product Image + Voice])"
 
     rcap = page.evaluate(
         """async () => {
@@ -377,9 +426,12 @@ def submit_scene_in_page(page, wiz, task):
     x_batch = [b_uuid, 1]
     model_key = "abra_r2v_10s"
     aspect_int = 1  # 9:16 portrait
-    ref_list = [[None, ref_uuid]]
-    if prod_uuid and prod_uuid != ref_uuid:
-        ref_list.append([None, prod_uuid])
+    # Standard 5-Step Google Flow Pipeline:
+    # All 3 scenes (s1, s2, s3) ALWAYS pass the exact same 3 Reference Ingredients:
+    #   1) [None, ref_uuid]  -> 2K Reference Image of Character holding Product (1536x2752)
+    #   2) [None, prod_uuid] -> Product Reference Image (prod_1.jpg)
+    #   3) [[voice_id]]      -> Character Voice
+    ref_list = [[None, ref_uuid], [None, prod_uuid]]
     voice_list = [[voice_id]] if voice_id else []
     item_g = [
         h_prompt,
@@ -518,14 +570,17 @@ def submit_upsample_1080p_in_page(page, wiz, task):
     return True, upsampled_uuid, None
 
 
-def poll_and_download_one(cookie_hdr, wiz, dl_headers, task):
+def poll_and_download_one(default_cookie_hdr, default_wiz, default_dl_headers, task):
+    cookie_hdr = task.get("cookie_hdr") or default_cookie_hdr
+    wiz = task.get("wiz") or default_wiz
+    dl_headers = task.get("dl_headers") or default_dl_headers
     uid = task["media_uuid"]
     project_id = task["project_id"]
     out_mp4 = task["out_mp4"]
     stage = task.get("stage", "upsample_1080p" if str(uid).endswith("_upsampled") else "base_720p")
 
     with cffi_requests.Session(impersonate="chrome131") as s:
-        ok_p, inner_p, err_p = call_flow_rpc_cffi(s, cookie_hdr, wiz, project_id, "as29s", [uid])
+        ok_p, inner_p, err_p = call_flow_rpc_cffi(s, cookie_hdr, wiz, project_id, "as29s", [uid, None, [2]])
         if not ok_p or not isinstance(inner_p, list):
             return f"rpc_err:{str(err_p)[:25]}", None
 
@@ -640,16 +695,67 @@ def is_ref_image_2k(img_path):
 
 def main():
     only_pids = sys.argv[1:] if len(sys.argv) > 1 else ALL_PIDS
-    MAX_INFLIGHT = 25
-    SUBMIT_DELAY_SEC = 15.0  # 15s delay between Google Flow requests
+    cfg = _esm.load_engine_settings() if _esm is not None else {}
+    MAX_INFLIGHT = int(cfg.get("max_total_inflight") or 20)
+    SUBMIT_DELAY_SEC = float(cfg.get("submit_delay_sec") or 12.0)
+    FFMPEG_WORKERS = int(cfg.get("ffmpeg_render_workers") or 4)
+    multi_acc_enabled = bool(cfg.get("multi_account_enabled", True))
+    detected_accs = cfg.get("detected_flow_accounts") or [{"name": f"Google_{PROF_NAME}", "profile_name": PROF_NAME, "active": True}]
+    active_flow_accs = [a for a in detected_accs if a.get("active", True)] if multi_acc_enabled else detected_accs[:1]
+    if not active_flow_accs:
+        active_flow_accs = [{"name": f"Google_{PROF_NAME}", "profile_name": PROF_NAME, "active": True}]
 
-    ffmpeg_pool = concurrent.futures.ThreadPoolExecutor(max_workers=4)
-    poll_pool = concurrent.futures.ThreadPoolExecutor(max_workers=25)
+    print(
+        f"⚙️ [ENGINE CONFIG] FFmpeg Workers={FFMPEG_WORKERS} | Max Inflight={MAX_INFLIGHT} | "
+        f"Submit Delay={SUBMIT_DELAY_SEC}s | Active Flow Accounts={len(active_flow_accs)} ({', '.join(a['profile_name'] for a in active_flow_accs)})",
+        flush=True,
+    )
+
+    ffmpeg_pool = concurrent.futures.ThreadPoolExecutor(max_workers=FFMPEG_WORKERS)
+    poll_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(15, MAX_INFLIGHT))
     ffmpeg_futures = []
 
     pending_queue = []
     inflight_tasks = {}
     prod_meta = {}
+
+    def write_pipeline_heartbeat(step_text: str, is_running: bool = True):
+        now_s = time.strftime("%H:%M:%S")
+        active_list = [
+            {
+                "key": tk.get("key"),
+                "pid": tk.get("pid"),
+                "v_key": tk.get("v_key"),
+                "sc_id": (tk.get("sc") or {}).get("id", tk.get("v_key")),
+                "stage": tk.get("stage", tk.get("type")),
+                "account": tk.get("account_name", PROF_NAME),
+                "elapsed_sec": int(time.time() - (tk.get("submitted_at") or time.time())),
+            }
+            for tk in list(inflight_tasks.values())
+        ]
+        for p_id in only_pids:
+            p_dir = os.path.join(PROJECTS_DIR, p_id)
+            if not os.path.isdir(p_dir):
+                continue
+            p_inflight = [x for x in active_list if x["pid"] == p_id]
+            p_queued = [q for q in pending_queue if q.get("pid") == p_id]
+            st_obj = {
+                "pid": p_id,
+                "pid_os": os.getpid(),
+                "is_running": is_running,
+                "inflight_count": len(p_inflight),
+                "queued_count": len(p_queued),
+                "active_tasks": p_inflight,
+                "accounts_active": [a["profile_name"] for a in active_flow_accs],
+                "ffmpeg_workers": FFMPEG_WORKERS,
+                "current_step_text": step_text,
+                "updated_at": now_s,
+            }
+            try:
+                with open(os.path.join(p_dir, "pipeline_status.json"), "w", encoding="utf-8") as sf:
+                    json.dump(st_obj, sf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
 
     for pid in only_pids:
         pdir = os.path.join(PROJECTS_DIR, pid)
@@ -678,7 +784,8 @@ def main():
                 continue
             v_info = prompts_data["videos"][v_key]
             char_key = v_info.get("character", "nv1")
-            base_char = "nv1" if "nv1" in char_key else "nv2"
+            ck_low = (char_key or "").lower()
+            base_char = "nv3" if ("nv3" in ck_low or v_key.lower().startswith("nv3")) else ("nv2" if ("nv2" in ck_low or v_key.lower().startswith("nv2")) else "nv1")
             project_id = v_info.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
             char_id = v_info.get("character_id") or ""
             voice_id = v_info.get("voice_id") or ""
@@ -696,11 +803,19 @@ def main():
             has_unique_ref = bool(ref_uuid and os.path.exists(ref_img_abs) and os.path.getsize(ref_img_abs) > 10000)
 
             scenes = v_info["scenes"]
+            char_v_code = v_info.get("char_v") or get_final_video_filename(pid, v_key).replace(f"{pid}_", "").replace(".mp4", "")
+            out_thumb_proj = os.path.join(pdir, "thumbnails", f"{pid}_{char_v_code}_thumb.jpg")
+            need_thumb = bool(
+                cfg.get("auto_generate_thumbnail", True)
+                and _esm is not None
+                and not (os.path.exists(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 10000)
+            )
             if has_unique_ref:
                 state["uploaded_refs"][ref_img_rel] = ref_uuid
                 save_prod_state(pdir, state, refs_state)
-                if not is_ref_image_2k(ref_img_abs):
-                    pending_queue.append({
+                needs_2k_upgrade = not is_ref_image_2k(ref_img_abs)
+                if needs_2k_upgrade:
+                    pending_queue.insert(0, {
                         "type": "upsample_ref_2k",
                         "key": f"{pid}_{v_key}_2k",
                         "pid": pid,
@@ -711,8 +826,26 @@ def main():
                         "out_file": ref_img_abs,
                         "retries": 0,
                     })
+                if need_thumb:
+                    pending_queue.append({
+                        "type": "thumb_img",
+                        "key": f"{pid}_{v_key}_thumb",
+                        "pid": pid,
+                        "pdir": pdir,
+                        "v_key": v_key,
+                        "char_v": char_v_code,
+                        "base_char": base_char,
+                        "primary_prod_img": primary_prod_img,
+                        "project_id": project_id,
+                        "char_id": char_id,
+                        "ref_uuid": ref_uuid,
+                        "prod_uuid": prod_uuids[0] if prod_uuids else None,
+                        "out_file": out_thumb_proj,
+                        "retries": 0,
+                    })
                 check_and_queue_ffmpeg(ffmpeg_pool, ffmpeg_futures, pid, pdir, v_key, scenes)
             else:
+                needs_2k_upgrade = False
                 # Queue a ref_img generation task for this variant!
                 pending_queue.append({
                     "type": "ref_img",
@@ -720,6 +853,7 @@ def main():
                     "pid": pid,
                     "pdir": pdir,
                     "v_key": v_key,
+                    "char_v": char_v_code,
                     "base_char": base_char,
                     "primary_prod_img": primary_prod_img,
                     "project_id": project_id,
@@ -728,6 +862,8 @@ def main():
                     "prompt_str": v_info["ref_image_prompt"],
                     "ref_img_rel": ref_img_rel,
                     "out_file": ref_img_abs,
+                    "out_thumb_proj": out_thumb_proj,
+                    "need_thumb": need_thumb,
                     "style": v_info.get("style", ""),
                     "scenes": scenes,
                     "voice_id": voice_id,
@@ -743,6 +879,7 @@ def main():
                     continue
 
                 existing_vid_uuid = state.get("scene_uuids", {}).get(sc_id)
+                can_resume_inflight = bool(has_unique_ref and not needs_2k_upgrade and existing_vid_uuid and len(inflight_tasks) < MAX_INFLIGHT)
                 init_stage = "upsample_1080p" if (existing_vid_uuid and str(existing_vid_uuid).endswith("_upsampled")) else "base_720p"
                 task_obj = {
                     "type": "vid_scene",
@@ -753,6 +890,7 @@ def main():
                     "v_key": v_key,
                     "base_char": base_char,
                     "primary_prod_img": primary_prod_img,
+                    "ref_img_abs": ref_img_abs,
                     "sc": sc,
                     "project_id": project_id,
                     "ref_uuid": ref_uuid,
@@ -760,8 +898,8 @@ def main():
                     "voice_id": voice_id,
                     "out_mp4": out_mp4,
                     "retries": 0,
-                    "media_uuid": existing_vid_uuid if (has_unique_ref and existing_vid_uuid and len(inflight_tasks) < MAX_INFLIGHT) else None,
-                    "submitted_at": time.time() if (has_unique_ref and existing_vid_uuid and len(inflight_tasks) < MAX_INFLIGHT) else 0,
+                    "media_uuid": existing_vid_uuid if can_resume_inflight else None,
+                    "submitted_at": time.time() if can_resume_inflight else 0,
                 }
                 if task_obj["media_uuid"]:
                     inflight_tasks[task_obj["key"]] = task_obj
@@ -770,16 +908,47 @@ def main():
                     pending_queue.append(task_obj)
 
     print(f"\n=== MULTI-THREADED PIPELINE READY: {len(inflight_tasks)} in-flight, {len(pending_queue)} tasks queued ===", flush=True)
+    write_pipeline_heartbeat(
+        f"🚀 Khởi động Đa Luồng ({len(active_flow_accs)} TK Google Flow | {FFMPEG_WORKERS} luồng FFmpeg): {len(inflight_tasks)} đang xử lý, {len(pending_queue)} hàng đợi",
+        is_running=True,
+    )
+    safe_sync_ui()
 
     import socket
     try:
         with socket.create_connection(("flow.google.com", 443), timeout=3.0):
             pass
     except OSError as net_err:
+        write_pipeline_heartbeat(f"❌ Lỗi kết nối mạng tới flow.google.com: {net_err}", is_running=False)
         raise RuntimeError(f"Network access to flow.google.com:443 is required before launching Chrome profile: {net_err}")
 
     with sync_playwright() as pw:
-        print("Reading and refreshing auth cookies from persistent profile & cookies_file...", flush=True)
+        print("Reading and refreshing auth cookies from persistent profile(s) & cookies_file...", flush=True)
+        account_cookie_pool = []
+        for acc_item in active_flow_accs:
+            acc_prof = acc_item.get("profile_name") or PROF_NAME
+            acc_sh_dir = gvt._resolve_flow_shared_dir(acc_prof)
+            acc_p_dir, acc_c_file = profile_paths(acc_sh_dir, acc_prof)
+            acc_saved = []
+            if acc_c_file and os.path.exists(str(acc_c_file)):
+                try:
+                    c_json = json.load(open(str(acc_c_file), "r", encoding="utf-8"))
+                    if isinstance(c_json, dict) and isinstance(c_json.get("cookies"), list):
+                        acc_saved = [c for c in c_json["cookies"] if "GRECAPTCHA" not in c.get("name", "").upper()]
+                    elif isinstance(c_json, list):
+                        acc_saved = [c for c in c_json if "GRECAPTCHA" not in c.get("name", "").upper()]
+                except Exception:
+                    pass
+            if acc_saved:
+                merged_acc = {(c.get("domain", ""), c.get("name", "")): c for c in acc_saved}
+                account_cookie_pool.append({
+                    "name": acc_item.get("name") or acc_prof,
+                    "profile_name": acc_prof,
+                    "profile_dir": acc_p_dir,
+                    "clean_cookies": list(merged_acc.values()),
+                })
+
+        # Warm-up primary profile ONLY if saved_cookies are missing/empty (prevents TargetClosedError if profile is busy)
         saved_cookies = []
         if cookies_file and os.path.exists(str(cookies_file)):
             try:
@@ -791,38 +960,55 @@ def main():
             except Exception as e:
                 print(f"[WARN] Could not read cookies_file {cookies_file}: {e}", flush=True)
 
-        p_ctx = pw.chromium.launch_persistent_context(
-            str(profile_dir),
-            channel="chrome",
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--window-position=-2000,-2000",
-                "--window-size=1280,800",
-            ],
-        )
-        if saved_cookies:
+        raw_cookies = []
+        if len(saved_cookies) < 5 and not account_cookie_pool:
             try:
-                p_ctx.add_cookies(saved_cookies)
-            except Exception as e:
-                print(f"[WARN] p_ctx.add_cookies: {e}", flush=True)
-        p_page = p_ctx.pages[0] if p_ctx.pages else p_ctx.new_page()
-        try:
-            p_page.goto("https://flow.google.com/project/932bc2a1-07ea-4199-b147-80ab0018d41c", wait_until="domcontentloaded", timeout=35000)
-            p_page.wait_for_timeout(2500)
-        except Exception as e:
-            print(f"[WARN] Initial profile warm-up: {e}", flush=True)
-        raw_cookies = p_ctx.cookies(["https://flow.google.com", "https://google.com", "https://www.google.com", "https://accounts.google.com"])
-        p_ctx.close()
+                p_ctx = pw.chromium.launch_persistent_context(
+                    str(profile_dir),
+                    channel="chrome",
+                    headless=False,
+                    args=[
+                        "--disable-blink-features=AutomationControlled",
+                        "--window-position=-2000,-2000",
+                        "--window-size=1280,800",
+                    ],
+                )
+                if saved_cookies:
+                    try:
+                        p_ctx.add_cookies(saved_cookies)
+                    except Exception as e:
+                        print(f"[WARN] p_ctx.add_cookies: {e}", flush=True)
+                p_page = p_ctx.pages[0] if p_ctx.pages else p_ctx.new_page()
+                try:
+                    p_page.goto("https://flow.google.com/project/932bc2a1-07ea-4199-b147-80ab0018d41c", wait_until="domcontentloaded", timeout=35000)
+                    p_page.wait_for_timeout(2500)
+                except Exception as e:
+                    print(f"[WARN] Initial profile warm-up: {e}", flush=True)
+                raw_cookies = p_ctx.cookies(["https://flow.google.com", "https://google.com", "https://www.google.com", "https://accounts.google.com"])
+                p_ctx.close()
+            except Exception as e_warm:
+                print(f"[WARN] Skipping persistent profile warm-up ({e_warm}), using saved cookies pool...", flush=True)
 
         merged_by_key = {}
         for c in (saved_cookies + raw_cookies):
             if "GRECAPTCHA" not in c.get("name", "").upper():
                 merged_by_key[(c.get("domain", ""), c.get("name", ""))] = c
         clean_cookies = list(merged_by_key.values())
+        if not clean_cookies and account_cookie_pool:
+            clean_cookies = list(account_cookie_pool[0].get("clean_cookies") or [])
+        if not account_cookie_pool:
+            account_cookie_pool.append({
+                "name": f"Google_{PROF_NAME}",
+                "profile_name": PROF_NAME,
+                "profile_dir": profile_dir,
+                "clean_cookies": clean_cookies,
+            })
+        elif clean_cookies:
+            account_cookie_pool[0]["clean_cookies"] = clean_cookies
+
         cookie_map = {c["name"]: c["value"] for c in clean_cookies}
         cookie_hdr_box = ["; ".join(f"{k}={v}" for k, v in cookie_map.items())]
-        print(f"Extracted {len(cookie_map)} clean deduplicated auth cookies (stripped _GRECAPTCHA)!", flush=True)
+        print(f"Extracted {len(cookie_map)} clean deduplicated auth cookies across {len(account_cookie_pool)} account(s)!", flush=True)
 
         browser = pw.chromium.launch(
             channel="chrome",
@@ -839,6 +1025,8 @@ def main():
         dl_headers_box = [{}]
         ctx_uses = [0]
         cur_proj_box = [None]
+        acc_idx_box = [0]
+        cur_acc_box = [account_cookie_pool[0]["profile_name"]]
 
         def open_fresh_clean_context(project_id="932bc2a1-07ea-4199-b147-80ab0018d41c"):
             for attempt in range(1, 5):
@@ -847,11 +1035,18 @@ def main():
                         ctx_box[0].close()
                     except Exception:
                         pass
-                print(f"✨ Opening fresh clean Chrome context for project {project_id[:8]} (attempt {attempt})...", flush=True)
+                acc_entry = account_cookie_pool[acc_idx_box[0] % len(account_cookie_pool)]
+                acc_idx_box[0] = (acc_idx_box[0] + 1) % len(account_cookie_pool)
+                cur_acc_box[0] = acc_entry["profile_name"]
+                use_cookies = acc_entry.get("clean_cookies") or clean_cookies
+                print(
+                    f"✨ [TK: {acc_entry['profile_name']}] Opening fresh clean Chrome context for project {project_id[:8]} (attempt {attempt})...",
+                    flush=True,
+                )
                 try:
                     ctx = browser.new_context()
                     ctx.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
-                    ctx.add_cookies(clean_cookies)
+                    ctx.add_cookies(use_cookies)
                     pg = ctx.new_page()
                     pg.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=45000)
                     pg.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
@@ -886,7 +1081,7 @@ def main():
                     cur_proj_box[0] = project_id
                     return
                 except Exception as e:
-                    print(f"[WARN] open_fresh_clean_context attempt {attempt} failed: {e}", flush=True)
+                    print(f"[WARN] open_fresh_clean_context ({acc_entry['profile_name']}) attempt {attempt} failed: {e}", flush=True)
                     time.sleep(3.0)
             raise RuntimeError("Failed to open clean Chrome context after 4 attempts")
 
@@ -908,8 +1103,31 @@ def main():
             refs_state["uploaded_prod_refs"][base_char] = [u_id]
             save_prod_state(pdir, state, refs_state)
             print(f"✅ [{pid} | {base_char.upper()}] Uploaded single product image {os.path.basename(primary_prod_img)} -> uuid={u_id}", flush=True)
-            time.sleep(3.0)
+            time.sleep(2.5)
             return u_id
+
+        def ensure_char_photo_uuid(pid, pdir, state, refs_state, base_char, project_id):
+            refs_state.setdefault("uploaded_char_refs", {})
+            cached_u = refs_state["uploaded_char_refs"].get(base_char)
+            if cached_u:
+                return cached_u
+            chars_dir = os.path.join(WS_DIR, "flow_final_pipeline", "characters")
+            for ext in ("jpg", "png", "jpeg"):
+                cand_p = os.path.join(chars_dir, f"{base_char}_ref.{ext}")
+                if os.path.isfile(cand_p) and os.path.getsize(cand_p) > 5000:
+                    print(f"📤 [{pid} | {base_char.upper()}] Uploading character reference photo {os.path.basename(cand_p)}...", flush=True)
+                    ok_c, c_uid, err_c = upload_single_product_ref_in_page(
+                        page_box[0], wiz_box[0], project_id, cand_p, quality=96
+                    )
+                    if ok_c and c_uid:
+                        refs_state["uploaded_char_refs"][base_char] = c_uid
+                        save_prod_state(pdir, state, refs_state)
+                        print(f"✅ [{pid} | {base_char.upper()}] Uploaded character photo -> uuid={c_uid}", flush=True)
+                        time.sleep(2.0)
+                        return c_uid
+                    else:
+                        print(f"⚠️ [{pid} | {base_char.upper()}] Character photo upload failed ({err_c})", flush=True)
+            return None
 
         def fill_inflight_slots(wait_for_delay=False):
             while pending_queue and len(inflight_tasks) < MAX_INFLIGHT:
@@ -921,9 +1139,9 @@ def main():
                     print(f"⏱️ Waiting {wait_rem:.1f}s before next Google Flow request (15s delay)...", flush=True)
                     time.sleep(wait_rem)
 
-                # Prefer a task matching the current open project context if ctx_uses < 4
+                # Prefer a task matching the current open project context if ctx_uses < 12
                 pick_idx = 0
-                if cur_proj_box[0] and ctx_uses[0] < 4:
+                if cur_proj_box[0] and ctx_uses[0] < 12:
                     for idx_q, cand_t in enumerate(pending_queue):
                         if cand_t.get("project_id") == cur_proj_box[0]:
                             pick_idx = idx_q
@@ -932,7 +1150,7 @@ def main():
                 pid = t["pid"]
                 pdir, prompts_data, state, refs_state = prod_meta[pid]
 
-                if ctx_uses[0] >= 4 or cur_proj_box[0] != t["project_id"]:
+                if ctx_uses[0] >= 12 or cur_proj_box[0] != t["project_id"]:
                     open_fresh_clean_context(t["project_id"])
 
                 ctx_uses[0] += 1
@@ -944,14 +1162,43 @@ def main():
                     ok_2k, nbytes_2k, err_2k = upsample_image_2k_in_page(
                         page_box[0], wiz_box[0], t["project_id"], t["ref_uuid"], t["out_file"]
                     )
+                    if not (ok_2k and nbytes_2k > 50000) and t["retries"] >= 2 and os.path.exists(t["out_file"]):
+                        try:
+                            from PIL import ImageFilter
+                            with Image.open(t["out_file"]) as im_fb:
+                                im_2k = im_fb.convert("RGB").resize((1536, 2752), Image.Resampling.LANCZOS)
+                                im_2k = im_2k.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=2))
+                                im_2k.save(t["out_file"], format="JPEG", quality=98, subsampling=0)
+                            refs_dir = os.path.join(os.path.dirname(t["out_file"]), "refs")
+                            os.makedirs(refs_dir, exist_ok=True)
+                            shutil.copy2(t["out_file"], os.path.join(refs_dir, os.path.basename(t["out_file"])))
+                            ok_2k = True
+                            nbytes_2k = os.path.getsize(t["out_file"])
+                        except Exception as e_loc2k:
+                            err_2k = str(e_loc2k)
                     if ok_2k and nbytes_2k > 50000:
-                        print(f"✨ [{pid} | {v_key.upper()}] Upgraded existing Ref Image to 2K (1536x2752) ({nbytes_2k//1024} KB)!", flush=True)
+                        try:
+                            ok_u2k, uuid_2k, _ = upload_single_product_ref_in_page(
+                                page_box[0], wiz_box[0], t["project_id"], t["out_file"], quality=98
+                            )
+                            if ok_u2k and uuid_2k:
+                                ref_rel_name = os.path.basename(t["out_file"])
+                                state["uploaded_refs"][ref_rel_name] = uuid_2k
+                                if v_key in refs_state.get("variants", {}):
+                                    refs_state["variants"][v_key]["ref_image_uuid"] = uuid_2k
+                                save_prod_state(pdir, state, refs_state)
+                                for q_item in pending_queue:
+                                    if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
+                                        q_item["ref_uuid"] = uuid_2k
+                        except Exception:
+                            pass
+                        print(f"✨ [{pid} | {v_key.upper()}] Upgraded existing Ref Image to 2K (1536x2752) & re-uploaded ({nbytes_2k//1024} KB)!", flush=True)
                         safe_sync_ui()
                     else:
                         t["retries"] += 1
                         print(f"⚠️ [{pid} | {v_key.upper()} 2K] SPrCad failed ({err_2k}) ({t['retries']}/4)", flush=True)
                         if t["retries"] <= 4:
-                            pending_queue.append(t)
+                            pending_queue.insert(0, t)
                         open_fresh_clean_context(t["project_id"])
 
                 elif t_type == "ref_img":
@@ -966,7 +1213,17 @@ def main():
                             pending_queue.insert(0, t)
                         open_fresh_clean_context(t["project_id"])
                         continue
-                    t["prod_uuids"] = [u_id]
+                    if not t.get("char_id"):
+                        c_photo_uuid = ensure_char_photo_uuid(
+                            pid, pdir, state, refs_state, base_char, t["project_id"]
+                        )
+                        if c_photo_uuid:
+                            t["prod_uuids"] = [c_photo_uuid, u_id]
+                            t["allow_multi_refs"] = True
+                        else:
+                            t["prod_uuids"] = [u_id]
+                    else:
+                        t["prod_uuids"] = [u_id]
                     ok, gen_uuid, err = generate_variant_ref_image_in_page(
                         page_box[0], wiz_box[0], cookie_hdr_box[0], dl_headers_box[0], t
                     )
@@ -981,7 +1238,8 @@ def main():
                         save_prod_state(pdir, state, refs_state)
                         safe_sync_ui()
 
-                        # Immediately insert the 3 scene tasks for this variant at the front of pending_queue!
+                        # Immediately insert the 3 scene tasks (+ AI Thumbnail task) for this variant at the front of pending_queue!
+                        # All 3 scenes share the exact same 3 ingredients: [gen_uuid (2K Ref Image), u_id (Product Image)] + voice_id!
                         new_scene_tasks = []
                         for sc in t["scenes"]:
                             sc_id = sc["id"]
@@ -997,6 +1255,7 @@ def main():
                                 "v_key": v_key,
                                 "base_char": base_char,
                                 "primary_prod_img": t["primary_prod_img"],
+                                "ref_img_abs": t["out_file"],
                                 "sc": sc,
                                 "project_id": t["project_id"],
                                 "ref_uuid": gen_uuid,
@@ -1007,12 +1266,72 @@ def main():
                                 "media_uuid": None,
                                 "submitted_at": 0,
                             })
+                        if t.get("need_thumb") and t.get("out_thumb_proj"):
+                            new_scene_tasks.append({
+                                "type": "thumb_img",
+                                "key": f"{pid}_{v_key}_thumb",
+                                "pid": pid,
+                                "pdir": pdir,
+                                "v_key": v_key,
+                                "char_v": t.get("char_v") or v_key,
+                                "base_char": base_char,
+                                "primary_prod_img": t["primary_prod_img"],
+                                "project_id": t["project_id"],
+                                "char_id": t.get("char_id") or "",
+                                "ref_uuid": gen_uuid,
+                                "prod_uuid": u_id,
+                                "out_file": t["out_thumb_proj"],
+                                "retries": 0,
+                            })
                         pending_queue[:0] = new_scene_tasks
                     else:
                         t["retries"] += 1
                         print(f"⚠️ [{pid} | {v_key} REF] Image gen failed ({err}), recycling context ({t['retries']}/15)...", flush=True)
                         if t["retries"] <= 15:
                             pending_queue.insert(0, t)
+                        open_fresh_clean_context(t["project_id"])
+
+                elif t_type == "thumb_img":
+                    v_key = t["v_key"]
+                    char_v = t["char_v"]
+                    out_thumb_proj = t["out_file"]
+                    os.makedirs(os.path.dirname(out_thumb_proj), exist_ok=True)
+                    thumbs_central_dir = os.path.join(WS_DIR, "thumbnails")
+                    os.makedirs(thumbs_central_dir, exist_ok=True)
+                    out_thumb_central = os.path.join(thumbs_central_dir, os.path.basename(out_thumb_proj))
+
+                    u_id = t.get("prod_uuid") or ensure_single_prod_uuid(
+                        pid, pdir, state, refs_state, t["base_char"], t["project_id"], t["primary_prod_img"]
+                    )
+                    ref_uuids_th = [x for x in [t.get("ref_uuid"), u_id] if x]
+                    meta_th = _esm.build_thumbnail_prompt_for_variant(pid=pid, vkey=v_key) if _esm else {"prompt": f"9:16 commercial TikTok Shop thumbnail of {pid}"}
+                    th_task = {
+                        "pid": pid,
+                        "v_key": f"{v_key}_thumb",
+                        "project_id": t["project_id"],
+                        "char_id": t.get("char_id") or "",
+                        "prod_uuids": ref_uuids_th,
+                        "allow_multi_refs": True,
+                        "skip_reupload_2k": True,
+                        "prompt_str": meta_th["prompt"],
+                        "out_file": out_thumb_proj,
+                    }
+                    write_pipeline_heartbeat(f"🖼️ [{pid} | {char_v}] Đang tạo Ảnh Thumbnail AI 2K ({cur_acc_box[0]})...", is_running=True)
+                    ok_th, th_uuid, err_th = generate_variant_ref_image_in_page(
+                        page_box[0], wiz_box[0], cookie_hdr_box[0], dl_headers_box[0], th_task
+                    )
+                    if ok_th and os.path.isfile(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 10000:
+                        shutil.copy2(out_thumb_proj, out_thumb_central)
+                        print(f"🖼️ [{pid} | {char_v}] Generated 2K AI Thumbnail -> {os.path.basename(out_thumb_central)} ({os.path.getsize(out_thumb_central)//1024} KB)!", flush=True)
+                        final_mp4 = os.path.join(WS_DIR, "final_videos", f"{pid}_{char_v}.mp4")
+                        if os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 50000 and _esm is not None:
+                            _esm.inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=float(cfg.get("thumbnail_duration_sec") or 0.1))
+                        safe_sync_ui()
+                    else:
+                        t["retries"] += 1
+                        print(f"⚠️ [{pid} | {char_v} THUMB] Thumbnail gen failed ({err_th}) ({t['retries']}/4)...", flush=True)
+                        if t["retries"] <= 4:
+                            pending_queue.append(t)
                         open_fresh_clean_context(t["project_id"])
 
                 elif t_type == "upsample_1080p":
@@ -1022,9 +1341,14 @@ def main():
                         t["media_uuid"] = up_uuid
                         t["stage"] = "upsample_1080p"
                         t["submitted_at"] = time.time()
+                        t["cookie_hdr"] = cookie_hdr_box[0]
+                        t["wiz"] = wiz_box[0]
+                        t["dl_headers"] = dict(dl_headers_box[0])
+                        t["account_name"] = cur_acc_box[0]
                         state["scene_uuids"][sc_id] = up_uuid
                         save_prod_state(pdir, state)
                         inflight_tasks[t["key"]] = t
+                        write_pipeline_heartbeat(f"✨ [{pid} | {sc_id}] Đang Upsample 1080p ({cur_acc_box[0]})...", is_running=True)
                     else:
                         t["retries"] += 1
                         print(f"⚠️ [{pid} | {sc_id}] 1080p Upsample submit failed ({err}) ({t['retries']}/5)...", flush=True)
@@ -1041,20 +1365,58 @@ def main():
 
                 else:
                     sc_id = t["sc"]["id"]
+                    v_key = t["v_key"]
                     if not t.get("prod_uuid"):
                         u_id = ensure_single_prod_uuid(
                             pid, pdir, state, refs_state, t["base_char"], t["project_id"], t["primary_prod_img"]
                         )
                         if u_id:
                             t["prod_uuid"] = u_id
+                            for q_item in pending_queue:
+                                if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
+                                    q_item["prod_uuid"] = u_id
+                    # If retrying after a failed submission (e.g. account switch in multi-account mode),
+                    # re-upload both the 2K Ref Image and Product Image to the current account's project and sync across all 3 scenes!
+                    if t.get("retries", 0) > 0:
+                        ref_img_local = t.get("ref_img_abs") or os.path.join(pdir, prompts_data["videos"][v_key]["ref_image"])
+                        if os.path.isfile(ref_img_local):
+                            ok_r, new_ref_u, _ = upload_single_product_ref_in_page(
+                                page_box[0], wiz_box[0], t["project_id"], ref_img_local, quality=98
+                            )
+                            if ok_r and new_ref_u:
+                                t["ref_uuid"] = new_ref_u
+                                state["uploaded_refs"][os.path.basename(ref_img_local)] = new_ref_u
+                                if v_key in refs_state.get("variants", {}):
+                                    refs_state["variants"][v_key]["ref_image_uuid"] = new_ref_u
+                                for q_item in pending_queue:
+                                    if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
+                                        q_item["ref_uuid"] = new_ref_u
+                        if os.path.isfile(t["primary_prod_img"]):
+                            ok_p, new_prod_u, _ = upload_single_product_ref_in_page(
+                                page_box[0], wiz_box[0], t["project_id"], t["primary_prod_img"], quality=95
+                            )
+                            if ok_p and new_prod_u:
+                                t["prod_uuid"] = new_prod_u
+                                refs_state["uploaded_prod_refs"][t["base_char"]] = [new_prod_u]
+                                for q_item in pending_queue:
+                                    if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
+                                        q_item["prod_uuid"] = new_prod_u
+                        save_prod_state(pdir, state, refs_state)
+
+                    t["worker_profile"] = cur_acc_box[0]
                     ok, ret_uuid, err = submit_scene_in_page(page_box[0], wiz_box[0], t)
                     if ok and ret_uuid:
                         t["media_uuid"] = ret_uuid
                         t["stage"] = "base_720p"
                         t["submitted_at"] = time.time()
+                        t["cookie_hdr"] = cookie_hdr_box[0]
+                        t["wiz"] = wiz_box[0]
+                        t["dl_headers"] = dict(dl_headers_box[0])
+                        t["account_name"] = cur_acc_box[0]
                         state["scene_uuids"][sc_id] = ret_uuid
                         save_prod_state(pdir, state)
                         inflight_tasks[t["key"]] = t
+                        write_pipeline_heartbeat(f"🚀 [{pid} | {sc_id}] Đã gửi render cảnh 10s ({cur_acc_box[0]})", is_running=True)
                     else:
                         t["retries"] += 1
                         print(f"⚠️ [{pid} | {sc_id}] Submit failed ({err}), recycling clean context (retry {t['retries']}/15)...", flush=True)
@@ -1105,6 +1467,7 @@ def main():
                     print(f"📥 [{pid} | {sc_id}] Downloaded 1080p MP4 ({nbytes//1024} KB in {elapsed}s)!", flush=True)
                     inflight_tasks.pop(t_key, None)
                     freed_slot = True
+                    write_pipeline_heartbeat(f"📥 [{pid} | {sc_id}] Tải xong cảnh 1080p ({nbytes//1024} KB)!", is_running=True)
                     safe_sync_ui()
                     check_and_queue_ffmpeg(
                         ffmpeg_pool,
@@ -1153,11 +1516,12 @@ def main():
                 fill_inflight_slots(wait_for_delay=False)
 
             if status_summary:
-                print(
-                    f"⏳ [Inflight={len(inflight_tasks)} | Queued={len(pending_queue)}] "
-                    + ", ".join(status_summary[:12]),
-                    flush=True,
+                summary_line = (
+                    f"⏳ [Đang xử lý={len(inflight_tasks)} | Hàng đợi={len(pending_queue)}] "
+                    + ", ".join(status_summary[:10])
                 )
+                print(summary_line, flush=True)
+                write_pipeline_heartbeat(summary_line, is_running=True)
 
             if time.time() - loop_start > 7200:
                 print("Global timeout reached!", flush=True)
@@ -1183,12 +1547,15 @@ def main():
                     prompts_data["videos"][v_key]["scenes"],
                 )
 
+    if ffmpeg_futures:
+        write_pipeline_heartbeat(f"🎞️ Đang ghép {len(ffmpeg_futures)} Video Final 60FPS + Thumbnail 0.1s...", is_running=True)
     print(f"Waiting for {len(ffmpeg_futures)} parallel FFmpeg Final Video builds to finish...", flush=True)
     concurrent.futures.wait(ffmpeg_futures)
     ffmpeg_pool.shutdown(wait=True)
     poll_pool.shutdown(wait=False)
+    write_pipeline_heartbeat("🎉 Đã hoàn tất toàn bộ tiến trình sản xuất Video Final & Thumbnail!", is_running=False)
     safe_sync_ui()
-    print("\n🎉 ALL 7 PRODUCTS × 6 UNIQUE 2K REF IMAGES & 6 FINAL 1080P VIDEOS COMPLETED AND SYNCED TO WEB UI!", flush=True)
+    print("\n🎉 ALL PRODUCTS × UNIQUE 2K REF IMAGES & FINAL 1080P VIDEOS COMPLETED AND SYNCED TO WEB UI!", flush=True)
 
 
 if __name__ == "__main__":
