@@ -1,0 +1,56 @@
+BÁO CÁO TẢI 254 FACEBOOK REELS
+================================
+Ngày tạo: 2026-11-07
+Công cụ: fb_reels.py + yt-dlp 2026.10.26 (6 luồng, chất lượng tối đa 1080)
+Nguồn link: urls-254.txt (254 link reel Facebook)
+
+KẾT QUẢ TỔNG
+------------
+- Tổng số video yêu cầu: 254
+- Tải OK (kiểm chứng decode đầy đủ): 254
+- Lỗi cuối cùng: 0
+- Tổng dung lượng video: 1.538.187.502 byte = 1,43 GB (1.466,9 MB)
+- Tổng thời lượng: 70,8 phút (trung bình 16,7 giây/video; ngắn nhất 9,3s, dài nhất 20,1s)
+- Tên file: <id-reel>.mp4 (giữ nguyên ID Facebook)
+
+LƯU Ý VỀ 60FPS (QUAN TRỌNG)
+----------------------------
+User yêu cầu 60fps, nhưng ĐO THỰC TẾ: cả 254/254 file đều là 30,0 fps,
+không có file nào 60fps. Đây là fps GỐC của video trên Facebook — nguồn
+không có bản 60fps nên không thể tải ra 60fps. Tool đã lấy đúng bản chất
+lượng cao nhất mà Facebook cung cấp (tối đa 1080), không upscale hay
+chuyển đổi fps giả (chuyển 30fps -> 60fps chỉ nhân đôi khung hình, không
+thêm thông tin thật và làm tăng dung lượng vô ích).
+
+PHÂN BỐ ĐỘ PHÂN GIẢI (dọc 9:16)
+--------------------------------
+- 1080x1920 (Full HD dọc chuẩn): 244 file
+- 1072x1920 (gần 1080, nguồn gốc hơi lệch chiều rộng): 8 file
+- 1080x1934 (1080 rộng, nguồn gốc hơi lệch chiều cao): 1 file
+- 360x640 (SD thấp — nguồn chỉ có bản SD): 1 file
+=> Rộng 1080: 245/254 file. Codec: VP9 / AV1 / H.264 (tùy bản tốt nhất của từng reel).
+
+PHÂN BỐ FPS
+-----------
+- 30,0 fps: 254 file
+- 60 fps: 0 file
+
+DANH SÁCH ID LỖI CUỐI CÙNG
+--------------------------
+- Không có. (Lượt chạy đầu có 1 link lỗi timeout mạng: 1041995201972617,
+  đã tải lại thành công ở lượt retry, 7,7 MB.)
+
+FILE NGOẠI LỆ CẦN BIẾT
+----------------------
+- 1061769476384687.mp4: chỉ 360x640 (1,0 MB) — reel gốc trên Facebook
+  chỉ có bản SD, không có bản HD để tải.
+- 8 file 1072x1920: 1042193718674012, 1355056186142164, 1388929436490310,
+  2105397426855788, 2227253904696949, 2237820323454461, 885532080869304,
+  925213833219953 — kích thước gốc của reel hơi lệch, không phải lỗi tải.
+- 1049121658013272.mp4: 1080x1934 (AV1).
+
+KIỂM CHỨNG ĐÃ THỰC HIỆN
+-----------------------
+Mỗi file .mp4 đã qua ffprobe (có video stream, width/height, fps,
+duration > 0, size > 100KB) và ffmpeg decode toàn bộ ra null (không lỗi).
+Kết quả: 254/254 OK.
