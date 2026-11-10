@@ -4847,7 +4847,7 @@
                         <div style="display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap;">
                           <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
                             <span class="badge" style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:900; font-size:9.5px;">${tplBadge}</span>
-                            <span class="badge badge-done" style="font-size:9.5px;">✅ 1080p • 60FPS</span>
+                            <span class="badge badge-done" style="font-size:9.5px;">✅ 1080p • 24FPS</span>
                             ${isCur ? `<span class="badge" style="background:rgba(16,185,129,0.22); color:#34d399; border:1px solid #10b981; font-size:9px; font-weight:900;">● Đang mở</span>` : ''}
                           </div>
                           ${fp.final_rendered_at ? `<span style="font-size:9px; color:#94a3b8;">🕒 ${fp.final_rendered_at}</span>` : ''}
@@ -4904,7 +4904,7 @@
                             👁️ Xem Kịch Bản Cảnh 1 & 2
                           </button>
                           <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#f9a8d4; border-color:rgba(236,72,153,0.45);"
-                                  onclick="renderFashionFinalForProject('${fp.project_id}')" title="Chạy ghép hậu kỳ lại Video Final 60FPS cho dự án này">
+                                  onclick="renderFashionFinalForProject('${fp.project_id}')" title="Chạy ghép hậu kỳ lại Video Final 24FPS cho dự án này">
                             🎞️ Ghép Lại
                           </button>
                           <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#fde68a; border-color:rgba(245,158,11,0.45);"
@@ -4927,9 +4927,9 @@
 
       box.innerHTML = `
         <div style="display:grid; grid-template-columns: 215px 1fr; gap:16px; align-items:center;">
-          <!-- Cột Trái: Trình Phát Video Final 9:16 Hoàn Chỉnh (1080p 60FPS) + Đầy Đủ Nút Dưới Video -->
+          <!-- Cột Trái: Trình Phát Video Final 9:16 Hoàn Chỉnh (1080p 24FPS) + Đầy Đủ Nút Dưới Video -->
           <div style="background:#04070e; border:2px solid ${hasFinal ? '#10b981' : 'rgba(148,163,184,0.35)'}; border-radius:10px; padding:6px; display:flex; flex-direction:column; gap:5px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-            <div style="font-size:10px; font-weight:900; color:#34d399; text-align:center;">🏆 VIDEO FINAL HOÀN CHỈNH (1080P • 60FPS)</div>
+            <div style="font-size:10px; font-weight:900; color:#34d399; text-align:center;">🏆 VIDEO FINAL HOÀN CHỈNH (1080P • 24FPS)</div>
             <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer;"
                  onclick="${hasFinal ? `toggleFashionInlineVideo('fBottomStep4FinalVid', 'btnBottomStep4Play')` : `renderFashionFinalPostProd()`}">
               ${hasFinal
@@ -4962,7 +4962,7 @@
                 ${hasFinal ? `<span class="badge badge-done">✅ Sẵn sàng Upload TikTok / Reels / Shorts</span>` : `<span class="badge badge-wait">⏳ Chờ Render Hậu Kỳ</span>`}
               </div>
               <div style="font-size:11.5px; color:#cbd5e1; margin-top:6px; line-height:1.5;">
-                • <b>Ghép nối mượt mà:</b> Tự động nối <b>${scCount} Video Phân Cảnh</b> + đồng bộ <b>Nhạc Gốc AAC 192kbps</b> của Video Tham Chiếu (<code>${proj.reference_video?.filename || ''}</code> — ${totalDur}s) và nâng cấp khung hình lên <b>1080×1920 • 60 FPS</b>.<br/>
+                • <b>Ghép nối mượt mà:</b> Tự động nối <b>${scCount} Video Phân Cảnh</b> + đồng bộ <b>Nhạc Gốc AAC 192kbps</b> của Video Tham Chiếu (<code>${proj.reference_video?.filename || ''}</code> — ${totalDur}s) ở chuẩn khung hình gốc <b>1080×1920 • 24 FPS</b> mượt mà.<br/>
                 • <b>Số lượng trang phục đã phối:</b> <b>${outCount} Bộ Đồ 2K</b> biến hình khớp chính xác từng điểm cắt hình ảnh & nhịp bass nhạc nền.<br/>
                 • <b>Đường dẫn xuất file Final:</b> <code style="color:#fde68a;">${finalPath || 'final_videos/' + proj.project_id + '_final.mp4'}</code>
               </div>
@@ -4970,7 +4970,7 @@
 
             <div style="display:flex; gap:7px; flex-wrap:wrap;">
               <button class="btn btn-success" style="padding:8px 15px; font-weight:900; font-size:12px;" onclick="renderFashionFinalPostProd()">
-                🎞️ Render Hậu Kỳ Ghép ${scCount} Phân Cảnh + Nhạc Gốc Thành Video Final (1080p 60FPS)
+                🎞️ Render Hậu Kỳ Ghép ${scCount} Phân Cảnh + Nhạc Gốc Thành Video Final (1080p 24FPS)
               </button>
               <button class="btn btn-primary" style="padding:8px 14px; font-weight:800;" onclick="runFashionProjectOnFlow()">
                 🚀 Chạy Tạo Video Phân Cảnh Qua Google Flow (Omni Flash)
@@ -5069,7 +5069,7 @@
           }
           STATE._fashionRunStartTs = 0;
           if (nextProj.final_video_ready) {
-            showFashionBanner(`🎉 Đã tạo xong toàn bộ phân cảnh và Render Hậu Kỳ hoàn tất Video Final 1080p 60FPS!`);
+            showFashionBanner(`🎉 Đã tạo xong toàn bộ phân cảnh và Render Hậu Kỳ hoàn tất Video Final 1080p 24FPS!`);
             if (typeof refreshAll === "function") refreshAll(true);
           }
         } else if (ticks > 360) {

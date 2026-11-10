@@ -64,14 +64,18 @@ REQUIRED_DIRS = [
 ]
 
 REQUIRED_PACKAGES = [
+    ("httpx", "httpx"),
     ("requests", "requests"),
     ("curl_cffi", "curl_cffi"),
     ("PIL", "Pillow"),
     ("cv2", "opencv-python"),
     ("numpy", "numpy"),
     ("playwright", "playwright"),
+    ("psutil", "psutil"),
+    ("openpyxl", "openpyxl"),
     ("PyQt6", "PyQt6"),
     ("torch", "torch"),
+    ("torchvision", "torchvision"),
 ]
 
 
@@ -205,6 +209,8 @@ def main():
     rep = verify_environment()
     if args.json:
         print(json.dumps(rep, ensure_ascii=False, indent=2))
+        if not rep.get("ok"):
+            sys.exit(1)
         return
 
     print("\n" + "=" * 72)
@@ -230,6 +236,8 @@ def main():
         for w in rep["warnings"]:
             print(f"⚠️ Lưu ý: {w}")
     print("=" * 72)
+    if not rep.get("ok"):
+        sys.exit(1)
 
 
 if __name__ == "__main__":

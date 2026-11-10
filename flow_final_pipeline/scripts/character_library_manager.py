@@ -18,6 +18,7 @@ import random
 import urllib.request
 
 WS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+WORKSPACE_DIR = WS_DIR
 PIPELINE_DIR = os.path.join(WS_DIR, "flow_final_pipeline")
 CHARS_DIR = os.path.join(PIPELINE_DIR, "characters")
 VOICE_SAMPLES_DIR = os.path.join(PIPELINE_DIR, "voice_samples")
@@ -25,6 +26,37 @@ VOICES_CHARS_PATH = os.path.join(PIPELINE_DIR, "voices_and_characters.json")
 SHEET_TEMPLATES_DIR = os.path.join(WS_DIR, "Template", "Character_Sheet_Templates")
 SHEET_TEMPLATES_JSON = os.path.join(SHEET_TEMPLATES_DIR, "templates.json")
 PROJECTS_DIR = os.path.join(WS_DIR, "projects")
+
+
+def _save_audio_bytes_as_mp3(raw_bytes: bytes, out_mp3_path: str) -> None:
+    """Lưu dữ liệu âm thanh Google Flow thành file MP3 chuẩn (tự chuyển đổi nếu nguồn là WAV/PCM)."""
+    os.makedirs(os.path.dirname(out_mp3_path), exist_ok=True)
+    if raw_bytes[:4] == b"RIFF" or raw_bytes[:4] == b"OggS":
+        tmp_in = out_mp3_path + ".raw_audio_tmp"
+        tmp_out = out_mp3_path + ".enc_tmp.mp3"
+        try:
+            with open(tmp_in, "wb") as f:
+                f.write(raw_bytes)
+            import subprocess as _sp
+            r = _sp.run(
+                ["ffmpeg", "-y", "-hide_banner", "-loglevel", "error", "-i", tmp_in, "-vn", "-c:a", "libmp3lame", "-b:a", "192k", "-ar", "24000", tmp_out],
+                capture_output=True,
+                timeout=30,
+            )
+            if r.returncode == 0 and os.path.isfile(tmp_out) and os.path.getsize(tmp_out) > 1000:
+                os.replace(tmp_out, out_mp3_path)
+                return
+        except Exception:
+            pass
+        finally:
+            for p_tmp in (tmp_in, tmp_out):
+                if os.path.exists(p_tmp):
+                    try:
+                        os.remove(p_tmp)
+                    except OSError:
+                        pass
+    with open(out_mp3_path, "wb") as f:
+        f.write(raw_bytes)
 
 COMMON_VN_DIALOGUE_PRESETS = [
     {
@@ -616,6 +648,8 @@ def delete_voice_profile(voice_key: str) -> dict:
     if vk in ("nv1", "nv2"):
         return {"ok": False, "error": "Không thể xoá 2 giọng gốc mặc định (nv1, nv2). Bạn có thể bấm Sửa để thay đổi thông tin."}
     cfg.get("voices", {}).pop(vk, None)
+    if isinstance(cfg.get("custom_voices"), list):
+        cfg["custom_voices"] = [x for x in cfg["custom_voices"] if x.get("key") != vk]
     with open(VOICES_CHARS_PATH, "w", encoding="utf-8") as f:
         json.dump(cfg, f, ensure_ascii=False, indent=2)
     return get_character_library_state()
@@ -928,8 +962,7 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                                                     cap_vid, _, cap_bytes = audio_captured[-1]
                                                     if cap_vid:
                                                         got_vid = cap_vid
-                                                    with open(out_abs, "wb") as f_mp3:
-                                                        f_mp3.write(cap_bytes)
+                                                    _save_audio_bytes_as_mp3(cap_bytes, out_abs)
                                                     break
 
                                     if got_vid:
@@ -1267,6 +1300,26 @@ def _load_clean_flow_cookies(profile_name: str = "") -> list:
             except Exception:
                 pass
 
+        for grok_acc_p in (
+            os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "accounts.json"),
+            os.path.join(WORKSPACE_DIR, "accounts.json"),
+        ):
+            if os.path.isfile(grok_acc_p):
+                try:
+                    rows = json.loads(open(grok_acc_p, "r", encoding="utf-8").read())
+                    if isinstance(rows, list):
+                        for r in rows:
+                            if isinstance(r, dict) and r.get("active", True) is not False and r.get("profile_name"):
+                                pn = str(r["profile_name"]).strip()
+                                for cp in (
+                                    os.path.join(WORKSPACE_DIR, "cookies", f"{pn}.json"),
+                                    os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "cookies", f"{pn}.json"),
+                                ):
+                                    if os.path.isfile(cp) and cp not in cookie_candidates:
+                                        cookie_candidates.append(cp)
+                except Exception:
+                    pass
+
     for cpath in cookie_candidates:
         try:
             with open(cpath, "r", encoding="utf-8") as f:
@@ -1353,14 +1406,13 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
     bấm `Lưu giọng nói mới` trên Google Flow và cập nhật vào `voices_and_characters.json`.
     """
     ensure_dirs_and_default_sheet()
-    save_voice_profile(payload)
     state = get_character_library_state()
 
-    vkey = (payload.get("key") or "").strip().lower()
-    vkey = __import__("re").sub(r"[^a-z0-9_]", "_", vkey).strip("_")
-    v_obj = next((x for x in state.get("voices_list", []) if x["key"] == vkey), None)
-    if not v_obj:
-        return {"ok": False, "error": f"Không tìm thấy cấu hình giọng đọc #{vkey}"}
+    raw_key = (payload.get("key") or payload.get("voice_key") or "").strip().lower()
+    vkey = __import__("re").sub(r"[^a-z0-9_]", "_", raw_key).strip("_")
+    if not vkey:
+        vkey = f"v_custom_{int(time.time()) % 100000}"
+    v_obj = next((x for x in state.get("voices_list", []) if x["key"] == vkey), None) or {}
 
     gender = (payload.get("gender") or v_obj.get("gender") or "female").lower()
     region = (payload.get("region") or v_obj.get("region") or "north").lower()
@@ -1368,10 +1420,10 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
     flow_slug = (payload.get("flow_slug") or v_obj.get("flow_slug") or "").strip().lower()
     base_speaker = _resolve_base_speaker_title(gender, flow_slug, tone_style, region)
 
-    v_name = v_obj.get("name") or f"Custom Voice {vkey}"
+    v_name = (payload.get("name") or v_obj.get("name") or f"Custom Voice {vkey}").strip()
     v_prompt_en = (payload.get("voice_prompt_en") or v_obj.get("voice_prompt_en") or "").strip()
     if not v_prompt_en or len(v_prompt_en) < 120:
-        v_prompt_en = build_voice_prompt_en(gender, region, tone_style, v_obj.get("speed_wpm", ""))
+        v_prompt_en = build_voice_prompt_en(gender, region, tone_style, payload.get("speed_wpm") or v_obj.get("speed_wpm", ""))
     elif gender == "male" and "no female resonance" not in v_prompt_en.lower():
         v_prompt_en = (
             f"Vietnamese male commercial presenter, young adult masculine baritone-tenor voice, {v_prompt_en}. "
@@ -1429,9 +1481,9 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
             )
             pg.wait_for_timeout(1800)
 
-            pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
+            pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật'), button:has-text('Character'), [role='button']:has-text('Character')").first.click(force=True, timeout=6000)
             pg.wait_for_timeout(1400)
-            pg.locator("text=MUSE Nhân vật 1").first.click(force=True, timeout=6000)
+            pg.locator("text=MUSE").first.click(force=True, timeout=6000)
             pg.wait_for_timeout(1400)
             pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
             pg.wait_for_timeout(1800)
@@ -1459,7 +1511,7 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
                 pg.locator(".cdk-overlay-container input.voice-name-input").first.fill(v_name, force=True)
             pg.wait_for_timeout(600)
 
-            pg.locator(".cdk-overlay-container button:has-text('Xem trước')").first.click(force=True, timeout=6000)
+            pg.locator(".cdk-overlay-container button:has-text('Xem trước'), .cdk-overlay-container button:has-text('Preview')").first.click(force=True, timeout=6000)
             got_vid = ""
             out_rel = f"voice_samples/{vkey}_flow.mp3"
             out_abs = os.path.join(PIPELINE_DIR, out_rel.replace("/", os.sep))
@@ -1468,15 +1520,14 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
                 pg.wait_for_timeout(1000)
                 if audio_captured:
                     got_vid, _, got_bytes = audio_captured[-1]
-                    with open(out_abs, "wb") as f_aud:
-                        f_aud.write(got_bytes)
+                    _save_audio_bytes_as_mp3(got_bytes, out_abs)
                     break
 
             if got_vid:
                 if pg.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
                     pg.locator(".cdk-overlay-container input.voice-name-input").first.fill(v_name, force=True)
                     pg.wait_for_timeout(300)
-                save_btn = pg.locator(".cdk-overlay-container button:has-text('Lưu giọng nói mới')").first
+                save_btn = pg.locator(".cdk-overlay-container button:has-text('Lưu giọng nói mới'), .cdk-overlay-container button:has-text('Save new voice')").first
                 if save_btn.count() > 0 and not save_btn.is_disabled():
                     save_btn.click(force=True, timeout=5000)
                     pg.wait_for_timeout(2500)
@@ -1845,7 +1896,7 @@ def generate_character_or_product_image(payload: dict) -> dict:
         state_cfg = get_character_library_state()
         char_entry = next((c for c in state_cfg["characters"] if c["key"] == char_key), None)
         project_id = (char_entry or {}).get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
-        char_uuid = (char_entry or {}).get("character_id") or "208606a7-a345-48b2-af32-9fd3c37d0c9a"
+        char_uuid = (char_entry or {}).get("character_id") or ""
 
         clean_cookies = _load_clean_flow_cookies()
         if not clean_cookies:
@@ -1883,20 +1934,45 @@ def generate_character_or_product_image(payload: dict) -> dict:
             )
             dl_headers = {"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": wz["ua"]}
             prod_uuids = []
-            if mode == "product_ref" and pid:
-                prod_img_dir = os.path.join(PROJECTS_DIR, pid, "product_images")
-                cand_jpg = os.path.join(prod_img_dir, "prod_1.jpg")
-                if os.path.exists(cand_jpg):
-                    ok_u, u_id, _ = mt.upload_single_product_ref_in_page(pg, wz, project_id, cand_jpg)
+            allow_multi_refs = False
+            if not char_uuid and char_entry:
+                char_ref_rel = char_entry.get("ref_image_path") or ""
+                char_ref_abs = char_ref_rel if os.path.isabs(char_ref_rel) else os.path.join(WS_DIR, char_ref_rel.replace("/", os.sep))
+                if char_ref_rel and os.path.isfile(char_ref_abs):
+                    ok_cr, cr_uid, _ = mt.upload_single_product_ref_in_page(pg, wz, project_id, char_ref_abs)
+                    if ok_cr and cr_uid:
+                        prod_uuids.append(cr_uid)
+                        allow_multi_refs = True
+
+            if mode == "product_ref":
+                cand_prod_imgs = []
+                if payload.get("product_image_path"):
+                    cand_prod_imgs.append(str(payload["product_image_path"]).strip())
+                if pid:
+                    for p_dir in (
+                        os.path.join(PROJECTS_DIR, pid, "product_images"),
+                        os.path.join(WS_DIR, "data", "tiktok_crawler", "data", "product_images", pid),
+                    ):
+                        if os.path.isdir(p_dir):
+                            cand_prod_imgs.append(os.path.join(p_dir, "prod_1.jpg"))
+                            for fn in sorted(os.listdir(p_dir)):
+                                if fn.lower().endswith((".jpg", ".jpeg", ".png", ".webp")) and fn != "prod_clean.jpg":
+                                    cand_prod_imgs.append(os.path.join(p_dir, fn))
+                chosen_prod_jpg = next((p for p in cand_prod_imgs if p and os.path.isfile(p)), "")
+                if chosen_prod_jpg:
+                    ok_u, u_id, _ = mt.upload_single_product_ref_in_page(pg, wz, project_id, chosen_prod_jpg)
                     if ok_u and u_id:
-                        prod_uuids = [u_id]
+                        prod_uuids.append(u_id)
+                        if len(prod_uuids) > 1:
+                            allow_multi_refs = True
 
             task = {
                 "pid": pid or char_key,
                 "v_key": char_key,
                 "project_id": project_id,
-                "char_id": char_uuid if mode == "product_ref" else char_uuid,
+                "char_id": char_uuid,
                 "prod_uuids": prod_uuids,
+                "allow_multi_refs": allow_multi_refs,
                 "prompt_str": final_prompt,
                 "out_file": out_abs,
             }

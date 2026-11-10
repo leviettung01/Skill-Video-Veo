@@ -16,7 +16,7 @@
   "scene_duration_sec": 8,
   "video_aspect": "9:16",
   "image_resolution": "2K (1536x2752 / 2048x3639)",
-  "video_resolution": "1080p • 60 FPS",
+  "video_resolution": "1080p • 24 FPS",
   "image_model": "Nano Banana 2.1 (BELUGA) + SPrCad 2K",
   "video_model": "Omni 1.1 Flash Video Reference (abra_edit • 6s/8s/10s)",
   "demo_video_caption": "Demo #004: Motion Control Video Fashion — Chia 2 Phân Cảnh × 8s (16s) Thay 3 Bộ Đồ Theo Beat Nhạc",

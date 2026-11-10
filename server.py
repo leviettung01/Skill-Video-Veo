@@ -794,6 +794,14 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         self.end_headers()
 
     def do_GET(self):
+        try:
+            self._do_GET_inner()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+
+    def _do_GET_inner(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         qs = urllib.parse.parse_qs(parsed.query)
@@ -1261,9 +1269,31 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(e)})
             return
 
+        if path == "/api/studio/overview":
+            char_st = _clm.get_character_library_state() if _clm else {"characters": [], "voices_list": []}
+            prods_st = _pcb.load_products_store() if _pcb else {"products": []}
+            tpls = _tm.list_video_templates() if _tm else []
+            self._send_json({
+                "ok": True,
+                "characters": char_st.get("characters", []),
+                "voices": char_st.get("voices_list", []),
+                "products": prods_st.get("products", []),
+                "templates": tpls,
+                "projects": core._load_projects_index(),
+            })
+            return
+
         self._send_json({"error": "Not found"}, 404)
 
     def do_POST(self):
+        try:
+            self._do_POST_inner()
+        except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
+            pass
+        except Exception as e:
+            self._send_json({"ok": False, "error": str(e)}, 500)
+
+    def _do_POST_inner(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
@@ -2300,9 +2330,9 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             self._send_json({"ok": bool(picked), "path": picked, "cancelled": not bool(picked)})
             return
 
-        if path == "/api/templates/save-doc":
+        if path in ("/api/templates/save-doc", "/api/templates/save_doc"):
             _ensure_latest_sws()
-            tname = (body.get("template") or body.get("name") or "001").strip()
+            tname = (body.get("template") or body.get("folder_name") or body.get("name") or "001").strip()
             doc_name = (body.get("doc_name") or "ROLE_SKILL.md").strip()
             content = body.get("content") or ""
             res = _tm.save_template_doc(tname, doc_name, content)

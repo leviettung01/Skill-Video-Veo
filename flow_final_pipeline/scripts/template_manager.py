@@ -375,14 +375,30 @@ def generate_prompts_for_product(
     tdir = resolve_template_dir(template_name)
     target_tpl_folder = os.path.basename(tdir)
 
-    # Nếu prompts.json đã tồn tại và không bắt buộc tạo lại, kiểm tra xem đã khớp template chưa
+    # Nếu prompts.json đã tồn tại và không bắt buộc tạo lại, kiểm tra xem đã khớp CHÍNH XÁC template_id / template_code chưa
+    custom_cfg_path = os.path.join(tdir, "template_config.json")
+    tpl_cfg_obj = {}
+    if os.path.exists(custom_cfg_path):
+        try:
+            with open(custom_cfg_path, "r", encoding="utf-8") as f_cfg:
+                tpl_cfg_obj = json.load(f_cfg)
+        except Exception:
+            tpl_cfg_obj = {}
+    target_tpl_id = str(tpl_cfg_obj.get("id") or "").strip().lower()
+    target_tpl_code = str(tpl_cfg_obj.get("code") or "001").strip()
+
     if os.path.exists(prompts_path) and not force_regenerate:
         try:
             with open(prompts_path, "r", encoding="utf-8") as f:
                 existing = json.load(f)
             existing_vids = existing.get("videos", {})
-            existing_tpl = (existing.get("template_name") or existing.get("template_id") or "").lower()
-            if existing_vids and (not template_name or target_tpl_folder.lower() in existing_tpl or existing_tpl in target_tpl_folder.lower()):
+            existing_id = str(existing.get("template_id") or "").strip().lower()
+            existing_name = str(existing.get("template_name") or "").strip().lower()
+            is_exact_match = (
+                (target_tpl_id and existing_id == target_tpl_id)
+                or (existing_name == target_tpl_folder.lower())
+            )
+            if existing_vids and (not template_name or is_exact_match):
                 updated = False
                 if primary_product_refs:
                     existing["primary_product_refs"] = primary_product_refs
@@ -409,27 +425,31 @@ def generate_prompts_for_product(
     mod = importlib.util.module_from_spec(spec)
     spec.loader.exec_module(mod)
 
-    custom_cfg_path = os.path.join(tdir, "template_config.json")
-    tpl_cfg_obj = {}
     if os.path.exists(custom_cfg_path):
         mod.CONFIG_PATH = custom_cfg_path
-        try:
-            tpl_cfg_obj = json.load(open(custom_cfg_path, "r", encoding="utf-8"))
-        except Exception:
-            pass
+        if hasattr(mod, "_mod"):
+            mod._mod.CONFIG_PATH = custom_cfg_path
 
     prompts_obj = mod.generate_project_from_template(
         pid=pid,
         pdir=pdir,
         info_data=info_data,
         characters_data=chars_cfg,
-        videos_per_character=target_vpc,
+        videos_per_character=videos_per_character,
         primary_product_refs=primary_product_refs,
         slide_overlay_files=slide_overlay_files,
     )
     if isinstance(prompts_obj, dict):
-        prompts_obj["template_code"] = str(tpl_cfg_obj.get("code") or "001")
+        prompts_obj["template_code"] = target_tpl_code
+        if target_tpl_id:
+            prompts_obj["template_id"] = target_tpl_id
         prompts_obj["template_name"] = target_tpl_folder
+        for _, vv in (prompts_obj.get("videos") or {}).items():
+            if isinstance(vv, dict):
+                vv["template_code"] = target_tpl_code
+                if target_tpl_id:
+                    vv["template_id"] = target_tpl_id
+                vv["template_name"] = target_tpl_folder
         try:
             with open(prompts_path, "w", encoding="utf-8") as f:
                 json.dump(prompts_obj, f, ensure_ascii=False, indent=2)

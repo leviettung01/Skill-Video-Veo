@@ -1027,11 +1027,34 @@ def _apply_pro_thumbnail_badge_overlay(
     out_im.save(img_path, format="JPEG", quality=95)
 
 
+def _load_thumb_intro_registry() -> dict:
+    reg_path = os.path.join(THUMBS_ROOT_DIR, ".thumb_injected_registry.json")
+    if os.path.isfile(reg_path):
+        try:
+            with open(reg_path, "r", encoding="utf-8") as f:
+                data = json.load(f)
+            if isinstance(data, dict):
+                return data
+        except Exception:
+            pass
+    return {}
+
+
+def _save_thumb_intro_registry(reg: dict) -> None:
+    try:
+        os.makedirs(THUMBS_ROOT_DIR, exist_ok=True)
+        reg_path = os.path.join(THUMBS_ROOT_DIR, ".thumb_injected_registry.json")
+        with open(reg_path, "w", encoding="utf-8") as f:
+            json.dump(reg, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
 def inject_thumbnail_01s_into_video(video_path: str, thumb_path: str, duration_sec: float = 0.1) -> dict:
     """
-    Ghép ảnh Thumbnail (1080x1920) vào 0.1 giây đầu tiên của Video Final (60 FPS).
-    Nếu video đã từng được ghép 0.1s trước đó (duration >= 29.98s), tự động thay thế đúng 0.1s đầu tiên
-    để không bị cộng dồn thời lượng khi đổi Template Thumbnail nhiều lần.
+    Ghép ảnh Thumbnail (1080x1920) vào 0.1 giây đầu tiên của Video Final (giữ nguyên FPS gốc của video: 24/30/60 FPS).
+    Tự động nhận diện chính xác nếu video đã từng ghép intro trước đó qua metadata tag `skillautoveo_thumb_intro=<sec>`
+    và registry để cắt bỏ đúng phần intro cũ khi đổi Thumbnail nhiều lần, tuyệt đối không làm tăng thời lượng clip ngắn.
     """
     if not os.path.isfile(video_path):
         return {"ok": False, "error": f"Không tìm thấy file video: {video_path}"}
@@ -1045,56 +1068,138 @@ def inject_thumbnail_01s_into_video(video_path: str, thumb_path: str, duration_s
     use_nvenc = (enc_pref == "h264_nvenc") or (enc_pref == "auto" and hw.get("has_nvenc"))
     threads_cnt = int(cfg.get("ffmpeg_threads_per_job") or 4)
 
-    # Kiểm tra xem video đã có sẵn 0.1s intro chưa để thay thế thay vì cộng dồn
+    # Đọc thời lượng, FPS gốc, có kênh âm thanh không và metadata comment xem đã có intro 0.1s chưa
     already_has_intro = False
+    prev_intro_dur = dur
+    v_dur = 0.0
+    target_fps = 60
+    has_audio = True
+
+    norm_vpath = os.path.normcase(os.path.abspath(video_path))
+    reg = _load_thumb_intro_registry()
+
     try:
         r_pr = subprocess.run(
-            ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path],
-            capture_output=True, text=True, timeout=10,
+            [
+                "ffprobe", "-v", "error",
+                "-show_entries", "format=duration:format_tags=comment:stream=codec_type,r_frame_rate",
+                "-of", "json",
+                video_path,
+            ],
+            capture_output=True, text=True, timeout=12,
         )
-        v_dur = float((r_pr.stdout or "").strip())
-        if v_dur >= 29.98:
+        pr_data = json.loads(r_pr.stdout or "{}")
+        fmt_info = pr_data.get("format") or {}
+        v_dur = float(fmt_info.get("duration") or 0.0)
+        tags = fmt_info.get("tags") or {}
+        comment_val = str(tags.get("comment") or tags.get("COMMENT") or "")
+        m_tag = re.search(r"skillautoveo_thumb_intro=([0-9.]+)", comment_val)
+        if m_tag:
             already_has_intro = True
+            prev_intro_dur = float(m_tag.group(1))
+
+        streams = pr_data.get("streams") or []
+        has_audio = any(s.get("codec_type") == "audio" for s in streams)
+        for s in streams:
+            if s.get("codec_type") == "video" and s.get("r_frame_rate"):
+                fr_str = str(s["r_frame_rate"])
+                if "/" in fr_str:
+                    num, den = fr_str.split("/", 1)
+                    if float(den) > 0:
+                        fps_calc = int(round(float(num) / float(den)))
+                        if 15 <= fps_calc <= 120:
+                            target_fps = fps_calc
+                break
     except Exception:
         pass
 
-    v_trim_expr = f"trim=start={dur}," if already_has_intro else ""
-    a_trim_expr = f"atrim=start={dur}," if already_has_intro else ""
+    if not already_has_intro and norm_vpath in reg:
+        entry_reg = reg[norm_vpath]
+        expected_total = float(entry_reg.get("expected_total_dur") or 0.0)
+        if v_dur > 0 and expected_total > 0 and abs(v_dur - expected_total) < 0.08:
+            already_has_intro = True
+            prev_intro_dur = float(entry_reg.get("intro_dur") or dur)
+    elif not already_has_intro and v_dur >= 29.98 and abs(v_dur - 30.0) < 0.18:
+        already_has_intro = True
+        prev_intro_dur = dur
+
+    base_dur_est = max(0.1, (v_dur - prev_intro_dur) if already_has_intro else v_dur)
+    v_trim_expr = f"trim=start={prev_intro_dur:.4f}," if already_has_intro else ""
+    a_trim_expr = f"atrim=start={prev_intro_dur:.4f}," if already_has_intro else ""
 
     tmp_out = video_path + ".thumb_tmp.mp4"
-    fc = (
-        f"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
-        f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=60,trim=duration={dur},setpts=PTS-STARTPTS,format=yuv420p[vt];"
-        f"aevalsrc=0:d={dur}:s=44100:c=stereo,aformat=sample_fmts=fltp:channel_layouts=stereo[at];"
-        f"[1:v]{v_trim_expr}scale=1080:1920:force_original_aspect_ratio=decrease,"
-        f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps=60,setpts=PTS-STARTPTS,format=yuv420p[vm];"
-        f"[1:a]{a_trim_expr}aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[am];"
-        f"[vt][at][vm][am]concat=n=2:v=1:a=1[vout][aout]"
-    )
+    if has_audio:
+        fc = (
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={target_fps},trim=duration={dur:.4f},setpts=PTS-STARTPTS,format=yuv420p[vt];"
+            f"aevalsrc=0:d={dur:.4f}:s=44100:c=stereo,aformat=sample_fmts=fltp:channel_layouts=stereo[at];"
+            f"[1:v]{v_trim_expr}scale=1080:1920:force_original_aspect_ratio=decrease,"
+            f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={target_fps},setpts=PTS-STARTPTS,format=yuv420p[vm];"
+            f"[1:a]{a_trim_expr}aresample=44100,aformat=sample_fmts=fltp:channel_layouts=stereo,asetpts=PTS-STARTPTS[am];"
+            f"[vt][at][vm][am]concat=n=2:v=1:a=1[vout][aout]"
+        )
+        map_args = ["-map", "[vout]", "-map", "[aout]"]
+        audio_enc_args = ["-c:a", "aac", "-b:a", "128k"]
+    else:
+        fc = (
+            f"[0:v]scale=1080:1920:force_original_aspect_ratio=decrease,"
+            f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={target_fps},trim=duration={dur:.4f},setpts=PTS-STARTPTS,format=yuv420p[vt];"
+            f"[1:v]{v_trim_expr}scale=1080:1920:force_original_aspect_ratio=decrease,"
+            f"pad=1080:1920:(ow-iw)/2:(oh-ih)/2,setsar=1,fps={target_fps},setpts=PTS-STARTPTS,format=yuv420p[vm];"
+            f"[vt][vm]concat=n=2:v=1:a=0[vout]"
+        )
+        map_args = ["-map", "[vout]"]
+        audio_enc_args = []
 
     cmd = [
         "ffmpeg", "-y", "-v", "error",
-        "-loop", "1", "-t", str(dur), "-i", thumb_path,
+        "-loop", "1", "-t", f"{dur:.4f}", "-i", thumb_path,
         "-i", video_path,
         "-filter_complex", fc,
-        "-map", "[vout]", "-map", "[aout]",
-        "-r", "60",
+        *map_args,
+        "-r", str(target_fps),
         "-threads", str(threads_cnt),
+        "-metadata", f"comment=skillautoveo_thumb_intro={dur:.4f}",
     ]
     if use_nvenc:
         cmd += ["-c:v", "h264_nvenc", "-preset", "p4", "-cq", "20"]
     else:
         cmd += ["-c:v", "libx264", "-preset", "fast", "-crf", "19"]
-    cmd += ["-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp_out]
+    cmd += [*audio_enc_args, "-movflags", "+faststart", tmp_out]
 
     try:
         res = subprocess.run(cmd, capture_output=True, text=True, timeout=180)
-        if res.returncode != 0 or not os.path.isfile(tmp_out) or os.path.getsize(tmp_out) < 50000:
+        if res.returncode != 0 or not os.path.isfile(tmp_out) or os.path.getsize(tmp_out) < 20000:
             if os.path.isfile(tmp_out):
                 os.remove(tmp_out)
             return {"ok": False, "error": f"FFmpeg lỗi: {(res.stderr or '')[:250]}"}
         os.replace(tmp_out, video_path)
-        return {"ok": True, "video_path": video_path, "thumb_path": thumb_path, "duration_sec": dur}
+        new_dur = base_dur_est + dur
+        try:
+            r_new = subprocess.run(
+                ["ffprobe", "-v", "error", "-show_entries", "format=duration", "-of", "default=noprint_wrappers=1:nokey=1", video_path],
+                capture_output=True, text=True, timeout=8,
+            )
+            new_dur = float((r_new.stdout or "").strip() or new_dur)
+        except Exception:
+            pass
+        reg[norm_vpath] = {
+            "intro_dur": round(dur, 4),
+            "orig_dur": round(base_dur_est, 4),
+            "expected_total_dur": round(new_dur, 4),
+            "fps": target_fps,
+            "updated_at": time.time(),
+        }
+        _save_thumb_intro_registry(reg)
+        return {
+            "ok": True,
+            "video_path": video_path,
+            "thumb_path": thumb_path,
+            "duration_sec": dur,
+            "replaced_existing_intro": already_has_intro,
+            "fps": target_fps,
+            "total_duration_sec": round(new_dur, 4),
+        }
     except Exception as e:
         if os.path.isfile(tmp_out):
             try:
@@ -1232,7 +1337,16 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
     flow_accs = [a for a in list_available_flow_accounts() if a.get("active", True)]
     prof_name = flow_accs[0]["profile_name"] if flow_accs else "leviettung04"
     shared_dir = mt.gvt._resolve_flow_shared_dir(prof_name)
-    raw_cookies = gfa.load_cookies(shared_dir, prof_name)
+    raw_cookies = []
+    try:
+        _, snap_path = gfa.profile_paths(shared_dir, prof_name)
+        snap_obj = gfa.read_json(snap_path, default=None)
+        if isinstance(snap_obj, dict):
+            raw_cookies = snap_obj.get("cookies") or []
+        elif isinstance(snap_obj, list):
+            raw_cookies = snap_obj
+    except Exception:
+        raw_cookies = []
     if not raw_cookies:
         for alt_dir in (
             os.path.join(WS_DIR, "cookies", f"{prof_name}.json"),
@@ -1246,6 +1360,12 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
                         break
                 except Exception:
                     pass
+    if not raw_cookies:
+        try:
+            import character_library_manager as _clm_th
+            raw_cookies = _clm_th._load_clean_flow_cookies(prof_name) or _clm_th._load_clean_flow_cookies("")
+        except Exception:
+            pass
 
     try:
         with sync_playwright() as pw:

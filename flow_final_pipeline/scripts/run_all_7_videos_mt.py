@@ -424,7 +424,8 @@ def submit_scene_in_page(page, wiz, task):
     h_prompt = [None, None, [[[sc["prompt"]]]]]
     l_item = [None, None, None, None, m_uuid, wf_uuid]
     x_batch = [b_uuid, 1]
-    model_key = "abra_r2v_10s"
+    dur_sec = int(sc.get("duration_sec") or task.get("scene_duration_sec") or 10)
+    model_key = sc.get("model_key") or ("abra_r2v_6s" if dur_sec <= 6 else ("abra_r2v_8s" if dur_sec <= 8 else "abra_r2v_10s"))
     aspect_int = 1  # 9:16 portrait
     # Standard 5-Step Google Flow Pipeline:
     # All 3 scenes (s1, s2, s3) ALWAYS pass the exact same 3 Reference Ingredients:
@@ -785,7 +786,11 @@ def main():
             v_info = prompts_data["videos"][v_key]
             char_key = v_info.get("character", "nv1")
             ck_low = (char_key or "").lower()
-            base_char = "nv3" if ("nv3" in ck_low or v_key.lower().startswith("nv3")) else ("nv2" if ("nv2" in ck_low or v_key.lower().startswith("nv2")) else "nv1")
+            m_nv = __import__("re").search(r"(nv\d+)", ck_low) or __import__("re").search(r"(nv\d+)", v_key.lower())
+            base_char = m_nv.group(1) if m_nv else (ck_low if ck_low else "nv1")
+            tpl_id_low = str(v_info.get("template_id") or prompts_data.get("template_id") or "").lower()
+            is_pov_only = bool(v_info.get("pov_only") or "pov" in tpl_id_low or tpl_id_low == "do_an_vat")
+            scene_dur_sec = int(v_info.get("scene_duration_sec") or prompts_data.get("scene_duration_sec") or 10)
             project_id = v_info.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
             char_id = v_info.get("character_id") or ""
             voice_id = v_info.get("voice_id") or ""
@@ -858,6 +863,8 @@ def main():
                     "primary_prod_img": primary_prod_img,
                     "project_id": project_id,
                     "char_id": char_id,
+                    "pov_only": is_pov_only,
+                    "scene_duration_sec": scene_dur_sec,
                     "prod_uuids": prod_uuids,
                     "prompt_str": v_info["ref_image_prompt"],
                     "ref_img_rel": ref_img_rel,
@@ -892,6 +899,7 @@ def main():
                     "primary_prod_img": primary_prod_img,
                     "ref_img_abs": ref_img_abs,
                     "sc": sc,
+                    "scene_duration_sec": int(sc.get("duration_sec") or scene_dur_sec),
                     "project_id": project_id,
                     "ref_uuid": ref_uuid,
                     "prod_uuid": prod_uuids[0] if prod_uuids else None,
@@ -1213,7 +1221,7 @@ def main():
                             pending_queue.insert(0, t)
                         open_fresh_clean_context(t["project_id"])
                         continue
-                    if not t.get("char_id"):
+                    if not t.get("char_id") and not t.get("pov_only"):
                         c_photo_uuid = ensure_char_photo_uuid(
                             pid, pdir, state, refs_state, base_char, t["project_id"]
                         )
@@ -1238,8 +1246,8 @@ def main():
                         save_prod_state(pdir, state, refs_state)
                         safe_sync_ui()
 
-                        # Immediately insert the 3 scene tasks (+ AI Thumbnail task) for this variant at the front of pending_queue!
-                        # All 3 scenes share the exact same 3 ingredients: [gen_uuid (2K Ref Image), u_id (Product Image)] + voice_id!
+                        # Immediately insert the scene tasks (+ AI Thumbnail task) for this variant at the front of pending_queue!
+                        # All scenes share the exact same ingredients: [gen_uuid (2K Ref Image), u_id (Product Image)] + voice_id!
                         new_scene_tasks = []
                         for sc in t["scenes"]:
                             sc_id = sc["id"]
@@ -1257,6 +1265,7 @@ def main():
                                 "primary_prod_img": t["primary_prod_img"],
                                 "ref_img_abs": t["out_file"],
                                 "sc": sc,
+                                "scene_duration_sec": int(sc.get("duration_sec") or t.get("scene_duration_sec") or 10),
                                 "project_id": t["project_id"],
                                 "ref_uuid": gen_uuid,
                                 "prod_uuid": u_id,

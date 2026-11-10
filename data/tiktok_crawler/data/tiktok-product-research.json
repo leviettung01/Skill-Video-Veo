@@ -8,7 +8,7 @@
     "targetCategory": "",
     "autoScanCount": 20
   },
-  "updatedAt": 1793702933.155461,
+  "updatedAt": 1794279850.3769934,
   "products": [
     {
       "id": "1737611143753598226",
@@ -11038,11 +11038,11 @@
     {
       "id": "1731391379899778653",
       "title": "Kho quẹt nồi đất Làng Chài Xưa hủ 250g thơm ngon đặc biệt full topping tôm khô, cá cơm rim, thịt ba rọi, tốp mỡ & mắm nhỉ 40N",
-      "price": 57455,
-      "original_price": 91927,
+      "price": 55360,
+      "original_price": 88577,
       "commission": 0,
-      "sold_total": 187354,
-      "sold_total_label": "187,354 đã bán",
+      "sold_total": 111119,
+      "sold_total_label": "111,119 đã bán",
       "orders_7d": 0,
       "creators_7d": 0,
       "ratio": 0.0,
@@ -11071,7 +11071,17 @@
       ],
       "description": "THÔNG TIN CHI TIẾT:\nKho quẹt nồi đất Làng Chài Xưa rất thơm ngon, được làm công phu hoàn toàn từ thủ công. Nguyên liệu chính để ra được \"KHO QUẸT\" trứ danh ngon khó cưỡng: Tôm khô, Cá cơm rim, Thịt ba rọi, Tốp mỡ và Mắm nhỉ 40N đạm giúp món ăn ngon hơn rất nhiều. Tất cả được pha trộn theo công thức chỉ có tại Bảo tàng nước mắm Làng Chài Xưa - Bảo tàng nước mắm đầu tiên tại Việt Nam.\nLOẠI ĐẶC BIỆT 5IN1:",
       "shop_name": "Làng Chài Xưa",
-      "variations": [],
+      "variations": [
+        {
+          "group_name": "Thông số",
+          "options": [
+            {
+              "name": "Mặc định",
+              "image": null
+            }
+          ]
+        }
+      ],
       "has_details": true,
       "category": "",
       "rating": 0.0,

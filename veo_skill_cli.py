@@ -315,7 +315,7 @@ def create_or_get_project(
 def append_project_log(project_id: str, msg: str) -> None:
     ts = datetime.now().strftime("%H:%M:%S")
     line = f"[{ts}] {msg}"
-    print(line, flush=True)
+    print(line, file=sys.stderr, flush=True)
     with _STORE_LOCK:
         proj = load_project(project_id)
         if not proj:
@@ -1136,6 +1136,34 @@ def main():
     p_run.add_argument("--product-workers", type=int, default=2, help="Số sản phẩm chạy song song")
     p_run.add_argument("--scene-workers", type=int, default=3, help="Số phân cảnh chạy song song mỗi sản phẩm")
 
+    # 8. crawl-product (Tự động tải ảnh & thông tin sản phẩm TikTokShop theo Cách 1 SPAI hoặc Cách 2 Browser)
+    p_crawl = sub.add_parser("crawl-product", help="Crawl thông tin & ảnh sản phẩm TikTokShop theo Link hoặc ID")
+    p_crawl.add_argument("--url", "--id", dest="raw_input", required=True, help="Link hoặc ID sản phẩm TikTokShop")
+    p_crawl.add_argument("--method", choices=["auto", "api", "browser"], default="auto", help="Phương thức crawl (auto/api/browser)")
+    p_crawl.add_argument("--force", action="store_true", help="Tải lại ngay cả khi đã có cache")
+
+    # 9. set-videos-per-char (Cấu hình số lượng video tạo ra cho mỗi nhân vật)
+    p_vpc = sub.add_parser("set-videos-per-char", help="Cập nhật số video mặc định cho mỗi nhân vật trong thư viện")
+    p_vpc.add_argument("--count", type=int, required=True, help="Số lượng video mỗi nhân vật (1 - 5)")
+    p_vpc.add_argument("--char", default="", help="Mã nhân vật cụ thể (VD: nv1, nv2) hoặc để trống áp dụng toàn bộ")
+
+    # 10. gen-char-image (Tạo ảnh Character Sheet hoặc ảnh Nhân vật cầm sản phẩm 2K)
+    p_gci = sub.add_parser("gen-char-image", help="Tạo ảnh Character Sheet hoặc ảnh Nhân vật cầm sản phẩm 2K")
+    p_gci.add_argument("--mode", choices=["character_sheet", "product_ref"], default="character_sheet", help="Chế độ tạo ảnh")
+    p_gci.add_argument("--char", default="nv1", help="Mã nhân vật (nv1..nv5)")
+    p_gci.add_argument("--sheet-template", default="sheet_6panel_studio", help="Mã mẫu Character Sheet")
+    p_gci.add_argument("--pid", default="", help="Mã sản phẩm (khi mode=product_ref)")
+    p_gci.add_argument("--model", choices=["nano_banana", "chatgpt"], default="nano_banana", help="Model tạo ảnh")
+    p_gci.add_argument("--prompt", default="", help="Prompt tùy chỉnh (nếu có)")
+
+    # 11. create-video (Khởi tạo kịch bản theo Template #001..#003 và tùy chọn chạy pipeline ngay)
+    p_cv = sub.add_parser("create-video", help="Tạo kịch bản theo Template (#001, #002, #003) từ Link/ID sản phẩm và tùy chọn chạy tạo video")
+    p_cv.add_argument("--product", required=True, help="Link hoặc ID sản phẩm TikTokShop")
+    p_cv.add_argument("--template", default="001", help="Mã hoặc tên Template (001, 002, 003)")
+    p_cv.add_argument("--videos-per-char", type=int, default=None, help="Số video mỗi nhân vật")
+    p_cv.add_argument("--crawl-method", choices=["auto", "api", "browser"], default="auto", help="Phương thức crawl")
+    p_cv.add_argument("--run", action="store_true", help="Tự động kích hoạt pipeline tạo Ảnh 2K -> Video -> Final")
+
     args = parser.parse_args()
 
     if args.cmd == "status":
@@ -1253,6 +1281,78 @@ def main():
                 for p in proj["products"]
             ],
         }, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "crawl-product":
+        scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import io, contextlib
+        import product_crawler_bridge as _pcb
+        with contextlib.redirect_stdout(sys.stderr):
+            res = _pcb.crawl_product_by_id_or_url(args.raw_input, method=args.method, force=args.force)
+        print(json.dumps(res, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "set-videos-per-char":
+        scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import character_library_manager as _clm
+        st = _clm.get_character_library_state()
+        cnt = max(1, min(5, int(args.count)))
+        target_ck = args.char.strip().lower()
+        chars_payload = {}
+        for c in st.get("characters", []):
+            ck = c["key"]
+            c_copy = dict(c)
+            if not target_ck or ck == target_ck:
+                c_copy["videos_per_character"] = cnt
+            chars_payload[ck] = c_copy
+        payload = {"characters": chars_payload}
+        if not target_ck:
+            payload["default_videos_per_character"] = cnt
+        updated = _clm.save_character_library_settings(payload)
+        print(json.dumps({
+            "ok": True,
+            "default_videos_per_character": updated.get("default_videos_per_character"),
+            "characters": [
+                {"key": c["key"], "enabled": c.get("enabled", True), "videos_per_character": c.get("videos_per_character")}
+                for c in updated.get("characters", [])
+            ],
+        }, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "gen-char-image":
+        scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import io, contextlib
+        import character_library_manager as _clm
+        with contextlib.redirect_stdout(sys.stderr):
+            res = _clm.generate_character_or_product_image({
+                "mode": args.mode,
+                "char_key": args.char,
+                "sheet_template_id": args.sheet_template,
+                "pid": args.pid,
+                "model": args.model,
+                "custom_prompt": args.prompt,
+            })
+        print(json.dumps(res, indent=2, ensure_ascii=False))
+
+    elif args.cmd == "create-video":
+        scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+        if scripts_dir not in sys.path:
+            sys.path.insert(0, scripts_dir)
+        import contextlib
+        import product_crawler_bridge as _pcb
+        with contextlib.redirect_stdout(sys.stderr):
+            res = _pcb.prepare_and_optionally_run_product(
+                raw_id_or_url=args.product,
+                template_name=args.template,
+                crawl_method=args.crawl_method,
+                videos_per_character=args.videos_per_char,
+                force_regenerate_prompts=True,
+                auto_run_pipeline=bool(args.run),
+            )
+        print(json.dumps(res, indent=2, ensure_ascii=False))
 
 
 if __name__ == "__main__":

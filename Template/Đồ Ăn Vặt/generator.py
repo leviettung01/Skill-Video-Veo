@@ -117,9 +117,10 @@ POLICY_REPLACEMENTS = [
 ]
 
 
-def load_template_config() -> dict:
-    if os.path.exists(CONFIG_PATH):
-        with open(CONFIG_PATH, "r", encoding="utf-8") as f:
+def load_template_config(config_path: str = None) -> dict:
+    p = config_path or CONFIG_PATH
+    if p and os.path.exists(p):
+        with open(p, "r", encoding="utf-8") as f:
             return json.load(f)
     return {}
 
@@ -675,6 +676,145 @@ def _build_pov_voice_scenes_for_variant(
     return scenes_out
 
 
+def _adapt_food_dialect(line: str, region: str) -> str:
+    reg = (region or "north").lower()
+    out = line
+    if reg == "south":
+        out = re.sub(r"\bnhé\b", "nha", out, flags=re.IGNORECASE)
+        out = re.sub(r"\bđấy ạ\b", "luôn nè", out, flags=re.IGNORECASE)
+        out = re.sub(r"\bcực hời\b", "siêu hời", out, flags=re.IGNORECASE)
+    elif reg == "central":
+        out = re.sub(r"\bnha\b", "nhé", out, flags=re.IGNORECASE)
+    return out
+
+
+def _build_ugc_4scenes_8s_for_variant(
+    vkey: str,
+    variant_idx: int,
+    pname: str,
+    price_str: str,
+    desc: str,
+    bg_item: dict,
+    hand_block: str,
+) -> list:
+    """
+    Sinh đúng 4 phân cảnh × 8 giây (Tổng 32s, `abra_r2v_8s`) cho Template #003 (`do_an_vat` — Đồ Ăn Vặt & Đồ Uống UGC):
+      - Cảnh 1 (0–8s): PACK HERO — Mở màn bao bì chính hãng sắc nét cạnh thành phẩm gợi mở trên mặt bàn.
+      - Cảnh 2 (8–16s): UNBOXING & TEXTURE — Mở nắp / xoay bao bì / múc muỗng sốt sánh khoe kết cấu thật.
+      - Cảnh 3 (16–24s): FOOD PORN / CHẾ BIẾN — Cao trào thị giác cận cảnh múc sốt / pha ly đá / chấm món ngon.
+      - Cảnh 4 (24–32s): THƯỞNG THỨC & ENDING HERO — Pull-back mượt khoe trọn bộ thành phẩm và bao bì chính hãng.
+    Âm thanh ASMR ẩm thực tự nhiên trên bàn ăn (không có giọng đọc thuyết minh Voiceover), đi kèm phụ đề Karaoke 60 FPS.
+    """
+    short_name = _clean_short_product_name_vn(pname)
+    price_spoken = _format_price_spoken_vn(price_str)
+    flav_1, flav_2, occ_line = _extract_flavor_highlights_vn(pname, desc)
+    bg_block = bg_item["block"]
+    plan = _build_culinary_staging_plan(pname, desc, hand_block)
+    prod_desc_en = plan["prod_desc_en"]
+    staging_en = plan["staging_en"]
+    neg_en = plan["negative_en"]
+
+    c1_cap = sanitize_tiktok_policy(f"Siêu phẩm {short_name} bày lên bàn nhìn thôi đã thèm")
+    c2_cap = sanitize_tiktok_policy(flav_1)
+    c3_cap = sanitize_tiktok_policy(flav_2)
+    c4_cap = sanitize_tiktok_policy(f"{occ_line}. Ưu đãi hôm nay {price_spoken} ở giỏ hàng góc trái")
+
+    four_specs = [
+        {
+            "num": 1,
+            "title": f"CẢNH 1 (0–8s): PACK HERO — BAO BÌ CHÍNH HÃNG & BÀN TIỆC GỢI MỞ ({bg_item['label']})",
+            "caption_vn": c1_cap,
+            "img_prompt": (
+                f"Use the uploaded product image as the strict product reference. Vertical 9:16 realistic commercial UGC food photography. "
+                f"{bg_block} PRODUCT LOCK: {prod_desc_en}. Keep packaging, logo, and Vietnamese label 100% faithful to the uploaded reference image. "
+                f"{staging_en} Action & Framing: {plan['s1_img_action']} Appetizing 8K commercial food styling, {neg_en}"
+            ),
+            "v1": plan["s1_vis_t1"],
+            "v2": f"Very slow push-in + subtle rack focus sharpening the authentic Vietnamese product label while {hand_block} gently steadies the package.",
+            "v3": "Warm natural window light catches the appetizing surface textures, holding a clean tabletop continuity frame for Scene 2.",
+        },
+        {
+            "num": 2,
+            "title": f"CẢNH 2 (8–16s): UNBOXING & TEXTURE — KHOE KẾT CẤU THẬT ({bg_item['label']})",
+            "caption_vn": c2_cap,
+            "img_prompt": (
+                f"Use the uploaded product image as the strict product reference. Vertical 9:16 realistic commercial UGC macro close-up food image. "
+                f"{bg_block} PRODUCT LOCK: {prod_desc_en}. {staging_en} "
+                f"Scene Inheritance from Scene 1: {plan['s1_img_action']} Shallow depth of field, photorealistic 8K, {neg_en}"
+            ),
+            "v1": "SCENE INHERITANCE FROM SCENE 1: Locked macro close-up on the exact tabletop spread with the authentic product beside the freshly prepared serving.",
+            "v2": plan["s1_vis_t2"],
+            "v3": plan["s1_vis_t3"],
+        },
+        {
+            "num": 3,
+            "title": f"CẢNH 3 (16–24s): FOOD PORN / CHẾ BIẾN — CAO TRÀO THỊ GIÁC ({bg_item['label']})",
+            "caption_vn": c3_cap,
+            "img_prompt": (
+                f"Use the uploaded product image as the strict product reference. Vertical 9:16 realistic commercial UGC food-porn close-up. "
+                f"{bg_block} PRODUCT LOCK: {prod_desc_en}. {staging_en} "
+                f"Scene Inheritance from Scene 2: {plan['s2_img_action']} Photorealistic 8K culinary macro, {neg_en}"
+            ),
+            "v1": plan["s2_vis_t1"],
+            "v2": plan["s2_vis_t2"],
+            "v3": plan["s2_vis_t3"],
+        },
+        {
+            "num": 4,
+            "title": f"CẢNH 4 (24–32s): THƯỞNG THỨC & ENDING HERO — CHỐT ĐƠN ({bg_item['label']})",
+            "caption_vn": c4_cap,
+            "img_prompt": (
+                f"Use the uploaded product image as the strict product reference. Vertical 9:16 realistic commercial UGC hero food image. "
+                f"{bg_block} PRODUCT LOCK: {prod_desc_en}. {staging_en} "
+                f"Scene Inheritance from Scene 3: {plan['s3_img_action']} Warm inviting natural daylight, photorealistic 8K, {neg_en}"
+            ),
+            "v1": plan["s3_vis_t1"].replace("SCENE 2", "SCENE 3").replace("Scene 2", "Scene 3"),
+            "v2": plan["s3_vis_t2"],
+            "v3": "Camera holds a crisp, mouth-watering commercial ending hero shot of the authentic product and full culinary spread.",
+        },
+    ]
+
+    scenes_out = []
+    for sc in four_specs:
+        sc_num = sc["num"]
+        cap_vn = sc["caption_vn"]
+        vid_prompt = (
+            f"8-second vertical 9:16 realistic commercial UGC food & drink continuity video clip. "
+            f"CONTINUITY & APPETIZING CULINARY STAGING: Inherit the exact tabletop scene, natural window lighting, hand identity ({hand_block}), "
+            f"authentic packaged product ({prod_desc_en}), and appetizing served accompaniment from the reference image. "
+            f"{staging_en} {bg_block} "
+            f"VISUAL & CAMERA TIMELINE (8s smooth macro food cinematography): "
+            f"[0.0-2.8s]: {sc['v1']} "
+            f"[2.8-5.6s]: {sc['v2']} "
+            f"[5.6-8.0s]: {sc['v3']} "
+            f"AUDIO: Subtle, crisp natural culinary ASMR tabletop sounds only (gentle utensil/glass clink, spoon dipping, appetizing ambient kitchen sound); "
+            f"strictly NO spoken dialogue, NO human voiceover, NO background singing. "
+            f"STRICT NEGATIVE: {neg_en} Photorealistic."
+        )
+        phrases = _split_into_karaoke_phrases(cap_vn, max_chars=26)
+        word_cnt = sum(w for _, w in phrases)
+        scenes_out.append({
+            "id": f"{vkey}_s{sc_num}",
+            "file": f"{vkey}_s{sc_num}.mp4",
+            "duration_sec": 8,
+            "model_key": "abra_r2v_8s",
+            "scene_title": sc["title"],
+            "scene_description": cap_vn,
+            "dialogue": "",
+            "caption_vn": cap_vn,
+            "visual_timeline": {
+                "0.0-2.8s": sc["v1"],
+                "2.8-5.6s": sc["v2"],
+                "5.6-8.0s": sc["v3"],
+            },
+            "image_prompt": sc["img_prompt"],
+            "prompt": vid_prompt,
+            "words": max(6, word_cnt),
+            "phrases": phrases,
+        })
+    return scenes_out
+
+
 def generate_project_from_template(
     pid: str,
     pdir: str,
@@ -684,11 +824,21 @@ def generate_project_from_template(
     primary_product_refs: list = None,
     slide_overlay_files: list = None,
     selected_voice_key: str = None,
+    config_path_override: str = None,
 ) -> dict:
     """
-    Sinh prompts.json và spec_v*.json trong thư mục projects/<pid>/ theo Template Đồ Ăn Vặt POV (Có Voice + Random Background + Creative Culinary Staging + Timeline Sync + 60fps Subtitles).
+    Sinh `prompts.json` và `spec_*.json` trong thư mục `projects/<pid>/` cho:
+      - Template #002 (`do_an_vat_pov_voice` — Đồ Ăn Vặt POV Có Voice): 3 cảnh × 10s (`abra_r2v_10s`), có Voice ID theo nhân vật đang bật.
+      - Template #003 (`do_an_vat` — Đồ Ăn Vặt & Đồ Uống UGC): 4 cảnh × 8s (`abra_r2v_8s`), ASMR UGC không lời thoại + Sub Karaoke 60fps, tuân thủ nhân vật đang bật.
     """
-    cfg = load_template_config()
+    cfg = load_template_config(config_path_override)
+    tpl_id = str(cfg.get("id") or "do_an_vat").strip()
+    tpl_folder = str(cfg.get("folder_name") or ("Đồ Ăn Vặt POV (Có Voice)" if "pov" in tpl_id else "Đồ Ăn Vặt")).strip()
+    tpl_code = str(cfg.get("code") or ("002" if "pov" in tpl_id else "003")).strip()
+    is_voice_pov = (tpl_id == "do_an_vat_pov_voice" or tpl_code == "002")
+    scenes_per_vid = int(cfg.get("scenes_per_video") or (3 if is_voice_pov else 4))
+    scene_dur_sec = int(cfg.get("scene_duration_sec") or (10 if is_voice_pov else 8))
+
     voices_cat = load_voices_catalog()
     os.makedirs(pdir, exist_ok=True)
     prod_img_dir = os.path.join(pdir, "product_images")
@@ -707,90 +857,131 @@ def generate_project_from_template(
     price_str = str(info_data.get("price") or info_data.get("sale_price") or "")
     desc = info_data.get("description") or ""
 
-    num_variants = int(videos_per_character or cfg.get("default_videos_per_character", 2))
-    num_variants = max(1, min(6, num_variants))
+    default_vpc = int(videos_per_character or cfg.get("default_videos_per_character", 2))
+    default_vpc = max(1, min(5, default_vpc))
 
-    # Lấy thông tin Voice & Project từ voices_and_characters.json (character_id để rỗng "" vì quay POV sản phẩm)
     chars_dict = (characters_data or {}).get("characters") or voices_cat.get("characters") or {}
     voices_dict = (characters_data or {}).get("voices") or voices_cat.get("voices") or {}
 
-    nv1_info = chars_dict.get("nv1", {})
-    nv2_info = chars_dict.get("nv2", {})
-    voice_presets = [
-        {
-            "char_key": "nv1",
-            "voice_id": voices_dict.get("nv1", {}).get("voice_id") or nv1_info.get("voice_id") or "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
-            "voice_name": voices_dict.get("nv1", {}).get("name") or nv1_info.get("voice_name") or "Nhân Vật 1 Affi Giọng Bắc",
-            "voice_prompt_en": voices_dict.get("nv1", {}).get("voice_prompt_en") or nv1_info.get("voice_prompt_en") or "",
-            "project_id": nv1_info.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c",
-        },
-        {
-            "char_key": "nv2",
-            "voice_id": voices_dict.get("nv2", {}).get("voice_id") or nv2_info.get("voice_id") or "75a3d14a-ed10-4bdc-862c-44adb02a5562",
-            "voice_name": voices_dict.get("nv2", {}).get("name") or nv2_info.get("voice_name") or "Nhân Vật 2 Affi Giọng Bắc Năng Lượng",
-            "voice_prompt_en": voices_dict.get("nv2", {}).get("voice_prompt_en") or nv2_info.get("voice_prompt_en") or "",
-            "project_id": nv2_info.get("project_id") or "bf4979d1-548a-44bd-a265-3927bba76dc1",
-        },
+    enabled_chars = [
+        (ck, cval)
+        for ck, cval in chars_dict.items()
+        if isinstance(cval, dict) and cval.get("enabled", True) is not False
     ]
-    if selected_voice_key and selected_voice_key in voices_dict:
-        v_sel = voices_dict[selected_voice_key]
-        voice_presets = [{
-            "char_key": selected_voice_key if selected_voice_key in ("nv1", "nv2") else "nv1",
-            "voice_id": v_sel.get("voice_id") or "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
-            "voice_name": v_sel.get("name") or selected_voice_key,
-            "voice_prompt_en": v_sel.get("voice_prompt_en") or "",
-            "project_id": nv1_info.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c",
-        }]
+    if not enabled_chars:
+        if chars_dict:
+            enabled_chars = list(chars_dict.items())[:1]
+        else:
+            enabled_chars = [("nv1", {"default_voice": "nv1", "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c"})]
 
-    # Random ngẫu nhiên Background từ 8 Background trong DoAnVat cho mỗi video
-    chosen_bgs = random.sample(RANDOM_BG_POOL, k=min(num_variants, len(RANDOM_BG_POOL)))
-    while len(chosen_bgs) < num_variants:
+    # Tính tổng số biến thể sẽ sinh để random danh sách Background không trùng
+    variant_plan = []
+    for ck, cval in enabled_chars:
+        char_vpc = int(
+            videos_per_character
+            if videos_per_character is not None
+            else cval.get("videos_per_character", default_vpc)
+        )
+        char_vpc = max(1, min(5, char_vpc))
+        v_key_sel = selected_voice_key if (selected_voice_key and selected_voice_key in voices_dict) else cval.get("default_voice", ck)
+        v_obj = voices_dict.get(v_key_sel, {})
+        voice_id = (v_obj.get("voice_id") if selected_voice_key else (cval.get("voice_id") or v_obj.get("voice_id"))) or "27f51973-e290-4a38-bd7a-9d6fbe81b2f6"
+        voice_name = (v_obj.get("name") if selected_voice_key else (cval.get("voice_name") or v_obj.get("name"))) or f"Giọng {ck.upper()}"
+        voice_region = (v_obj.get("region") if selected_voice_key else (cval.get("voice_region") or v_obj.get("region"))) or "north"
+        voice_gender = (v_obj.get("gender") if selected_voice_key else (cval.get("voice_gender") or v_obj.get("gender"))) or "female"
+        voice_prompt_en = (v_obj.get("voice_prompt_en") if selected_voice_key else (cval.get("voice_prompt_en") or v_obj.get("voice_prompt_en"))) or ""
+        proj_id = cval.get("project_id") or ("bf4979d1-548a-44bd-a265-3927bba76dc1" if ck == "nv2" else "932bc2a1-07ea-4199-b147-80ab0018d41c")
+        for v_idx in range(1, char_vpc + 1):
+            variant_plan.append({
+                "ck": ck,
+                "v_idx": v_idx,
+                "voice_id": voice_id if is_voice_pov else "",
+                "voice_name": voice_name if is_voice_pov else "UGC ASMR (Không Voiceover)",
+                "voice_region": voice_region,
+                "voice_gender": voice_gender,
+                "voice_prompt_en": voice_prompt_en if is_voice_pov else "",
+                "project_id": proj_id,
+            })
+
+    total_variants = len(variant_plan)
+    chosen_bgs = random.sample(RANDOM_BG_POOL, k=min(total_variants, len(RANDOM_BG_POOL)))
+    while len(chosen_bgs) < total_variants:
         chosen_bgs.append(random.choice(RANDOM_BG_POOL))
 
     videos_json = {}
-    nv_counts = {"nv1": 0, "nv2": 0}
+    male_hand = "a clean masculine hand with neat short natural nails, steady natural food-serving pose"
 
-    for idx in range(num_variants):
-        vkey = f"v{idx + 1}"
-        vp = voice_presets[idx % len(voice_presets)]
-        ck = vp["char_key"]
-        nv_counts[ck] = nv_counts.get(ck, 0) + 1
-        char_v = f"{ck}_v{nv_counts[ck]}"
+    for idx, vp in enumerate(variant_plan):
+        ck = vp["ck"]
+        v_idx = vp["v_idx"]
+        if ck == "nv1" and v_idx <= 5:
+            vkey = f"v{(v_idx - 1) * 2 + 1}"
+        elif ck == "nv2" and v_idx <= 5:
+            vkey = f"v{v_idx * 2}"
+        else:
+            vkey = f"{ck}_v{v_idx}"
+        char_v = f"{ck}_v{v_idx}"
         bg_item = chosen_bgs[idx]
-        hand_block = HAND_POOL[idx % len(HAND_POOL)]
+        hand_block = male_hand if vp["voice_gender"] == "male" else HAND_POOL[idx % len(HAND_POOL)]
 
-        hook_title = (
-            f"POV Review Có Voice #{idx + 1}: {bg_item['label']} ({vp['voice_name']})"
-        )
-        style_label = f"POV Đồ Ăn Vặt Có Voice • {bg_item['label']} • {vp['voice_name']}"
-
-        built_scenes = _build_pov_voice_scenes_for_variant(
-            vkey=vkey,
-            variant_idx=idx + 1,
-            pname=pname,
-            price_str=price_str,
-            desc=desc,
-            bg_item=bg_item,
-            hand_block=hand_block,
-            voice_prompt_en=vp.get("voice_prompt_en", ""),
-        )
+        if is_voice_pov:
+            hook_title = f"{ck.upper()} • POV Có Voice #{v_idx}: {bg_item['label']} ({vp['voice_name']})"
+            style_label = f"POV Đồ Ăn Vặt Có Voice • {bg_item['label']} • {vp['voice_name']}"
+            built_scenes = _build_pov_voice_scenes_for_variant(
+                vkey=vkey,
+                variant_idx=idx + 1,
+                pname=pname,
+                price_str=price_str,
+                desc=desc,
+                bg_item=bg_item,
+                hand_block=hand_block,
+                voice_prompt_en=vp.get("voice_prompt_en", ""),
+            )
+            # Điều chỉnh từ ngữ phương ngữ theo vùng miền giọng đọc của nhân vật bật
+            if vp["voice_region"] != "north":
+                for s in built_scenes:
+                    s["dialogue"] = _adapt_food_dialect(s.get("dialogue", ""), vp["voice_region"])
+                    s["scene_description"] = s["dialogue"]
+                    s["phrases"] = _split_into_karaoke_phrases(s["dialogue"])
+                    s["words"] = max(8, sum(w for _, w in s["phrases"]))
+            for s in built_scenes:
+                s["duration_sec"] = scene_dur_sec
+                s["model_key"] = "abra_r2v_10s" if scene_dur_sec >= 10 else "abra_r2v_8s"
+        else:
+            hook_title = f"{ck.upper()} • Đồ Ăn Vặt UGC #{v_idx} (4 Cảnh × 8s): {bg_item['label']}"
+            style_label = f"Đồ Ăn Vặt & Đồ Uống UGC (4×8s ASMR) • {bg_item['label']}"
+            built_scenes = _build_ugc_4scenes_8s_for_variant(
+                vkey=vkey,
+                variant_idx=idx + 1,
+                pname=pname,
+                price_str=price_str,
+                desc=desc,
+                bg_item=bg_item,
+                hand_block=hand_block,
+            )
 
         scenes_list = []
         spec_scenes = []
         for s in built_scenes:
-            scenes_list.append({
+            sc_entry = {
                 "id": s["id"],
                 "file": s["file"],
+                "duration_sec": int(s.get("duration_sec") or scene_dur_sec),
+                "model_key": s.get("model_key") or ("abra_r2v_10s" if scene_dur_sec >= 10 else "abra_r2v_8s"),
                 "scene_title": s["scene_title"],
                 "scene_description": s["scene_description"],
-                "dialogue": s["dialogue"],
-                "voice_timeline": s["voice_timeline"],
+                "dialogue": s.get("dialogue", ""),
                 "visual_timeline": s["visual_timeline"],
                 "image_prompt": s["image_prompt"],
                 "prompt": s["prompt"],
                 "words": s["words"],
                 "phrases": s["phrases"],
-            })
+            }
+            if "voice_timeline" in s:
+                sc_entry["voice_timeline"] = s["voice_timeline"]
+            if "caption_vn" in s:
+                sc_entry["caption_vn"] = s["caption_vn"]
+            scenes_list.append(sc_entry)
             spec_scenes.append({
                 "file": s["file"],
                 "words": s["words"],
@@ -801,7 +992,8 @@ def generate_project_from_template(
         videos_json[vkey] = {
             "char_v": char_v,
             "character": ck,
-            "character_id": "",  # Quay POV trực diện bàn ăn & sản phẩm, không chèn nhân vật nhà xưởng
+            "character_id": "",  # Quay POV trực diện mặt bàn & sản phẩm, tuyệt đối không chèn ảnh chân dung nhân vật
+            "pov_only": True,
             "voice_id": vp["voice_id"],
             "voice_name": vp["voice_name"],
             "project_id": vp["project_id"],
@@ -809,8 +1001,11 @@ def generate_project_from_template(
             "background_label": bg_item["label"],
             "hook_title": hook_title,
             "style": style_label,
-            "template_id": cfg.get("id", "do_an_vat_pov_voice"),
-            "template_name": cfg.get("folder_name", "Đồ Ăn Vặt"),
+            "template_code": tpl_code,
+            "template_id": tpl_id,
+            "template_name": tpl_folder,
+            "scenes_per_video": scenes_per_vid,
+            "scene_duration_sec": scene_dur_sec,
             "ref_image": ref_img_name,
             "ref_image_prompt": built_scenes[0]["image_prompt"] if built_scenes else "",
             "primary_product_refs": primary_refs,
@@ -819,6 +1014,7 @@ def generate_project_from_template(
         }
 
         spec_obj = {
+            "scene_duration_sec": scene_dur_sec,
             "scenes": spec_scenes,
             "overlays": [os.path.join("product_images", f) for f in slide_overlays],
             "output": f"{pid}_{char_v}.mp4",
@@ -829,9 +1025,12 @@ def generate_project_from_template(
     prompts_obj = {
         "product_id": pid,
         "product_name": pname,
-        "template_id": cfg.get("id", "do_an_vat_pov_voice"),
-        "template_name": cfg.get("folder_name", "Đồ Ăn Vặt"),
-        "videos_per_character": num_variants,
+        "template_code": tpl_code,
+        "template_id": tpl_id,
+        "template_name": tpl_folder,
+        "scenes_per_video": scenes_per_vid,
+        "scene_duration_sec": scene_dur_sec,
+        "videos_per_character": default_vpc,
         "primary_product_refs": primary_refs,
         "slide_overlay_files": slide_overlays,
         "ref_img_prompt_nv1": videos_json.get("v1", {}).get("ref_image_prompt", ""),

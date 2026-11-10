@@ -124,24 +124,30 @@ def draw_left_vertical_feature_pills(
     palette: dict,
     load_font_fn,
     fit_text_fn,
-    start_y: int = 360,
-    pill_w: int = 385,
-    pill_h: int = 78,
-    gap_y: int = 18,
+    start_y: int = 690,
+    pill_w: int = 296,
+    pill_h: int = 66,
+    gap_y: int = 12,
     is_dark: bool = False,
 ) -> Image.Image:
     """
-    Vẽ cột dọc 4-5 Pill Ưu Điểm có Vòng Tròn Icon Số/Ký Hiệu bên trái (`x=26..415`)
-    theo đúng mẫu Sheet 1 (`Cute, Comfy & Stylish`, `Check Your Health`, `Stackable Multicooker`).
+    Vẽ cột dọc 4-5 Pill Ưu Điểm gọn gàng ở rìa trái vùng thân dưới (`x=18..314, y>=690`)
+    đảm bảo Safe Zone tuyệt đối không đè lên đầu hay gương mặt nhân vật ở trung tâm.
     """
     ov = Image.new("RGBA", canvas.size, (0, 0, 0, 0))
     draw = ImageDraw.Draw(ov)
     acc = palette.get("accent_rgb", (236, 72, 153))
     pill_bg = palette.get("pill_bg", (219, 39, 119))
 
-    f_code = load_font_fn(22, bold=True)
-    f_main = load_font_fn(22, bold=True)
-    f_sub = load_font_fn(17, bold=False)
+    # Khóa Safe Zone: đặt dưới vùng đầu/mặt (`y >= 685`) và thu gọn chiều ngang (`<= 300px`)
+    safe_start_y = max(685, int(start_y))
+    safe_pill_w = min(300, int(pill_w))
+    safe_pill_h = min(68, int(pill_h))
+    safe_gap_y = min(13, int(gap_y))
+
+    f_code = load_font_fn(18, bold=True)
+    f_main = load_font_fn(19, bold=True)
+    f_sub = load_font_fn(15, bold=False)
 
     for idx, item in enumerate(pill_items):
         if isinstance(item, (list, tuple)) and len(item) >= 3:
@@ -151,27 +157,29 @@ def draw_left_vertical_feature_pills(
         else:
             icon_txt, title_txt, sub_txt = f"0{idx+1}", str(item), "Chất lượng kiểm định"
 
-        x1 = 26
-        y1 = start_y + idx * (pill_h + gap_y)
-        x2 = x1 + pill_w
-        y2 = y1 + pill_h
+        x1 = 18
+        y1 = safe_start_y + idx * (safe_pill_h + safe_gap_y)
+        if y1 + safe_pill_h > 1320:
+            break
+        x2 = x1 + safe_pill_w
+        y2 = y1 + safe_pill_h
 
         # Đổ bóng
-        draw.rounded_rectangle([x1 + 3, y1 + 5, x2 + 3, y2 + 5], radius=pill_h // 2, fill=(0, 0, 0, 125))
+        draw.rounded_rectangle([x1 + 3, y1 + 5, x2 + 3, y2 + 5], radius=safe_pill_h // 2, fill=(0, 0, 0, 125))
         bg_fill = (17, 24, 39, 232) if is_dark else (255, 255, 255, 242)
         border_col = acc + (255,) if is_dark else pill_bg + (235,)
         draw.rounded_rectangle(
             [x1, y1, x2, y2],
-            radius=pill_h // 2,
+            radius=safe_pill_h // 2,
             fill=bg_fill,
             outline=border_col,
             width=3,
         )
 
         # Vòng tròn icon bên trái
-        r_ic = (pill_h - 14) // 2
-        cx = x1 + 8 + r_ic
-        cy = y1 + pill_h // 2
+        r_ic = (safe_pill_h - 14) // 2
+        cx = x1 + 7 + r_ic
+        cy = y1 + safe_pill_h // 2
         draw.ellipse(
             [cx - r_ic, cy - r_ic, cx + r_ic, cy + r_ic],
             fill=pill_bg + (255,),
@@ -187,14 +195,14 @@ def draw_left_vertical_feature_pills(
         )
 
         # Text chính & phụ bên phải vòng tròn
-        tx = x1 + pill_h + 6
-        max_tw = pill_w - pill_h - 20
+        tx = x1 + safe_pill_h + 4
+        max_tw = safe_pill_w - safe_pill_h - 16
         m_fit = fit_text_fn(draw, title_txt, f_main, max_tw)
         s_fit = fit_text_fn(draw, sub_txt, f_sub, max_tw)
         t_col = (254, 243, 199, 255) if is_dark else (17, 24, 39, 255)
         s_col = (203, 213, 225, 255) if is_dark else (75, 85, 99, 255)
-        draw.text((tx, y1 + 12), m_fit, font=f_main, fill=t_col)
-        draw.text((tx, y1 + 42), s_fit, font=f_sub, fill=s_col)
+        draw.text((tx, y1 + 10), m_fit, font=f_main, fill=t_col)
+        draw.text((tx, y1 + 37), s_fit, font=f_sub, fill=s_col)
 
     return Image.alpha_composite(canvas, ov)
 
@@ -527,12 +535,12 @@ def render_extended_layout(
         f_pt = load_font_fn(21, bold=True)
         f_ps = load_font_fn(17, bold=False)
 
-        # 4 thẻ Callout ở 4 góc quanh vùng trung tâm kèm đường kẻ mũi tên chỉ vào sản phẩm ở giữa (`540, 760`)
+        # 4 thẻ Callout ở 4 góc vùng thân dưới (Safe Zone y>=700, không chạm đầu nhân vật) chỉ vào sản phẩm ở giữa (`540, 840`)
         callouts = [
-            (32, 370, 355, 466, (355, 425), (475, 585), five_icons[0] if len(five_icons) > 0 else ("01", "Chất Liệu Cao Cấp", "Mềm mịn bền đẹp")),
-            (725, 370, 1048, 466, (725, 425), (605, 585), five_icons[1] if len(five_icons) > 1 else ("02", "Thiết Kế Tinh Xảo", "Từng đường nét")),
-            (32, 960, 355, 1056, (355, 1005), (465, 865), five_icons[2] if len(five_icons) > 2 else ("03", "Cực Kỳ Tiện Lợi", "Dễ dùng mỗi ngày")),
-            (725, 960, 1048, 1056, (725, 1005), (615, 865), five_icons[3] if len(five_icons) > 3 else ("04", "Chuẩn Hàng Xưởng", "Cam kết y hình")),
+            (20, 700, 312, 788, (312, 748), (455, 810), five_icons[0] if len(five_icons) > 0 else ("01", "Chất Liệu Cao Cấp", "Mềm mịn bền đẹp")),
+            (768, 700, 1060, 788, (768, 748), (625, 810), five_icons[1] if len(five_icons) > 1 else ("02", "Thiết Kế Tinh Xảo", "Từng đường nét")),
+            (20, 990, 312, 1078, (312, 1030), (455, 910), five_icons[2] if len(five_icons) > 2 else ("03", "Cực Kỳ Tiện Lợi", "Dễ dùng mỗi ngày")),
+            (768, 990, 1060, 1078, (768, 1030), (625, 910), five_icons[3] if len(five_icons) > 3 else ("04", "Chuẩn Hàng Xưởng", "Cam kết y hình")),
         ]
         for x1, y1, x2, y2, p_start, p_end, ic_tuple in callouts:
             _, t_m, t_s = ic_tuple
@@ -573,19 +581,19 @@ def render_extended_layout(
 
     # ── 10. INFLUENCER OOTD + 3 VERTICAL LEFT CIRCLE ZOOMS + MUSIC BAR (Sheet 4) ──
     if layout_type == "influencer_3circle_left_music":
-        # Cột dọc 3 Vòng Tròn Zoom bên trái (`x=24..280, y=380..1240`)
-        ys_left = [370, 660, 950]
+        # Cột dọc 3 Vòng Tròn Zoom bên trái (`x=16..212, y=440..1180`, Safe Zone không chạm mặt)
+        ys_left = [440, 695, 950]
         for idx in range(3):
-            im_z = smart_crop_fn(chosen_prods[idx % len(chosen_prods)], 226, 226)
+            im_z = smart_crop_fn(chosen_prods[idx % len(chosen_prods)], 196, 196)
             circ_z = make_circle_fn(
-                im_z, 226,
+                im_z, 196,
                 ring_color=acc,
                 outer_color=(255, 255, 255),
                 badge_text=photo_meta[idx][0],
                 caption_text=photo_meta[idx][1],
                 pill_bg=pill_bg,
             )
-            canvas.alpha_composite(circ_z, (22, ys_left[idx]))
+            canvas.alpha_composite(circ_z, (16, ys_left[idx]))
 
         # Dưới đáy (`y=1342..1730`): 2 Khung Ảnh Lớn + Nhãn Giỏ Hàng Vàng TikTok
         im_a = smart_crop_fn(chosen_prods[0], 484, 385)

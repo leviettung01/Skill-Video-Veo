@@ -2135,6 +2135,7 @@ def run_workflow_execution_pipeline(
             )
 
             if is_parallel and len(run_batch) > 1:
+                parallel_errors = []
                 with ThreadPoolExecutor(max_workers=min(3, len(run_batch))) as pool:
                     fut_map = {
                         pool.submit(
@@ -2155,6 +2156,10 @@ def run_workflow_execution_pipeline(
                         except Exception as exc:
                             res = {"ok": False, "status": "error", "error": str(exc)}
                         _apply_node_result(nd, res)
+                        if not res.get("ok"):
+                            parallel_errors.append(f"Node '{nd.get('node_name')}' báo lỗi: {res.get('error')}")
+                if parallel_errors and stop_on_err:
+                    raise RuntimeError(parallel_errors[0])
             else:
                 for nd in run_batch:
                     res = execute_single_node_in_context(
@@ -2187,10 +2192,20 @@ def run_workflow_execution_pipeline(
                     existing_paths.add(p_path)
         wf["timeline"] = timeline_clips
 
-        _WORKFLOW_RUN_STATE[wf_id]["status"] = "done"
-        _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"✅ Đã hoàn thành chạy Workflow '{wf.get('name')}'!"
+        err_nodes = [nid for nid, st_n in node_states.items() if isinstance(st_n, dict) and st_n.get("status") == "error"]
+        if err_nodes:
+            _WORKFLOW_RUN_STATE[wf_id]["status"] = "error" if len(err_nodes) >= len(node_states) else "partial"
+            _WORKFLOW_RUN_STATE[wf_id]["ok"] = False
+            _WORKFLOW_RUN_STATE[wf_id]["error"] = f"{len(err_nodes)} node gặp lỗi thực thi ({', '.join(err_nodes)})"
+            _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"⚠️ Workflow '{wf.get('name')}' hoàn tất một phần ({len(err_nodes)} node lỗi)."
+        else:
+            _WORKFLOW_RUN_STATE[wf_id]["status"] = "done"
+            _WORKFLOW_RUN_STATE[wf_id]["ok"] = True
+            _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"✅ Đã hoàn thành chạy Workflow '{wf.get('name')}'!"
     except Exception as e:
         _WORKFLOW_RUN_STATE[wf_id]["status"] = "error"
+        _WORKFLOW_RUN_STATE[wf_id]["ok"] = False
+        _WORKFLOW_RUN_STATE[wf_id]["error"] = str(e)
         _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"❌ Lỗi thực thi Workflow: {e}"
 
     # Lưu lại `last_output` và `timeline` vào file JSON của workflow

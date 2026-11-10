@@ -1,7 +1,4 @@
 {
-  "default_videos_per_character": 3,
-  "default_image_model": "nano_banana",
-  "default_sheet_template_id": "sheet_6panel_studio",
   "voices": {
     "nv1": {
       "key": "nv1",
@@ -306,8 +303,8 @@
     "nv1": {
       "key": "nv1",
       "name": "Nữ Tư Vấn Xưởng",
-      "enabled": true,
-      "videos_per_character": 3,
+      "enabled": false,
+      "videos_per_character": 1,
       "character_id": "208606a7-a345-48b2-af32-9fd3c37d0c9a",
       "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
       "ref_image_file": "characters/nv1_ref.jpg",
@@ -328,7 +325,7 @@
       "key": "nv2",
       "name": "Nữ Chốt Sale Năng Lượng",
       "enabled": true,
-      "videos_per_character": 3,
+      "videos_per_character": 1,
       "character_id": "562be2fe-3c7c-4fc9-b3f2-c9b87743ec30",
       "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
       "ref_image_file": "characters/nv2_ref.png",
@@ -349,7 +346,7 @@
       "key": "nv3",
       "name": "Nam Mẫu Thời Trang",
       "enabled": false,
-      "videos_per_character": 3,
+      "videos_per_character": 1,
       "character_id": "",
       "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
       "ref_image_file": "characters/nv3_ref.jpg",
@@ -370,7 +367,7 @@
       "key": "nv4",
       "name": "Nữ Luxury Thời Trang & Phụ Kiện (NV4)",
       "enabled": false,
-      "videos_per_character": 3,
+      "videos_per_character": 1,
       "character_id": "",
       "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
       "ref_image_file": "characters/nv4_ref.jpg",
@@ -390,8 +387,8 @@
     "nv5": {
       "key": "nv5",
       "name": "Nữ Mẫu Thời Trang Lookbook 2K (NV5)",
-      "enabled": true,
-      "videos_per_character": 3,
+      "enabled": false,
+      "videos_per_character": 1,
       "character_id": "",
       "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",
       "ref_image_file": "characters/nv5_ref.png",
@@ -410,5 +407,130 @@
       "sheet_template_id": "sheet_fashion_model_turnaround_5poses",
       "subtitle": "Tóc xoăn sóng nâu hạt dẻ • Chuyên Thời Trang & Biến Hình 2K"
     }
-  }
+  },
+  "default_videos_per_character": 1,
+  "default_image_model": "nano_banana",
+  "default_sheet_template_id": "sheet_6panel_studio",
+  "custom_voices": [
+    {
+      "key": "nv1",
+      "voice_id": "27f51973-e290-4a38-bd7a-9d6fbe81b2f6",
+      "name": "Nhân Vật 1 Affi Giọng Bắc (NV1)",
+      "gender": "female",
+      "region": "north",
+      "flow_slug": "erinome",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ miền Bắc chuẩn Hà Nội (Nhân Vật 1 Affi Giọng Bắc), phát âm tròn vành rõ chữ, nhấn giá cực chuẩn khi giới thiệu hàng xuất xưởng, báo giá bậc thang và miễn phí ship."
+    },
+    {
+      "key": "nv2",
+      "voice_id": "75a3d14a-ed10-4bdc-862c-44adb02a5562",
+      "name": "Nữ Bắc • Chốt Sale Năng Lượng (NV2)",
+      "gender": "female",
+      "region": "north",
+      "flow_slug": "zephyr",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ miền Bắc trẻ trung, tiết tấu nhanh, dồn dập tạo hiệu ứng FOMO cực mạnh cho các video xả kho, flash sale, báo giá bậc thang."
+    },
+    {
+      "key": "v5_nam_bac_chuyen_gia",
+      "voice_id": "a5f4e862-16ec-4900-a435-76b37b495f94",
+      "name": "Nam Bắc • Chốt Sale Năng Lượng Affi (NV3)",
+      "gender": "male",
+      "region": "north",
+      "flow_slug": "fenrir",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nam miền Bắc trẻ trung, nam tính, năng lượng cao (Fenrir), nhấn nhá giá tiền và ưu đãi cực bốc như giọng Nữ Affi, chuyên chốt đơn đồ Nam & gia dụng."
+    },
+    {
+      "key": "v6_nam_nam_reviewer",
+      "voice_id": "f216db87-54f1-42b7-bd98-582a7cd777b5",
+      "name": "Nam Miền Nam • Chốt Sale & Review Năng Lượng",
+      "gender": "male",
+      "region": "south",
+      "flow_slug": "puck",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nam miền Nam (Sài Gòn - Puck) hào hứng, nam tính, tốc độ nhanh vừa phải, cực bắt tai khi chốt sale xả kho và review đồ ăn, gia dụng."
+    },
+    {
+      "key": "v9_nam_bac_chot_sale",
+      "voice_id": "5708dfe9-d9a1-4bdb-bc2c-eee5938bac67",
+      "name": "Nam Bắc • Chuyên Gia Đồ Nam & Xưởng QC",
+      "gender": "male",
+      "region": "north",
+      "flow_slug": "alnilam",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nam miền Bắc trầm đĩnh đạc, quyết đoán (Alnilam), chuyên phân tích chất liệu da bò, hợp kim, thông số kỹ thuật tại xưởng cực kỳ uy tín."
+    },
+    {
+      "key": "v10_nam_bac_flash_sale",
+      "voice_id": "6cbec782-0211-4f64-bbac-6c13c0a578a5",
+      "name": "Nam Bắc • Livestream Xả Kho Sôi Động",
+      "gender": "male",
+      "region": "north",
+      "flow_slug": "sadachbia",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nam miền Bắc sôi động, tiết tấu nhanh dồn dập (Sadachbia), nhấn mạnh câu 'không phải hai trăm đâu' tạo hiệu ứng chốt đơn tức thì."
+    },
+    {
+      "key": "v3_nu_nam_foodie",
+      "voice_id": "6c15e209-a473-4f17-badc-56777aa6ff2a",
+      "name": "Nữ Nam • Review Ẩm Thực & Mỹ Phẩm",
+      "gender": "female",
+      "region": "south",
+      "flow_slug": "leda",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ miền Nam dễ thương, thân thiện, nhấn nhá cảm xúc vị giác cực hợp cho video quay POV Đồ Ăn Vặt (#002) và review mỹ phẩm."
+    },
+    {
+      "key": "v4_nu_nam_sale",
+      "voice_id": "d346e94f-810e-4031-9368-ca1740558bcd",
+      "name": "Nữ Nam • Livestream Chốt Đơn",
+      "gender": "female",
+      "region": "south",
+      "flow_slug": "laomedeia",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ Sài Gòn năng lượng cao, hoạt ngôn, tạo không khí săn sale sôi động cho tệp khách hàng miền Nam và toàn quốc."
+    },
+    {
+      "key": "v7_nu_bac_genz_foodie",
+      "voice_id": "29f2a669-6ea7-4486-939e-5cef9db7f211",
+      "name": "Nữ Bắc • GenZ Review Ăn Vặt",
+      "gender": "female",
+      "region": "north",
+      "flow_slug": "autonoe",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ GenZ Hà Nội tươi sáng, bắt trend, cực hợp với bối cảnh bàn học GenZ, tiệm ăn vặt Hà Nội và trà trái cây."
+    },
+    {
+      "key": "v8_nu_trung_truyen_cam",
+      "voice_id": "0a70e0a0-8d2c-4f7a-b649-a049096b3ed3",
+      "name": "Nữ Trung • Kể Chuyện Đặc Sản",
+      "gender": "female",
+      "region": "central",
+      "flow_slug": "sulafat",
+      "owner_profile": "leviettung04",
+      "account_voice_ids": {},
+      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "description": "Giọng nữ nhẹ nhàng, sâu lắng, tạo cảm giác chân thật và trân quý cho các dòng sản phẩm truyền thống, sức khỏe, tâm linh."
+    }
+  ]
 }

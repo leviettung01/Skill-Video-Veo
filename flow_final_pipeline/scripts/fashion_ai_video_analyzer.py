@@ -1708,7 +1708,7 @@ def render_fashion_postprod_final_video(
     if not scene_video_paths:
         return {"ok": False, "error": "Không tìm thấy hoặc không thể tạo file video cho các phân cảnh."}
 
-    local_final_mp4 = os.path.join(proj_dir, f"{project_id_slug}_final_1080p_60fps.mp4")
+    local_final_mp4 = os.path.join(proj_dir, f"{project_id_slug}_final_1080p_24fps.mp4")
     export_final_mp4 = os.path.join(final_videos_dir, f"{project_id_slug}_final.mp4")
     master_aud = manifest.get("master_audio_path") or ""
     ref_vid_path = (manifest.get("reference_video") or {}).get("path") or ""
@@ -1805,7 +1805,8 @@ def render_fashion_postprod_final_video(
         "project_id": project_id_slug,
         "final_video_path": export_final_mp4,
         "local_final_video_path": local_final_mp4,
+        "fps": 24,
         "scenes_count": len(scene_video_paths),
-        "message": f"Đã ghép hậu kỳ {len(scene_video_paths)} phân cảnh + Nhạc gốc thành Video Final 1080p 60FPS ({os.path.basename(export_final_mp4)})!",
+        "message": f"Đã ghép hậu kỳ {len(scene_video_paths)} phân cảnh + Nhạc gốc thành Video Final 1080p 24FPS ({os.path.basename(export_final_mp4)})!",
     }
 
