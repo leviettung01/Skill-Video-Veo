@@ -1,0 +1,198 @@
+[
+  {
+    "id": "kawaii_pastel",
+    "sources": "3, 4, 6, 7, 10, 17",
+    "industry": "Dép, phụ kiện, đồ trẻ em",
+    "prompt": "Playful pastel pink or mint tactile paper backdrop, large centered hero product, delicate flower doodles and tiny hand-drawn icons, soft studio light, rounded display type, generous spacing, tasteful product callouts.",
+    "name": "Pastel dễ thương",
+    "category": "giay_dep",
+    "sample_index": 4,
+    "subject_mode": "auto"
+  },
+  {
+    "id": "korean_scrapbook",
+    "sources": "14–16, 23",
+    "industry": "Túi, giày, phụ kiện nữ",
+    "prompt": "Korean scrapbook editorial with cream kraft paper, torn-paper edges, tasteful ribbons, a single oversized product hero, optional small authentic detail inset, handwritten accents and warm soft light; avoid clutter.",
+    "name": "Scrapbook Hàn Quốc",
+    "category": "tui_xach",
+    "sample_index": 16,
+    "subject_mode": "auto"
+  },
+  {
+    "id": "fashion_lookbook",
+    "sources": "5, 8, 9, 11",
+    "industry": "Trang phục, đồ ngủ",
+    "prompt": "Elegant beige fashion lookbook, full-length referenced model wearing the exact outfit, soft interior studio, restrained garment detail insets, refined editorial type and clean aligned information blocks.",
+    "name": "Lookbook thời trang",
+    "category": "quan_ao_nu",
+    "sample_index": 5,
+    "subject_mode": "character"
+  },
+  {
+    "id": "streetwear_flash",
+    "sources": "21",
+    "industry": "Streetwear, quần áo unisex",
+    "prompt": "High-contrast dynamic streetwear campaign, bold condensed typography, graphic black white and red accents, strong full-body pose and product silhouette, energetic but clear visual hierarchy; show prices only when verified.",
+    "name": "Streetwear năng động",
+    "category": "nam_nu_unisex",
+    "sample_index": 21,
+    "subject_mode": "character"
+  },
+  {
+    "id": "fashion_review",
+    "sources": "26–28",
+    "industry": "Thời trang, giày",
+    "prompt": "Authentic creator fashion review cover, referenced model prominently displaying the exact item, natural indoor backdrop, one carefully placed garment detail image, crisp headline and concise factual callouts, contemporary editorial layout.",
+    "name": "Creator review thời trang",
+    "category": "quan_ao_nu",
+    "sample_index": 27,
+    "subject_mode": "character"
+  },
+  {
+    "id": "kitchen_minimal",
+    "sources": "20",
+    "industry": "Gia dụng, dụng cụ bếp",
+    "prompt": "Premium warm ivory kitchen product advertising, coordinated pastel palette, exact product prominently displayed on a light wood counter, sunlit window, refined serif headline, restrained supporting copy and clean negative space.",
+    "name": "Gia dụng tối giản",
+    "category": "gia_dung",
+    "sample_index": 20,
+    "subject_mode": "pov"
+  },
+  {
+    "id": "product_multicolor",
+    "sources": "22",
+    "industry": "Dép, hàng nhiều màu",
+    "prompt": "Soft neutral catalog photography, accurate verified color variants arranged in a balanced row, gentle fabric and wood textures, clear lead product and minimal rounded callouts; do not invent variants.",
+    "name": "Bộ màu sản phẩm",
+    "category": "giay_dep",
+    "sample_index": 22,
+    "subject_mode": "pov"
+  },
+  {
+    "id": "skincare_creator",
+    "sources": "25",
+    "industry": "Mỹ phẩm, chăm sóc cá nhân",
+    "prompt": "Bright beauty creator cover, authentic reference model holding exact packaging, fresh pink and white backdrop, flattering soft light, legible title and verified facts only, neat small accent icons, no invented effects or claims.",
+    "name": "Beauty creator",
+    "category": "my_pham",
+    "sample_index": 25,
+    "subject_mode": "character"
+  },
+  {
+    "id": "jewelry_nature",
+    "sources": "29",
+    "industry": "Trang sức, phụ kiện",
+    "prompt": "Fresh elegant botanical jewelry advertising, faithful macro close-up of the exact jewelry, soft green and ivory palette, diffused daylight, refined product detail insets and understated typography.",
+    "name": "Trang sức thiên nhiên",
+    "category": "phu_kien",
+    "sample_index": 29,
+    "subject_mode": "pov"
+  },
+  {
+    "id": "food_editorial",
+    "sources": "Phát triển cho món ăn từ yêu cầu hiện tại",
+    "industry": "Món ăn, đồ uống",
+    "prompt": "Appetizing high-end food editorial photography, hero dish large and sharp, natural ingredients and cooking environment consistent with references, gentle steam and realistic textures, dark or warm contrasting background, bold Vietnamese title with generous safe margins; no presenter unless provided.",
+    "name": "Ẩm thực editorial",
+    "category": "food",
+    "sample_index": null,
+    "subject_mode": "pov"
+  },
+  {
+    "id": "direct_retail",
+    "sources": "1, 24",
+    "industry": "Hàng tiêu dùng, ưu đãi đã xác minh",
+    "prompt": "Direct-response retail cover with the supplied presenter and exact product, strong concise headline, structured contrast panels and a clean product hero. Show an offer or price only if provided and verified; avoid fabricated urgency.",
+    "name": "Retail có người thật",
+    "category": "gia_dung",
+    "sample_index": 24,
+    "subject_mode": "character"
+  },
+  {
+    "id": "pastel_pov_handmade",
+    "sources": "Ảnh 2, ô Lavender & Lace; demo đã duyệt",
+    "industry": "Phụ kiện, handmade, kẹp tóc",
+    "prompt": "Overhead POV hands presenting the exact product on a cream card, tactile crochet or material details, ivory linen and lace, lavender blush butter-yellow palette, white die-cut sticker outline around product and hands, rounded pastel headline, sparse hand-drawn hearts and curved callouts, soft diffused daylight. No face or presenter.",
+    "name": "POV pastel handmade",
+    "category": "genz_cute",
+    "sample_index": 2,
+    "subject_mode": "pov"
+  },
+  {
+    "id": "home_creator",
+    "sources": "1, 20, 24",
+    "industry": "Gia dụng có người giới thiệu",
+    "prompt": "Premium lifestyle creator product campaign, the supplied real adult character naturally demonstrating the exact household item on a coordinated kitchen counter, believable scale and hand contact, soft window daylight, warm ivory and muted sage palette, one clear product hero and refined readable headline, a maximum of two factual callouts. No fake factory, price stickers or clutter.",
+    "name": "Gia dụng lifestyle creator",
+    "category": "gia_dung",
+    "sample_index": 1,
+    "subject_mode": "character"
+  },
+  {
+    "id": "factory_creator_editorial",
+    "name": "Creator xưởng · Editorial sạch",
+    "category": "gia_dung",
+    "subject_mode": "character",
+    "industry": "Gia dụng, dụng cụ bếp, sản phẩm có người giới thiệu",
+    "source_project_id": "1738086213622335480",
+    "prompt": "Clean industrial creator editorial, preserve the supplied real character identity, hair, glasses and outfit. Naturally present the exact referenced product close to the camera, with at most one authentic product-detail inset. Preserve the recognizable workshop or video environment, softened behind the hero. White and pale steel blue palette, restrained warm yellow accent, asymmetric magazine composition, large readable navy headline, fine graphic lines and generous whitespace. Realistic daylight, natural hands and accurate product scale. No fabricated technical specifications, certification or price badges.",
+    "sources": "Project 1738086213622335480",
+    "sample_index": null,
+    "sample_image": "Template/Thumbnail_Templates/samples/factory_creator_editorial_demo.png",
+    "preview_kind": "generated_demo",
+    "prompt_structure": [
+      "REFERENCE ROLES: exact product / actual character if requested / video environment",
+      "SUBJECT: {product_name}; verified facts: {product_info}",
+      "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+      "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+      "CONTINUITY: preserve reference identity, product geometry and video context",
+      "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+      "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+    ]
+  },
+  {
+    "id": "luxury_gift_stilllife",
+    "name": "Phụ kiện nam · Quiet Luxury",
+    "category": "nam_nu_unisex",
+    "subject_mode": "pov",
+    "industry": "Thắt lưng, đồng hồ, phụ kiện và bộ quà tặng",
+    "source_project_id": "1738260652434293979",
+    "prompt": "Quiet luxury accessory editorial still life, only the exact supplied products in a refined presentation composition, no presenter. Match the video boutique environment, walnut and ivory tactile surfaces, espresso shadows and restrained champagne typography. Close oblique camera, readable leather grain and carefully controlled metallic highlights, one balanced product hero. Refined serif headline and thin editorial rules with generous whitespace. Show a gift set only when all its contents are actually supplied and verified. No discount graphics, gold frames, invented gifts or sales offers.",
+    "sources": "Project 1738260652434293979",
+    "sample_index": null,
+    "sample_image": "Template/Thumbnail_Templates/samples/luxury_gift_stilllife_demo.png",
+    "preview_kind": "generated_demo",
+    "prompt_structure": [
+      "REFERENCE ROLES: exact product / actual character if requested / video environment",
+      "SUBJECT: {product_name}; verified facts: {product_info}",
+      "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+      "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+      "CONTINUITY: preserve reference identity, product geometry and video context",
+      "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+      "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+    ]
+  },
+  {
+    "id": "food_macro_magazine",
+    "name": "Ẩm thực · Macro tạp chí",
+    "category": "food",
+    "subject_mode": "pov",
+    "industry": "Món nấu ăn, lẩu, món nóng, đồ uống",
+    "source_project_id": "pov_cooking_v2_20261110",
+    "prompt": "Premium food magazine editorial, one seamless macro food photograph matching the supplied dish, cookware, ingredient state and video kitchen. Tight oblique close-up, realistic moist texture and translucent steam where appropriate, readable ingredient layers. Let the dish dominate the lower two thirds; reserve upper negative space for rich dark brick-red refined editorial typography. Warm ivory, natural ingredient colors, neutral whites, restrained highlights and no overall yellow cast. No face, presenter, contact sheet, storyboard grid, fabricated ingredients or cooking-time claims.",
+    "sources": "Project pov_cooking_v2_20261110",
+    "sample_index": null,
+    "sample_image": "Template/Thumbnail_Templates/samples/food_macro_magazine_demo.png",
+    "preview_kind": "generated_demo",
+    "prompt_structure": [
+      "REFERENCE ROLES: exact product / actual character if requested / video environment",
+      "SUBJECT: {product_name}; verified facts: {product_info}",
+      "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+      "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+      "CONTINUITY: preserve reference identity, product geometry and video context",
+      "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+      "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+    ]
+  }
+]

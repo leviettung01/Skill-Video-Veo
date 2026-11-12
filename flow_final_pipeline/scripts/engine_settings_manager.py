@@ -65,7 +65,9 @@ from subtitle_template_engine import (
 THUMBNAIL_PRESETS = THUMBNAIL_TEMPLATES
 
 DEFAULT_ENGINE_SETTINGS = {
-    # 1. Đa luồng & Đa tài khoản Google Flow
+    # 1. Đa luồng & Đa tài khoản Google Flow / Google Vids Web
+    "video_provider": "google_flow",  # 'google_flow' (aisandbox-pa + Voice UUID) | 'google_vids' (docs.google.com/videos Omni 1080p • Zero reCAPTCHA)
+    "google_vids_model": "omni",  # 'omni' (Model 12 • Lên tới 15s 1080p) | 'veo_3_1' (Model 9)
     "multi_account_enabled": True,
     "flow_api_workers": 2,
     "max_inflight_per_account": 5,
@@ -309,9 +311,25 @@ def load_engine_settings() -> dict:
         cfg["ffmpeg_threads_per_job"] = hw["recommended"]["ffmpeg_threads_per_job"]
 
     flow_accs = [a for a in list_available_flow_accounts() if a.get("active", True)]
+    try:
+        import google_vids_client as _gvc
+        vids_map = {x["profile_name"]: x for x in _gvc.list_available_vids_accounts()}
+        for a in flow_accs:
+            vi = vids_map.get(a.get("profile_name") or "")
+            a["ready_for_vids"] = bool(vi and vi.get("ready_for_vids"))
+    except Exception:
+        pass
     cfg["detected_flow_accounts_count"] = len(flow_accs)
     cfg["detected_flow_accounts"] = flow_accs
     cfg["hardware"] = hw
+    # Migrate only obsolete thumbnail settings, preserving unrelated settings.
+    cfg['thumbnail_catalog_version'] = 'ai-complete-v3'
+    cfg['thumbnail_embed_product_insets'] = False
+    cfg['composite_product_insets'] = False
+    cfg['thumbnail_add_text_badge'] = False
+    cfg['thumbnail_preset_id'] = get_template_by_id(cfg.get('thumbnail_preset_id',''))['id']
+    cfg['category_thumbnail_map'] = {k:get_template_by_id(v)['id'] for k,v in (cfg.get('category_thumbnail_map') or {}).items()}
+    cfg['thumbnail_master_prompt'] = get_template_by_id(cfg['thumbnail_preset_id'])['master_prompt']
     cfg["thumbnail_presets"] = [
         {k: v for k, v in tpl.items() if k != "palette"}
         for tpl in THUMBNAIL_PRESETS
@@ -352,6 +370,14 @@ def save_engine_settings(new_settings: dict) -> dict:
             to_save[k] = v
 
     # Ép kiểu chuẩn xác
+    vid_prov = str(to_save.get("video_provider") or "google_flow").strip().lower()
+    if vid_prov not in ("google_flow", "google_vids"):
+        vid_prov = "google_flow"
+    to_save["video_provider"] = vid_prov
+    vids_m = str(to_save.get("google_vids_model") or "omni").strip().lower()
+    if vids_m not in ("omni", "veo_3_1"):
+        vids_m = "omni"
+    to_save["google_vids_model"] = vids_m
     to_save["multi_account_enabled"] = bool(to_save.get("multi_account_enabled", True))
     to_save["flow_api_workers"] = max(1, min(10, int(to_save.get("flow_api_workers") or 2)))
     to_save["max_inflight_per_account"] = max(1, min(15, int(to_save.get("max_inflight_per_account") or 5)))
@@ -760,6 +786,8 @@ def build_thumbnail_prompt_for_variant(
     custom_master_prompt: str = "",
     preset_id: str = "",
     custom_product_info: str = "",
+    subject_mode: str = "auto",
+    headline: str = "",
 ) -> dict:
     """
     Sinh Prompt & gom đủ 3 nguồn dữ liệu Reference để AI Render Ảnh Thumbnail chuyên nghiệp:
@@ -770,6 +798,7 @@ def build_thumbnail_prompt_for_variant(
     cfg = load_engine_settings()
     pdir = os.path.join(PROJECTS_DIR, pid)
     prompts_path = os.path.join(pdir, "prompts.json")
+    proj_json_path = os.path.join(pdir, "project.json")
     info_path = os.path.join(pdir, "product_images", "info.json")
     if not os.path.isfile(info_path):
         alt_info = os.path.join(pdir, "info.json")
@@ -777,24 +806,59 @@ def build_thumbnail_prompt_for_variant(
             info_path = alt_info
     pdata = json.load(open(prompts_path, "r", encoding="utf-8")) if os.path.isfile(prompts_path) else {}
     idata = json.load(open(info_path, "r", encoding="utf-8")) if os.path.isfile(info_path) else {}
+    proj_data = json.load(open(proj_json_path, "r", encoding="utf-8")) if os.path.isfile(proj_json_path) else {}
 
-    prod_name = pdata.get("product_name") or idata.get("name") or idata.get("title") or f"Sản phẩm {pid}"
-    price_str = str(idata.get("price") or pdata.get("price") or "").strip()
-    cat_str = str(idata.get("category") or pdata.get("category") or "").strip()
+    proj_prods = proj_data.get("products") or []
+    prod_obj = next(
+        (
+            p for p in proj_prods
+            if str(p.get("vkey") or "").lower() == vkey.lower()
+            or str(p.get("char_v_code") or "").lower() == vkey.lower()
+        ),
+        proj_prods[0] if proj_prods else {},
+    )
+    is_cooking = (proj_data.get("pipeline_kind") == "cooking_storyboard") or (prod_obj.get("pipeline_kind") == "cooking_storyboard")
+    is_fashion = bool(proj_data.get("is_fashion_motion_project"))
+
+    prod_name = (
+        pdata.get("product_name")
+        or idata.get("name")
+        or idata.get("title")
+        or proj_data.get("dish")
+        or proj_data.get("full_product_name")
+        or proj_data.get("name")
+        or f"Sản phẩm {pid}"
+    )
+    price_str = str(idata.get("price") or pdata.get("price") or (proj_data.get("price") if not is_fashion else "") or "").strip()
+    cat_str = str(
+        idata.get("category")
+        or pdata.get("category")
+        or ("am_thuc" if is_cooking else ("thoi_trang" if is_fashion else ""))
+        or ""
+    ).strip()
     vcfg = (pdata.get("videos") or {}).get(vkey) or {}
     char_key = vcfg.get("character") or ("nv2" if vkey in ("v2", "v4", "v6") else "nv1")
-    hook_title = vcfg.get("hook_title") or "Giá Xưởng Tận Gốc"
+    hook_title = headline.strip() or vcfg.get("hook_title") or prod_obj.get("hook_label") or prod_name
     if "—" in hook_title:
         hook_title = hook_title.split("—")[-1].strip()
     elif ":" in hook_title:
         hook_title = hook_title.split(":")[-1].strip()
-    style_desc = vcfg.get("style") or "Modern commercial studio with soft warm rim lighting"
-
-    char_v = vkey if re.match(r"^nv\d+_v\d+$", vkey.lower()) else (
-        {"v1": "nv1_v1", "v3": "nv1_v2", "v5": "nv1_v3", "v2": "nv2_v1", "v4": "nv2_v2", "v6": "nv2_v3"}.get(vkey.lower(), f"{char_key}_{vkey}")
+    style_desc = vcfg.get("style") or (
+        "Warm cozy overhead kitchen counter lighting, rich food photography"
+        if is_cooking
+        else "Modern commercial studio with soft warm rim lighting"
     )
 
-    # 1. Tổng hợp Thông tin Sản phẩm & USP (`product_info`) từ info.json + prompts.json
+    if vkey.lower() in ("pov", "pov_v1"):
+        char_v = "pov"
+    elif not pdata and prod_obj.get("char_v_code"):
+        char_v = str(prod_obj["char_v_code"]).lower()
+    else:
+        char_v = vkey if re.match(r"^nv\d+_v\d+$", vkey.lower()) else (
+            {"v1": "nv1_v1", "v3": "nv1_v2", "v5": "nv1_v3", "v2": "nv2_v1", "v4": "nv2_v2", "v6": "nv2_v3"}.get(vkey.lower(), f"{char_key}_{vkey}")
+        )
+
+    # 1. Tổng hợp Thông tin Sản phẩm & USP (`product_info`) từ info.json + prompts.json + project.json
     prod_info_str = (custom_product_info or "").strip()
     if not prod_info_str:
         info_parts = [f"Sản phẩm: {prod_name}"]
@@ -807,17 +871,21 @@ def build_thumbnail_prompt_for_variant(
             info_parts.append("Đặc điểm nổi bật: " + "; ".join(str(x).strip() for x in highlights[:4] if str(x).strip()))
         elif isinstance(highlights, str) and highlights.strip():
             info_parts.append(f"Đặc điểm nổi bật: {highlights.strip()[:220]}")
-        raw_desc = str(idata.get("short_description") or idata.get("description") or pdata.get("product_description") or "").strip()
+        raw_desc = str(idata.get("short_description") or idata.get("description") or pdata.get("product_description") or prod_obj.get("product_info") or "").strip()
         if raw_desc:
             clean_desc = re.sub(r"\s+", " ", raw_desc)[:240]
             info_parts.append(f"Mô tả: {clean_desc}")
         # Lấy câu mở đầu Cảnh 1 để nắm bắt USP cốt lõi của kịch bản
-        scenes_list = vcfg.get("scenes") or []
+        scenes_list = vcfg.get("scenes") or prod_obj.get("scenes") or []
         if scenes_list and isinstance(scenes_list[0], dict):
-            sc1_p = str(scenes_list[0].get("prompt") or "")
-            m_q = re.findall(r'"([^"]{15,160})"', sc1_p)
-            if m_q:
-                info_parts.append(f"Thông điệp Hook kịch bản: \"{m_q[0]}\"")
+            sc1_d = str(scenes_list[0].get("dialogue_vn") or "")
+            sc1_p = str(scenes_list[0].get("prompt") or scenes_list[0].get("video_prompt") or "")
+            if sc1_d:
+                info_parts.append(f"Thông điệp kịch bản: \"{sc1_d[:160]}\"")
+            else:
+                m_q = re.findall(r'"([^"]{15,160})"', sc1_p)
+                if m_q:
+                    info_parts.append(f"Thông điệp Hook kịch bản: \"{m_q[0]}\"")
         prod_info_str = " | ".join(info_parts)
 
     # Giải quyết Template Thumbnail theo cấu hình (fixed / auto_category / custom_category)
@@ -830,17 +898,25 @@ def build_thumbnail_prompt_for_variant(
         category_hint=cat_str,
     )
     detected_cat = detect_product_thumbnail_category(prod_name, prod_info_str, cat_str)
+    if is_cooking and subject_mode != 'character':
+        effective_mode = 'pov'
+    elif is_fashion and subject_mode == 'auto':
+        effective_mode = 'character'
+    else:
+        effective_mode = subject_mode if subject_mode in ('pov','character') else resolved_tpl.get('subject_mode','auto')
+        if effective_mode == 'auto':
+            effective_mode = 'character' if vcfg.get('character') else 'pov'
+
     master_tpl = (custom_master_prompt or "").strip()
     if not master_tpl:
         master_tpl = resolved_tpl.get("master_prompt") or cfg.get("thumbnail_master_prompt") or THUMBNAIL_PRESETS[0]["master_prompt"]
 
     # 2. Đọc mô tả ngoại hình nhân vật & ảnh Ref nhân vật gốc
-    char_desc = "young Vietnamese woman, friendly confident expression"
+    char_desc = "Use only the supplied character identity; do not invent a person."
     vc_json = os.path.join(PIPELINE_DIR, "voices_and_characters.json")
     char_ref_path = os.path.join(CHARS_DIR, f"{char_key}_ref.jpg")
-    if not os.path.isfile(char_ref_path):
-        char_ref_path = os.path.join(CHARS_DIR, "nv1_ref.jpg")
-    char_uuid = vcfg.get("character_id") or ""
+
+    char_uuid = vcfg.get("character_id") or prod_obj.get("character_id") or ""
     if os.path.isfile(vc_json):
         try:
             vc_data = json.load(open(vc_json, "r", encoding="utf-8"))
@@ -863,17 +939,23 @@ def build_thumbnail_prompt_for_variant(
         os.path.join(pdir, "refs", f"{vkey}-refimg.jpg"),
         os.path.join(pdir, "refs", f"{char_v}-refimg.jpg"),
     ]
+    if is_fashion:
+        if prod_obj.get("product_image_path"):
+            holding_candidates.append(prod_obj["product_image_path"])
+        if prod_obj.get("character_sheet_path"):
+            holding_candidates.append(prod_obj["character_sheet_path"])
     # Nếu biến thể hiện tại chưa có refimg thì tìm refimg của cùng nhân vật trong dự án
     for vk_other, vcfg_other in (pdata.get("videos") or {}).items():
-        if vcfg_other.get("character") == char_key:
+        if vcfg.get("character") and vcfg_other.get("character") == char_key:
             holding_candidates.append(os.path.join(pdir, f"{vk_other}-refimg.jpg"))
-    holding_candidates.append(char_ref_path)
+    if effective_mode == "character" and vcfg.get("character"):
+        holding_candidates.append(char_ref_path)
     char_holding_prod_img = next(
         (p for p in holding_candidates if p and os.path.isfile(p) and os.path.getsize(p) > 5000),
         "",
     )
 
-    # 4. Tìm Ảnh Ref 2: Bộ ảnh sản phẩm gốc (`prod_img_path` & `prod_img_paths` — lấy tới 6 ảnh để ghép khung Inset đa góc)
+    # 4. Tìm Ảnh Ref 2: Bộ ảnh sản phẩm gốc / Storyboard / Outfit (`prod_img_path` & `prod_img_paths`)
     primary_refs = vcfg.get("primary_product_refs") or pdata.get("primary_product_refs") or ["prod_1.jpg", "prod_2.jpg", "prod_3.jpg"]
     prod_img_paths = []
     for pr_name in primary_refs:
@@ -883,10 +965,23 @@ def build_thumbnail_prompt_for_variant(
     for jp in sorted(glob.glob(os.path.join(pdir, "product_images", "prod_*.jpg")))[:6]:
         if os.path.isfile(jp) and os.path.getsize(jp) > 3000 and jp not in prod_img_paths:
             prod_img_paths.append(jp)
+    extra_proj_imgs = (
+        list(prod_obj.get("slide_overlay_image_paths") or [])
+        + list(prod_obj.get("all_product_image_paths") or [])
+        + list(proj_data.get("all_product_image_paths") or [])
+        + ([proj_data.get("primary_product_image_path")] if proj_data.get("primary_product_image_path") else [])
+    )
+    for ep in extra_proj_imgs:
+        if ep and os.path.isfile(ep) and os.path.getsize(ep) > 3000 and ep not in prod_img_paths:
+            prod_img_paths.append(ep)
+            if len(prod_img_paths) >= 6:
+                break
     prod_img_path = prod_img_paths[0] if prod_img_paths else ""
 
     # Danh sách tổng hợp các ảnh Reference truyền vào AI Renderer (Ảnh NV cầm SP + Ảnh SP gốc)
     reference_images = []
+    if effective_mode == "pov":
+        char_holding_prod_img = ""
     if char_holding_prod_img and os.path.isfile(char_holding_prod_img):
         reference_images.append(char_holding_prod_img)
     for pp in prod_img_paths[:2]:
@@ -903,14 +998,32 @@ def build_thumbnail_prompt_for_variant(
         .replace("{price}", price_str)
         .replace("{style}", style_desc)
     )
-    if "{product_info}" not in master_tpl and prod_info_str:
-        final_prompt += (
-            f"\n[REFERENCE INPUTS FOR AI THUMBNAIL RENDER]: "
-            f"Reference Image 1 = Character holding product ({os.path.basename(char_holding_prod_img) if char_holding_prod_img else 'character ref'}). "
-            f"Reference Image 2 = Original Product Closeup ({os.path.basename(prod_img_path) if prod_img_path else 'product ref'}). "
-            f"Product Details & USP: {prod_info_str}. "
-            f"Render a studio-grade 9:16 commercial poster thumbnail featuring the character in the upper 68% showcasing the exact product with high visual impact for hook \"{hook_title}\"."
-        )
+    # Frame provides scene identity, not a finished thumbnail to overlay.
+    scene_ref = ''
+    vid_candidates = [
+        os.path.join(FINAL_VIDEOS_DIR, f'{pid}_{char_v}.mp4'),
+        str(prod_obj.get("final_video_path") or ""),
+        os.path.join(FINAL_VIDEOS_DIR, f'{pid}_final.mp4'),
+    ]
+    video_path = next((vp for vp in vid_candidates if vp and os.path.isfile(vp) and os.path.getsize(vp) > 50000), "")
+    if video_path:
+        scene_ref = os.path.join(pdir, 'thumbnails', f'{char_v}_scene_ref.jpg')
+        os.makedirs(os.path.dirname(scene_ref), exist_ok=True)
+        frame = subprocess.run(['ffmpeg','-y','-ss','0.5','-i',video_path,'-frames:v','1',scene_ref],
+            stdout=subprocess.DEVNULL, stderr=subprocess.DEVNULL, timeout=30)
+        if frame.returncode != 0:
+            scene_ref = ''
+        elif scene_ref not in reference_images:
+            reference_images.append(scene_ref)
+    final_prompt += '\nREFERENCE ROLES: ' + json.dumps({
+        'character_and_scene': char_holding_prod_img, 'exact_products': prod_img_paths[:2],
+        'video_environment': scene_ref}, ensure_ascii=False)
+    if not reference_images:
+        raise ValueError('Chưa có ảnh tham chiếu nhân vật, sản phẩm hoặc video. Thêm ảnh trước khi tạo thumbnail AI.')
+    if effective_mode == 'character' and not char_holding_prod_img:
+        raise ValueError('Style có nhân vật cần ảnh nhân vật thật của dự án. Chọn POV hoặc thêm ảnh nhân vật.')
+    if effective_mode == 'pov':
+        final_prompt += '\nNo presenter or human face. Focus on the supplied product or dish and video setting.'
 
     return {
         "pid": pid,
@@ -923,6 +1036,9 @@ def build_thumbnail_prompt_for_variant(
         "prod_img_path": prod_img_path,
         "prod_img_paths": prod_img_paths,
         "reference_images": reference_images,
+        "scene_ref_path": scene_ref,
+        "final_video_path": video_path,
+        "subject_mode": effective_mode,
         "product_name": prod_name,
         "product_info": prod_info_str,
         "price": price_str,
@@ -934,7 +1050,7 @@ def build_thumbnail_prompt_for_variant(
         "layout_type": resolved_tpl.get("layout_type", "grid_3_bottom"),
         "detected_category": detected_cat,
         "prompt": final_prompt,
-        "flow_project_id": vcfg.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c",
+        "flow_project_id": vcfg.get("project_id") or prod_obj.get("flow_project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c",
     }
 
 
@@ -1231,19 +1347,20 @@ def _render_thumbnail_via_chatgpt(meta: dict, out_thumb_proj: str) -> tuple:
                 body_parts.append(f'Content-Disposition: form-data; name="{name}"\r\n\r\n'.encode("utf-8"))
                 body_parts.append(f"{val}\r\n".encode("utf-8"))
 
-            _add_field("model", "gpt-image-1")
+            _add_field("model", meta.get("image_model", "gpt-image-1"))
             _add_field("prompt", prompt_str)
             _add_field("size", "1024x1536")
             _add_field("n", "1")
 
-            for idx, rpath in enumerate(ref_imgs[:2]):
+            import mimetypes
+            for idx, rpath in enumerate(ref_imgs[:4]):
                 fname = os.path.basename(rpath)
                 raw_img = open(rpath, "rb").read()
-                field_name = "image[]" if len(ref_imgs[:2]) > 1 else "image"
+                field_name = "image[]" if len(ref_imgs[:4]) > 1 else "image"
                 body_parts.append(f"--{boundary}\r\n".encode("utf-8"))
                 body_parts.append(
                     f'Content-Disposition: form-data; name="{field_name}"; filename="{fname}"\r\n'
-                    f"Content-Type: image/jpeg\r\n\r\n".encode("utf-8")
+                    f"Content-Type: {mimetypes.guess_type(rpath)[0] or 'image/jpeg'}\r\n\r\n".encode("utf-8")
                 )
                 body_parts.append(raw_img)
                 body_parts.append(b"\r\n")
@@ -1270,8 +1387,9 @@ def _render_thumbnail_via_chatgpt(meta: dict, out_thumb_proj: str) -> tuple:
                     with urllib.request.urlopen(item0["url"], timeout=60) as r_dl:
                         open(out_thumb_proj, "wb").write(r_dl.read())
                         return True, "chatgpt (gpt-image-1 Ref Image Edit)", ""
-        except Exception:
-            pass
+        except Exception as e:
+            return False, "", f"Image edit failed; references preserved, no text-only fallback: {e}"
+        return False, "", "Image edit returned no image; no text-only fallback"
 
     # 2. Gọi `/v1/images/generations` với `gpt-image-1` kèm Master Prompt + Thông tin SP
     try:
@@ -1435,7 +1553,7 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
 
                     # Upload cả 2 Ảnh Reference: (1) Ảnh nhân vật cầm sản phẩm + (2) Ảnh sản phẩm gốc
                     ref_uuids = []
-                    for ref_path in (meta.get("reference_images") or [])[:2]:
+                    for ref_path in (meta.get("reference_images") or [])[:4]:
                         if not ref_path or not os.path.isfile(ref_path):
                             continue
                         cache_key = (project_id, os.path.abspath(ref_path))
@@ -1444,6 +1562,8 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
                             ok_u, u_id, err_u = mt.upload_single_product_ref_in_page(pg, wz, project_id, ref_path)
                             if ok_u and u_id:
                                 uploaded_img_cache[cache_key] = u_id
+                        if not u_id:
+                            raise RuntimeError('Không upload được ảnh tham chiếu: ' + os.path.basename(ref_path))
                         if u_id and u_id not in ref_uuids:
                             ref_uuids.append(u_id)
 
@@ -1490,6 +1610,8 @@ def generate_thumbnail_for_variant(
     inject_01s: bool = None,
     prefer_existing_ref: bool = False,
     apply_template_only: bool = False,
+    subject_mode: str = "auto",
+    headline: str = "",
 ) -> dict:
     """
     Render Ảnh Thumbnail AI chuyên nghiệp & ghép cụm Ảnh Sản Phẩm Thực Tế cho 1 video ({pid}_{char_v}):
@@ -1502,13 +1624,15 @@ def generate_thumbnail_for_variant(
       - Sau khi render & ghép cụm Ảnh Sản Phẩm Thực Tế xong, lưu vào `projects/<pid>/thumbnails/{pid}_{char_v}_thumb.jpg`
         & `thumbnails/{pid}_{char_v}_thumb.jpg`, đồng thời ghép 0.1s vào đầu Video Final nếu `inject_01s=True`.
     """
+    apply_template_only = False
+    prefer_existing_ref = False
     cfg = load_engine_settings()
     prov = (provider or cfg.get("thumbnail_provider") or "google_flow").strip().lower()
     if add_text_badge is None:
         add_text_badge = bool(cfg.get("thumbnail_add_text_badge", False))
     if inject_01s is None:
-        inject_01s = bool(cfg.get("auto_inject_thumbnail_01s", True))
-    embed_insets = bool(cfg.get("thumbnail_embed_product_insets", True))
+        inject_01s = False
+    embed_insets = False  # AI composes the entire thumbnail; no automatic PIL insets.
     dur_01s = float(cfg.get("thumbnail_duration_sec") or 0.1)
 
     meta = build_thumbnail_prompt_for_variant(
@@ -1517,6 +1641,7 @@ def generate_thumbnail_for_variant(
         custom_master_prompt=custom_master_prompt,
         preset_id=preset_id,
         custom_product_info=custom_product_info,
+        subject_mode=subject_mode, headline=headline,
     )
     char_v = meta["char_v"]
     tpl_obj = get_template_by_id(meta.get("template_id") or preset_id)
@@ -1554,7 +1679,14 @@ def generate_thumbnail_for_variant(
 
     # 1. Nếu chưa có sẵn (hoặc người dùng yêu cầu Render AI 2K mới hoàn toàn)
     if not generated_ok:
-        if prov in ("chatgpt", "openai", "gpt"):
+        if prov == 'grok':
+            meta['image_model'] = 'grok-imagine-image'
+            ok, engine, error = _render_thumbnail_via_chatgpt(meta, out_thumb_proj)
+            if not ok:
+                return {'ok': False, 'error': error, 'provider': 'grok'}
+            generated_ok = fresh_ai_rendered = True
+            used_engine = 'grok-imagine-image'
+        elif prov in ("chatgpt", "openai", "gpt"):
             ok_gpt, eng_gpt, err_gpt = _render_thumbnail_via_chatgpt(meta, out_thumb_proj)
             if ok_gpt and os.path.isfile(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 5000:
                 generated_ok = True
@@ -1562,14 +1694,7 @@ def generate_thumbnail_for_variant(
                 used_engine = f"{eng_gpt} + {tpl_obj['short_name']}"
             else:
                 err_detail = err_gpt
-                batch_res = _render_thumbnails_via_google_flow_batch([{"meta": meta, "out_thumb_proj": out_thumb_proj}])
-                ok_fl, eng_fl, err_fl = batch_res.get(vkey, (False, "", ""))
-                if ok_fl and os.path.isfile(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 10000:
-                    generated_ok = True
-                    fresh_ai_rendered = True
-                    used_engine = f"{eng_fl} + {tpl_obj['short_name']}"
-                else:
-                    err_detail = f"{err_gpt} | {err_fl}"
+
         else:
             batch_res = _render_thumbnails_via_google_flow_batch([{"meta": meta, "out_thumb_proj": out_thumb_proj}])
             ok_fl, eng_fl, err_fl = batch_res.get(vkey, (False, "", ""))
@@ -1579,11 +1704,6 @@ def generate_thumbnail_for_variant(
                 used_engine = f"{eng_fl} + {tpl_obj['short_name']}"
             else:
                 err_detail = err_fl
-                ok_gpt, eng_gpt, err_gpt = _render_thumbnail_via_chatgpt(meta, out_thumb_proj)
-                if ok_gpt and os.path.isfile(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 5000:
-                    generated_ok = True
-                    fresh_ai_rendered = True
-                    used_engine = f"{eng_gpt} + {tpl_obj['short_name']}"
 
     if not generated_ok or not os.path.isfile(out_thumb_proj):
         return {
@@ -1627,10 +1747,26 @@ def generate_thumbnail_for_variant(
         except Exception:
             pass
 
+    with open(out_thumb_proj + '.json', 'w', encoding='utf-8') as receipt:
+        json.dump({'provider': used_engine, 'style': meta['template_id'], 'prompt': meta['prompt'],
+                   'references': meta['reference_images']}, receipt, ensure_ascii=False, indent=2)
     shutil.copy2(out_thumb_proj, out_thumb_central)
+    cooking_mf = os.path.join(pdir, "cooking_manifest.json")
+    if os.path.isfile(cooking_mf):
+        try:
+            mdata = json.load(open(cooking_mf, "r", encoding="utf-8"))
+            mdata["thumbnail_path"] = out_thumb_central
+            with open(cooking_mf, "w", encoding="utf-8") as mf_out:
+                json.dump(mdata, mf_out, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
 
     # Nếu Video Final đã có sẵn và bật inject_01s -> ghép ngay 0.1s vào đầu Video Final!
-    final_mp4 = os.path.join(FINAL_VIDEOS_DIR, f"{pid}_{char_v}.mp4")
+    final_mp4 = meta.get("final_video_path") or os.path.join(FINAL_VIDEOS_DIR, f"{pid}_{char_v}.mp4")
+    if not os.path.isfile(final_mp4):
+        alt_final = os.path.join(FINAL_VIDEOS_DIR, f"{pid}_final.mp4")
+        if os.path.isfile(alt_final):
+            final_mp4 = alt_final
     injected_info = None
     if inject_01s and os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 50000:
         injected_info = inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=dur_01s)
@@ -1666,6 +1802,8 @@ def generate_thumbnails_for_all_variants(
     add_text_badge: bool = None,
     inject_01s: bool = None,
     apply_template_only: bool = False,
+    subject_mode: str = "auto",
+    headline: str = "",
 ) -> dict:
     """
     Render Ảnh Thumbnail AI + Ghép cụm Ảnh Sản Phẩm Thực Tế & ghép 0.1s đầu video cho toàn bộ các video của 1 sản phẩm.
@@ -1674,26 +1812,32 @@ def generate_thumbnails_for_all_variants(
     """
     pdir = os.path.join(PROJECTS_DIR, pid)
     prompts_path = os.path.join(pdir, "prompts.json")
-    if not os.path.isfile(prompts_path):
-        return {"ok": False, "error": f"Sản phẩm {pid} chưa có kịch bản (prompts.json). Hãy bấm Tạo Kịch Bản trước!"}
+    proj_json_path = os.path.join(pdir, "project.json")
+    vkeys = []
+    if os.path.isfile(prompts_path):
+        pdata = json.load(open(prompts_path, "r", encoding="utf-8"))
+        vkeys = list((pdata.get("videos") or {}).keys())
+    elif os.path.isfile(proj_json_path):
+        proj_data = json.load(open(proj_json_path, "r", encoding="utf-8"))
+        vkeys = [str(p.get("vkey") or p.get("char_v_code") or "v1") for p in (proj_data.get("products") or [])]
+    if not vkeys:
+        return {"ok": False, "error": f"Sản phẩm {pid} chưa có kịch bản (prompts.json / project.json). Hãy bấm Tạo Kịch Bản trước!"}
 
     cfg = load_engine_settings()
     prov = (provider or cfg.get("thumbnail_provider") or "google_flow").strip().lower()
     if add_text_badge is None:
         add_text_badge = bool(cfg.get("thumbnail_add_text_badge", False))
     if inject_01s is None:
-        inject_01s = bool(cfg.get("auto_inject_thumbnail_01s", True))
-    embed_insets = bool(cfg.get("thumbnail_embed_product_insets", True))
+        inject_01s = False
+    embed_insets = False  # AI composes the entire thumbnail; no automatic PIL insets.
     dur_01s = float(cfg.get("thumbnail_duration_sec") or 0.1)
 
-    pdata = json.load(open(prompts_path, "r", encoding="utf-8"))
-    vkeys = list((pdata.get("videos") or {}).keys())
     pdir_thumbs = os.path.join(pdir, "thumbnails")
     os.makedirs(pdir_thumbs, exist_ok=True)
     os.makedirs(THUMBS_ROOT_DIR, exist_ok=True)
 
     # Nếu chỉ áp dụng nhanh Template (ghép cụm Ảnh Sản Phẩm Thực Tế lên các ảnh 2K đã có)
-    if apply_template_only:
+    if False:  # Legacy compositor is no longer a generation mode.
         results = []
         for vk in vkeys:
             r = generate_thumbnail_for_variant(
@@ -1703,6 +1847,7 @@ def generate_thumbnails_for_all_variants(
                 custom_master_prompt=custom_master_prompt,
                 preset_id=preset_id,
                 custom_product_info=custom_product_info,
+        subject_mode=subject_mode, headline=headline,
                 add_text_badge=add_text_badge,
                 inject_01s=inject_01s,
                 prefer_existing_ref=True,
@@ -1727,6 +1872,7 @@ def generate_thumbnails_for_all_variants(
                 custom_master_prompt=custom_master_prompt,
                 preset_id=preset_id,
                 custom_product_info=custom_product_info,
+        subject_mode=subject_mode, headline=headline,
             )
             out_proj = os.path.join(pdir_thumbs, f"{pid}_{meta['char_v']}_thumb.jpg")
             batch_items.append({"meta": meta, "out_thumb_proj": out_proj})
@@ -1769,8 +1915,24 @@ def generate_thumbnails_for_all_variants(
                         )
                     except Exception:
                         pass
+                with open(out_thumb_proj + '.json', 'w', encoding='utf-8') as receipt:
+                    json.dump({'provider': eng_fl, 'style': meta['template_id'], 'prompt': meta['prompt'],
+                        'references': meta['reference_images']}, receipt, ensure_ascii=False, indent=2)
                 shutil.copy2(out_thumb_proj, out_thumb_central)
-                final_mp4 = os.path.join(FINAL_VIDEOS_DIR, f"{pid}_{char_v}.mp4")
+                cooking_mf = os.path.join(pdir, "cooking_manifest.json")
+                if os.path.isfile(cooking_mf):
+                    try:
+                        mdata = json.load(open(cooking_mf, "r", encoding="utf-8"))
+                        mdata["thumbnail_path"] = out_thumb_central
+                        with open(cooking_mf, "w", encoding="utf-8") as mf_out:
+                            json.dump(mdata, mf_out, ensure_ascii=False, indent=2)
+                    except Exception:
+                        pass
+                final_mp4 = meta.get("final_video_path") or os.path.join(FINAL_VIDEOS_DIR, f"{pid}_{char_v}.mp4")
+                if not os.path.isfile(final_mp4):
+                    alt_final = os.path.join(FINAL_VIDEOS_DIR, f"{pid}_final.mp4")
+                    if os.path.isfile(alt_final):
+                        final_mp4 = alt_final
                 injected_info = None
                 if inject_01s and os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 50000:
                     injected_info = inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=dur_01s)
@@ -1815,6 +1977,7 @@ def generate_thumbnails_for_all_variants(
             custom_master_prompt=custom_master_prompt,
             preset_id=preset_id,
             custom_product_info=custom_product_info,
+        subject_mode=subject_mode, headline=headline,
             add_text_badge=add_text_badge,
             inject_01s=inject_01s,
         )

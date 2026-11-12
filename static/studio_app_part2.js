@@ -965,8 +965,13 @@
 
     async function quickCreateVideoFromInput() {
       const inp = document.getElementById("inpQuickProdUrl").value.trim();
-      if (!inp) return alert("Vui lòng dán Link sản phẩm TikTok hoặc ID sản phẩm!");
       const tpl = document.getElementById("selQuickTemplate")?.value || "Nhà Xưởng";
+      if (String(tpl) === "005" || String(tpl).includes("Nấu Ăn")) {
+        const dishArg = (inp && !inp.startsWith("http") && !/^\d{15,22}$/.test(inp)) ? inp : "";
+        await window.openCookingStudio("", dishArg);
+        return;
+      }
+      if (!inp) return alert("Vui lòng dán Link sản phẩm TikTok hoặc ID sản phẩm!");
       const vpc = document.getElementById("selQuickVideosPerChar")?.value || "";
       showProdBanner(`🚀 Đang kiểm tra / tự động Crawl sản phẩm và khởi tạo kịch bản theo Template <b>${tpl}</b>...`);
       const res = await apiPost("/api/products-store/create-video", {
@@ -2689,23 +2694,44 @@
     }
 
     function updateMarketAiCommandPreview() {
-      const urlVal = (document.getElementById("inpMarketQuickUrl")?.value || "").trim() || "<Link_hoặc_ID_Sản_Phẩm>";
+      const inpEl = document.getElementById("inpMarketQuickUrl");
+      const rawInp = (inpEl?.value || "").trim();
+      const urlVal = rawInp || "<Link_hoặc_ID_Sản_Phẩm>";
       const codeVal = (document.getElementById("selMarketQuickCode")?.value || "001").trim();
+      if (inpEl) {
+        inpEl.placeholder = codeVal === "005"
+          ? "Nhập tên món ăn cho Template #005 (VD: Sườn xào chua ngọt, Thịt kho tàu...)"
+          : "Dán Link sản phẩm hoặc ID (VD: 1731391379899778653 hoặc https://shop.tiktok.com/vn/pdp/...)";
+      }
       const prevEl = document.getElementById("txtMarketAiCmdPreview");
       if (prevEl) {
-        prevEl.textContent = `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
+        const dishSample = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "Sườn xào chua ngọt";
+        prevEl.textContent = codeVal === "005"
+          ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
+          : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
       }
     }
 
     function copyMarketAiCommand(customCode = "") {
-      const urlVal = (document.getElementById("inpMarketQuickUrl")?.value || "").trim() || "<Link_hoặc_ID_Sản_Phẩm>";
+      const rawInp = (document.getElementById("inpMarketQuickUrl")?.value || "").trim();
+      const urlVal = rawInp || "<Link_hoặc_ID_Sản_Phẩm>";
       const codeVal = customCode || (document.getElementById("selMarketQuickCode")?.value || "001").trim();
-      const cmd = `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
+      const dishSample = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "Sườn xào chua ngọt";
+      const cmd = codeVal === "005"
+        ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
+        : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
       navigator.clipboard.writeText(cmd);
       showMarketBanner(`📋 Đã copy lệnh gửi AI Agent: <code>${cmd}</code>`);
     }
 
     async function runQuickFromMarketplace(overrideCode = "") {
+      const cookingCode = String(overrideCode || document.getElementById("selMarketQuickCode")?.value || "");
+      if (cookingCode === "005") {
+        const rawInp = (document.getElementById("inpMarketQuickUrl")?.value || "").trim();
+        const dishArg = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "";
+        await window.openCookingStudio("", dishArg);
+        return;
+      }
       const selMkt = document.getElementById("selMarketQuickCode");
       if (overrideCode && selMkt) {
         selMkt.value = overrideCode;
@@ -2769,12 +2795,13 @@
       }
       if (btnEl) btnEl.classList.add("active");
       renderTemplatesMarketplace();
-      if (flt === "004") {
-        switchTab("fashion", document.getElementById("navBtn-fashion"));
-      }
     }
 
     function useTemplateFromMarketplace(codeOrFolder) {
+      if (String(codeOrFolder) === "005") {
+        window.openCookingStudio().catch(error => alert(error.message));
+        return;
+      }
       if (String(codeOrFolder).includes("004") || String(codeOrFolder).toLowerCase().includes("fashion")) {
         switchTab("fashion", document.getElementById("navBtn-fashion"));
         loadFashionMotionStudio(true);
@@ -2825,7 +2852,7 @@
         const highlights = t.highlights || [];
         const sampleProds = t.sample_products || [];
         const firstSample = sampleProds[0] || null;
-        const aiCmdSample = `Tạo các sản phẩm cho ID ${firstSample ? firstSample.product_id : '<ID_SP>'} theo template ${code}`;
+        const aiCmdSample = t.ai_agent_command_example || `Tạo các sản phẩm cho ID ${firstSample ? firstSample.product_id : '<ID_SP>'} theo template ${code}`;
 
         const scenesCompactHtml = scenes.slice(0, 3).map(sc => `
           <div style="background:#080c15; border:1px solid var(--border); border-radius:6px; padding:6px 8px;">
@@ -2862,7 +2889,7 @@
               <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:7px;">
                 <span class="badge badge-run" style="font-size:9.8px;">📐 ${t.scenes_per_video} Cảnh × ${t.scene_duration_sec}s (${t.video_aspect || '9:16'})</span>
                 <span class="badge" style="background:rgba(16,185,129,0.16); color:#34d399; border:1px solid rgba(16,185,129,0.4); font-size:9.8px;">🎬 ${t.video_resolution || '1080p • 60 FPS'}</span>
-                <span class="badge" style="background:rgba(245,158,11,0.16); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); font-size:9.8px;">🔤 Có Sub Karaoke</span>
+                <span class="badge" style="background:rgba(245,158,11,0.16); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); font-size:9.8px;">${code === '005' ? '🎙️ Có Voice / 🎧 ASMR · Tự sinh KB' : (t.has_subtitles === false ? (code === '004' ? '🎵 Nhạc gốc · Không sub' : '🎧 ASMR · Không voice/sub') : '🔤 Có Sub Karaoke')}</span>
                 <span class="badge" style="background:rgba(6,182,212,0.16); color:#67e8f9; border:1px solid rgba(6,182,212,0.4); font-size:9.8px;">🧠 Kèm Role Skill (.MD)</span>
               </div>
 
@@ -2871,7 +2898,7 @@
                 <!-- Cột Trái: 01 Video Demo Hoàn Thiện Chất Lượng Tốt Nhất -->
                 <div style="background:#060911; border:1px solid rgba(245,158,11,0.45); border-radius:8px; padding:5px; display:flex; flex-direction:column; gap:5px;">
                   <div style="display:flex; justify-content:space-between; align-items:center;">
-                    <span style="font-size:9.5px; font-weight:800; color:#fbbf24;">▶️ DEMO FINAL 60FPS</span>
+                    <span style="font-size:9.5px; font-weight:800; color:#fbbf24;">▶️ DEMO HOÀN CHỈNH</span>
                     ${primaryVid ? `<button class="btn btn-xs btn-outline" style="padding:1px 5px; font-size:9px;" onclick="openVerticalVideoModal('${encodeURIComponent(primaryVid.path || '')}', '', '', 'Template #${code} — ${t.folder_name.replace(/'/g, "\\'")}')">📱 Phóng to</button>` : ''}
                   </div>
                   <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:6px; overflow:hidden; position:relative;">
@@ -2911,7 +2938,7 @@
                   🎬 Dùng Template #${code}
                 </button>
                 <button class="btn btn-xs btn-amber" style="padding:7px 8px; font-size:11px; font-weight:800; justify-content:center;" onclick="openTemplateDetailModal('${code}')">
-                  🧠 Role Skill & Quy Trình
+                  🎞️ Phân cảnh & Chi tiết
                 </button>
                 ${firstSample ? `
                   <button class="btn btn-xs btn-outline" style="padding:7px 8px; font-size:10.5px; border-color:rgba(16,185,129,0.45); color:#6ee7b7;" onclick="openSampleProductInStudio('${firstSample.product_id}', '${t.folder_name}')" title="Mở xem dự án mẫu đã render trong Studio">
@@ -3001,6 +3028,7 @@
           </div>
         </div>
       `;
+      if (window.renderTemplateExplorer) window.renderTemplateExplorer(res);
       openModal("modalTemplateDetail");
     }
 
@@ -4244,17 +4272,31 @@
       }).join("");
     }
 
+    function _normFashionModeUI(modeVal) {
+      const m = String(modeVal || "").toLowerCase();
+      if (m.includes("vids")) return "google_vids";
+      if (m.includes("i2v") || m.includes("chained")) return "chained_i2v";
+      return "video_ref";
+    }
+
+    function _fashionModeLabelUI(normMode) {
+      if (normMode === "google_vids") return "Google Vids Web Omni 1080p (Không reCAPTCHA • 3 Chip Ảnh 2K)";
+      if (normMode === "chained_i2v") return "Chained Img2Video 0.1s Chuẩn Nhạc (Google Flow)";
+      return "Motion Control Video Ref (Google Flow)";
+    }
+
     async function onChangeFashionGenerationMode(modeVal) {
-      const normMode = (String(modeVal || "").toLowerCase().includes("i2v") || String(modeVal || "").toLowerCase().includes("chained")) ? "chained_i2v" : "video_ref";
+      const normMode = _normFashionModeUI(modeVal);
+      const targetStyle = normMode === "google_vids" ? "google_vids" : (normMode === "chained_i2v" ? "chained_i2v" : "timeline_pro");
       const selMode = document.getElementById("selFashionGenerationMode");
       if (selMode && selMode.value !== normMode) selMode.value = normMode;
       const selStyle = document.getElementById("selFashionPromptStyle");
-      if (selStyle) selStyle.value = normMode === "chained_i2v" ? "chained_i2v" : "timeline_pro";
+      if (selStyle) selStyle.value = targetStyle;
 
       if (!STATE.fashionProject) return;
       const slug = STATE.fashionProject.project_id || "fashion_lookbook_chan_vay_6e19";
       STATE.fashionProject.generation_mode = normMode;
-      STATE.fashionProject.prompt_style = normMode === "chained_i2v" ? "chained_i2v" : "timeline_pro";
+      STATE.fashionProject.prompt_style = targetStyle;
 
       try {
         const res = await apiPost("/api/fashion_motion/switch_mode", {
@@ -4269,16 +4311,17 @@
 
       renderFashionMotionStudio();
       showFashionBanner(
-        normMode === "chained_i2v"
-          ? `✨ Đã chuyển sang chế độ <b>Chained Img2Video + Timeline 0.1s Chuẩn Nhạc</b> (Không dùng Video Ref • Phân cảnh 2 tự động cắt Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> để nối tiếp liền mạch)!`
-          : `🎬 Đã chuyển sang chế độ <b>Motion Control Video Ref</b> (Dùng Video Gốc làm Ref • Phân cảnh 2 tự động dùng Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> làm ảnh mở đầu nối tiếp)!`
+        normMode === "google_vids"
+          ? `🌐 Đã chuyển sang chế độ <b>Google Vids Web Omni 1080p</b> (100% HTTP Cookie thuần • Không cần reCAPTCHA • Gắn trực tiếp 3 Chip Ảnh 2K gốc + Nối Frame cuối Cảnh 1)!`
+          : normMode === "chained_i2v"
+            ? `✨ Đã chuyển sang chế độ <b>Chained Img2Video + Timeline 0.1s Chuẩn Nhạc</b> (Không dùng Video Ref • Phân cảnh 2 tự động cắt Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> để nối tiếp liền mạch)!`
+            : `🎬 Đã chuyển sang chế độ <b>Motion Control Video Ref</b> (Dùng Video Gốc làm Ref • Phân cảnh 2 tự động dùng Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> làm ảnh mở đầu nối tiếp)!`
       );
     }
 
     function switchFashionPromptStyleUI(styleVal) {
       if (!STATE.fashionProject) return;
-      const isI2V = styleVal === "chained_i2v";
-      const normMode = isI2V ? "chained_i2v" : "video_ref";
+      const normMode = styleVal === "google_vids" ? "google_vids" : (styleVal === "chained_i2v" ? "chained_i2v" : "video_ref");
       const selMode = document.getElementById("selFashionGenerationMode");
       if (selMode && selMode.value !== normMode) selMode.value = normMode;
       STATE.fashionProject.generation_mode = normMode;
@@ -4286,7 +4329,9 @@
       (STATE.fashionProject.scenes || []).forEach(sc => {
         sc.active_prompt_style = styleVal;
         sc.generation_mode = normMode;
-        if (styleVal === "chained_i2v") {
+        if (styleVal === "google_vids") {
+          sc.prompt = sc.prompt_google_vids || sc.prompt_chained_i2v || sc.prompt;
+        } else if (styleVal === "chained_i2v") {
           sc.prompt = sc.prompt_chained_i2v || sc.prompt;
         } else if (styleVal === "concise_flow") {
           sc.prompt = sc.prompt_concise_flow || sc.prompt_timeline_pro || sc.prompt;
@@ -4305,7 +4350,11 @@
       const selGenMode = document.getElementById("selFashionGenerationMode");
       if (selGenMode) selGenMode.value = curGenMode;
       const selPStyle = document.getElementById("selFashionPromptStyle");
-      if (selPStyle) selPStyle.value = curGenMode === "chained_i2v" ? "chained_i2v" : (proj.prompt_style || "timeline_pro");
+      if (selPStyle) {
+        selPStyle.value = curGenMode === "google_vids"
+          ? "google_vids"
+          : (curGenMode === "chained_i2v" ? "chained_i2v" : (proj.prompt_style || "timeline_pro"));
+      }
 
       const inpChar = document.getElementById("inpFashionBaseChar");
       if (inpChar && proj.base_char_2k?.path) inpChar.value = proj.base_char_2k.path;
@@ -5104,24 +5153,30 @@
 
     async function runSingleFashionScene(sceneId) {
       const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      const generation_mode = document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v";
+      const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+      const modeLbl = _fashionModeLabelUI(generation_mode);
+      const isVids = generation_mode === "google_vids";
       STATE._fashionRunStartTs = Date.now();
       if (STATE.fashionProject) {
         STATE.fashionProject.generation_mode = generation_mode;
         STATE.fashionProject.status = "running_flow";
-        STATE.fashionProject.status_message = `🚀 Đang gửi Phân Cảnh ${sceneId.toUpperCase()} lên Google Flow (${generation_mode === 'chained_i2v' ? 'Chained I2V 0.1s' : 'Motion Control Video Ref'})...`;
+        STATE.fashionProject.status_message = isVids
+          ? `🌐 Đang gửi Phân Cảnh ${sceneId.toUpperCase()} lên Google Vids Web (${modeLbl})...`
+          : `🚀 Đang gửi Phân Cảnh ${sceneId.toUpperCase()} lên Google Flow (${modeLbl})...`;
         (STATE.fashionProject.scenes || []).forEach(s => {
           if (s.id === sceneId) {
             s.status = "preparing";
             s.attempt = 1;
-            s.max_attempts = 4;
-            s.status_detail = "🚀 Đang kết nối Google Flow & tải ảnh tham chiếu 2K...";
+            s.max_attempts = isVids ? 3 : 4;
+            s.status_detail = isVids
+              ? "🌐 Đang kết nối Google Vids Web & tải ảnh 2K qua Scotty..."
+              : "🚀 Đang kết nối Google Flow & tải ảnh tham chiếu 2K...";
           }
         });
         renderFashionLiveMonitorBar();
         renderFashionScenesTimeline();
       }
-      showFashionBanner(`⏳ Đang gửi Phân Cảnh <b>${sceneId.toUpperCase()}</b> lên Google Flow (${generation_mode === 'chained_i2v' ? 'Chained Img2Video 0.1s' : 'Motion Control Video Ref'})...`);
+      showFashionBanner(`⏳ Đang gửi Phân Cảnh <b>${sceneId.toUpperCase()}</b> (${modeLbl})...`);
       const res = await apiPost("/api/fashion_motion/run_scene", {
         project_id: slug,
         scene_id: sceneId,
@@ -5130,7 +5185,7 @@
       });
       if (res && res.ok) {
         if (res.project) STATE.fashionProject = res.project;
-        showFashionBanner(res.message || `🚀 Đang tạo Video Phân Cảnh ${sceneId.toUpperCase()} trên Google Flow!`);
+        showFashionBanner(res.message || `🚀 Đang tạo Video Phân Cảnh ${sceneId.toUpperCase()} (${modeLbl})!`);
         startFashionLiveStatusMonitor(slug);
       } else {
         showFashionBanner(`❌ Lỗi tạo phân cảnh ${sceneId}: ${(res && res.error) || 'Không xác định'}`, true);
@@ -5158,8 +5213,9 @@
       const char_sheet_path = document.getElementById("inpFashionCharSheet")?.value || "";
       const ref_video_path = document.getElementById("inpFashionRefVideo")?.value || "";
       const preferred_chunk_sec = document.getElementById("selFashionChunkSec")?.value || "auto";
-      const generation_mode = document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v";
-      const prompt_style = document.getElementById("selFashionPromptStyle")?.value || (generation_mode === "chained_i2v" ? "chained_i2v" : "timeline_pro");
+      const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+      const defaultPStyle = generation_mode === "google_vids" ? "google_vids" : (generation_mode === "chained_i2v" ? "chained_i2v" : "timeline_pro");
+      const prompt_style = document.getElementById("selFashionPromptStyle")?.value || defaultPStyle;
       const ai_provider = document.getElementById("selFashionAiProvider")?.value || "auto";
       const ai_model = document.getElementById("selFashionAiModel")?.value || "gemini-2.5-flash";
 
@@ -5182,7 +5238,7 @@
       const targetSlug = overrideSlug || STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
       const targetTitle = overrideTitle || STATE.fashionProject?.title || `Lookbook Thời Trang AI 2K (${enabledOutfits.length} Bộ Đồ)`;
 
-      showFashionBanner(`⏳ Đang phân tích Video Tham Chiếu chuẩn từng 0.1s theo nhạc (Chế độ: <b>${generation_mode === 'chained_i2v' ? 'Chained Img2Video 0.1s' : 'Motion Control Video Ref'}</b>) và gán ${enabledOutfits.length} Bộ Đồ 2K...`);
+      showFashionBanner(`⏳ Đang phân tích Video Tham Chiếu chuẩn từng 0.1s theo nhạc (Chế độ: <b>${_fashionModeLabelUI(generation_mode)}</b>) và gán ${enabledOutfits.length} Bộ Đồ 2K...`);
       const res = await apiPost("/api/fashion_motion/analyze_and_create", {
         project_id: targetSlug,
         title: targetTitle,
@@ -5220,7 +5276,9 @@
       }
 
       const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      const generation_mode = document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v";
+      const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+      const modeLbl = _fashionModeLabelUI(generation_mode);
+      const isVids = generation_mode === "google_vids";
       STATE._fashionWatchdogRetries = STATE._fashionWatchdogRetries || {};
       STATE._fashionWatchdogRetries[slug] = 0;
       STATE._fashionRunStartTs = Date.now();
@@ -5228,19 +5286,23 @@
       if (STATE.fashionProject) {
         STATE.fashionProject.generation_mode = generation_mode;
         STATE.fashionProject.status = "running_flow";
-        STATE.fashionProject.status_message = `🚀 Đang khởi động trình duyệt Google Flow (${generation_mode === 'chained_i2v' ? 'Chained Img2Video 0.1s Chuẩn Nhạc' : 'Motion Control Video Ref'}) cho dự án ${slug}...`;
+        STATE.fashionProject.status_message = isVids
+          ? `🌐 Đang kết nối Google Vids Web (${modeLbl}) cho dự án ${slug}...`
+          : `🚀 Đang khởi động trình duyệt Google Flow (${modeLbl}) cho dự án ${slug}...`;
         (STATE.fashionProject.scenes || []).forEach(s => {
           s.status = "preparing";
           s.attempt = 1;
-          s.max_attempts = 4;
-          s.status_detail = "🚀 Đang kết nối Google Flow & tải nguyên liệu 2K...";
+          s.max_attempts = isVids ? 3 : 4;
+          s.status_detail = isVids
+            ? "🌐 Đang kết nối Google Vids Web & chuẩn bị 3 ảnh 2K..."
+            : "🚀 Đang kết nối Google Flow & tải nguyên liệu 2K...";
         });
         renderFashionLiveMonitorBar();
         renderFashionScenesTimeline();
         document.getElementById("fashionLiveMonitorBarTop")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       }
 
-      showFashionBanner(`🚀 Đang gửi dự án <b>${slug}</b> (Chế độ: <b>${generation_mode === 'chained_i2v' ? 'Chained Img2Video + Timeline 0.1s Chuẩn Nhạc' : 'Motion Control Video Ref'}</b> • Cảnh 2 nối tiếp Frame cuối Cảnh 1) lên Google Flow...`);
+      showFashionBanner(`🚀 Đang gửi dự án <b>${slug}</b> (Chế độ: <b>${modeLbl}</b> • Cảnh 2 nối tiếp Frame cuối Cảnh 1)...`);
       const res = await apiPost("/api/fashion_motion/run_flow", {
         project_id: slug,
         generation_mode,

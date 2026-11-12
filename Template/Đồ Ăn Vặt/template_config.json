@@ -104,5 +104,10 @@
   "code": "003",
   "demo_video_caption": "Demo #003: Hạt Đác Rim Chanh Dây — UGC Cận Cảnh Pha Chế + Sub Karaoke (1080p 60FPS)",
   "role_skill_file": "ROLE_SKILL.md",
-  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 003"
+  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 003",
+  "demo_project_ids": [
+    "1732219603106695747",
+    "1731538566295553898",
+    "qa_20261110_t003"
+  ]
 }

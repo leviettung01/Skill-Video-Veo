@@ -43,6 +43,8 @@ Trong kiến trúc **Lê Việt Tùng - SkillAutoVeo**, **AI Agent (Antigravity 
 
 ## 1. Quy Trình Nhanh 1 Bước: Gửi Link / ID Sản Phẩm + Mã Số Template (`001`, `002`, `003`)
 
+Riêng **Template 005 — Nấu Ăn POV Storyboard** nhận **tên món ăn** (tự sinh công thức 6 ô/cảnh + lời dẫn tiếng Việt) hoặc công thức, không nhận link sản phẩm. Đọc `../Template/Nấu Ăn POV Storyboard/ROLE_SKILL.md`; dùng `flow_final_pipeline/scripts/cooking_storyboard_engine.py`: hỗ trợ chạy thẳng 1-Click (`--dish "..." --voice <voice_key> --profile <profile> --stage auto`) hoặc tách bước (`prepare` → `storyboards` → xem ảnh 2K → `video`). Hỗ trợ cả giọng đọc tiếng Việt trong Thư Viện Voice lẫn chế độ ASMR. Trên UI bấm **🍲 Nấu Ăn POV** hoặc Chợ Template → Dùng Template #005.
+
 Mỗi Template trong **Chợ Template & Role Skill (`Template/`)** có một **Mã số định danh độc nhất (`code`)** tích hợp sẵn `ROLE_SKILL.md`, `generator.py` và Video Demo Final 1080p 60 FPS:
 - **`001`** (`Template/Nhà Xưởng`): **Nhà Xưởng (Báo Giá Tận Xưởng & Kiểm Định QC — Có Nhân Vật + Voice + Sub Karaoke 60 FPS)**
 - **`002`** (`Template/Đồ Ăn Vặt POV (Có Voice)`): **Đồ Ăn Vặt & Ẩm Thực POV (Có Voice Review + Bày Biện Món Ăn + Sub Karaoke 60 FPS)**

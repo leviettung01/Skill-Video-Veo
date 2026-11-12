@@ -1,3 +1,7 @@
 {
-  "code": "004"
+  "code": "004",
+  "demo_project_ids": [
+    "qa_20261110_fashion",
+    "fashion_motion_demo_7anh_2k"
+  ]
 }

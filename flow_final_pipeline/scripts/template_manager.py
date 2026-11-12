@@ -180,6 +180,9 @@ def list_video_templates() -> list:
             "name": cfg.get("name") or entry,
             "badge": cfg.get("badge") or "TEMPLATE VIDEO",
             "category": cfg.get("category") or "Thương Mại Điện Tử / TikTok Affiliate",
+            "pipeline_kind": cfg.get("pipeline_kind", "product"),
+            "input_kind": cfg.get("input_kind", "product"),
+            "has_subtitles": cfg.get("has_subtitles", True),
             "price_label": cfg.get("price_label") or "Miễn Phí • Sẵn Sàng",
             "tier_badge": cfg.get("tier_badge") or "🔥 CHỢ TEMPLATE",
             "author": cfg.get("author") or "Lê Việt Tùng - SkillAutoVeo",
@@ -263,11 +266,40 @@ def resolve_template_dir(template_name_or_id: str = "") -> str:
     return default_dir
 
 
+def _template_scene_examples(cfg):
+    """Use real saved projects, with provenance; never invent media for a scene."""
+    ids = list(cfg.get('demo_project_ids') or [])
+    ids += [p['product_id'] for p in cfg.get('sample_products', []) if p.get('product_id')]
+    try:
+        with open(os.path.join(PROJECTS_DIR, 'projects_index.json'), encoding='utf-8') as f:
+            ids += [p['id'] for p in json.load(f) if str(p.get('template_code', '')).zfill(3) == str(cfg.get('code', '')).zfill(3) and p.get('done_products')]
+    except (OSError, ValueError):
+        pass
+    result = []
+    for pid in dict.fromkeys(ids):
+        if os.path.basename(pid) != pid:
+            continue
+        try:
+            with open(os.path.join(PROJECTS_DIR, pid, 'project.json'), encoding='utf-8') as f:
+                project = json.load(f)
+            product = next((p for p in project.get('products', []) if p.get('final_video_path') and os.path.isfile(p['final_video_path'])), None)
+            if not product:
+                continue
+            result.append({'id': pid, 'name': project.get('name', pid), 'final_video_path': product['final_video_path'],
+                           'scenes': [dict({k: s.get(k) for k in ('scene_number','scene_title','scene_description','image_prompt','video_prompt','image_path','video_path','actions')},
+                                           duration_sec=s.get('duration_sec') or product.get('seconds_per_scene') or cfg.get('scene_duration_sec')) for s in product.get('scenes', [])]})
+            if len(result) >= 3:
+                break
+        except (OSError, ValueError):
+            continue
+    return result
+
+
 def get_template_detail(template_name_or_id: str) -> dict:
     tdir = resolve_template_dir(template_name_or_id)
     folder_name = os.path.basename(tdir)
     docs = {}
-    doc_order = ("ROLE_SKILL.md", "SKILL.md", "KICH_BAN.md", "PROMPT_TEMPLATES.md", "RENDER.md", "WORKFLOW_GUIDE.md", "template_config.json", "generator.py")
+    doc_order = ("ROLE_SKILL.md", "MASTER_PROMPT.md", "GENERATED_PROMPTS_V2.md", "SKILL.md", "KICH_BAN.md", "PROMPT_TEMPLATES.md", "RENDER.md", "WORKFLOW_GUIDE.md", "template_config.json", "generator.py")
     for fn in doc_order:
         fp = os.path.join(tdir, fn)
         if os.path.exists(fp):
@@ -291,8 +323,9 @@ def get_template_detail(template_name_or_id: str) -> dict:
         "folder_path": tdir,
         "config": cfg,
         "primary_demo_video": primary_demo_video,
-        "demo_videos": [primary_demo_video] if primary_demo_video else [],
+        "demo_videos": demo_videos,
         "demo_images": demo_images,
+        "demo_projects": _template_scene_examples(cfg),
         "docs": docs,
     }
 
@@ -373,6 +406,10 @@ def generate_prompts_for_product(
     chars_cfg = load_characters_config()
     target_vpc = int(videos_per_character or chars_cfg.get("default_videos_per_character", 3))
     tdir = resolve_template_dir(template_name)
+    if os.path.isfile(os.path.join(tdir, "template_config.json")):
+        with open(os.path.join(tdir, "template_config.json"), encoding="utf-8") as cooking_cfg_file:
+            if json.load(cooking_cfg_file).get("pipeline_kind") == "cooking_storyboard":
+                raise ValueError("Template 005 dùng công thức nấu ăn. Mở Nấu Ăn POV trong Chợ Template hoặc dùng cooking_storyboard_engine.py.")
     target_tpl_folder = os.path.basename(tdir)
 
     # Nếu prompts.json đã tồn tại và không bắt buộc tạo lại, kiểm tra xem đã khớp CHÍNH XÁC template_id / template_code chưa

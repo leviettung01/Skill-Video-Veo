@@ -48,6 +48,8 @@ Template Thời Trang Video/_duplicates_excluded/
 WorkFlow/museflow/
 audit_release.py
 audit_results/
+/update_installed_autoveo_thumbnail.py
+/recipe_*.json
 Extension Recapcha/LeVietTung_autoveo/_metadata/
 Extension Recapcha/veo3-captcha-extension*/
 

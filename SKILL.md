@@ -8,6 +8,10 @@ description: >-
 
 # ⚡ Lê Việt Tùng - SkillAutoVeo — AI Agent Brain × Multi-Threaded Video Engine
 
+## Thumbnail AI
+
+Khi người dùng yêu cầu thumbnail, đọc `Template/Thumbnail_Templates/AI_THUMBNAIL_STYLES.md`: phân tích sản phẩm, nhân vật và bối cảnh sẵn có; chọn style theo ngành hàng; dùng model AI tạo ảnh hoàn chỉnh từ prompt và các ảnh tham chiếu; kiểm tra ảnh thực tế trước khi ghép. Không coi việc chỉ phủ chữ lên một frame video là tạo thumbnail AI. Chỉ thêm thumbnail vào video khi được yêu cầu hoặc cấu hình dự án yêu cầu.
+
 > **Thương hiệu & Tác giả:** **Lê Việt Tùng - SkillAutoVeo**
 > - 📞 **Zalo:** [0915967790](https://zalo.me/0915967790)
 > - 🌐 **Facebook:** [https://www.facebook.com/tungbinh.38/](https://www.facebook.com/tungbinh.38/)
@@ -42,6 +46,10 @@ Trong kiến trúc **Lê Việt Tùng - SkillAutoVeo**, **AI Agent (Antigravity 
 ---
 
 ## 1. Quy Trình Nhanh 1 Bước: Gửi Link / ID Sản Phẩm + Mã Số Template (`001`, `002`, `003`)
+
+### Riêng Template 005 — Nấu Ăn POV Storyboard
+
+Đầu vào là **tên món ăn** (hệ thống tự sinh kịch bản + lời dẫn) hoặc công thức nấu ăn, không phải link sản phẩm. Đọc `Template/Nấu Ăn POV Storyboard/ROLE_SKILL.md`. Mỗi clip 8s có storyboard riêng 6 ô tải 2K thật bằng `SPrCad`, upload lại làm ref. Hỗ trợ chọn giọng đọc trong Thư Viện Voice (đồng bộ 3 nhịp lời dẫn tiếng Việt) hoặc chế độ ASMR không lời, và chọn tài khoản Google Flow từ danh sách sẵn có. Trên giao diện: bấm **🍲 Nấu Ăn POV** (hoặc Chợ Template → Dùng Template #005) → gõ tên món + chọn Voice + chọn Tài khoản → bấm **🚀 Tạo Video Final Luôn**. CLI 1-Click: `python flow_final_pipeline/scripts/cooking_storyboard_engine.py --dish "Sườn xào chua ngọt" --voice voice_nu_nam_am_thuc --profile leviettung04 --stage auto` (hoặc chạy tách bước `prepare` → `storyboards` → `video`). Không dùng `product_crawler_bridge.py` cho Template này.
 
 Mỗi Template trong **Chợ Template & Role Skill (`Template/`)** có một **Mã số định danh độc nhất (`code`)** tích hợp sẵn `ROLE_SKILL.md`, `generator.py` và Video Demo Final 1080p 60 FPS:
 - **`001`** (`Template/Nhà Xưởng`): **Nhà Xưởng (Báo Giá Tận Xưởng & Kiểm Định QC — Có Nhân Vật + Voice + Sub Karaoke 60 FPS)**
@@ -189,3 +197,8 @@ python "Skill Video Veo/veo_skill_cli.py" submit-prompts --project "Ten_Du_An" -
 ```
 - Lệnh này sẽ tự động chạy đa luồng: **Tạo Ảnh các cảnh song song -> Tạo Video I2V song song -> Ghép FFmpeg ra Video Final (`.mp4`)** và cập nhật trực tiếp lên giao diện Web Local (`http://127.0.0.1:8456`).
 
+
+
+## Thumbnail AI — thiết kế toàn bộ ảnh
+
+Đọc `Template/Thumbnail_Templates/AI_STYLE_GUIDE.md` và `ai_styles.json`. Thumbnail phải được model tạo ảnh thiết kế toàn bộ từ prompt style và ảnh tham chiếu thật: nhân vật nếu có, sản phẩm nếu có, khung cảnh video. Không dùng chỉ overlay chữ/khung làm kết quả AI. Chọn 11 style theo ngành; không sao chép chữ, giá, thương hiệu hay nhân vật từ ảnh mẫu. Kiểm tra prompt và toàn bộ ref trước gửi. Chỉ ghép 0,1s vào video khi được chọn. CLIProxy phải hỗ trợ image edits cho model đã chọn; thất bại thì báo lỗi, không tự bỏ ref hoặc đổi nhà cung cấp.

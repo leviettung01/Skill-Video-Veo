@@ -1,0 +1,42 @@
+{
+  "dish": "Lẩu Thái tôm nấm",
+  "dish_en": "Thai-style shrimp and mushroom hotpot",
+  "clips": [
+    {
+      "title": "Phi thơm và nấu nền",
+      "start_state": "Empty clean pot; all ingredients still separate.",
+      "actions": [
+        "Tilt a small clear glass bowl and pour one continuous thin golden oil stream into the empty ivory pot; oil spreads into a reflective film.",
+        "Tilt a clear glass bowl to drop thin crushed lemongrass into the established oil; show pieces mid-fall and tiny bubbles at contact.",
+        "Tilt a clear glass bowl so purple-white shallot slices tumble onto the established lemongrass; translucent layers catch the light.",
+        "Stir the lemongrass and shallots once with the wooden spatula; aromatics glisten without burning.",
+        "Tip glossy ripe red tomato wedges from a clear glass bowl into the established aromatics; first wedges land while others fall; no seafood or mushrooms yet.",
+        "Pour clear broth into the tomatoes and aromatics; end with the pot half full and light steam."
+      ]
+    },
+    {
+      "title": "Tạo vị nước lẩu và cho rau nấm",
+      "start_state": "Pot half full of broth with lemongrass, shallots and tomato wedges from clip 1; no seafood yet.",
+      "actions": [
+        "Stir one spoonful of red Thai chili paste into the existing broth; broth becomes orange-red.",
+        "Drop two torn kaffir lime leaves into the orange-red broth; keep existing tomato and aromatics.",
+        "Add thin pale galangal slices to the broth; slices land on the visible surface.",
+        "Show the same seasoned broth gently simmering, small bubbles and wisps of steam; no hand action.",
+        "Tip a small cluster of oyster mushrooms from a clear glass bowl into the simmering orange-red broth; visible landing ripples.",
+        "Tip three yellow corn rounds from a clear glass bowl into the same pot; natural falling arc and small splash, mushrooms remain visible."
+      ]
+    },
+    {
+      "title": "Nấu tôm và hoàn thiện",
+      "start_state": "Simmering orange-red broth with tomatoes, aromatics, lime leaves, mushrooms and corn from clip 2.",
+      "actions": [
+        "Lower peeled raw shrimp one by one into the simmering broth with wooden cooking chopsticks.",
+        "Show a later cooking moment: the same shrimp now opaque pink and curled in gently bubbling broth; no raw shrimp remain.",
+        "Add a small handful of clean fresh bok choy leaves to the shrimp and mushrooms in the pot.",
+        "Gently press the green leaves into the hot broth with the same wooden spatula; leaves soften but stay green.",
+        "Show the finished hotpot surface in close macro: glossy cooked pink shrimp, mushrooms, yellow corn and green leaves in rich orange-red broth with distinct oil ribbons and gentle bubbling.",
+        "Hero shot: wooden chopsticks slowly lift one cooked pink-orange shrimp and a mushroom above the SAME finished pot toward the lens; broth droplets fall back, keep the food in focus and the pot softly behind. No serving bowl."
+      ]
+    }
+  ]
+}

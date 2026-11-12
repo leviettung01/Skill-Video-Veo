@@ -223,5 +223,8 @@
   "code": "001",
   "demo_video_caption": "Demo #001: Cân Tiểu Ly Inox 304 — Nhân Vật Đứng Xưởng + Voice + Sub Karaoke (1080p 60FPS)",
   "role_skill_file": "ROLE_SKILL.md",
-  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 001"
+  "ai_agent_command_example": "Tạo video cho sản phẩm <Link_hoặc_ID> theo template 001",
+  "demo_project_ids": [
+    "qa_20261110_t001"
+  ]
 }

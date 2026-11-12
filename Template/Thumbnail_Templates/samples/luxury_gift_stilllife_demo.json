@@ -1,0 +1,21 @@
+{
+  "provider": "built-in image_gen",
+  "style_id": "luxury_gift_stilllife",
+  "project_id": "1738260652434293979",
+  "reference_images": [
+    "projects\\1738260652434293979\\product_images\\prod_1.jpg",
+    "projects\\1738260652434293979\\nv1-luxury-refimg.jpg"
+  ],
+  "generation_prompt": "Create ONE complete professional vertical 9:16 Vietnamese AI thumbnail, production-ready photography and typography integrated as a single designed image. Quiet luxury men's accessory editorial still life. Product reference defines exact rolled black textured leather belt, black rectangular buckle with gold edging and distinctive flowing curved gold lower detail, and gold link bracelet watch with black dial. Scene reference supplies only warm wood boutique, display counter and gift box colors: OMIT the person entirely. Arrange exact belt and watch inside a refined open dark gift presentation box, one product composition only, close oblique camera angle, tactile ivory lining, warm walnut counter. Restrained champagne typography and fine rules, espresso brown shadows, directional warm soft light, jewelry-quality highlights with readable textured black leather. Large refined serif Vietnamese headline upper quarter 'ĐIỂM NHẤN LỊCH LÃM'. Small secondary text 'Thắt lưng & đồng hồ'. Generous 8 percent safe margins, minimal premium men's magazine advertising, no gold frame, discount, prices, buy-one-get-one text, floating products or invented branded marks. No person or hands. Use references only for the stated roles, preserve actual identity and product shapes. Correct Vietnamese diacritics, polished readable mobile hierarchy, no watermark. Generate a new complete composition, not just text over the original reference.",
+  "reusable_style_prompt": "Quiet luxury accessory editorial still life, only the exact supplied products in a refined presentation composition, no presenter. Match the video boutique environment, walnut and ivory tactile surfaces, espresso shadows and restrained champagne typography. Close oblique camera, readable leather grain and carefully controlled metallic highlights, one balanced product hero. Refined serif headline and thin editorial rules with generous whitespace. Show a gift set only when all its contents are actually supplied and verified. No discount graphics, gold frames, invented gifts or sales offers.",
+  "prompt_structure": [
+    "REFERENCE ROLES: exact product / actual character if requested / video environment",
+    "SUBJECT: {product_name}; verified facts: {product_info}",
+    "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+    "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+    "CONTINUITY: preserve reference identity, product geometry and video context",
+    "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+    "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+  ],
+  "demo_path": "Template\\Thumbnail_Templates\\samples\\luxury_gift_stilllife_demo.png"
+}

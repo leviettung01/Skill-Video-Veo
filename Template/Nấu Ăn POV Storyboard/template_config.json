@@ -1,0 +1,90 @@
+{
+  "id": "cooking_pov_storyboard",
+  "code": "005",
+  "folder_name": "Nấu Ăn POV Storyboard",
+  "name": "Nấu Ăn POV — Tự Sinh Kịch Bản + Storyboard 2K → Video Final",
+  "badge": "V2 • AUTO SCRIPT • VOICE / ASMR",
+  "category": "Nấu Ăn / Công Thức / POV",
+  "price_label": "Demo đã tạo • Sẵn sàng",
+  "description": "Gõ tên món ăn + chọn giọng đọc trong Thư Viện Voice (hoặc ASMR) + chọn Tài khoản Flow là tự sinh công thức 6 ô/cảnh, tạo Storyboard 2K gốc, upload lại và xuất Video Final 1080p 60FPS.",
+  "pipeline_kind": "cooking_storyboard",
+  "input_kind": "recipe",
+  "has_subtitles": false,
+  "audio_mode": "voice",
+  "default_videos_per_character": 1,
+  "scenes_per_video": 3,
+  "scene_duration_sec": 8,
+  "video_aspect": "9:16",
+  "image_resolution": "2K thật (1536×2752) + upload lại",
+  "video_resolution": "1080p • 60 FPS",
+  "image_model": "Nano Banana 2.1 — Storyboard 6 ô",
+  "video_model": "Flow — abra_r2v_8s + Upsample 1080p",
+  "tags": [
+    "Nấu ăn POV",
+    "Tự sinh kịch bản",
+    "Có Voice / ASMR",
+    "Storyboard 2K",
+    "6 shot/8s",
+    "1-Click Final"
+  ],
+  "highlights": [
+    "Chỉ cần gõ tên món ăn + chọn giọng đọc từ danh sách Voice Library + chọn tài khoản Flow để ra thẳng Video Final 1080p 60FPS",
+    "Bộ đạo diễn ẩm thực tự sinh 6 thao tác cận cảnh/clip và 3 câu lời dẫn tiếng Việt khớp vùng miền (Bắc / Trung / Nam)",
+    "Tải Storyboard 2K gốc qua SPrCad và upload lại làm tham chiếu chuẩn cho từng clip 8 giây",
+    "Hỗ trợ cả Chạy Tự Động 1-Click lẫn Chế Độ Kiểm Duyệt Từng Bước (xem Storyboard 2K trước khi gửi job video)",
+    "Giữ đồng nhất nồi/chảo, gian bếp, bàn tay, ánh sáng và lưu UUID chống gửi trùng tốn credit"
+  ],
+  "workflow_steps": [
+    {
+      "step": 1,
+      "icon": "🍲",
+      "title": "Nhập món & chọn Voice",
+      "detail": "Gõ tên món ăn, chọn giọng đọc trong Thư Viện Voice (có nghe thử) hoặc ASMR, và chọn tài khoản Google Flow."
+    },
+    {
+      "step": 2,
+      "icon": "✨",
+      "title": "Tự sinh kịch bản 6 ô",
+      "detail": "Hệ thống tự động lên công thức theo đúng kỹ thuật chế biến (6 thao tác/cảnh + 3 nhịp lời dẫn tiếng Việt)."
+    },
+    {
+      "step": 3,
+      "icon": "🖼️",
+      "title": "Storyboard 2K & Re-upload",
+      "detail": "Tạo ảnh lưới 2×3 ô cho từng cảnh, tải bản 2K thật qua SPrCad và upload lại lên đúng dự án Flow của tài khoản."
+    },
+    {
+      "step": 4,
+      "icon": "🎬",
+      "title": "6 shot Full-Screen & Final",
+      "detail": "Render các cảnh 8s toàn màn hình đồng bộ Voice/ASMR, upscale 1080p và ghép Final 1080p 60FPS (kèm phụ đề tùy chọn)."
+    }
+  ],
+  "scene_breakdown": [
+    {
+      "title": "Đoạn 1 — Phi thơm, nấu nền",
+      "purpose": "Dầu → sả → hành → đảo → cà chua → nước dùng."
+    },
+    {
+      "title": "Đoạn 2 — Nêm vị, thêm rau nấm",
+      "purpose": "Sốt lẩu → lá chanh → riềng → sôi → nấm → ngô."
+    },
+    {
+      "title": "Đoạn 3 — Nấu tôm, ra thành phẩm",
+      "purpose": "Tôm → chín hồng → rau → nhúng rau → cận thành phẩm → gắp tôm lên gần máy."
+    }
+  ],
+  "sample_products": [],
+  "role_skill_file": "ROLE_SKILL.md",
+  "ai_agent_command_example": "Tạo video nấu ăn POV món \"Sườn xào chua ngọt\" theo Template 005 với giọng đọc Phương Thảo trên tài khoản leviettung04.",
+  "demo_video_caption": "Demo V2: Lẩu Thái tôm nấm • 22,57s • 1080×1920 • xuất 60 FPS • ASMR",
+  "master_prompt_version": "2.0-reference-macro",
+  "demo_project_ids": [
+    "pov_cooking_v2_20261110",
+    "pov_cooking_demo_20261110"
+  ],
+  "audio_modes": [
+    "voice",
+    "asmr"
+  ]
+}

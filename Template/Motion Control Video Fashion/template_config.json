@@ -82,6 +82,11 @@
       "purpose": "Bắt đầu từ Ảnh Ref 2K nhân vật đang mặc Bộ Đồ 1 trong phòng ngủ, tiếp tục nhún nhảy theo clip tham chiếu 2 (8s-16s). Tại giây 3:04 đổi sang Bộ Đồ 2 (Váy ngắn xếp tầng vàng bơ), đến giây 6:12 đổi sang Bộ Đồ 3 (Áo yếm vàng + Quần ống rộng màu be + Kính hồng).",
       "camera": "Full-body / Three-quarter 9:16 đồng nhất ánh sáng và phòng ngủ với Cảnh 1; sử dụng nhạc gốc xuyên suốt 16 giây."
     }
-  ]
+  ],
+  "demo_project_ids": [
+    "qa_20261110_fashion",
+    "fashion_motion_demo_7anh_2k"
+  ],
+  "has_subtitles": false,
+  "audio_mode": "original_music"
 }
-

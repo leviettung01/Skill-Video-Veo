@@ -1934,3 +1934,50 @@ def composite_template_product_insets(
     out_rgb = canvas.convert("RGB")
     out_rgb.save(img_path, format="JPEG", quality=96)
     return True
+
+
+
+# Public AI catalog; historic compositor IDs remain aliases, not gallery entries.
+with open(os.path.join(THUMB_TPL_DIR, 'ai_styles.json'), encoding='utf-8') as _f:
+    AI_THUMBNAIL_STYLES = json.load(_f)
+_LEGACY_AI_MAP = {'gia_dung':'kitchen_minimal','giay_dep':'kawaii_pastel',
+ 'quan_ao_nu':'fashion_lookbook','nam_nu_unisex':'streetwear_flash',
+ 'genz_cute':'pastel_pov_handmade','tui_xach':'korean_scrapbook',
+ 'my_pham':'skincare_creator','phu_kien':'jewelry_nature','food':'food_editorial'}
+_legacy_templates = THUMBNAIL_TEMPLATES
+_source_files = sorted(glob.glob(os.path.join(WS_DIR,'ảnh mẫu thumbnail','*.jpg')))
+def _ai_master(style):
+    return ('Create ONE complete professional vertical 9:16 Vietnamese thumbnail. '
+        'Design photography, composition, lighting, background, decorative graphics and typography together. '
+        'STYLE DIRECTION: '+style['prompt']+' SUBJECT: {product_name}. VERIFIED FACTS: {product_info}. '
+        'VIDEO SETTING: {style}. Exact headline: "{hook_text}". Correct Vietnamese diacritics. '
+        'Use the actual reference roles supplied with this request: preserve exact product geometry, '
+        'material, label and colors; preserve character identity only if requested and supplied. '
+        'One dominant hero, clear mobile hierarchy, at most two concise factual callouts, '
+        '8 percent safe margins, no watermark, no extra fingers, no invented product variants, '
+        'no unsupported prices, discounts, urgency, certifications or claims. '
+        'Never copy sample faces, brands or text. Output a complete finished image.')
+THUMBNAIL_TEMPLATES = []
+for _style in AI_THUMBNAIL_STYLES:
+    _index = _style.get('sample_index')
+    _sample = os.path.relpath(_source_files[_index-1],WS_DIR).replace(os.sep,'/') if _index else ''
+    if _style.get('sample_image'):
+        _sample = _style['sample_image']
+    if _style['id']=='pastel_pov_handmade':
+        _sample='Template/Thumbnail_Templates/samples/pastel_pov_handmade_approved.png'
+    THUMBNAIL_TEMPLATES.append(dict(id=_style['id'],name=_style['name'],short_name=_style['name'],
+        aliases=[t['id'] for t in _legacy_templates if _LEGACY_AI_MAP.get(t.get('category'),'direct_retail')==_style['id']],
+        category=_style['category'],category_label=_style['industry'],style_id=_style['id'],
+        style_badge='POV · Không lộ mặt' if _style['subject_mode']=='pov' else 'Có nhân vật tham chiếu' if _style['subject_mode']=='character' else 'Linh hoạt POV / nhân vật',
+        subject_mode=_style['subject_mode'],layout_type='ai_complete',sample_image=_sample,
+        reference_image=_sample,preview_kind=_style.get('preview_kind') or ('approved_demo' if _style['id']=='pastel_pov_handmade' else 'style_reference'),
+        source_project_id=_style.get('source_project_id',''),
+        prompt_structure=_style.get('prompt_structure',[]),
+        recommended_for=_style['industry'],description=_style['prompt'],master_prompt=_ai_master(_style)))
+if not any(c['id']=='food' for c in THUMBNAIL_CATEGORIES):
+    THUMBNAIL_CATEGORIES.append(dict(id='food',name='Ẩm thực & Món ăn',short_name='Ẩm thực',keywords=['lẩu','món ăn','nấu ăn','tôm','bánh','đồ uống','cà phê']))
+for _cat in THUMBNAIL_CATEGORIES:
+    _ids=[t['id'] for t in THUMBNAIL_TEMPLATES if t['category']==_cat['id']]
+    _cat['default_template']=_LEGACY_AI_MAP.get(_cat['id'],'kitchen_minimal')
+    _cat['rotation_templates']=_ids or [_cat['default_template']]
+DEFAULT_CATEGORY_THUMBNAIL_MAP = {c['id']:c['default_template'] for c in THUMBNAIL_CATEGORIES}

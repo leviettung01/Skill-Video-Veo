@@ -1,0 +1,21 @@
+{
+  "provider": "built-in image_gen",
+  "style_id": "factory_creator_editorial",
+  "project_id": "1738086213622335480",
+  "reference_images": [
+    "projects\\1738086213622335480\\v1-refimg.jpg",
+    "projects\\1738086213622335480\\product_images\\prod_1.jpg"
+  ],
+  "generation_prompt": "Create ONE complete professional vertical 9:16 Vietnamese AI thumbnail, production-ready photography and typography integrated as a single designed image. Clean industrial creator editorial. Preserve the supplied adult woman's exact face, black glasses, black hair, navy suit and pale blue shirt. Preserve the exact stainless digital kitchen scale with rounded rectangular brushed steel platform, black LCD strip and two circular silver buttons. Keep the genuine bright assembly workshop context from reference, softened but recognizable. Medium portrait with friendly natural expression, woman offset slightly right naturally presenting scale close to camera, one large neatly integrated scale detail near lower left, no repetitive product grid. Crisp white and pale steel blue palette, restrained warm yellow design accent, airy asymmetric magazine layout. Large navy Vietnamese headline at upper left 'CÂN BẾP GỌN XINH', smaller subtitle 'Gọn một góc bếp'. Restrained fine graphic lines, elegant whitespace, realistic studio daylight, sharp product details, no price or specs, no offers or certification. Product must be central to hierarchy, not a generic portrait. Use references only for the stated roles, preserve actual identity and product shapes. Correct Vietnamese diacritics, polished readable mobile hierarchy, no watermark. Generate a new complete composition, not just text over the original reference.",
+  "reusable_style_prompt": "Clean industrial creator editorial, preserve the supplied real character identity, hair, glasses and outfit. Naturally present the exact referenced product close to the camera, with at most one authentic product-detail inset. Preserve the recognizable workshop or video environment, softened behind the hero. White and pale steel blue palette, restrained warm yellow accent, asymmetric magazine composition, large readable navy headline, fine graphic lines and generous whitespace. Realistic daylight, natural hands and accurate product scale. No fabricated technical specifications, certification or price badges.",
+  "prompt_structure": [
+    "REFERENCE ROLES: exact product / actual character if requested / video environment",
+    "SUBJECT: {product_name}; verified facts: {product_info}",
+    "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+    "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+    "CONTINUITY: preserve reference identity, product geometry and video context",
+    "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+    "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+  ],
+  "demo_path": "Template\\Thumbnail_Templates\\samples\\factory_creator_editorial_demo.png"
+}

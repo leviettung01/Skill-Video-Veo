@@ -801,17 +801,24 @@
       display: block;
     }
 
-    /* ── 3-COLUMN COMPACT VIDEO VARIANT GRID (6 VIDEOS ON 1 SCREEN) ── */
+    /* ── 3-COLUMN COMPACT VIDEO VARIANT GRID (SCALABLE 75%..175%) ── */
     .variants-grid {
+      --card-cols: 3;
+      --vc-media-w: 106px;
+      --vc-media-h: 188px;
+      --vc-font-scale: 1;
+      --sc-thumb-w: 26px;
+      --sc-thumb-h: 46px;
+      --sc-voice-clamp: 2;
       display: grid;
-      grid-template-columns: repeat(3, minmax(0, 1fr));
-      gap: 10px;
+      grid-template-columns: repeat(var(--card-cols, 3), minmax(0, 1fr));
+      gap: calc(10px * var(--vc-font-scale, 1));
       align-items: stretch;
     }
 
     @media (max-width: 1180px) {
       .variants-grid {
-        grid-template-columns: repeat(2, minmax(0, 1fr));
+        grid-template-columns: repeat(min(var(--card-cols, 2), 2), minmax(0, 1fr));
       }
     }
 
@@ -834,7 +841,7 @@
     }
 
     .vc-head {
-      padding: 6px 9px;
+      padding: calc(6px * var(--vc-font-scale, 1)) calc(9px * var(--vc-font-scale, 1));
       background: rgba(9, 13, 22, 0.55);
       border-bottom: 1px solid var(--border);
       display: flex;
@@ -854,7 +861,7 @@
     .char-pill {
       padding: 2px 6px;
       border-radius: 4px;
-      font-size: 10px;
+      font-size: calc(10px * var(--vc-font-scale, 1));
       font-weight: 800;
       letter-spacing: 0.3px;
       flex-shrink: 0;
@@ -879,7 +886,7 @@
     }
 
     .vc-title {
-      font-size: 11.5px;
+      font-size: calc(11.5px * var(--vc-font-scale, 1));
       font-weight: 700;
       color: #e2e8f0;
       white-space: nowrap;
@@ -929,16 +936,16 @@
     }
 
     .vc-body {
-      padding: 8px;
+      padding: calc(8px * var(--vc-font-scale, 1));
       display: flex;
-      gap: 8px;
+      gap: calc(8px * var(--vc-font-scale, 1));
       flex: 1;
-      min-height: 196px;
+      min-height: calc(var(--vc-media-h, 188px) + 12px);
     }
 
     /* Left 9:16 Video/Ref Preview inside Variant Card */
     .vc-media {
-      width: 106px;
+      width: var(--vc-media-w, 106px);
       flex-shrink: 0;
       display: flex;
       flex-direction: column;
@@ -946,8 +953,8 @@
     }
 
     .vc-video-wrap {
-      width: 106px;
-      height: 188px;
+      width: var(--vc-media-w, 106px);
+      height: var(--vc-media-h, 188px);
       border-radius: 6px;
       overflow: hidden;
       background: #000;
@@ -959,7 +966,7 @@
     }
 
     .vc-video-wrap video,
-    .vc-video-wrap img {
+    .vc-video-wrap > img:not(.vc-mini-thumb):not(.vc-mini-prod) {
       width: 100%;
       height: 100%;
       object-fit: cover;
@@ -970,14 +977,57 @@
       position: absolute;
       top: 4px;
       left: 4px;
-      background: rgba(9, 13, 22, 0.78);
+      background: rgba(9, 13, 22, 0.82);
       color: #cbd5e1;
-      font-size: 9.5px;
+      font-size: calc(9.5px * var(--vc-font-scale, 1));
       font-weight: 700;
       padding: 1px 5px;
       border-radius: 4px;
       pointer-events: none;
-      border: 1px solid rgba(255, 255, 255, 0.12);
+      border: 1px solid rgba(255, 255, 255, 0.15);
+      z-index: 6;
+    }
+
+    .vc-mini-thumb {
+      position: absolute;
+      bottom: 4px;
+      left: 4px;
+      width: calc(28px * var(--vc-font-scale, 1));
+      height: calc(46px * var(--vc-font-scale, 1));
+      border-radius: 4px;
+      object-fit: cover;
+      border: 1.5px solid #ec4899;
+      background: #000;
+      cursor: zoom-in;
+      box-shadow: 0 2px 8px rgba(0, 0, 0, 0.75);
+      z-index: 6;
+      pointer-events: auto;
+      transition: transform 0.12s, border-color 0.12s;
+    }
+
+    .vc-mini-thumb:hover {
+      transform: scale(1.08);
+      border-color: #f472b6;
+    }
+
+    .vc-mini-prod {
+      position: absolute;
+      bottom: 4px;
+      right: 4px;
+      width: calc(28px * var(--vc-font-scale, 1));
+      height: calc(28px * var(--vc-font-scale, 1));
+      border-radius: 4px;
+      object-fit: cover;
+      border: 1.5px solid #f59e0b;
+      background: #000;
+      cursor: pointer;
+      z-index: 6;
+      pointer-events: auto;
+      transition: transform 0.12s;
+    }
+
+    .vc-mini-prod:hover {
+      transform: scale(1.08);
     }
 
     /* Right 3 Compact Scene Strips inside Variant Card */
@@ -995,10 +1045,10 @@
       background: rgba(9, 13, 22, 0.55);
       border: 1px solid rgba(51, 65, 85, 0.55);
       border-radius: 6px;
-      padding: 4px 6px;
+      padding: calc(4px * var(--vc-font-scale, 1)) calc(6px * var(--vc-font-scale, 1));
       display: flex;
       align-items: center;
-      gap: 6px;
+      gap: calc(6px * var(--vc-font-scale, 1));
       min-width: 0;
       cursor: pointer;
       transition: all 0.12s;
@@ -1010,8 +1060,8 @@
     }
 
     .sc-thumb {
-      width: 26px;
-      height: 46px;
+      width: var(--sc-thumb-w, 26px);
+      height: var(--sc-thumb-h, 46px);
       border-radius: 4px;
       object-fit: cover;
       background: #000;
@@ -1029,18 +1079,18 @@
       align-items: center;
       justify-content: space-between;
       gap: 4px;
-      font-size: 10.5px;
+      font-size: calc(10.5px * var(--vc-font-scale, 1));
       font-weight: 700;
       color: #e2e8f0;
     }
 
     .sc-voice {
-      font-size: 10.5px;
+      font-size: calc(10.5px * var(--vc-font-scale, 1));
       color: var(--muted);
-      line-height: 1.3;
+      line-height: 1.35;
       margin-top: 2px;
       display: -webkit-box;
-      -webkit-line-clamp: 2;
+      -webkit-line-clamp: var(--sc-voice-clamp, 2);
       -webkit-box-orient: vertical;
       overflow: hidden;
     }
@@ -1517,7 +1567,12 @@
     }
 
   </style>
-</head>
+<style>
+label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{background:#101827;border:1px solid #334155;border-radius:13px;overflow:hidden;display:flex;flex-direction:column}
+.thumb-ai-style.selected{border:2px solid #eab308}.thumb-ai-preview{padding:0;border:0;background:#202737;color:#a8b6c9;position:relative;aspect-ratio:9/12;overflow:hidden;cursor:zoom-in}
+.thumb-ai-preview img{width:100%;height:100%;object-fit:contain}.thumb-ai-preview span{position:absolute;bottom:0;left:0;right:0;padding:7px;background:#0b1222df;font-size:10px}
+.thumb-ai-copy{padding:12px;display:grid;gap:7px}.thumb-ai-copy small{color:#a5b4fc}.thumb-ai-copy p{font-size:11px;color:#94a3b8;min-height:28px;margin:0}.thumb-ai-controls{display:grid;grid-template-columns:1fr 2fr;gap:14px;margin:12px 0}.thumb-ai-controls label{display:grid;gap:6px}
+</style></head>
 
 <body>
   <!-- CLEAN LUXURY TOPBAR (Brand + Navigation + Quick Actions) -->
@@ -1799,18 +1854,18 @@
         <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
           <div>
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-size:15.5px; font-weight:800; color:#fde68a;">🏪 CHỢ TEMPLATE & ROLE SKILL — MÃ SỐ ĐỘC NHẤT (#001, #002, #003, #004)</span>
+              <span style="font-size:15.5px; font-weight:800; color:#fde68a;">🏪 CHỢ TEMPLATE & ROLE SKILL — MÃ SỐ ĐỘC NHẤT (#001–#005)</span>
               <span class="badge" style="background:rgba(245,158,11,0.2); color:#fbbf24; border:1px solid rgba(245,158,11,0.45);">1080p • 60 FPS • Karaoke Subtitles</span>
               <span class="badge" style="background:rgba(236,72,153,0.2); color:#f472b6; border:1px solid rgba(236,72,153,0.45);">👗 #004 Motion Control Fashion 2K</span>
               <span class="badge" style="background:rgba(16,185,129,0.18); color:#34d399; border:1px solid rgba(16,185,129,0.4);">Lê Việt Tùng - SkillAutoVeo</span>
             </div>
             <div style="font-size:11.5px; color:var(--muted); margin-top:4px;">
-              Mỗi Template tích hợp sẵn <b>Role Skill (.MD)</b>, <b>Bộ sinh kịch bản & Prompt</b>, <b>Mã số định danh duy nhất (#001, #002, #003, #004)</b> và <b>Video Demo Final 1080p 60 FPS</b>. Hỗ trợ <b>Template #004 Motion Control Video Fashion (Omni Flash Thay Đồ Theo Nhạc & Video Gốc 8s/10s)</b>!
+              Mỗi Template tích hợp sẵn <b>Role Skill (.MD)</b>, <b>Bộ sinh kịch bản & Prompt</b>, <b>Mã số định danh duy nhất (#001–#005)</b> và <b>Video Demo Final 1080p 60 FPS</b>. Hỗ trợ <b>Template #004 Motion Control Video Fashion</b> và <b>Template #005 Nấu Ăn POV</b>!
             </div>
           </div>
           <div style="display:flex; gap:6px; flex-wrap:wrap;">
             <button class="btn btn-xs" style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:800; border:none;" onclick="switchTab('fashion', document.getElementById('navBtn-fashion'));" title="Mở Tab Riêng Video Thời Trang (#004: Motion Control Video Fashion)">👗 Mở Tab Video Thời Trang (#004)</button>
-            <button class="btn btn-xs btn-amber" onclick="switchTab('settings', document.getElementById('navBtn-settings')); setTimeout(()=>{document.getElementById('settingsThumbTemplateGallery')?.scrollIntoView({behavior:'smooth'});}, 120);" title="Mở Kho 24 Template Thumbnail Đa Ngành Hàng (Có Ảnh Demo AI 1080x1920)">🖼️ Kho 24 Template Thumbnail</button>
+            <button class="btn btn-xs btn-amber" onclick="switchTab('settings', document.getElementById('navBtn-settings')); setTimeout(()=>{document.getElementById('settingsThumbTemplateGallery')?.scrollIntoView({behavior:'smooth'});}, 120);" title="Mở Style Thumbnail AI Đa Ngành Hàng (Ảnh tham khảo style)">🖼️ Style Thumbnail AI</button>
             <button class="btn btn-xs btn-success" onclick="switchTab('settings', document.getElementById('navBtn-settings')); setTimeout(()=>{document.getElementById('cardSubtitleTemplateStudio')?.scrollIntoView({behavior:'smooth'});}, 120);" title="Mở Kho 16 Template Subtitle & Bộ Tùy Chỉnh Phụ Đề Chuyên Nghiệp">🎬 Kho 16 Template Subtitle</button>
             <button class="btn btn-xs btn-primary" onclick="switchTab('roles', null)" title="Mở trình quản lý toàn bộ file .MD trong thư mục role_skills/">📜 Kho File Role Skill Mở Rộng (.MD)</button>
             <button class="btn btn-xs btn-outline" onclick="openFolderEncoded(encodeURIComponent(STATE.templateRootDir || 'Template'))">📂 Mở Thư Mục Template</button>
@@ -1855,6 +1910,7 @@
               <button class="btn-filter" onclick="setTemplateMarketFilter('002', this)">#002 • 🍲 Đồ Ăn Vặt POV (Có Voice)</button>
               <button class="btn-filter" onclick="setTemplateMarketFilter('003', this)">#003 • 🧋 Đồ Ăn Vặt UGC</button>
               <button class="btn-filter" onclick="setTemplateMarketFilter('004', this)" style="border-color:rgba(236,72,153,0.5); color:#f9a8d4;">#004 • 👗 Motion Control Fashion</button>
+              <button class="btn-filter" onclick="setTemplateMarketFilter('005', this)">#005 • 🍲 Nấu Ăn POV Storyboard</button>
             </div>
           </div>
           <div id="marketStatusBanner" style="display:none; margin-top:8px; padding:7px 10px; border-radius:6px; background:#090d16; border:1px solid var(--border-light); color:#a5f3fc; font-size:11.5px;"></div>
@@ -1918,8 +1974,9 @@
                 <option value="fashion_lookbook_chan_vay_6e19">👗 Dự án: Lookbook Phối Đồ Đi Làm Tủ Gỗ (Video 6e19 - 16.77s)</option>
               </select>
               <span style="font-size:11px; font-weight:900; color:#67e8f9;">🎛️ Phương pháp tạo:</span>
-              <select id="selFashionGenerationMode" onchange="onChangeFashionGenerationMode(this.value)" style="min-width:290px; max-width:395px; font-size:11px; font-weight:800; color:#34d399; background:#051412; border:1.5px solid rgba(16,185,129,0.65); padding:5px 9px; border-radius:7px;">
-                <option value="chained_i2v" selected>✨ Chained Img2Video + Timeline 0.1s Chuẩn Nhạc (Không dùng Video Ref)</option>
+              <select id="selFashionGenerationMode" onchange="onChangeFashionGenerationMode(this.value)" style="min-width:290px; max-width:420px; font-size:11px; font-weight:800; color:#34d399; background:#051412; border:1.5px solid rgba(16,185,129,0.65); padding:5px 9px; border-radius:7px;">
+                <option value="chained_i2v" selected>✨ Chained Img2Video + Timeline 0.1s Chuẩn Nhạc (Google Flow)</option>
+                <option value="google_vids">🌐 Google Vids Web Omni 1080p (Không reCAPTCHA • Gắn 3 Chip Ảnh 2K)</option>
                 <option value="video_ref">🎬 Motion Control Video Ref (Dùng Video Gốc làm Ref + Nối Frame Cuối)</option>
               </select>
               <button class="btn btn-xs btn-success" style="font-weight:900; padding:5px 11px; box-shadow:0 3px 12px rgba(16,185,129,0.35);" onclick="runFashionProjectOnFlow()" title="Bấm Render chạy tạo Video AI trên Google Flow cho dự án đang mở">
@@ -2077,6 +2134,7 @@
                 <span style="font-size:12px; font-weight:900; color:#34d399;">⚡ ĐIỀU KHIỂN PIPELINE & RENDER FINAL</span>
                 <select id="selFashionPromptStyle" onchange="switchFashionPromptStyleUI(this.value)" style="font-size:10px; width:auto; padding:2px 6px;">
                   <option value="chained_i2v" selected>✨ Chained I2V (Timeline 0.1s Chuẩn Nhạc)</option>
+                  <option value="google_vids">🌐 Google Vids Omni 1080p (3 Chip Ảnh 2K)</option>
                   <option value="timeline_pro">🎬 Motion Video Ref (Nối Frame Cuối Cảnh 1)</option>
                   <option value="concise_flow">🎬 Motion Video Ref (Gắn Chip Google Flow)</option>
                 </select>
@@ -2641,14 +2699,33 @@
         </div>
       </div>
 
-      <!-- KHỐI 2: ĐA LUỒNG & ĐA TÀI KHOẢN GOOGLE FLOW -->
+      <!-- KHỐI 2: ĐA LUỒNG & ĐA TÀI KHOẢN GOOGLE FLOW / GOOGLE VIDS WEB -->
       <div class="card" style="margin-bottom:12px; border-color:rgba(59,130,246,0.4);">
         <div class="card-title">
-          <span>🌐 2. Cài Đặt Đa Luồng & Đa Tài Khoản Google Flow (`Multi-Thread & Multi-Account`)</span>
+          <span>🌐 2. Nguồn Tạo Video AI (Google Flow / Google Vids Web) & Đa Tài Khoản</span>
           <label style="margin:0; display:flex; align-items:center; gap:6px; font-size:12px; color:#60a5fa; cursor:pointer;">
             <input type="checkbox" id="chkMultiAccountEnabled" style="width:auto;" checked />
-            🔑 Bật chạy Đa Tài Khoản Google Flow (Tự động xoay vòng các tài khoản đang có)
+            🔑 Bật chạy Đa Tài Khoản Google (Tự động xoay vòng & dự phòng khi hết quota)
           </label>
+        </div>
+
+        <div class="grid-2" style="margin-bottom:10px;">
+          <div>
+            <label>🎬 Nền Tảng Tạo Video Trên Tài Khoản Google (`video_provider`)</label>
+            <select id="selVideoProvider" style="border-color:rgba(16,185,129,0.55); font-weight:700;">
+              <option value="google_flow">🎬 Google Flow (flow.google.com • Có Custom Voice UUID Nhân Vật)</option>
+              <option value="google_vids">🌐 Google Vids Web (docs.google.com/videos • Omni 1080p Native • Không reCAPTCHA • Tối đa 15s)</option>
+            </select>
+            <div style="font-size:10px; color:var(--muted); margin-top:3px;">Google Vids chạy 100% HTTP Cookie thuần, không mở Chrome, không cần reCAPTCHA Enterprise, xuất thẳng 1080p!</div>
+          </div>
+          <div>
+            <label>✨ Mô Hình Video Khi Dùng Google Vids (`google_vids_model`)</label>
+            <select id="selGoogleVidsModel">
+              <option value="omni">✨ Omni (Model 12 • Khuyên dùng • Gắn tối đa 3 Chip Ảnh 2K • 4–15 giây)</option>
+              <option value="veo_3_1">🎥 Veo 3.1 (Model 9 • 1080p)</option>
+            </select>
+            <div style="font-size:10px; color:var(--muted); margin-top:3px;">Áp dụng khi chọn Google Vids ở Engine Settings, Fashion (#004) hoặc Template #005</div>
+          </div>
         </div>
 
         <div class="grid-4" style="margin-bottom:10px;">
@@ -2686,19 +2763,19 @@
       <!-- KHỐI 3: CÀI ĐẶT ẢNH THUMBNAIL CHUYÊN NGHIỆP & KHO 12 TEMPLATE ĐA NGÀNH HÀNG + GHÉP 0.1S -->
       <div class="card" style="border-color:rgba(245,158,11,0.45);">
         <div class="card-title">
-          <span>🖼️ 3. Kho Template Thumbnail Đa Ngành Hàng (Có Khung Ảnh Sản Phẩm Thật) & Ghép 0.1s Đầu Video</span>
+          <span>🖼️ 3. Thumbnail AI · Thiết kế toàn bộ ảnh từ tham chiếu</span>
           <div style="display:flex; gap:10px; align-items:center; flex-wrap:wrap;">
             <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#fcd34d; cursor:pointer;">
               <input type="checkbox" id="chkAutoGenThumbnail" style="width:auto;" checked />
               ✅ Tự động tạo Thumbnail
             </label>
             <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#38bdf8; cursor:pointer;">
-              <input type="checkbox" id="chkThumbCompositeInsets" style="width:auto;" checked />
-              📸 Ghép 3 Ảnh SP Thật lên Thumbnail
+              <input type="checkbox" id="chkThumbCompositeInsets" disabled style="width:auto;" checked />
+              AI thiết kế toàn ảnh (không ghép khung cũ)
             </label>
             <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#c084fc; cursor:pointer;">
               <input type="checkbox" id="chkThumbRotateVariants" style="width:auto;" checked />
-              🔄 Xoay vòng 3 Style giữa V1/V2/V3
+              🔄 Đổi style theo phiên bản
             </label>
             <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#34d399; cursor:pointer;">
               <input type="checkbox" id="chkAutoInject01s" style="width:auto;" checked />
@@ -2727,8 +2804,8 @@
             </select>
           </div>
           <div>
-            <label>🤖 Công Cụ AI Render Poster Nền</label>
-            <select id="selThumbnailProvider">
+            <label>🤖 Model tạo thumbnail hoàn chỉnh</label>
+            <select id="selThumbnailProvider"><option value="grok">Grok Image · cần CLIProxy image-edit</option>
               <option value="google_flow">🍌 Google Flow — Nano Banana 2.1 (2K 1536x2752)</option>
               <option value="chatgpt">🤖 ChatGPT Image — gpt-image-1 (CLIProxy :8317)</option>
             </select>
@@ -2742,7 +2819,7 @@
         <!-- BẢNG CUSTOM GÁN STYLE RIÊNG CHO 8 NGÀNH HÀNG -->
         <div id="boxCustomCategoryThumbMap" style="display:none; margin-bottom:12px; background:#070b13; border:1px solid rgba(168,85,247,0.45); border-radius:9px; padding:10px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:6px;">
-            <span style="font-size:12px; font-weight:800; color:#e9d5ff;">🏷️ Cấu Hình Gán Style Template Mặc Định Theo Từng Ngành Hàng (8 Ngành Hàng):</span>
+            <span style="font-size:12px; font-weight:800; color:#e9d5ff;">🏷️ Cấu Hình Gán Style Template Mặc Định Theo Từng Ngành Hàng (Ngành hàng):</span>
             <span style="font-size:10.5px; color:#cbd5e1;">Hệ thống tự động nhận diện sản phẩm thuộc ngành hàng nào để áp dụng đúng Template bạn chọn bên dưới</span>
           </div>
           <div id="gridCategoryThumbMapInputs" class="grid-4" style="gap:8px;"></div>
@@ -2752,11 +2829,11 @@
         <div style="margin-bottom:12px; background:#080c16; border:1px solid rgba(245,158,11,0.35); border-radius:10px; padding:10px 12px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
             <div>
-              <span style="font-size:12.5px; font-weight:800; color:#fcd34d;">🏪 Kho 24 Template Thumbnail Đa Ngành Hàng (Phân tích từ 88 Mẫu Thực Chiến — Có Ảnh Demo AI 9:16 Mới)</span>
+              <span style="font-size:12.5px; font-weight:800; color:#fcd34d;">🏪 Thư viện style Thumbnail AI · POV, nhân vật & ngành hàng</span>
               <span style="font-size:10.5px; color:#94a3b8; margin-left:6px;">• Bấm vào ảnh Demo / nút <b>🔍 Xem Full</b> để xem toàn màn hình • Bấm thẻ để áp dụng Style</span>
             </div>
             <div style="display:flex; gap:6px; flex-wrap:wrap;">
-              <button class="btn btn-xs btn-amber" onclick="openThumbTemplateGalleryLightbox('', 'demo')">🔍 Xem Full Bộ 24 Ảnh Demo AI</button>
+              <button class="btn btn-xs btn-amber" onclick="openThumbTemplateGalleryLightbox('', 'demo')">🔍 Xem ảnh tham khảo</button>
               <button class="btn btn-xs btn-outline" onclick="toggleCategoryMapBox()">🏷️ Mở/Đóng Bảng Gán Theo Ngành Hàng</button>
             </div>
           </div>
@@ -2766,7 +2843,7 @@
 
         <div>
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px; flex-wrap:wrap; gap:6px;">
-            <label style="margin:0; color:#fde68a; font-weight:800;">🔮 Master Prompt Của Template Đang Chọn (Dùng khi Render AI 2K phần Nhân vật + Sản phẩm phía trên):</label>
+            <label style="margin:0; color:#fde68a; font-weight:800;">🔮 Master Prompt Của Template Đang Chọn (AI thiết kế toàn bộ ảnh, bố cục và chữ):</label>
             <span style="font-size:10.5px; color:var(--muted);">Biến tự động: <code>{product_name}</code>, <code>{product_info}</code>, <code>{character_desc}</code>, <code>{hook_text}</code>, <code>{price}</code>, <code>{style}</code></span>
           </div>
           <textarea id="inpThumbnailMasterPrompt" rows="3" style="font-family:Consolas, monospace; font-size:11.5px; line-height:1.45;"></textarea>
@@ -3947,8 +4024,8 @@
             </select>
           </div>
           <div>
-            <label>🤖 Chọn Công Cụ AI Render Poster Nền</label>
-            <select id="selThumbStudioProvider">
+            <label>🤖 Model tạo toàn bộ Thumbnail AI</label>
+            <select id="selThumbStudioProvider"><option value="grok">Grok Image · CLIProxy (cần hỗ trợ image edits)</option>
               <option value="google_flow">🍌 Google Flow — Nano Banana 2.1 (2K 1536x2752)</option>
               <option value="chatgpt">🤖 ChatGPT Image — gpt-image-1 (CLIProxy :8317)</option>
             </select>
@@ -3961,13 +4038,18 @@
           </div>
         </div>
 
+        <div class="thumb-ai-controls">
+          <label>Chủ thể<select id="selThumbSubjectMode" onchange="onThumbStudioScopeChange()"><option value="auto">Theo style và dự án</option><option value="pov">POV · Không có người dẫn</option><option value="character">Có nhân vật tham chiếu</option></select></label>
+          <label>Tiêu đề trên ảnh<input onchange="onThumbStudioScopeChange()" id="inpThumbHeadline" placeholder="Để trống: dùng tiêu đề kịch bản"></label>
+        </div>
+        <p style="color:#a8b6c9;font-size:12px">1. Chọn style → 2. Kiểm tra ảnh tham chiếu → 3. Tạo ảnh AI. Lưu ảnh riêng; ghép vào video khi bạn chọn.</p>
         <!-- KHO TEMPLATE THUMBNAIL TRỰC QUAN NGAY TRONG STUDIO MODAL -->
         <div style="margin-bottom:10px; background:#070b14; border:1px solid rgba(245,158,11,0.38); border-radius:9px; padding:9px 11px;">
           <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
-            <span style="font-size:11.5px; font-weight:800; color:#fcd34d;">🏪 Kho 24 Template Thumbnail Đa Ngành Hàng (Có Ảnh AI Demo Mới + Xem Full Màn Hình):</span>
+            <span style="font-size:11.5px; font-weight:800; color:#fcd34d;">🏪 Style Thumbnail AI · Chọn phong cách theo ngành hàng:</span>
             <div style="display:flex; gap:8px; align-items:center;">
-              <span style="font-size:10px; color:#93c5fd;">Bấm vào ảnh hoặc nút <b>🔍 Full</b> để xem phóng to 1080x1920</span>
-              <button type="button" class="btn btn-xs btn-amber" onclick="openThumbTemplateGalleryLightbox('', 'demo')">🔍 Xem Full 24 Demo</button>
+              <span style="font-size:10px; color:#93c5fd;">Ảnh tham khảo phong cách; không phải kết quả đã tạo cho sản phẩm này</span>
+              <button type="button" class="btn btn-xs btn-amber" onclick="openThumbTemplateGalleryLightbox('', 'demo')">🔍 Xem ảnh tham khảo</button>
             </div>
           </div>
           <div id="modalThumbCategoryFilterBar" style="display:flex; gap:5px; flex-wrap:wrap; margin-bottom:8px;"></div>
@@ -3979,12 +4061,12 @@
             <label style="margin:0; color:#fde68a; font-weight:800;">🔮 Master Prompt Render Ảnh Thumbnail AI (Tuỳ chỉnh theo ý hoặc style riêng của bạn):</label>
             <div style="display:flex; gap:12px; align-items:center; flex-wrap:wrap;">
               <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#34d399; cursor:pointer;">
-                <input type="checkbox" id="chkThumbStudioInject01s" style="width:auto;" checked />
+                <input type="checkbox" id="chkThumbStudioInject01s" style="width:auto;" />
                 🎞️ Ghép 0.1s vào đầu Video Final
               </label>
-              <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#94a3b8; cursor:pointer;" title="Mặc định tắt để dùng Khung Ảnh Sản Phẩm Thật của Template.">
+              <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#94a3b8; cursor:pointer;" title="Chỉ dùng khi cần sửa chữ sau khi AI đã thiết kế toàn bộ ảnh.">
                 <input type="checkbox" id="chkThumbStudioAddBadge" style="width:auto;" />
-                🏷️ Vẽ thêm khung chữ phụ (Tuỳ chọn)
+                🏷️ Sửa chữ bằng overlay sau AI (tuỳ chọn)
               </label>
             </div>
           </div>
@@ -3996,11 +4078,11 @@
 
         <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
           <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-            <button class="btn btn-amber" id="btnApplyTemplateFast" style="padding:9px 15px; font-weight:800;" onclick="submitGenerateThumbnails(true)" title="Ghép ngay khung Ảnh Sản Phẩm Thật theo Template đã chọn lên Poster 2K sẵn có trong 0.2 giây/ảnh (Không cần chờ AI vẽ lại)">
+            <button class="btn btn-amber" id="btnApplyTemplateFast" style="display:none;" onclick="submitGenerateThumbnails(true)" title="Ghép ngay khung Ảnh Sản Phẩm Thật theo Template đã chọn lên Poster 2K sẵn có trong 0.2 giây/ảnh (Không cần chờ AI vẽ lại)">
               ⚡ Áp Dụng Nhanh Template & Ghép Ảnh SP Thật (0.2s)
             </button>
-            <button class="btn btn-success" id="btnSubmitThumbStudio" style="padding:9px 16px; font-weight:800;" onclick="submitGenerateThumbnails(false)" title="Gửi lên Google Flow Nano Banana 2K / ChatGPT để vẽ lại Poster Nhân vật + Sản phẩm mới rồi đóng khung Template SP">
-              🚀 Render Ảnh AI 2K Mới + Đóng Khung Template SP & Ghép 0.1s
+            <button class="btn btn-success" id="btnSubmitThumbStudio" style="padding:9px 16px; font-weight:800;" onclick="submitGenerateThumbnails(false)" title="AI thiết kế toàn bộ ảnh từ style và ảnh tham chiếu; lưu thumbnail riêng">
+              ✨ Tạo Thumbnail bằng AI
             </button>
             <button class="btn btn-outline" onclick="openFolderEncoded(encodeURIComponent('thumbnails'))">
               📂 Mở Thư Mục Ảnh Thumbnail
@@ -4387,6 +4469,7 @@
       renderedProjectId: "",
       renderedProjectSig: "",
       charFilter: "all", // 'all' | 'nv1' | 'nv2'
+      studioCardZoom: parseInt(localStorage.getItem("autoveo_studio_card_zoom") || "100", 10) || 100,
       logsOpen: false,
       rolesSig: "",
       voicesSig: "",
@@ -4394,6 +4477,78 @@
       roles: [],
       accounts: {},
     };
+
+    function getStudioCardZoom() {
+      const z = parseInt(STATE.studioCardZoom, 10);
+      if (isNaN(z)) return 100;
+      return Math.max(75, Math.min(175, z));
+    }
+
+    function computeStudioCardGridStyle(zoomPct, visibleCardsCount = 3) {
+      const z = Math.max(75, Math.min(175, parseInt(zoomPct, 10) || 100));
+      let cols = 3;
+      if (z <= 85) cols = 4;
+      else if (z <= 105) cols = 3;
+      else if (z <= 145) cols = 2;
+      else cols = 1;
+
+      if (visibleCardsCount === 1 && z >= 130) {
+        cols = 1;
+      }
+
+      const scale = z / 100;
+      const mediaScale = z <= 100 ? scale : (1 + (scale - 1) * 1.45);
+      const mediaW = Math.round(106 * mediaScale);
+      const mediaH = Math.round(188 * mediaScale);
+      const fontScale = Number((z <= 100 ? (0.9 + (z - 75) * 0.004) : (1 + (scale - 1) * 0.42)).toFixed(2));
+      const scThumbW = Math.round(26 * mediaScale);
+      const scThumbH = Math.round(46 * mediaScale);
+      const voiceClamp = z >= 150 ? 6 : (z >= 125 ? 4 : (z >= 110 ? 3 : 2));
+
+      return `--card-cols:${cols}; --vc-media-w:${mediaW}px; --vc-media-h:${mediaH}px; --vc-font-scale:${fontScale}; --sc-thumb-w:${scThumbW}px; --sc-thumb-h:${scThumbH}px; --sc-voice-clamp:${voiceClamp};`;
+    }
+
+    function setStudioCardZoom(val) {
+      const z = Math.max(75, Math.min(175, parseInt(val, 10) || 100));
+      STATE.studioCardZoom = z;
+      try {
+        localStorage.setItem("autoveo_studio_card_zoom", String(z));
+      } catch (e) {}
+
+      const gridEl = document.querySelector("#curProjBody .variants-grid");
+      if (gridEl) {
+        const cardsCnt = gridEl.querySelectorAll(".variant-card").length || 1;
+        gridEl.setAttribute("style", computeStudioCardGridStyle(z, cardsCnt));
+      }
+      const selEl = document.getElementById("selStudioCardZoom");
+      if (selEl) {
+        if (!Array.from(selEl.options).some(o => Number(o.value) === z)) {
+          const opt = document.createElement("option");
+          opt.value = String(z);
+          opt.textContent = `${z}%`;
+          opt.style.background = "#0f172a";
+          opt.style.color = "#e2e8f0";
+          selEl.appendChild(opt);
+        }
+        selEl.value = String(z);
+      }
+      const resetBtn = document.getElementById("btnResetStudioCardZoom");
+      if (resetBtn) {
+        resetBtn.style.display = z !== 100 ? "inline-flex" : "none";
+      }
+    }
+
+    function stepStudioCardZoom(delta) {
+      const presets = [75, 90, 100, 115, 130, 145, 160, 175];
+      const cur = getStudioCardZoom();
+      if (delta > 0) {
+        const next = presets.find(p => p > cur) || 175;
+        setStudioCardZoom(next);
+      } else {
+        const prev = [...presets].reverse().find(p => p < cur) || 75;
+        setStudioCardZoom(prev);
+      }
+    }
 
     function openModal(id) {
       const el = document.getElementById(id);
@@ -4411,6 +4566,19 @@
         if (b) b.innerHTML = "";
       }
     }
+
+    window.addEventListener("keydown", (e) => {
+      if (e.key !== "Escape") return;
+      const lb = document.getElementById("modalImageLightbox");
+      if (lb && lb.classList.contains("open")) return;
+      if (document.getElementById("cookingStudioModal")) return;
+      const openModals = Array.from(document.querySelectorAll(".modal-backdrop.open"));
+      if (openModals.length) {
+        e.preventDefault();
+        const topModal = openModals[openModals.length - 1];
+        if (topModal && topModal.id) closeModal(topModal.id);
+      }
+    });
 
     // ═══════════════════════════════════════════════════════════════════════
     // TRÌNH XEM ẢNH FULL MÀN HÌNH & PHÓNG TO / THU NHỎ / KÉO THẢ / XOAY
@@ -4467,6 +4635,12 @@
     }
 
     function openImageLightbox(srcOrAbsPath, title = "", galleryList = null, startIndex = -1) {
+      if (Array.isArray(srcOrAbsPath)) {
+        galleryList = srcOrAbsPath;
+        if (typeof title === "number") startIndex = title;
+        title = "";
+        srcOrAbsPath = galleryList[startIndex >= 0 ? startIndex : 0] || null;
+      }
       let items = [];
       if (Array.isArray(galleryList) && galleryList.length > 0) {
         items = galleryList.map((it, i) => _normalizeImgItem(it, title || `Ảnh #${i + 1}`)).filter(Boolean);
@@ -4495,6 +4669,50 @@
       const p = decodeURIComponent(encodedPath || "");
       if (!p) return;
       openImageLightbox(p, title);
+    }
+
+    function openVariantThumbnailLightbox(projId, prodIdx, fallbackEncodedPath = "", fallbackTitle = "") {
+      const proj = (STATE.currentProject && STATE.currentProject.id === projId)
+        ? STATE.currentProject
+        : (STATE.projectDetailsCache[projId] || STATE.currentProject);
+      const prod = (proj && Array.isArray(proj.products) && proj.products[prodIdx]) || null;
+
+      const gallery = [];
+      const seen = new Set();
+      const pushUnique = (absPath, title) => {
+        const clean = String(absPath || "").trim();
+        if (!clean) return;
+        const normKey = clean.replace(/\\/g, "/").toLowerCase();
+        if (seen.has(normKey)) return;
+        seen.add(normKey);
+        gallery.push({ absPath: clean, title });
+      };
+
+      if (prod) {
+        const vInfo = extractShortVariantInfo(prod, prodIdx);
+        if (prod.thumbnail_path) {
+          pushUnique(prod.thumbnail_path, `🖼️ Thumbnail 0.1s — ${proj.id} (${vInfo.vNum})`);
+        }
+        if (prod.product_image_path) {
+          pushUnique(prod.product_image_path, `🎨 Ảnh Ref / Storyboard — ${vInfo.vNum}`);
+        }
+        (prod.scenes || []).forEach(sc => {
+          if (sc && sc.image_path) {
+            pushUnique(sc.image_path, `🎬 Cảnh ${sc.scene_number} Storyboard/Ref — ${vInfo.vNum}`);
+          }
+        });
+        const origProd = prod.primary_product_image_path || (proj && proj.primary_product_image_path) || "";
+        if (origProd) {
+          pushUnique(origProd, `📦 Ảnh Sản Phẩm Mẫu — ${proj.id}`);
+        }
+      }
+
+      if (!gallery.length && fallbackEncodedPath) {
+        const dec = decodeURIComponent(fallbackEncodedPath);
+        if (dec) pushUnique(dec, fallbackTitle || "🖼️ Thumbnail 0.1s");
+      }
+      if (!gallery.length) return;
+      openImageLightbox(gallery[0], gallery[0].title, gallery, 0);
     }
 
     function closeImageLightbox() {
@@ -4888,6 +5106,13 @@
     }
 
     function extractShortVariantInfo(prod, idx) {
+      if (prod.pipeline_kind === 'cooking_storyboard') {
+        return {
+          vNum: 'pov_v1',
+          charKey: 'NV1',
+          hookLabel: prod.hook_label || `Kịch bản 1: ${prod.dish || prod.product_name || 'Nấu ăn POV'}`,
+        };
+      }
       // Nhận diện nv1_v1..nv1_v3 và nv2_v1..nv2_v3 từ char_v_code, vkey hoặc id
       const mapLegacy = {
         v1: ["NV1", "V1"], v3: ["NV1", "V2"], v5: ["NV1", "V3"],
@@ -4945,10 +5170,11 @@
       return { vNum: codeLabel, charKey, hookLabel };
     }
 
-    function extractSpokenDialogue(videoPrompt, fallbackDesc) {
+    function extractSpokenDialogue(videoPrompt, fallbackDesc, dialogueVn) {
+      if (dialogueVn && String(dialogueVn).trim()) return String(dialogueVn).trim();
       if (!videoPrompt) return fallbackDesc || "(Chưa có kịch bản thoại)";
       const quotes = [];
-      const re = /\[[\d.]+-[\d.]+s\]\s*"([^"]+)"/g;
+      const re = /\[[\d.\s–-]+s\]\s*(?:Voice says:\s*)?"([^"]+)"/gi;
       let m;
       while ((m = re.exec(videoPrompt)) !== null) {
         quotes.push(m[1]);
@@ -5230,8 +5456,10 @@
       if (!sc) return;
 
       const vInfo = extractShortVariantInfo(prod, prodIdx);
+      const scDur = sc.duration_sec || prod.seconds_per_scene || 10;
+      const totalDur = prod.duration_sec ? Math.round(prod.duration_sec) : ((prod.scenes || []).length * (prod.seconds_per_scene || 10) || 30);
       document.getElementById("scModalTitle").textContent = `${vInfo.vNum} (${vInfo.charKey}) — Cảnh ${sc.scene_number}: ${sc.scene_title || ''} | Kiểm Tra Sản Phẩm & Video 9:16`;
-      const voiceScript = extractSpokenDialogue(sc.video_prompt, sc.scene_description);
+      const voiceScript = extractSpokenDialogue(sc.video_prompt, sc.scene_description, sc.dialogue_vn);
 
       const origProdPath = sc.primary_product_image_path || prod.primary_product_image_path || STATE.currentProject.primary_product_image_path || "";
       const charSheetPath = sc.character_sheet_path || prod.character_sheet_path || "";
@@ -5241,7 +5469,7 @@
       const finalVidPath = prod.final_video_path || "";
 
       const slideThumbsHtml = slideImgs.map((sp, i) => `
-        <img src="/api/media?path=${encodeURIComponent(sp)}" title="Slide #${i + 1} (hiển thị ở 20s cuối) — Bấm để mở trong Explorer" onclick="openFolderEncoded('${encodeURIComponent(sp)}')" style="width:48px; height:48px; object-fit:cover; border-radius:5px; border:1px solid #475569; cursor:pointer; background:#000;" />
+        <img src="/api/media?path=${encodeURIComponent(sp)}" title="Slide #${i + 1} — Bấm để mở trong Explorer" onclick="openFolderEncoded('${encodeURIComponent(sp)}')" style="width:48px; height:48px; object-fit:cover; border-radius:5px; border:1px solid #475569; cursor:pointer; background:#000;" />
       `).join("");
 
       document.getElementById("scModalBody").innerHTML = `
@@ -5252,7 +5480,7 @@
               <!-- Cột 1: Video 9:16 -->
               <div style="background:#090d16; border:1px solid var(--border-light); border-radius:8px; padding:8px;">
                 <label style="color:#34d399; display:flex; justify-content:space-between; align-items:center;">
-                  <span>🎬 ${sceneVidPath ? `Video Cảnh ${sc.scene_number} (10s)` : 'Video Final (30s)'}</span>
+                  <span>🎬 ${sceneVidPath ? `Video Cảnh ${sc.scene_number} (${scDur}s)` : `Video Final (${totalDur}s)`}</span>
                   <span style="font-size:9.5px; color:#93c5fd;">9:16 Dọc</span>
                 </label>
                 ${(sceneVidPath || finalVidPath) ? `
@@ -5295,7 +5523,7 @@
                   </div>
                 ` : ''}
                 <div>
-                  <label style="color:#22d3ee; font-size:10px;">🎞️ Slide Phân Loại (Hiển Thị 20s Cuối: 10s–30s)</label>
+                  <label style="color:#22d3ee; font-size:10px;">🎞️ Bộ Ảnh Tham Chiếu / Storyboard</label>
                   <div style="display:flex; flex-wrap:wrap; gap:5px; margin-top:4px;">
                     ${slideThumbsHtml || '<span style="font-size:10.5px; color:var(--muted);">Chưa có slide</span>'}
                   </div>
@@ -5307,25 +5535,25 @@
           <!-- Right: Spoken Script + Prompts -->
           <div style="display:flex; flex-direction:column; gap:10px;">
             <div>
-              <label>🎙️ Lời Thoại Tiếng Việt (10 giây)</label>
+              <label>🎙️ Lời Thoại / Kịch Bản Cảnh (${scDur} giây)</label>
               <div style="padding:8px 10px; background:#090d16; border:1px solid var(--border-light); border-radius:6px; color:#fde68a; font-weight:600; line-height:1.45;">
                 "${voiceScript}"
               </div>
             </div>
             ${finalVidPath ? `
               <div style="display:flex; gap:8px; align-items:center; background:rgba(16,185,129,0.1); border:1px solid rgba(16,185,129,0.35); padding:7px 10px; border-radius:6px; flex-wrap:wrap;">
-                <span style="font-size:11.5px; color:#34d399; font-weight:700; flex:1;">✅ Video Final 30s (${vInfo.vNum}) đã hoàn tất!</span>
-                <button class="btn btn-xs btn-primary" onclick="openVerticalVideoModal('${encodeURIComponent(finalVidPath)}', '${encodeURIComponent(refImgPath)}', '${encodeURIComponent(origProdPath)}', '${vInfo.vNum} • ${vInfo.charKey} — VIDEO FINAL 30s', '${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}')">📱 Xem Dọc 9:16</button>
+                <span style="font-size:11.5px; color:#34d399; font-weight:700; flex:1;">✅ Video Final ${totalDur}s (${vInfo.vNum}) đã hoàn tất!</span>
+                <button class="btn btn-xs btn-primary" onclick="openVerticalVideoModal('${encodeURIComponent(finalVidPath)}', '${encodeURIComponent(refImgPath)}', '${encodeURIComponent(origProdPath)}', '${vInfo.vNum} • ${vInfo.charKey} — VIDEO FINAL ${totalDur}s', '${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}')">📱 Xem Dọc 9:16</button>
                 <button class="btn btn-xs btn-success" onclick="openFolderEncoded('${encodeURIComponent(finalVidPath)}')">📂 Mở Trong Folder Video Final</button>
                 <button class="btn btn-xs btn-danger" onclick="closeModal('modalSceneDetail'); deleteFinalVideo('${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}', '${encodeURIComponent(finalVidPath)}', '${vInfo.vNum}')">🗑️ Xoá Video Final</button>
               </div>
             ` : ''}
             <div>
-              <label>🖼️ Image Prompt (Nano Banana 2.1 — Chỉ mô tả Nhân vật + Bối cảnh + Hành động cầm SP, giữ nguyên logo SP)</label>
+              <label>🖼️ Image / Storyboard Prompt (2K Reference)</label>
               <textarea rows="5" readonly style="font-family:Consolas, monospace; font-size:11px;">${sc.image_prompt || ''}</textarea>
             </div>
             <div>
-              <label>🎬 Video Prompt (Omni Flash 10s)</label>
+              <label>🎬 Video Prompt (${scDur}s)</label>
               <textarea rows="7" readonly style="font-family:Consolas, monospace; font-size:11px;">${sc.video_prompt || ''}</textarea>
             </div>
           </div>
@@ -5365,34 +5593,51 @@
       renderLivePipelineMonitor(proj);
 
       const slideStripHtml = slideImgs.slice(0, 5).map((sp, i) => `
-        <img src="/api/media?path=${encodeURIComponent(sp)}" title="Ảnh phân loại Slide #${i + 1} (hiển thị 20s cuối) — Bấm để mở trong Explorer" onclick="openFolderEncoded('${encodeURIComponent(sp)}')" style="width:28px; height:28px; border-radius:5px; object-fit:cover; border:1px solid #475569; cursor:pointer; background:#000;" />
+        <img src="/api/media?path=${encodeURIComponent(sp)}" title="Ảnh phân loại / Storyboard Slide #${i + 1} — Bấm để phóng to" onclick="openStudioProductLightbox('${proj.id}', ${i})" style="width:28px; height:28px; border-radius:5px; object-fit:cover; border:1px solid #475569; cursor:zoom-in; background:#000;" />
       `).join("");
 
-      const tplList = (STATE.videoTemplates && STATE.videoTemplates.length) ? STATE.videoTemplates : [
+      const defaultTplCatalog = [
         { code: "001", folder_name: "Nhà Xưởng", name: "Báo Giá Tận Xưởng & Kiểm Định QC (Có Nhân Vật + Voice)" },
         { code: "002", folder_name: "Đồ Ăn Vặt POV (Có Voice)", name: "Đồ Ăn Vặt & Ẩm Thực POV (Có Voice Review)" },
-        { code: "003", folder_name: "Đồ Ăn Vặt", name: "Đồ Ăn Vặt & Pha Chế UGC (Cận Cảnh & ASMR)" }
+        { code: "003", folder_name: "Đồ Ăn Vặt", name: "Đồ Ăn Vặt & Pha Chế UGC (Cận Cảnh & ASMR)" },
+        { code: "004", folder_name: "Motion Control Video Fashion", name: "Video Thời Trang Biến Hình Theo Nhạc" },
+        { code: "005", folder_name: "Nấu Ăn POV Storyboard", name: "Nấu Ăn POV · Tự Sinh Kịch Bản → Storyboard 2K → Video Final" }
       ];
+      const baseTplList = (STATE.videoTemplates && STATE.videoTemplates.length) ? [...STATE.videoTemplates] : [...defaultTplCatalog];
+      defaultTplCatalog.forEach(dt => {
+        if (!baseTplList.some(t => String(t.code || "").replace(/^#/, "") === dt.code)) {
+          baseTplList.push(dt);
+        }
+      });
+      const tplList = baseTplList;
+
       if (!STATE.studioSelectedTemplate) STATE.studioSelectedTemplate = {};
       if (!STATE.studioSelectedVpc) STATE.studioSelectedVpc = {};
-      const activeTplCode = STATE.studioSelectedTemplate[proj.id] || proj.template_code || "001";
+      const rawTplCode = STATE.studioSelectedTemplate[proj.id] || proj.template_code || (proj.is_fashion_motion_project ? "004" : (proj.pipeline_kind === "cooking_storyboard" ? "005" : "001"));
+      const activeTplCode = String(rawTplCode).replace(/^#/, "");
       const activeVpc = STATE.studioSelectedVpc[proj.id] || proj.videos_per_character || 3;
-      const activeTplObj = tplList.find(t => t.code === activeTplCode || t.folder_name === activeTplCode) || tplList[0];
+      const activeTplObj = tplList.find(t => String(t.code || "").replace(/^#/, "") === activeTplCode || t.folder_name === rawTplCode)
+        || { code: activeTplCode || "001", folder_name: proj.template_name || "Nhà Xưởng" };
+
+      const isSingleFinalPipeline = !!(proj.is_fashion_motion_project || proj.pipeline_kind === "cooking_storyboard" || activeTplCode === "004" || activeTplCode === "005");
 
       const studioTplOptsHtml = tplList.map(t => {
-        const val = t.code || t.folder_name;
-        const isSel = (val === activeTplCode || t.folder_name === activeTplCode);
-        return `<option value="${val}" ${isSel ? 'selected' : ''}>🎬 [#${t.code || '001'}] ${t.folder_name}</option>`;
+        const cleanCode = String(t.code || "001").replace(/^#/, "");
+        const val = cleanCode || t.folder_name;
+        const isSel = (cleanCode === activeTplCode || t.folder_name === rawTplCode);
+        return `<option value="${val}" ${isSel ? 'selected' : ''}>🎬 [#${cleanCode}] ${t.folder_name}</option>`;
       }).join("");
 
-      const studioVpcOptsHtml = [1, 2, 3, 4, 5].map(n =>
-        `<option value="${n}" ${Number(activeVpc) === n ? 'selected' : ''}>🎞️ ${n} Vid/NV (${n * 2} Video)</option>`
-      ).join("");
+      const studioVpcOptsHtml = isSingleFinalPipeline
+        ? `<option value="1" selected>🎞️ 1 Video (${(allProds[0] && (allProds[0].scenes || []).length) || 3} Cảnh ${(allProds[0] && allProds[0].seconds_per_scene) || 8}s)</option>`
+        : [1, 2, 3, 4, 5].map(n =>
+            `<option value="${n}" ${Number(activeVpc) === n ? 'selected' : ''}>🎞️ ${n} Vid/NV (${n * 2} Video)</option>`
+          ).join("");
 
       document.getElementById("curProjTitle").innerHTML = `
         <div style="display:flex; align-items:center; gap:10px; min-width:0; flex:1;">
           ${origProdThumb ? `
-            <div style="position:relative; flex-shrink:0; cursor:zoom-in;" onclick="openStudioProductLightbox('${proj.id}', 0)" title="Ảnh Sản Phẩm Mẫu Đơn Chiếc (Dùng làm tham chiếu tạo ảnh AI) — Bấm để Phóng To">
+            <div style="position:relative; flex-shrink:0; cursor:zoom-in;" onclick="openStudioProductLightbox('${proj.id}', 0)" title="Ảnh Sản Phẩm Mẫu / Tham Chiếu 2K — Bấm để Phóng To">
               <img class="proj-thumb" style="width:42px; height:42px; border:2px solid #f59e0b;" src="/api/media?path=${encodeURIComponent(origProdThumb)}" />
               <span style="position:absolute; bottom:-3px; left:0; right:0; background:#f59e0b; color:#000; font-size:8px; font-weight:900; text-align:center; border-radius:3px;">MẪU AI</span>
             </div>
@@ -5402,7 +5647,7 @@
             <div class="proj-head-sub">
               <span class="proj-id-tag">ID: ${meta.pid || proj.id}</span>
               ${meta.price ? `<span class="proj-price-tag">💰 ${meta.price}</span>` : ''}
-              <span style="background:rgba(139,92,246,0.16); color:#c4b5fd; border:1px solid rgba(139,92,246,0.38); padding:1px 7px; border-radius:4px; font-size:10px; font-weight:700;">🎬 #${activeTplObj.code || '001'} ${activeTplObj.folder_name}</span>
+              <span style="background:rgba(139,92,246,0.16); color:#c4b5fd; border:1px solid rgba(139,92,246,0.38); padding:1px 7px; border-radius:4px; font-size:10px; font-weight:700;">🎬 #${String(activeTplObj.code || '001').replace(/^#/, '')} ${activeTplObj.folder_name}</span>
               <span>• Video Final: <b style="color:${doneCount > 0 ? '#34d399' : '#fbbf24'}">${doneCount}/${allProds.length || 0}</b></span>
               <span>• Thumbnail AI (0.1s): <b style="color:#f472b6;">${thumbDoneCount}/${allProds.length || 0}</b></span>
               ${proj.deleted_finals_count ? `<span style="color:#94a3b8;">(Đã upload/xoá: ${proj.deleted_finals_count})</span>` : ''}
@@ -5417,33 +5662,55 @@
         ` : ''}
       `;
 
+      const curCardZoom = getStudioCardZoom();
+      const zoomPresets = [
+        { val: 75, label: "75% (Gọn • 4 cột)" },
+        { val: 90, label: "90% (Gọn • 3 cột)" },
+        { val: 100, label: "100% (Chuẩn • 3 cột)" },
+        { val: 115, label: "115% (Rõ • 2 cột)" },
+        { val: 130, label: "130% (Lớn • 2 cột)" },
+        { val: 145, label: "145% (Rất lớn)" },
+        { val: 160, label: "160% (Chi tiết • 1 cột)" },
+        { val: 175, label: "175% (Siêu to • 1 cột)" },
+      ];
+      if (!zoomPresets.some(p => p.val === curCardZoom)) {
+        zoomPresets.push({ val: curCardZoom, label: `${curCardZoom}%` });
+        zoomPresets.sort((a, b) => a.val - b.val);
+      }
+      const zoomOptsHtml = zoomPresets.map(p =>
+        `<option value="${p.val}" ${p.val === curCardZoom ? 'selected' : ''} style="background:#0f172a; color:#e2e8f0;">${p.label}</option>`
+      ).join("");
+
       document.getElementById("curProjActions").innerHTML = `
         <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
           <button class="btn-filter ${STATE.charFilter === 'all' ? 'active' : ''}" onclick="setCharFilter('all')">Tất cả (${allProds.length})</button>
           <button class="btn-filter ${STATE.charFilter === 'nv1' ? 'active' : ''}" onclick="setCharFilter('nv1')">👩‍💼 NV1 (${nv1Count})</button>
           <button class="btn-filter ${STATE.charFilter === 'nv2' ? 'active' : ''}" onclick="setCharFilter('nv2')">👩‍💼 NV2 (${nv2Count})</button>
           ${nv3Count > 0 ? `<button class="btn-filter ${STATE.charFilter === 'nv3' ? 'active' : ''}" onclick="setCharFilter('nv3')">👨 NV3 (${nv3Count})</button>` : ''}
+          <div style="display:inline-flex; align-items:center; gap:3px; background:#090d16; border:1px solid rgba(56,189,248,0.38); border-radius:6px; padding:2px 5px; margin-left:4px;" title="Phóng to / Thu nhỏ kích thước Card sản phẩm & kịch bản (nhìn gọn 4 cột hoặc nhìn chi tiết 1-2 cột lớn)">
+            <span style="font-size:10px; color:#94a3b8; font-weight:700; padding:0 2px; white-space:nowrap;">🔍 Cỡ Card:</span>
+            <button class="btn btn-xs btn-outline" style="padding:1px 6px; font-size:11px; font-weight:900; min-width:22px; line-height:1.2;" onclick="stepStudioCardZoom(-15)" title="Thu nhỏ Card (Xem gọn nhiều card)">−</button>
+            <select id="selStudioCardZoom" onchange="setStudioCardZoom(this.value)" style="width:auto; padding:1px 4px; font-size:10.5px; font-weight:800; background:transparent; border:none; color:#38bdf8; cursor:pointer; outline:none;">
+              ${zoomOptsHtml}
+            </select>
+            <button class="btn btn-xs btn-outline" style="padding:1px 6px; font-size:11px; font-weight:900; min-width:22px; line-height:1.2;" onclick="stepStudioCardZoom(15)" title="Phóng to Card (Xem chi tiết kịch bản & video)">+</button>
+            <button id="btnResetStudioCardZoom" class="btn btn-xs btn-outline" style="display:${curCardZoom !== 100 ? 'inline-flex' : 'none'}; padding:1px 5px; font-size:9.5px; color:#cbd5e1;" onclick="setStudioCardZoom(100)" title="Đặt lại kích thước mặc định 100%">Đặt lại</button>
+          </div>
         </div>
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap; margin-left:auto;">
-          ${proj.is_fashion_motion_project ? `
-            <button class="btn" style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:800; border:none; padding:5px 12px;" onclick="switchTab('fashion', document.getElementById('navBtn-fashion')); setTimeout(()=>{if(typeof onSelectFashionProjectSlug==='function') onSelectFashionProjectSlug('${proj.id}');}, 120);" title="Mở dự án này trong Tab Video Thời Trang (#004)">👗 Mở Trong Tab Video Thời Trang (#004)</button>
-          ` : `
-            <select id="selStudioToolbarTemplate" onchange="onChangeStudioTemplate('${proj.id}', this.value)" title="Chọn Template Video để tạo kịch bản & dựng video cho sản phẩm này" style="width:auto; min-width:155px; max-width:210px; padding:4px 8px; font-size:11px; font-weight:700; background:#0f172a; border:1px solid rgba(139,92,246,0.5); color:#e2e8f0; border-radius:6px;">
-              ${studioTplOptsHtml}
-            </select>
-            <select id="selStudioToolbarVpc" onchange="onChangeStudioVpc('${proj.id}', this.value)" title="Số lượng Video tạo cho mỗi Nhân vật" style="width:auto; padding:4px 6px; font-size:11px; font-weight:600; background:#0f172a; border:1px solid var(--border-light); color:#cbd5e1; border-radius:6px;">
-              ${studioVpcOptsHtml}
-            </select>
-            <button class="btn btn-outline" style="border-color:rgba(99,102,241,0.5); color:#a5b4fc;" onclick="generateStudioProductPromptsOnly('${proj.id}')" title="Tạo hoặc đổi kịch bản mới theo Template đang chọn (Xem trước các cảnh trước khi chạy)">📝 Tạo Kịch Bản</button>
-          `}
-          <button class="btn btn-outline" style="border-color:rgba(236,72,153,0.55); color:#f9a8d4; background:rgba(236,72,153,0.12);" onclick="openThumbnailStudioModal('${proj.id}', 'ALL')" title="Render Ảnh Thumbnail AI Chuyên Nghiệp (Từ Ảnh NV cầm SP + Ảnh SP + Thông tin SP) & Ghép 0.1s đầu Video Final">🖼️ Tạo Thumbnail AI (0.1s)</button>
+          <select id="selStudioToolbarTemplate" onchange="onChangeStudioTemplate('${proj.id}', this.value)" title="Chọn Template Video để tạo kịch bản & dựng video cho dự án này" style="width:auto; min-width:155px; max-width:225px; padding:4px 8px; font-size:11px; font-weight:700; background:#0f172a; border:1px solid rgba(139,92,246,0.5); color:#e2e8f0; border-radius:6px;">
+            ${studioTplOptsHtml}
+          </select>
+          <select id="selStudioToolbarVpc" onchange="onChangeStudioVpc('${proj.id}', this.value)" title="Số lượng Video tạo cho dự án" style="width:auto; padding:4px 6px; font-size:11px; font-weight:600; background:#0f172a; border:1px solid var(--border-light); color:#cbd5e1; border-radius:6px;">
+            ${studioVpcOptsHtml}
+          </select>
+          <button class="btn btn-outline" style="border-color:rgba(99,102,241,0.5); color:#a5b4fc;" onclick="generateStudioProductPromptsOnly('${proj.id}')" title="Tạo hoặc chỉnh sửa kịch bản theo Template đang chọn">📝 Tạo Kịch Bản</button>
+          <button class="btn btn-outline" style="border-color:rgba(236,72,153,0.55); color:#f9a8d4; background:rgba(236,72,153,0.12);" onclick="openThumbnailStudioModal('${proj.id}', 'ALL')" title="Render Ảnh Thumbnail AI Chuyên Nghiệp & Ghép 0.1s đầu Video Final">🖼️ Tạo Thumbnail AI (0.1s)</button>
           <button class="btn btn-success" onclick="openFolderEncoded('${finalDirEnc}')" title="Mở thư mục riêng chứa toàn bộ Video Final trên máy tính">📂 Mở Folder Video Final</button>
-          ${(!proj.is_fashion_motion_project && proj.has_rendered_cache) ? `
-            <button class="btn btn-danger" onclick="cleanProjectRender('${proj.id}', ${doneCount > 0})" title="Xoá toàn bộ ảnh ref AI & video phân cảnh đã render của sản phẩm này để làm lại như sản phẩm mới">🧹 Xoá Render (${proj.rendered_size_mb || 0} MB)</button>
+          ${proj.has_rendered_cache ? `
+            <button class="btn btn-danger" onclick="cleanProjectRender('${proj.id}', ${doneCount > 0})" title="Xoá toàn bộ ảnh ref AI & video phân cảnh đã render của dự án này để làm lại như mới">🧹 Xoá Render (${proj.rendered_size_mb || 0} MB)</button>
           ` : ''}
-          ${!proj.is_fashion_motion_project ? `
-            <button class="btn btn-primary" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng</button>
-          ` : ''}
+          <button class="btn btn-primary" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng</button>
         </div>
       `;
 
@@ -5616,7 +5883,7 @@
         const vkeyStr = prod.vkey || vInfo.vNum.toLowerCase();
 
         const scenesRowsHtml = (prod.scenes || []).map((sc, sIdx) => {
-          const spoken = extractSpokenDialogue(sc.video_prompt, sc.scene_description);
+          const spoken = extractSpokenDialogue(sc.video_prompt, sc.scene_description, sc.dialogue_vn);
           const scDone = sc.status === "done" && sc.video_path;
           const thumbSrc = sc.image_path ? `/api/media?path=${encodeURIComponent(sc.image_path)}` : (prod.product_image_path ? `/api/media?path=${refImgEnc}` : "");
           return `
@@ -5624,7 +5891,7 @@
               ${thumbSrc ? `<img class="sc-thumb" loading="lazy" src="${thumbSrc}" />` : ''}
               <div class="sc-info">
                 <div class="sc-top">
-                  <span>Cảnh ${sc.scene_number} (10s)</span>
+                  <span>Cảnh ${sc.scene_number} (${sc.duration_sec || prod.seconds_per_scene || 10}s)</span>
                   <span style="color:${scDone ? '#34d399' : '#fbbf24'}; font-size:9.5px;">${scDone ? '● Xong MP4' : '○ Đang xử lý'}</span>
                 </div>
                 <div class="sc-voice">${spoken}</div>
@@ -5662,19 +5929,22 @@
                 <div class="vc-video-wrap">
                   ${prod.final_video_path ? `
                     <video controls preload="metadata" poster="${thumbImgPath ? `/api/media?path=${thumbImgEnc}&v=${prod.final_video_mtime || 1}` : ''}" src="/api/media?path=${finalVidEnc}&v=${prod.final_video_mtime || 0}"></video>
-                    <span class="vc-ref-tag" style="cursor:pointer; pointer-events:auto;" onclick="openVerticalVideoModal('${finalVidEnc}', '${thumbImgEnc || refImgEnc}', '${origProdEnc}', '${proj.id}_${vInfo.vNum}.mp4 — VIDEO FINAL 30s', '${proj.id}', '${vkeyStr}')" title="Bấm để mở khung xem dọc 9:16 lớn">📱 XEM DỌC</span>
+                    <span class="vc-ref-tag" style="cursor:pointer; pointer-events:auto;" onclick="event.stopPropagation(); openVerticalVideoModal('${finalVidEnc}', '${thumbImgEnc || refImgEnc}', '${origProdEnc}', '${proj.id}_${vInfo.vNum}.mp4 — VIDEO FINAL 30s', '${proj.id}', '${vkeyStr}')" title="Bấm để mở khung xem dọc 9:16 lớn">📱 XEM DỌC</span>
                   ` : (prod.product_image_path ? `
-                    <img loading="lazy" src="/api/media?path=${refImgEnc}" style="cursor:pointer;" onclick="openVerticalVideoModal('', '${refImgEnc}', '${origProdEnc}', '${vInfo.vNum} — Ảnh Tham Chiếu 9:16')" title="Bấm để xem lớn Ảnh Ref 9:16 & đối chiếu Ảnh Sản Phẩm Mẫu" />
+                    <img loading="lazy" src="/api/media?path=${refImgEnc}" style="cursor:pointer;" onclick="event.stopPropagation(); openVerticalVideoModal('', '${refImgEnc}', '${origProdEnc}', '${vInfo.vNum} — Ảnh Tham Chiếu 9:16')" title="Bấm để xem lớn Ảnh Ref 9:16 & đối chiếu Ảnh Sản Phẩm Mẫu" />
                     <span class="vc-ref-tag">ẢNH REF</span>
                   ` : `<span style="color:var(--muted); font-size:10px;">Chưa có ảnh</span>`)}
                   ${thumbImgPath ? `
-                    <img src="/api/media?path=${thumbImgEnc}&v=${prod.final_video_mtime || 1}"
-                         onclick="openImageLightbox([{url: '/api/media?path=${thumbImgEnc}', path: decodeURIComponent('${thumbImgEnc}'), title: 'Thumbnail 0.1s — ${proj.id}_${vInfo.vNum}', subtitle: 'Ảnh bìa ghép 0.1s đầu video'}], 0)"
-                         title="Ảnh Thumbnail 0.1s đầu video — Bấm để xem Full & Tải về"
-                         style="position:absolute; bottom:4px; left:4px; width:28px; height:46px; border-radius:4px; object-fit:cover; border:1.5px solid #ec4899; background:#000; cursor:zoom-in; box-shadow:0 2px 8px rgba(0,0,0,0.7);" />
+                    <img class="vc-mini-thumb"
+                         src="/api/media?path=${thumbImgEnc}&v=${prod.final_video_mtime || 1}"
+                         onclick="event.stopPropagation(); openVariantThumbnailLightbox('${proj.id}', ${idx}, '${thumbImgEnc}', 'Thumbnail 0.1s — ${proj.id}_${vInfo.vNum}')"
+                         title="Ảnh Thumbnail 0.1s đầu video — Bấm để xem Full & Tải về" />
                   ` : ''}
                   ${origProdEnc ? `
-                    <img src="/api/media?path=${origProdEnc}" onclick="openSceneInspectModal(${idx}, 0)" title="Ảnh sản phẩm mẫu gốc — Bấm để đối chiếu" style="position:absolute; bottom:4px; right:4px; width:28px; height:28px; border-radius:4px; object-fit:cover; border:1.5px solid #f59e0b; background:#000; cursor:pointer;" />
+                    <img class="vc-mini-prod"
+                         src="/api/media?path=${origProdEnc}"
+                         onclick="event.stopPropagation(); openSceneInspectModal(${idx}, 0)"
+                         title="Ảnh sản phẩm mẫu gốc — Bấm để đối chiếu" />
                   ` : ''}
                 </div>
               </div>
@@ -5685,11 +5955,11 @@
                 </div>
                 <div style="margin-top:5px; padding-top:5px; border-top:1px dashed rgba(148,163,184,0.18); display:flex; align-items:center; justify-content:space-between; gap:4px; flex-wrap:wrap;">
                   ${thumbImgPath ? `
-                    <span style="font-size:10px; color:#f472b6; font-weight:700;">🖼️ Đã có Thumbnail (0.1s đầu video)</span>
+                    <span style="font-size:10px; color:#f472b6; font-weight:700; cursor:pointer;" onclick="event.stopPropagation(); openVariantThumbnailLightbox('${proj.id}', ${idx}, '${thumbImgEnc}', 'Thumbnail ${proj.id}_${vInfo.vNum}')" title="Bấm để xem phóng to Ảnh Thumbnail">🖼️ Đã có Thumbnail (0.1s đầu video)</span>
                     <div style="display:flex; gap:4px;">
-                      <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9.5px;" onclick="openImageLightbox([{url: '/api/media?path=${thumbImgEnc}', path: decodeURIComponent('${thumbImgEnc}'), title: 'Thumbnail ${proj.id}_${vInfo.vNum}', subtitle: 'Bấm Mở File Gốc hoặc tải riêng'}], 0)" title="Xem phóng to Ảnh Thumbnail">🔍 Xem</button>
-                      <button class="btn btn-xs btn-success" style="padding:2px 6px; font-size:9.5px;" onclick="downloadFileDirect('${thumbImgEnc}', '${proj.id}_${vkeyStr}_thumb.jpg')" title="Tải riêng file ảnh Thumbnail (.jpg) về máy">⬇️ Tải Ảnh</button>
-                      <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9.5px;" onclick="openFolderEncoded('${thumbImgEnc}')" title="Mở vị trí file Thumbnail trong thư mục">📂</button>
+                      <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9.5px;" onclick="event.stopPropagation(); openVariantThumbnailLightbox('${proj.id}', ${idx}, '${thumbImgEnc}', 'Thumbnail ${proj.id}_${vInfo.vNum}')" title="Xem phóng to Ảnh Thumbnail & Storyboard">🔍 Xem</button>
+                      <button class="btn btn-xs btn-success" style="padding:2px 6px; font-size:9.5px;" onclick="event.stopPropagation(); downloadFileDirect('${thumbImgEnc}', '${proj.id}_${vkeyStr}_thumb.jpg')" title="Tải riêng file ảnh Thumbnail (.jpg) về máy">⬇️ Tải Ảnh</button>
+                      <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9.5px;" onclick="event.stopPropagation(); openFolderEncoded('${thumbImgEnc}')" title="Mở vị trí file Thumbnail trong thư mục">📂</button>
                     </div>
                   ` : `
                     <span style="font-size:10px; color:var(--muted);">Chưa tạo ảnh Thumbnail riêng</span>
@@ -5702,9 +5972,17 @@
         `;
       }).join("");
 
+      const visibleCardsCnt = allProds.filter((prod, idx) => {
+        const vInfo = extractShortVariantInfo(prod, idx);
+        if (STATE.charFilter === "nv1" && vInfo.charKey !== "NV1") return false;
+        if (STATE.charFilter === "nv2" && vInfo.charKey !== "NV2") return false;
+        if (STATE.charFilter === "nv3" && vInfo.charKey !== "NV3") return false;
+        return true;
+      }).length || 1;
+
       document.getElementById("curProjBody").innerHTML = `
         <div class="log-drawer ${STATE.logsOpen ? 'open' : ''}" id="projLogBox">${logsHtml}</div>
-        <div class="variants-grid">${cardsHtml}</div>
+        <div class="variants-grid" style="${computeStudioCardGridStyle(curCardZoom, visibleCardsCnt)}">${cardsHtml}</div>
       `;
     }
 
@@ -5713,20 +5991,29 @@
       if (!bannerEl) return;
 
       const live = proj ? (proj.live_status || {}) : {};
+      const allProds = (proj && proj.products) || [];
       const runningAll = STATE.runningPipelines || [];
       const isRunning = !!(live && live.is_running);
-      const pct = live.progress_pct !== undefined ? live.progress_pct : 0;
-      const doneFinals = live.done_finals || 0;
-      const totalVars = live.total_variants || (proj && proj.products ? proj.products.length : 0);
-      const doneRefs = live.done_refs || 0;
-      const doneScenes = live.done_scenes || 0;
-      const totalScenes = live.total_scenes || (totalVars * 3);
-      const doneThumbs = live.done_thumbnails || 0;
-      const stepMsg = live.current_step || (doneFinals > 0 && doneFinals < totalVars ? `Đã hoàn thành ${doneFinals}/${totalVars} Video Final (${pct}%) — Bấm "Tiếp Tục Chạy Nốt" để hoàn tất các video còn lại` : "");
 
-      // Show banner if current project is running, or has partial progress (0 < pct < 100), or if other pipelines are running
+      const totalVars = live.total_variants || allProds.length || 0;
+      const calcDoneFinals = allProds.filter(p => p.status === "done" && p.final_video_path).length;
+      const calcDoneRefs = allProds.filter(p => !!(p.product_image_path || (p.scenes || []).some(s => s.image_path))).length;
+      const calcTotalScenes = allProds.reduce((acc, p) => acc + ((p.scenes && p.scenes.length) || p.num_scenes || 3), 0);
+      const calcDoneScenes = allProds.reduce((acc, p) => acc + (p.scenes || []).filter(s => s.status === "done" && s.video_path).length, 0);
+      const calcDoneThumbs = allProds.filter(p => !!(p.has_thumbnail && p.thumbnail_path)).length;
+
+      const doneFinals = live.done_finals !== undefined ? live.done_finals : calcDoneFinals;
+      const doneRefs = live.done_refs !== undefined ? live.done_refs : calcDoneRefs;
+      const doneScenes = live.done_scenes !== undefined ? live.done_scenes : calcDoneScenes;
+      const totalScenes = live.total_scenes || calcTotalScenes || (totalVars * 3);
+      const doneThumbs = live.done_thumbnails !== undefined ? live.done_thumbnails : calcDoneThumbs;
+      const pct = live.progress_pct !== undefined
+        ? live.progress_pct
+        : (proj && proj.progress_pct !== undefined ? proj.progress_pct : (totalVars > 0 ? Math.round((doneFinals / totalVars) * 100) : 0));
+      const stepMsg = live.current_step || live.current_step_text || (doneFinals > 0 && doneFinals < totalVars ? `Đã hoàn thành ${doneFinals}/${totalVars} Video Final (${pct}%) — Bấm "Tiếp Tục Chạy Nốt" để hoàn tất các video còn lại` : "");
+
       const hasPartial = totalVars > 0 && (doneRefs > 0 || doneScenes > 0 || doneFinals > 0) && doneFinals < totalVars;
-      if (!isRunning && !hasPartial && runningAll.length === 0) {
+      if (!isRunning && totalVars === 0 && runningAll.length === 0) {
         bannerEl.style.display = "none";
         return;
       }
@@ -5865,7 +6152,7 @@
           if (pr.id === presetId && mode === "demo") startIdx = gallery.length;
           gallery.push({
             absPath: demoPath,
-            title: `🎨 [AI DEMO MỚI] ${pr.name} — (${getLayoutBadgeLabel(pr.layout_type)})`,
+            title: `🎨 [THAM KHẢO STYLE] ${pr.name}`,
           });
         }
         if (refPath && refPath !== demoPath) {
@@ -5881,71 +6168,24 @@
     }
 
     function renderThumbnailTemplateGalleryUI(targetPrefix = "settings") {
-      const cfg = STATE.engineSettings || {};
-      const presets = STATE.thumbnailPresets || cfg.thumbnail_presets || [];
-      const cats = cfg.thumbnail_categories || [];
-      const isModal = targetPrefix === "modal";
-      const filterBarId = isModal ? "modalThumbCategoryFilterBar" : "settingsThumbCategoryFilterBar";
-      const galleryId = isModal ? "modalThumbTemplateGallery" : "settingsThumbTemplateGallery";
-      const activeCat = isModal ? (STATE.thumbGalleryFilterModal || "ALL") : (STATE.thumbGalleryFilterSettings || "ALL");
-      const currentSelectedId = isModal
-        ? (document.getElementById("selThumbStudioPreset")?.value || cfg.thumbnail_preset_id || "gia_dung_3grid_pro")
-        : (document.getElementById("selSettingsThumbPreset")?.value || cfg.thumbnail_preset_id || "gia_dung_3grid_pro");
-
-      const fBar = document.getElementById(filterBarId);
-      if (fBar) {
-        const allBtn = `<button type="button" class="btn btn-xs ${activeCat === 'ALL' ? 'btn-amber' : 'btn-outline'}" onclick="setThumbGalleryCategoryFilter('${targetPrefix}', 'ALL')">🌟 Tất cả (${presets.length})</button>`;
-        const catBtns = cats.map(c => {
-          const cnt = presets.filter(p => p.category === c.id).length;
-          return `<button type="button" class="btn btn-xs ${activeCat === c.id ? 'btn-amber' : 'btn-outline'}" onclick="setThumbGalleryCategoryFilter('${targetPrefix}', '${c.id}')">${c.name} (${cnt})</button>`;
-        }).join("");
-        fBar.innerHTML = allBtn + catBtns;
-      }
-
-      const gal = document.getElementById(galleryId);
-      if (!gal) return;
-      const filtered = activeCat === "ALL" ? presets : presets.filter(p => p.category === activeCat);
-      if (!filtered.length) {
-        gal.innerHTML = `<div style="font-size:11.5px; color:var(--muted); padding:8px;">Không có Template nào trong danh mục này.</div>`;
-        return;
-      }
-
-      const cacheBust = STATE.thumbDemoCacheBust || "v24";
-      gal.innerHTML = filtered.map(pr => {
-        const isSel = currentSelectedId === pr.id;
-        const samplePath = pr.sample_image_abs || pr.sample_image || "";
-        const refPath = pr.reference_image_abs || pr.reference_image || "";
-        const sampleEnc = encodeURIComponent(samplePath);
-        const refEnc = encodeURIComponent(refPath);
-        const badgeTxt = pr.style_badge || getLayoutBadgeLabel(pr.layout_type);
-        const recProds = (pr.recommended_products && pr.recommended_products.length)
-          ? pr.recommended_products.slice(0, 3).join(", ")
-          : (pr.recommended_for || "");
-        return `
-          <div onclick="selectThumbTemplateFromCard('${targetPrefix}', '${pr.id}')" style="cursor:pointer; background:${isSel ? 'rgba(245,158,11,0.16)' : '#0b101d'}; border:2px solid ${isSel ? '#f59e0b' : 'rgba(255,255,255,0.12)'}; border-radius:10px; padding:8px; display:flex; gap:9px; align-items:stretch; transition:all 0.15s;">
-            <div style="width:${isModal ? '74px' : '90px'}; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; flex-shrink:0; position:relative; border:1px solid rgba(251,191,36,0.45); box-shadow:0 4px 10px rgba(0,0,0,0.45);" onclick="event.stopPropagation(); openThumbTemplateGalleryLightbox('${pr.id}', 'demo')" title="Bấm để xem Full 1080x1920 Ảnh Demo AI Render Mới">
-              ${samplePath ? `<img src="/api/media?path=${sampleEnc}&v=${cacheBust}" style="width:100%; height:100%; object-fit:cover; cursor:zoom-in;" loading="lazy" />` : ''}
-              <span style="position:absolute; top:3px; left:3px; background:rgba(217,119,6,0.92); color:#fff; font-size:8px; font-weight:800; padding:1px 4px; border-radius:4px;">AI DEMO</span>
-              <span style="position:absolute; bottom:3px; right:3px; background:rgba(15,23,42,0.88); color:#fde68a; font-size:9px; font-weight:800; padding:2px 5px; border-radius:4px; border:1px solid rgba(251,191,36,0.5);">🔍 Full</span>
-            </div>
-            <div style="flex:1; min-width:0; display:flex; flex-direction:column; justify-content:space-between; gap:4px;">
-              <div>
-                <div style="font-size:11.5px; font-weight:800; color:${isSel ? '#fde68a' : '#f8fafc'}; line-height:1.25;">${pr.name}</div>
-                <div style="font-size:9.5px; color:#38bdf8; font-weight:700; margin-top:2px;">${badgeTxt}</div>
-                <div style="font-size:9.5px; color:#94a3b8; margin-top:3px; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">${pr.description || ''}</div>
-                <div style="font-size:9px; color:#a7f3d0; margin-top:3px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="Hợp: ${recProds}">🏷️ ${recProds}</div>
-              </div>
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; margin-top:3px; flex-wrap:wrap;">
-                <div style="display:flex; gap:4px;">
-                  <button type="button" class="btn btn-xs btn-amber" style="padding:2px 7px; font-size:9.5px; font-weight:800;" onclick="event.stopPropagation(); openThumbTemplateGalleryLightbox('${pr.id}', 'demo')" title="Xem Full Màn Hình Ảnh Demo AI 1080x1920">🔍 Xem Full Demo</button>
-                  ${refPath ? `<button type="button" class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9px;" onclick="event.stopPropagation(); openThumbTemplateGalleryLightbox('${pr.id}', 'ref')" title="Xem Ảnh Mẫu Gốc TikTok Affiliate">🖼️ Mẫu Gốc</button>` : ''}
-                </div>
-                <span style="font-size:9.5px; font-weight:800; color:${isSel ? '#34d399' : '#cbd5e1'}; flex-shrink:0;">${isSel ? '✓ Đang chọn' : 'Áp dụng'}</span>
-              </div>
-            </div>
-          </div>
-        `;
-      }).join("");
+      const cfg=STATE.engineSettings || {}, presets=STATE.thumbnailPresets || cfg.thumbnail_presets || [];
+      const modal=targetPrefix==='modal', prefix=modal?'modal':'settings';
+      const selected=document.getElementById(modal?'selThumbStudioPreset':'selSettingsThumbPreset')?.value;
+      const active=modal?(STATE.thumbGalleryFilterModal || 'ALL'):(STATE.thumbGalleryFilterSettings || 'ALL');
+      const filter=document.getElementById(prefix+'ThumbCategoryFilterBar');
+      if(filter) filter.innerHTML=[{id:'ALL',name:'Tất cả style'},...(cfg.thumbnail_categories || []).filter(c=>presets.some(p=>p.category===c.id))].map(c=>
+        `<button type="button" class="btn btn-xs ${active===c.id?'btn-amber':'btn-outline'}" onclick="setThumbGalleryCategoryFilter('${targetPrefix}','${c.id}')">${c.name}</button>`).join('');
+      const gallery=document.getElementById(prefix+'ThumbTemplateGallery'); if(!gallery)return;
+      gallery.style.gridTemplateColumns='repeat(auto-fill,minmax(190px,1fr))';
+      gallery.innerHTML=presets.filter(p=>active==='ALL'||p.category===active).map(p=>{
+        const path=p.sample_image_abs || p.sample_image || '';
+        return `<article class="thumb-ai-style ${selected===p.id?'selected':''}">
+          <button type="button" class="thumb-ai-preview" onclick="openThumbTemplateGalleryLightbox('${p.id}','demo')">
+          ${path?`<img loading="lazy" src="/api/media?path=${encodeURIComponent(path)}&v=ai-v3" alt="${p.name}">`:'<span>Chưa có ảnh mẫu · xem prompt style</span>'}
+          <span>${p.preview_kind==='approved_demo'?'Demo AI đã duyệt':p.preview_kind==='generated_demo'?'Demo AI từ project':'Ảnh tham khảo phong cách'}</span></button>
+          <div class="thumb-ai-copy"><strong>${p.name}</strong><small>${p.style_badge}</small><p>${p.recommended_for}</p>${p.source_project_id?`<small>Project: ${p.source_project_id}</small>`:""}${p.prompt_structure?.length?`<details style="font-size:10px;color:#a8b6c9"><summary style="cursor:pointer">Cấu trúc prompt mẫu</summary><ol style="padding-left:16px;line-height:1.6">${p.prompt_structure.map(step=>`<li>${step}</li>`).join('')}</ol></details>`:""}
+          <button class="btn btn-xs ${selected===p.id?'btn-success':'btn-outline'}" onclick="selectThumbTemplateFromCard('${targetPrefix}','${p.id}')">${selected===p.id?'✓ Đã chọn':'Chọn style'}</button></div></article>`;
+      }).join('');
     }
 
     function setThumbGalleryCategoryFilter(targetPrefix, catId) {
@@ -6038,7 +6278,9 @@
       setVal("selVideoEncoder", cfg.video_encoder || "auto");
       setVal("selFfmpegPreset", cfg.ffmpeg_preset || "fast");
 
-      // 3. Bind Multi-Thread & Multi-Account Flow Settings
+      // 3. Bind Multi-Thread & Multi-Account Flow / Google Vids Settings
+      setVal("selVideoProvider", cfg.video_provider || "google_flow");
+      setVal("selGoogleVidsModel", cfg.google_vids_model || "omni");
       setChk("chkMultiAccountEnabled", cfg.multi_account_enabled !== false);
       setVal("inpMaxTotalInflight", cfg.max_total_inflight || 12);
       setVal("inpMaxInflightPerAcc", cfg.max_inflight_per_account || 5);
@@ -6056,6 +6298,7 @@
               <span class="badge badge-done">✓ Active #${idx + 1}</span>
               <span style="font-size:12px; font-weight:700; color:#f8fafc;">${a.name || a.profile_name}</span>
               <code style="font-size:10.5px; color:#67e8f9;">Profile: ${a.profile_name}</code>
+              ${a.ready_for_vids ? `<span class="badge" style="background:rgba(59,130,246,0.22);color:#93c5fd;border:1px solid rgba(96,165,250,0.45);font-size:10px;">🌐 Google Vids Sẵn Sàng</span>` : ''}
             </div>
           `).join("");
         }
@@ -6069,7 +6312,7 @@
         ).join("");
       }
       setChk("chkAutoGenThumbnail", cfg.auto_generate_thumbnail !== false);
-      setChk("chkThumbCompositeInsets", cfg.composite_product_insets !== false);
+      setChk("chkThumbCompositeInsets", false);
       setChk("chkThumbRotateVariants", cfg.rotate_templates_per_variant !== false);
       setChk("chkAutoInject01s", cfg.auto_inject_thumbnail_01s !== false);
       setChk("chkThumbAddTextBadge", !!cfg.thumbnail_add_text_badge);
@@ -6542,6 +6785,8 @@
         ffmpeg_threads_per_job: Number(document.getElementById("inpFfmpegThreadsPerJob")?.value || 4),
         video_encoder: document.getElementById("selVideoEncoder")?.value || "auto",
         ffmpeg_preset: document.getElementById("selFfmpegPreset")?.value || "fast",
+        video_provider: document.getElementById("selVideoProvider")?.value || "google_flow",
+        google_vids_model: document.getElementById("selGoogleVidsModel")?.value || "omni",
         multi_account_enabled: !!document.getElementById("chkMultiAccountEnabled")?.checked,
         max_total_inflight: Number(document.getElementById("inpMaxTotalInflight")?.value || 12),
         max_inflight_per_account: Number(document.getElementById("inpMaxInflightPerAcc")?.value || 5),
@@ -6578,7 +6823,7 @@
       const pidInp = document.getElementById("inpThumbStudioPid");
       if (pidInp) pidInp.value = pid;
 
-      if (!STATE.engineSettings) {
+      {
         const sRes = await apiGet("/api/settings");
         if (sRes && sRes.ok) {
           STATE.engineSettings = sRes.settings;
@@ -6603,8 +6848,8 @@
       const subEl = document.getElementById("thumbStudioSubTitle");
       if (subEl) {
         subEl.textContent = scopeVal === "ALL"
-          ? `Sản phẩm ID: ${pid} — Áp dụng Kho Template Ảnh SP Thật hoặc Render AI cho toàn bộ ${allProds.length || 6} Video`
-          : `Sản phẩm ID: ${pid} — Đang chọn riêng Video: ${scopeVal.toUpperCase()} (Có Khung 3 Ảnh Sản Phẩm Thực Tế)`;
+          ? `Sản phẩm ID: ${pid} — Tạo Thumbnail AI cho toàn bộ ${allProds.length || 6} Video`
+          : `Sản phẩm ID: ${pid} — Đang chọn riêng Video: ${scopeVal.toUpperCase()} (Tham chiếu nhân vật + sản phẩm + cảnh video)`;
       }
 
       // Populate Scope selector
@@ -6622,18 +6867,20 @@
       const selPreset = document.getElementById("selThumbStudioPreset");
       const defaultModeIsAuto = (cfg.thumbnail_selection_mode || "auto_category") !== "fixed";
       if (selPreset && presets.length) {
-        const autoOpt = `<option value="AUTO_CATEGORY" ${defaultModeIsAuto ? 'selected' : ''}>🤖 Tự động theo Ngành Hàng & Xoay vòng 3 Bố cục cho V1/V2/V3</option>`;
+        const autoOpt = `<option value="AUTO_CATEGORY" ${defaultModeIsAuto ? 'selected' : ''}>🤖 Tự chọn style phù hợp ngành hàng</option>`;
         selPreset.innerHTML = autoOpt + presets.map(pr =>
-          `<option value="${pr.id}" ${(!defaultModeIsAuto && cfg.thumbnail_preset_id === pr.id) ? 'selected' : ''}>${pr.name} (${getLayoutBadgeLabel(pr.layout_type)})</option>`
+          `<option value="${pr.id}" ${(!defaultModeIsAuto && cfg.thumbnail_preset_id === pr.id) ? 'selected' : ''}>${pr.name}</option>`
         ).join("");
       }
 
       const provEl = document.getElementById("selThumbStudioProvider");
       if (provEl) provEl.value = cfg.thumbnail_provider || "google_flow";
       const masterEl = document.getElementById("inpThumbStudioMasterPrompt");
-      if (masterEl) masterEl.value = cfg.thumbnail_master_prompt || (presets[0] && presets[0].master_prompt) || "";
+      if (masterEl) masterEl.value = "";
+      document.getElementById("selThumbSubjectMode").value="auto";
+      document.getElementById("inpThumbHeadline").value="";
       const injEl = document.getElementById("chkThumbStudioInject01s");
-      if (injEl) injEl.checked = cfg.auto_inject_thumbnail_01s !== false;
+      if (injEl) injEl.checked = false;
       const badgeEl = document.getElementById("chkThumbStudioAddBadge");
       if (badgeEl) badgeEl.checked = !!cfg.thumbnail_add_text_badge;
 
@@ -6657,7 +6904,7 @@
       const sampleVk = (scopeVal && scopeVal !== "ALL") ? scopeVal : ((allProds[0] && (allProds[0].vkey || "v1")) || "v1");
       const presetVal = document.getElementById("selThumbStudioPreset")?.value || "";
       const qPreset = (presetVal && presetVal !== "AUTO_CATEGORY") ? `&preset_id=${encodeURIComponent(presetVal)}` : "";
-      const pRes = await apiGet(`/api/thumbnails/prompt?pid=${encodeURIComponent(pid)}&vkey=${encodeURIComponent(sampleVk)}${qPreset}`);
+      const pRes = await apiGet(`/api/thumbnails/prompt?pid=${encodeURIComponent(pid)}&vkey=${encodeURIComponent(sampleVk)}${qPreset}&subject_mode=${encodeURIComponent(document.getElementById("selThumbSubjectMode")?.value || "auto")}&headline=${encodeURIComponent(document.getElementById("inpThumbHeadline")?.value || "")}`);
 
       const ref1Wrap = document.getElementById("thumbRef1PreviewWrap");
       const ref2Wrap = document.getElementById("thumbRef2PreviewWrap");
@@ -6666,6 +6913,11 @@
       const gridEl = document.getElementById("thumbStudioResultGrid");
 
       if (pRes && pRes.ok) {
+        let refs = document.getElementById('thumbAllAIRefs');
+        if (!refs && ref1Wrap) { refs=document.createElement('div'); refs.id='thumbAllAIRefs'; ref1Wrap.parentElement.appendChild(refs); }
+        if (refs) refs.innerHTML='<p>Ảnh gửi cho AI · nhân vật / sản phẩm / bối cảnh</p>'+(pRes.reference_images || []).map(path=>`<img src="/api/media?path=${encodeURIComponent(path)}" style="height:90px;max-width:90px;object-fit:contain;margin:3px">`).join('');
+        const promptBox=document.getElementById('inpThumbStudioMasterPrompt');
+        if(promptBox && !promptBox.value) promptBox.placeholder=pRes.prompt || 'Để trống để tự dùng prompt của style đã chọn';
         if (ref1Wrap) {
           if (pRes.char_holding_prod_img) {
             const cEnc = encodeURIComponent(pRes.char_holding_prod_img);
@@ -6686,7 +6938,7 @@
           prodInfoInp.value = pRes.product_info || "";
         }
         if (hookInfoEl) {
-          hookInfoEl.textContent = `🎨 Template: ${pRes.preset_name || ''} • 🔥 Hook (${sampleVk.toUpperCase()}): "${pRes.hook_title || ''}" ${pRes.price ? '• 💰 ' + pRes.price : ''}`;
+          hookInfoEl.textContent = `🎨 Template: ${pRes.template_name || ''} • 🔥 Hook (${sampleVk.toUpperCase()}): "${pRes.hook_title || ''}" ${pRes.price ? '• 💰 ' + pRes.price : ''}`;
         }
       }
 
@@ -6731,13 +6983,13 @@
       const presets = STATE.thumbnailPresets || (STATE.engineSettings && STATE.engineSettings.thumbnail_presets) || [];
       const found = presets.find(p => p.id === presetId || (p.aliases || []).includes(presetId));
       const masterEl = document.getElementById("inpThumbStudioMasterPrompt");
-      if (found && masterEl) {
-        masterEl.value = found.master_prompt;
-      }
+      if (masterEl) masterEl.value = found ? found.master_prompt : "";
       renderThumbnailTemplateGalleryUI("modal");
+      onThumbStudioScopeChange();
     }
 
     async function submitGenerateThumbnails(applyTemplateOnly = false) {
+      applyTemplateOnly = false;
       const pid = document.getElementById("inpThumbStudioPid")?.value || STATE.currentProjectId;
       const scopeVal = document.getElementById("selThumbStudioScope")?.value || "ALL";
       const allVariants = (!scopeVal || scopeVal === "ALL");
@@ -6762,10 +7014,10 @@
           stEl.textContent = `⚡ Đang ghép Khung Ảnh Sản Phẩm Thực Tế + Giá Bán + USP theo Template (${rawPresetVal === 'AUTO_CATEGORY' ? 'Tự động theo Ngành Hàng' : rawPresetVal})...`;
         }
       } else {
-        if (btn) btn.textContent = "⏳ Đang Render Ảnh Thumbnail AI 2K + Đóng khung Template SP...";
+        if (btn) btn.textContent = "⏳ AI đang thiết kế toàn bộ thumbnail...";
         if (stEl) {
           stEl.style.color = "#67e8f9";
-          stEl.textContent = `🚀 Đang gửi Ảnh Ref Nhân vật cầm SP + Ảnh SP gốc + Master Prompt lên ${provider === 'chatgpt' ? 'ChatGPT Image (gpt-image-1)' : 'Google Flow Nano Banana 2.1 (2K)'}...`;
+          stEl.textContent = `🚀 Đang gửi Ảnh Ref Nhân vật cầm SP + Ảnh SP gốc + Master Prompt lên ${provider === 'grok' ? 'Grok Image' : provider === 'chatgpt' ? 'ChatGPT Image' : 'Nano Banana'}...`;
         }
       }
 
@@ -6774,6 +7026,8 @@
         vkey: allVariants ? "v1" : scopeVal,
         all_variants: allVariants,
         provider: provider,
+        subject_mode: document.getElementById("selThumbSubjectMode")?.value || "auto",
+        headline: document.getElementById("inpThumbHeadline")?.value || "",
         preset_id: presetId,
         custom_master_prompt: applyTemplateOnly ? "" : customPrompt,
         custom_product_info: customProdInfo,
@@ -6785,7 +7039,7 @@
 
       if (btn) {
         btn.disabled = false;
-        btn.textContent = "🚀 Render Ảnh AI 2K Mới + Đóng Khung Template SP & Ghép 0.1s";
+        btn.textContent = "✨ Tạo Thumbnail bằng AI";
       }
       if (btnFast) {
         btnFast.disabled = false;
@@ -6796,7 +7050,7 @@
         if (stEl) {
           stEl.style.color = "#34d399";
           stEl.textContent = allVariants
-            ? `🎉 Đã hoàn tất ${res.success_count || 0}/${res.total || 0} Ảnh Thumbnail (Có Khung Ảnh SP Thật) & ghép 0.1s đầu Video Final!`
+            ? `🎉 Đã hoàn tất ${res.success_count || 0}/${res.total || 0} Thumbnail AI. Việc ghép video tùy lựa chọn của bạn.`
             : `🎉 Đã hoàn tất Ảnh Thumbnail (${res.char_v || scopeVal}) theo Template ${res.template_name || presetId || 'Tự động'}!`;
         }
         delete STATE.projectDetailsCache[pid];
@@ -7073,22 +7327,55 @@
     function openStudioProductLightbox(projectId, startIdx = 0) {
       const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;
       if (!proj) return;
-      const imgs = proj.all_product_image_paths || (proj.primary_product_image_path ? [proj.primary_product_image_path] : []);
+      let imgs = (Array.isArray(proj.all_product_image_paths) && proj.all_product_image_paths.length)
+        ? [...proj.all_product_image_paths]
+        : [];
+      if (!imgs.length && Array.isArray(proj.slide_overlay_image_paths) && proj.slide_overlay_image_paths.length) {
+        imgs = [...proj.slide_overlay_image_paths];
+      }
+      if (!imgs.length && proj.primary_product_image_path) {
+        imgs = [proj.primary_product_image_path];
+      }
+      if (!imgs.length && Array.isArray(proj.products) && proj.products[0]) {
+        const p0 = proj.products[0];
+        (p0.scenes || []).forEach(sc => {
+          if (sc && sc.image_path && !imgs.includes(sc.image_path)) imgs.push(sc.image_path);
+        });
+        if (p0.product_image_path && !imgs.includes(p0.product_image_path)) imgs.push(p0.product_image_path);
+      }
       if (!imgs.length) return;
       const pri = proj.primary_product_image_path || imgs[0];
       const gallery = imgs.map((absPath, i) => ({
         absPath,
-        title: `${proj.full_product_name || proj.name || projectId} — Ảnh SP #${i + 1}${absPath === pri ? ' (⭐ Ảnh Mẫu AI)' : ''}`
+        title: `${proj.full_product_name || proj.name || projectId} — Ảnh #${i + 1}${absPath === pri ? ' (⭐ Ảnh Mẫu AI)' : ''}`
       }));
       const idx = Math.max(0, Math.min(startIdx, gallery.length - 1));
       openImageLightbox(gallery[idx].absPath, gallery[idx].title, gallery, idx);
     }
 
     async function generateStudioProductPromptsOnly(projectId) {
-      const tpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
+      const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;
+      const rawTpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
         || document.getElementById("selStudioCenterTemplate")?.value
         || document.getElementById("selStudioToolbarTemplate")?.value
+        || (proj && proj.template_code)
         || "001";
+      const tpl = String(rawTpl).replace(/^#/, "");
+      if (tpl === "004" || (proj && proj.is_fashion_motion_project && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        switchTab("fashion", document.getElementById("navBtn-fashion"));
+        setTimeout(() => {
+          if (proj && proj.is_fashion_motion_project && typeof onSelectFashionProjectSlug === "function") {
+            onSelectFashionProjectSlug(projectId);
+          }
+        }, 120);
+        return;
+      }
+      if (tpl === "005" || (proj && proj.pipeline_kind === "cooking_storyboard" && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        if (typeof window.openCookingStudio === "function") {
+          window.openCookingStudio((proj && proj.pipeline_kind === "cooking_storyboard") ? projectId : null);
+        }
+        return;
+      }
       const vpc = (STATE.studioSelectedVpc && STATE.studioSelectedVpc[projectId])
         || document.getElementById("selStudioCenterVpc")?.value
         || document.getElementById("selStudioToolbarVpc")?.value
@@ -7113,17 +7400,33 @@
 
     async function runProjectBatch(projectId, productId) {
       const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;
-      const tpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
+      const rawTpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])
         || document.getElementById("selStudioCenterTemplate")?.value
         || document.getElementById("selStudioToolbarTemplate")?.value
         || (proj && proj.template_code)
         || "001";
+      const tpl = String(rawTpl).replace(/^#/, "");
+      if (tpl === "004" || (proj && proj.is_fashion_motion_project && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        switchTab("fashion", document.getElementById("navBtn-fashion"));
+        setTimeout(() => {
+          if (proj && proj.is_fashion_motion_project && typeof onSelectFashionProjectSlug === "function") {
+            onSelectFashionProjectSlug(projectId);
+          }
+        }, 120);
+        return;
+      }
+      if (tpl === "005" || (proj && proj.pipeline_kind === "cooking_storyboard" && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        if (typeof window.openCookingStudio === "function") {
+          window.openCookingStudio((proj && proj.pipeline_kind === "cooking_storyboard") ? projectId : null);
+        }
+        return;
+      }
       const vpc = (STATE.studioSelectedVpc && STATE.studioSelectedVpc[projectId])
         || document.getElementById("selStudioCenterVpc")?.value
         || document.getElementById("selStudioToolbarVpc")?.value
         || (proj && proj.videos_per_character)
         || 3;
-      const isNewOrChangedTpl = !proj || (proj.products || []).length === 0 || (proj.template_code && proj.template_code !== tpl);
+      const isNewOrChangedTpl = !proj || (proj.products || []).length === 0 || (proj.template_code && String(proj.template_code).replace(/^#/, "") !== tpl);
       const res = await apiPost("/api/projects/run", {
         project_id: projectId,
         product_id: productId || "",
@@ -7186,7 +7489,10 @@
     }
   </script>
   <link rel="stylesheet" href="/static/workflow_studio.css?v=20261105_1800" />
-  <script src="/static/studio_app_part2.js?v=20261107_2330"></script>
+  <script src="/static/studio_app_part2.js?v=20261112_v5"></script>
+  <script src="/static/cooking_studio.js?v=20261112_v5"></script>
+  <link rel="stylesheet" href="/static/template_explorer.css?v=20261110_1" />
+  <script src="/static/template_explorer.js?v=20261112_v5"></script>
   <script src="/static/workflow_studio.js?v=20261106_0906"></script>
 </body>
 </html>

@@ -696,6 +696,18 @@ def extract_scene_last_frame_2k(video_path: str, out_png_path: str) -> str:
         return ""
 
 
+def normalize_fashion_generation_mode(mode_val: str, default: str = "chained_i2v") -> str:
+    """Chuẩn hóa `generation_mode`: `'google_vids'` | `'chained_i2v'` | `'video_ref'`."""
+    raw = str(mode_val or "").strip().lower()
+    if "vids" in raw:
+        return "google_vids"
+    if "i2v" in raw or "chained" in raw:
+        return "chained_i2v"
+    if "video" in raw or "ref" in raw:
+        return "video_ref"
+    return default
+
+
 def build_scene_timeline_prompt(
     scene_info: dict,
     start_char_ref: dict,
@@ -744,10 +756,220 @@ def build_scene_timeline_prompt(
     segments = []
 
     # ==========================================================================
+    # CHẾ ĐỘ A0: GOOGLE VIDS WEB OMNI 1080p (`google_vids`)
+    # Gắn tối đa 3 Chip Ảnh 2K gốc trực tiếp (@Hình ảnh1, @Hình ảnh2, @Hình ảnh3):
+    #   - Cảnh 1: [Ảnh phòng ngủ Basic 2K] + [Ảnh phẳng Bộ đồ 1 2K] + [Ảnh phẳng Bộ đồ 2 2K]
+    #   - Cảnh 2+: [Frame cuối Cảnh 1 2K] + [Ảnh phẳng Bộ đồ 3 2K] + [Ảnh phẳng Bộ đồ 4 2K]
+    # ==========================================================================
+    if prompt_style == "google_vids":
+        import fashion_ai_video_analyzer as fava
+
+        choreo = fava.analyze_scene_choreography_and_hooks_for_i2v(
+            ref_video_path=scene_info.get("ref_video_path") or scene_info.get("ref_clip_path") or "",
+            scene_info=scene_info,
+            bpm_info=bpm_info,
+            template_meta=scene_info.get("template_meta"),
+        )
+        scene_info["i2v_choreography_profile"] = choreo.get("profile_id") or "dynamic_cv"
+        move_feel_en = choreo.get("movement_feel_en") or (
+            f"Stylish rhythmic approximately {bpm_val} BPM TikTok fashion transition groove (beat every {beat_int:.2f} seconds): "
+            "light, graceful movement with soft knees, relaxed shoulders, curved arm paths and natural fabric physics."
+        )
+
+        if sc_num == 1:
+            t1 = round(float(transitions[0]["timestamp_sec"]) if len(transitions) >= 1 else 3.43, 2)
+            t2 = round(float(transitions[1]["timestamp_sec"]) if len(transitions) >= 2 else 6.86, 2)
+            out1 = transitions[0]["outfit"] if len(transitions) >= 1 else {}
+            out2 = transitions[1]["outfit"] if len(transitions) >= 2 else {}
+            out1_en = out1.get("en_desc") or out1.get("short_desc") or "exact Look 1 outfit and accessories"
+            out2_en = out2.get("en_desc") or out2.get("short_desc") or "exact Look 2 outfit and accessories"
+            out1_title = out1.get("filename") or os.path.basename(out1.get("path") or overall_title)
+            out1_key = out1.get("id") or out1_title
+            out2_title = out2.get("filename") or os.path.basename(out2.get("path") or overall_title)
+            out2_key = out2.get("id") or out2_title
+            use_individual_sheets = 1 <= len(transitions) <= 2 and bool(out1.get("filename") or out1.get("path"))
+            b1 = choreo.get("s1_blocks") or {}
+
+            segments.append({"type": "text", "text": f"Create an {dur}-second photorealistic vertical 9:16 fashion transformation video.\n\nREFERENCES\nUse "})
+            segments.append({"type": "media", "asset_key": bg_key, "title": bg_title})
+            segments.append({"type": "text", "text": " as the exact opening frame composition, room environment, lighting, camera angle, woman's facial identity, hairstyle, and opening basic outfit.\n"})
+            if use_individual_sheets:
+                segments.append({"type": "text", "text": "Use "})
+                segments.append({"type": "media", "asset_key": out1_key, "title": out1_title})
+                segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 1 ({out1_en}). Never show the flatlay collage sheet itself in the video.\n"})
+                if len(transitions) >= 2 and (out2.get("filename") or out2.get("path")):
+                    segments.append({"type": "text", "text": "Use "})
+                    segments.append({"type": "media", "asset_key": out2_key, "title": out2_title})
+                    segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 2 ({out2_en}). Completely replace Look 1's accessories and never show the flatlay collage sheet itself in the video.\n\n"})
+                else:
+                    segments.append({"type": "text", "text": "\n"})
+            else:
+                segments.append({"type": "text", "text": "Use "})
+                segments.append({"type": "media", "asset_key": overall_key, "title": overall_title})
+                segments.append({"type": "text", "text": " strictly for the exact Look 1 and Look 2 outfits. Never show the reference sheet in the video.\n\n"})
+
+            segments.append({"type": "text", "text": "IDENTITY AND CAMERA\nPreserve the exact woman's face, natural skin texture, body proportions, and hairstyle from "})
+            segments.append({"type": "media", "asset_key": bg_key, "title": bg_title})
+            segments.append({"type": "text", "text": " throughout the entire clip.\nKeep the exact room background from "})
+            segments.append({"type": "media", "asset_key": bg_key, "title": bg_title})
+            segments.append({
+                "type": "text",
+                "text": (
+                    " locked and unchanged.\n"
+                    "Locked tripod camera, continuous full-body head-to-toe 9:16 framing with both feet clearly visible on the floor at all times.\n\n"
+                    "MOVEMENT\n"
+                    f"{move_feel_en}\n\n"
+                    "TIMELINE (LOCAL CLIP TIME)\n"
+                    f"{b1.get('open_range', '0.00-1.30')}: Start in the exact opening pose, room, and basic outfit from "
+                ),
+            })
+            segments.append({"type": "media", "asset_key": bg_key, "title": bg_title})
+            segments.append({
+                "type": "text",
+                "text": (
+                    f". {b1.get('open_en', 'She smiles warmly at the camera and sways gently to the opening beat.')}\n"
+                    f"{b1.get('build1_range', f'1.30-{max(1.40, t1-0.80):.2f}')}: {b1.get('build1_en', 'She opens both forearms outward at waist level and performs a playful rhythmic hand gesture.')}\n"
+                    f"{b1.get('prep1_range', f'{max(1.40, t1-0.80):.2f}-{t1:.2f}')}: {b1.get('prep1_en', 'She prepares the crisp transformation gesture on the pre-beat.')}\n"
+                    f"AT {t1:.2f}: {b1.get('at1_trigger_en', 'At the exact peak of the gesture, perform an instantaneous matched-pose cut-free wardrobe switch into EXACT LOOK 1')} from "
+                ),
+            })
+            segments.append({"type": "media", "asset_key": out1_key if use_individual_sheets else overall_key, "title": out1_title if use_individual_sheets else overall_title})
+            segments.append({
+                "type": "text",
+                "text": (
+                    f": {out1_en}. Switch the entire outfit, shoes, and accessories cleanly in one single frame with zero dissolve while preserving her face, moving arm trajectory, and background.\n"
+                ),
+            })
+            if len(transitions) >= 2:
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f"{b1.get('post1_range', f'{t1:.2f}-{min(t2-0.55, t1+1.65):.2f}')}: {b1.get('post1_en', 'Continue the arm movement seamlessly after the switch and sway her shoulders gracefully.')}\n"
+                        f"{b1.get('build2_range', f'{min(t2-0.55, t1+1.65):.2f}-{max(t1+1.8, t2-0.35):.2f}')}: {b1.get('build2_en', 'She takes one small in-place step, softly tilts her head, and brings her hands gracefully toward her waist.')}\n"
+                        f"{b1.get('prep2_range', f'{max(t1+1.8, t2-0.35):.2f}-{t2:.2f}')}: {b1.get('prep2_en', 'She executes the crisp wrist/hand accent on the musical beat.')}\n"
+                        f"AT {t2:.2f}: {b1.get('at2_trigger_en', 'On the exact musical beat accent, perform an instantaneous matched-pose wardrobe switch into EXACT LOOK 2')} from "
+                    ),
+                })
+                segments.append({"type": "media", "asset_key": out2_key if use_individual_sheets else overall_key, "title": out2_title if use_individual_sheets else overall_title})
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f": {out2_en}. Completely remove all Look 1 accessories/necklaces and replace with the exact Look 2 set while maintaining the same face, hairstyle, body position, and continuous arm motion.\n"
+                        f"{b1.get('post2_range', f'{t2:.2f}-7.55')}: {b1.get('post2_en', 'Her arm settles smoothly at her waist as the garment hem settles naturally.')}\n"
+                    ),
+                })
+            else:
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f"{t1:.2f}-7.55: {b1.get('post1_en', 'Continue the arm movement naturally after the switch and showcase the full silhouette of Look 1.')}\n"
+                    ),
+                })
+            segments.append({
+                "type": "text",
+                "text": (
+                    f"{b1.get('end_range', f'7.55-{dur:.2f}')}: {b1.get('end_en', 'Settle into a poised front-facing full-body pose smiling softly at the camera to connect seamlessly to the next clip.')}\n\n"
+                    "AUDIO AND NEGATIVE CONSTRAINTS\n"
+                    "Silent visual clip only: no speech, singing, voiceover, music, or lip-syncing. No camera zoom, no camera pan, no face drift, no leftover accessories from previous outfit, no morphing/melting clothes, no text/captions, and no split-screen or visible product sheet panels."
+                ),
+            })
+        else:
+            t3 = round(float(transitions[0]["timestamp_sec"]) if len(transitions) >= 1 else 2.29, 2)
+            t4 = round(float(transitions[1]["timestamp_sec"]) if len(transitions) >= 2 else 4.86, 2)
+            out3 = transitions[0]["outfit"] if len(transitions) >= 1 else {}
+            out4 = transitions[1]["outfit"] if len(transitions) >= 2 else {}
+            prev_en = prev_outf_obj.get("en_desc") or prev_outf_obj.get("short_desc") or "exact ending outfit from the previous clip"
+            out3_en = out3.get("en_desc") or out3.get("short_desc") or "exact Look 3 outfit and accessories"
+            out4_en = out4.get("en_desc") or out4.get("short_desc") or "exact Look 4 outfit and accessories"
+            out3_title = out3.get("filename") or os.path.basename(out3.get("path") or overall_title)
+            out3_key = out3.get("id") or out3_title
+            out4_title = out4.get("filename") or os.path.basename(out4.get("path") or overall_title)
+            out4_key = out4.get("id") or out4_title
+            use_individual_sheets = 1 <= len(transitions) <= 2 and bool(out3.get("filename") or out3.get("path"))
+            b2 = choreo.get("s2_blocks") or {}
+            open_pose_en = choreo.get("opening_pose_en") or f"Her hands and feet begin in the exact ending pose of Clip {sc_num-1}."
+
+            segments.append({"type": "text", "text": f"Create an {dur}-second photorealistic vertical 9:16 continuation of the previous fashion video.\n\nREFERENCES AND CONTINUITY\nUse "})
+            segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
+            segments.append({"type": "text", "text": f" as the exact first frame, continuing the exact same woman, facial identity, hairstyle, room background, warm lighting, locked full-body 9:16 camera, and starting outfit ({prev_en}).\n"})
+            if use_individual_sheets:
+                segments.append({"type": "text", "text": "Use "})
+                segments.append({"type": "media", "asset_key": out3_key, "title": out3_title})
+                segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 3 ({out3_en}). Never show the flatlay collage sheet in the video.\n"})
+                if len(transitions) >= 2 and (out4.get("filename") or out4.get("path")):
+                    segments.append({"type": "text", "text": "Use "})
+                    segments.append({"type": "media", "asset_key": out4_key, "title": out4_title})
+                    segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 4 ({out4_en}). Never show the flatlay collage sheet in the video.\n\n"})
+                else:
+                    segments.append({"type": "text", "text": "\n"})
+            else:
+                segments.append({"type": "text", "text": "Use "})
+                segments.append({"type": "media", "asset_key": overall_key, "title": overall_title})
+                segments.append({"type": "text", "text": " strictly for the exact Look 3 and Look 4 outfits. Never show the reference sheet in the video.\n\n"})
+
+            segments.append({
+                "type": "text",
+                "text": (
+                    f"{open_pose_en}\n{move_feel_en}\n\n"
+                    "TIMELINE (LOCAL CLIP TIME)\n"
+                    f"{b2.get('open_range', '0.00-1.01')}: Start seamlessly from "
+                ),
+            })
+            segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
+            segments.append({
+                "type": "text",
+                "text": (
+                    f". {b2.get('open_en', f'Continue the gentle body sway from Clip {sc_num-1} without resetting.')}\n"
+                    f"{b2.get('build3_range', f'1.01-{max(1.20, t3-0.30):.2f}')}: {b2.get('build3_en', 'She places her right hand gently on her hip and gestures gracefully with her left forearm.')}\n"
+                    f"{b2.get('prep3_range', f'{max(1.20, t3-0.30):.2f}-{t3:.2f}')}: {b2.get('prep3_en', 'She prepares the transition gesture on the pre-beat without pausing.')}\n"
+                    f"AT {t3:.2f}: {b2.get('at3_trigger_en', 'Perform an instantaneous matched-pose wardrobe switch into EXACT LOOK 3')} from "
+                ),
+            })
+            segments.append({"type": "media", "asset_key": out3_key if use_individual_sheets else overall_key, "title": out3_title if use_individual_sheets else overall_title})
+            segments.append({
+                "type": "text",
+                "text": (
+                    f": {out3_en}. Switch the complete outfit, shoes, and accessories in a single clean frame while preserving her facial identity, moving arm trajectory, and locked room.\n"
+                ),
+            })
+            if len(transitions) >= 2:
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f"{b2.get('post3_range', f'{t3:.2f}-{min(t4-0.50, t3+1.30):.2f}')}: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3 and take one short graceful step in place.')}\n"
+                        f"{b2.get('build4_range', f'{min(t4-0.50, t3+1.30):.2f}-{max(t3+1.45, t4-0.30):.2f}')}: {b2.get('build4_en', 'She subtly angles her torso and brings her hand up toward her shoulder to prepare the next switch.')}\n"
+                        f"{b2.get('prep4_range', f'{max(t3+1.45, t4-0.30):.2f}-{t4:.2f}')}: {b2.get('prep4_en', 'She executes the pre-beat transition accent while keeping her face fully visible.')}\n"
+                        f"AT {t4:.2f}: {b2.get('at4_trigger_en', 'On the musical beat accent, switch instantaneously into EXACT LOOK 4')} from "
+                    ),
+                })
+                segments.append({"type": "media", "asset_key": out4_key if use_individual_sheets else overall_key, "title": out4_title if use_individual_sheets else overall_title})
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f": {out4_en}. Remove the previous Look 3 accessories completely and switch coherently in the same visual instant.\n"
+                        f"{b2.get('post4_range', f'{t4:.2f}-6.15')}: {b2.get('post4_en', 'Continue the hand movement smoothly after the switch and settle into a composed posture.')}\n"
+                    ),
+                })
+            else:
+                segments.append({
+                    "type": "text",
+                    "text": f"{t3:.2f}-6.15: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3.')}\n",
+                })
+            segments.append({
+                "type": "text",
+                "text": (
+                    f"{b2.get('turn_range', '6.15-7.35')}: {b2.get('turn_en', 'She angles her body slightly to showcase the silhouette and accessories while keeping her gaze on the camera.')}\n"
+                    f"{b2.get('end_range', f'7.35-{dur:.2f}')}: {b2.get('end_en', 'Settle into a balanced, confident final fashion lookbook pose.')}\n\n"
+                    "AUDIO AND NEGATIVE CONSTRAINTS\n"
+                    "Silent visual clip only: no speech, singing, voiceover, music, or lip-syncing. No camera movement, no face drift, no leftover accessories from previous outfits, no morphing clothes, no captions, and no visible reference-sheet panels."
+                ),
+            })
+
+    # ==========================================================================
     # CHẾ ĐỘ A: CHAINED IMAGE-TO-VIDEO + TIMELINE 0.1s CHUẨN NHẠC (`chained_i2v`)
     # Phân tích động tác & Hook biến hình trực tiếp từ Bảng Keyframe 0.5s + Video gốc!
     # ==========================================================================
-    if prompt_style == "chained_i2v":
+    elif prompt_style == "chained_i2v":
         import fashion_ai_video_analyzer as fava
 
         choreo = fava.analyze_scene_choreography_and_hooks_for_i2v(
@@ -1797,10 +2019,10 @@ def create_or_update_fashion_motion_project(
     """
     import fashion_ai_video_analyzer as fava
 
-    gen_mode = str(generation_mode or "").strip().lower()
-    if gen_mode not in ("chained_i2v", "video_ref"):
-        gen_mode = "chained_i2v" if str(prompt_style or "") == "chained_i2v" else "chained_i2v"
-    if gen_mode == "chained_i2v" and prompt_style not in ("chained_i2v", "timeline_pro", "concise_flow"):
+    gen_mode = normalize_fashion_generation_mode(generation_mode or prompt_style or "chained_i2v")
+    if gen_mode == "google_vids":
+        prompt_style = "google_vids"
+    elif gen_mode == "chained_i2v" and prompt_style not in ("chained_i2v", "timeline_pro", "concise_flow"):
         prompt_style = "chained_i2v"
 
     proj_dir = os.path.join(FASHION_STUDIO_DIR, project_id_slug)
@@ -1904,7 +2126,7 @@ def create_or_update_fashion_motion_project(
         outfits=normalized_outfits,
         preferred_chunk_sec=preferred_chunk_sec,
         custom_scene_cuts=custom_scene_cuts,
-        generation_mode=gen_mode,
+        generation_mode="chained_i2v" if gen_mode in ("chained_i2v", "google_vids") else "video_ref",
     )
     if not split_res.get("ok"):
         return split_res
@@ -1983,6 +2205,13 @@ def create_or_update_fashion_motion_project(
         sc["template_meta"] = {"code": project_id_slug, "slug": orig_ref_filename}
 
         sc["start_char_ref"] = start_char_ref
+        p_vids = build_scene_timeline_prompt(
+            sc, start_char_ref, char_sheet_ref_obj,
+            prompt_style="google_vids",
+            prev_scene_last_outfit=last_outfit_of_prev_scene,
+            prev_scene_last_frame_ref=prev_lf_ref,
+            bpm_info=bpm_info_obj,
+        )
         p_i2v = build_scene_timeline_prompt(
             sc, start_char_ref, char_sheet_ref_obj,
             prompt_style="chained_i2v",
@@ -2005,6 +2234,8 @@ def create_or_update_fashion_motion_project(
             bpm_info=bpm_info_obj,
         )
 
+        sc["prompt_google_vids"] = p_vids["display_prompt"]
+        sc["segments_google_vids"] = p_vids["segments_spec"]
         sc["prompt_chained_i2v"] = p_i2v["display_prompt"]
         sc["segments_chained_i2v"] = p_i2v["segments_spec"]
         sc["prompt_timeline_pro"] = p_pro["display_prompt"]
@@ -2012,8 +2243,15 @@ def create_or_update_fashion_motion_project(
         sc["prompt_concise_flow"] = p_concise["display_prompt"]
         sc["segments_concise_flow"] = p_concise["segments_spec"]
 
-        eff_style = "chained_i2v" if gen_mode == "chained_i2v" else (prompt_style if prompt_style in ("timeline_pro", "concise_flow") else "timeline_pro")
-        active_p = p_i2v if eff_style == "chained_i2v" else (p_concise if eff_style == "concise_flow" else p_pro)
+        if gen_mode == "google_vids":
+            eff_style = "google_vids"
+            active_p = p_vids
+        elif gen_mode == "chained_i2v":
+            eff_style = "chained_i2v"
+            active_p = p_i2v
+        else:
+            eff_style = prompt_style if prompt_style in ("timeline_pro", "concise_flow") else "timeline_pro"
+            active_p = p_concise if eff_style == "concise_flow" else p_pro
         sc["active_prompt_style"] = eff_style
         sc["generation_mode"] = gen_mode
         sc["prompt"] = active_p["display_prompt"]
@@ -2326,6 +2564,304 @@ def _poll_flow_scene_video_cffi(
     return f"rendering:{status_code}", None
 
 
+def _build_fashion_local_asset_path_map(proj_dir: str, manifest: dict) -> dict:
+    """Ánh xạ mọi `asset_key` và `filename` của dự án Thời Trang sang đường dẫn file ảnh 2K trên ổ đĩa."""
+    assets_dir = os.path.join(proj_dir, "assets_2k")
+    path_map = {}
+
+    def _reg(key_or_fn: str, fpath: str):
+        if key_or_fn and fpath and os.path.isfile(fpath):
+            path_map[str(key_or_fn)] = os.path.abspath(fpath)
+
+    base_obj = manifest.get("base_char_2k") or {}
+    base_fn = base_obj.get("filename") or "02_Character_Sheet_Basic_Poses_2K.png"
+    base_p = base_obj.get("path") or os.path.join(assets_dir, base_fn)
+    if not os.path.isfile(base_p):
+        base_p = os.path.join(DEMO_ASSETS_DIR, base_fn)
+    _reg("base_char_2k", base_p)
+    _reg(base_fn, base_p)
+
+    cs_obj = manifest.get("char_sheet_2k") or {}
+    cs_fn = cs_obj.get("filename") or "07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+    cs_p = cs_obj.get("path") or os.path.join(assets_dir, cs_fn)
+    if not os.path.isfile(cs_p):
+        cs_p = os.path.join(DEMO_ASSETS_DIR, cs_fn)
+    _reg("char_sheet_2k", cs_p)
+    _reg(cs_fn, cs_p)
+
+    ov_fn = "01_Character_Sheet_4_Outfits_2K.png"
+    ov_p = os.path.join(assets_dir, ov_fn)
+    if not os.path.isfile(ov_p):
+        ov_p = os.path.join(DEMO_ASSETS_DIR, ov_fn)
+    _reg("overall_sheet_2k", ov_p)
+    _reg(ov_fn, ov_p)
+
+    for outf in manifest.get("outfits") or []:
+        if not isinstance(outf, dict):
+            continue
+        fn = outf.get("filename") or os.path.basename(outf.get("path") or "")
+        op = outf.get("path") or os.path.join(assets_dir, fn)
+        if not os.path.isfile(op) and fn:
+            op = os.path.join(assets_dir, fn)
+        if not os.path.isfile(op) and fn:
+            op = os.path.join(DEMO_ASSETS_DIR, fn)
+        _reg(outf.get("id") or "", op)
+        _reg(fn, op)
+
+    for sc in manifest.get("scenes") or []:
+        for tr in sc.get("transitions") or []:
+            outf = tr.get("outfit") or {}
+            fn = outf.get("filename") or os.path.basename(outf.get("path") or "")
+            op = outf.get("path") or (os.path.join(assets_dir, fn) if fn else "")
+            if op and not os.path.isfile(op) and fn:
+                op = os.path.join(DEMO_ASSETS_DIR, fn)
+            _reg(outf.get("id") or "", op)
+            _reg(fn, op)
+        lf_ref = sc.get("prev_scene_last_frame_ref") or {}
+        lf_fn = lf_ref.get("filename") or ""
+        lf_p = lf_ref.get("path") or (os.path.join(assets_dir, lf_fn) if lf_fn else "")
+        _reg(lf_ref.get("asset_key") or "", lf_p)
+        _reg(lf_fn, lf_p)
+
+    return path_map
+
+
+def _run_fashion_motion_project_on_google_vids(
+    project_id_slug: str,
+    proj_dir: str,
+    manifest: dict,
+    manifest_path: str,
+    profile_name: str = "",
+    target_scene_id: str = "",
+) -> dict:
+    """
+    Thực thi dự án Video Thời Trang trực tiếp qua **Google Vids Web (`docs.google.com/videos`)**:
+      - 100% HTTP thuần (`GoogleVidsClient`), KHÔNG mở trình duyệt Chrome/Playwright, KHÔNG cần reCAPTCHA!
+      - Tải trực tiếp tối đa 3 ảnh 2K gốc mỗi phân cảnh qua Scotty temporaryblob & gắn UUID Chip `Amv` chuẩn xác.
+      - Xuất thẳng MP4 Native 1080×1920 24FPS (không cần bước chờ Upsample 720p -> 1080p).
+      - Cảnh 1 xong tự động trích xuất `scene_s1_last_frame_2k.png` làm Frame đầu nối tiếp Cảnh 2, sau đó ghép nhạc gốc Final!
+    """
+    import fashion_ai_video_analyzer as fava
+    import google_vids_client as gvc
+
+    cfg = {}
+    try:
+        import engine_settings_manager as _esm
+        cfg = _esm.load_engine_settings()
+    except Exception:
+        cfg = {}
+
+    vids_model = str(cfg.get("google_vids_model") or "omni").strip().lower()
+    multi_acc = bool(cfg.get("multi_account_enabled", True))
+    detected_accs = [
+        a["profile_name"]
+        for a in (cfg.get("detected_flow_accounts") or [])
+        if a.get("active", True) and a.get("profile_name")
+    ]
+    prof = (profile_name or "").strip() or (detected_accs[0] if detected_accs else "leviettung04")
+    fallback_profs = [p for p in detected_accs if p != prof] if multi_acc else []
+
+    manifest["generation_mode"] = "google_vids"
+    manifest["prompt_style"] = "google_vids"
+    all_scenes = sorted(manifest.get("scenes") or [], key=lambda x: int(x.get("scene_index") or 1))
+    scenes_to_run = [s for s in all_scenes if not target_scene_id or s.get("id") == target_scene_id]
+    if not scenes_to_run:
+        return {"ok": False, "error": f"Không tìm thấy phân cảnh '{target_scene_id}' trong dự án '{project_id_slug}'."}
+
+    def _save_live(st_code: str = None, st_msg: str = None):
+        if st_code:
+            manifest["status"] = st_code
+        if st_msg:
+            manifest["status_message"] = st_msg
+        manifest["updated_at"] = time.strftime("%H:%M:%S")
+        with open(manifest_path, "w", encoding="utf-8") as mf:
+            json.dump(manifest, mf, ensure_ascii=False, indent=2)
+
+    start_char_ref = {
+        "asset_key": "base_char_2k",
+        "filename": (manifest.get("base_char_2k") or {}).get("filename") or "02_Character_Sheet_Basic_Poses_2K.png",
+        "path": (manifest.get("base_char_2k") or {}).get("path") or "",
+        "is_continuity_generated": False,
+    }
+    char_sheet_ref_obj = manifest.get("char_sheet_2k")
+    bpm_info = (manifest.get("split_plan") or {}).get("bpm_info") or manifest.get("global_cuts_info") or {}
+    assets_dir = os.path.join(proj_dir, "assets_2k")
+    os.makedirs(assets_dir, exist_ok=True)
+
+    asset_path_map = _build_fashion_local_asset_path_map(proj_dir, manifest)
+    client = gvc.get_google_vids_client()
+    max_attempts = 3
+
+    _save_live(
+        "running_flow",
+        f"🌐 Đang kết nối Google Vids Web ({prof} • Model {vids_model.upper()} 1080p • Không cần reCAPTCHA)...",
+    )
+
+    for idx_s, sc in enumerate(all_scenes):
+        sc_id = sc.get("id") or f"s{idx_s + 1}"
+        sc_num = int(sc.get("scene_index") or (idx_s + 1))
+        out_mp4 = os.path.join(proj_dir, sc.get("output_video_file") or f"fashion_scene_{sc_id}_1080p.mp4")
+
+        # Nếu chỉ chạy 1 cảnh cụ thể (VD s2), vẫn đảm bảo cắt last frame từ s1 nếu s1 đã có sẵn trên ổ đĩa
+        if target_scene_id and sc_id != target_scene_id:
+            if os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 50000:
+                lf_key = f"scene_{sc_id}_last_frame_2k"
+                lf_path = os.path.join(assets_dir, f"{lf_key}.png")
+                if not os.path.isfile(lf_path):
+                    extract_scene_last_frame_2k(out_mp4, lf_path)
+                if os.path.isfile(lf_path):
+                    asset_path_map[lf_key] = os.path.abspath(lf_path)
+                    asset_path_map[f"{lf_key}.png"] = os.path.abspath(lf_path)
+            continue
+
+        # Với Cảnh 2+, cập nhật `prev_scene_last_frame_ref` mới nhất từ Cảnh trước vừa render xong
+        if sc_num >= 2 and idx_s >= 1:
+            prev_sc = all_scenes[idx_s - 1]
+            prev_id = prev_sc.get("id") or f"s{sc_num - 1}"
+            prev_mp4 = prev_sc.get("output_video_path") or os.path.join(
+                proj_dir, prev_sc.get("output_video_file") or f"fashion_scene_{prev_id}_1080p.mp4"
+            )
+            lf_key = f"scene_{prev_id}_last_frame_2k"
+            lf_fn = f"{lf_key}.png"
+            lf_path = os.path.join(assets_dir, lf_fn)
+            if os.path.isfile(prev_mp4) and os.path.getsize(prev_mp4) > 50000:
+                extract_scene_last_frame_2k(prev_mp4, lf_path)
+            if os.path.isfile(lf_path):
+                asset_path_map[lf_key] = os.path.abspath(lf_path)
+                asset_path_map[lf_fn] = os.path.abspath(lf_path)
+                sc["prev_scene_last_frame_ref"] = {"asset_key": lf_key, "filename": lf_fn, "path": lf_path}
+            if not sc.get("prev_scene_last_outfit") and prev_sc.get("transitions"):
+                sc["prev_scene_last_outfit"] = prev_sc["transitions"][-1].get("outfit")
+
+        # Đảm bảo phân cảnh có `segments_google_vids` chuẩn 3 chip ảnh 2K
+        if not sc.get("user_edited_prompt"):
+            p_vids = build_scene_timeline_prompt(
+                sc,
+                start_char_ref,
+                char_sheet_ref_obj,
+                prompt_style="google_vids",
+                prev_scene_last_outfit=sc.get("prev_scene_last_outfit"),
+                prev_scene_last_frame_ref=sc.get("prev_scene_last_frame_ref"),
+                bpm_info=bpm_info,
+            )
+            sc["prompt_google_vids"] = p_vids["display_prompt"]
+            sc["segments_google_vids"] = p_vids["segments_spec"]
+            sc["prompt"] = p_vids["display_prompt"]
+            sc["segments_spec"] = p_vids["segments_spec"]
+            sc["active_prompt_style"] = "google_vids"
+            sc["generation_mode"] = "google_vids"
+
+        dur_sec = int(round(float(sc.get("duration") or sc.get("duration_sec") or 8)))
+        sc["attempt"] = 1
+        sc["max_attempts"] = max_attempts
+        sc["status"] = "rendering:vids_1080p"
+        sc["status_detail"] = (
+            f"🌐 Đang tải ảnh 2K & tạo Video Phân Cảnh {sc_num} (1080p • {dur_sec}s) trên Google Vids Web ({prof})..."
+        )
+        _save_live("running_flow", sc["status_detail"])
+
+        # Nếu người dùng tự sửa text prompt thủ công, trích danh sách 3 ảnh từ segments_google_vids để gắn tag tự động
+        custom_img_specs = None
+        use_segments = sc.get("segments_google_vids") or sc.get("segments_spec")
+        if sc.get("user_edited_prompt") and sc.get("prompt"):
+            custom_img_specs = []
+            for seg in (use_segments or []):
+                if seg.get("type") == "media":
+                    ak = str(seg.get("asset_key") or "")
+                    tt = str(seg.get("title") or "")
+                    fp = asset_path_map.get(ak) or asset_path_map.get(tt)
+                    if fp and os.path.isfile(fp):
+                        custom_img_specs.append({"path": fp, "tags": [f"[{tt}]", tt, ak]})
+            use_segments = None
+
+        res_gen = client.generate_video(
+            out_mp4=out_mp4,
+            prompt=str(sc.get("prompt") or ""),
+            image_paths=custom_img_specs,
+            segments_spec=use_segments,
+            asset_path_map=asset_path_map if use_segments else None,
+            profile_name=prof,
+            fallback_profiles=fallback_profs,
+            model=vids_model,
+            aspect_ratio="9:16",
+            resolution="1080p",
+            duration_sec=dur_sec,
+            ingredient_role="fashion",
+            max_retries=max_attempts - 1,
+        )
+
+        if res_gen.get("ok") and os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 50000:
+            mb_size = round(res_gen["bytes"] / 1048576, 2)
+            used_prof = res_gen.get("profile") or prof
+            q_rem = (res_gen.get("quota") or {}).get("remaining")
+            q_str = f" • Quota còn: {q_rem}" if q_rem is not None else ""
+            sc["output_video_path"] = out_mp4
+            sc["is_ai_generated"] = True
+            sc["provider"] = "google_vids"
+            sc["last_error"] = ""
+            sc["status"] = "done"
+            sc["status_detail"] = (
+                f"✅ Đã hoàn tất Video Phân Cảnh {sc_num} Native 1080p qua Google Vids "
+                f"({used_prof} • {mb_size} MB trong {res_gen['elapsed_sec']}s{q_str})!"
+            )
+            lf_out = os.path.join(assets_dir, f"scene_{sc_id}_last_frame_2k.png")
+            extract_scene_last_frame_2k(out_mp4, lf_out)
+            if os.path.isfile(lf_out):
+                asset_path_map[f"scene_{sc_id}_last_frame_2k"] = os.path.abspath(lf_out)
+                asset_path_map[f"scene_{sc_id}_last_frame_2k.png"] = os.path.abspath(lf_out)
+            _save_live("running_flow", sc["status_detail"])
+        else:
+            err_msg = res_gen.get("error") or "Lỗi tạo video trên Google Vids"
+            sc["status"] = f"failed:vids"
+            sc["last_error"] = err_msg
+            sc["status_detail"] = f"❌ Phân cảnh {sc_num} lỗi trên Google Vids: {err_msg}"
+            _save_live("running_flow", sc["status_detail"])
+            # Nếu Cảnh 1 lỗi thì dừng sớm vì Cảnh 2 cần Frame cuối Cảnh 1
+            if sc_num == 1 and not target_scene_id:
+                break
+
+    done_scenes = [
+        s for s in (manifest.get("scenes") or [])
+        if s.get("status") == "done" or (s.get("output_video_path") and os.path.exists(s.get("output_video_path", "")))
+    ]
+    failed_scenes = [s for s in scenes_to_run if str(s.get("status") or "").startswith("failed")]
+
+    try:
+        if len(done_scenes) == len(manifest.get("scenes") or []):
+            post_res = fava.render_fashion_postprod_final_video(
+                project_id_slug, proj_dir, manifest, FINAL_VIDEOS_DIR
+            )
+            if post_res.get("ok"):
+                manifest["final_video_path"] = post_res["final_video_path"]
+                manifest["final_video_ready"] = True
+    except Exception as exc:
+        print(f"[GoogleVids PostProd Warn] {exc}", flush=True)
+
+    all_ok = len(failed_scenes) == 0
+    manifest["ok"] = all_ok
+    if all_ok:
+        manifest.pop("error", None)
+        manifest["status"] = "completed_flow"
+        manifest["status_message"] = (
+            f"🎉 Đã hoàn tất Video Final Thời Trang 1080p qua Google Vids Web ({len(done_scenes)} phân cảnh • Không reCAPTCHA)!"
+        )
+        manifest["message"] = manifest["status_message"]
+    else:
+        f_ids = ", ".join(str(s.get("id", "")).upper() for s in failed_scenes)
+        manifest["status"] = "failed_scenes"
+        manifest["status_message"] = f"⚠️ Phân cảnh {f_ids} chưa hoàn tất trên Google Vids: {failed_scenes[0].get('last_error', '')[:160]}"
+        manifest["error"] = manifest["status_message"]
+
+    _save_live()
+    try:
+        import sync_web_ui_state as _sws
+        _sws.sync_web_ui(force=True)
+    except Exception:
+        pass
+    manifest["project"] = dict(manifest)
+    return manifest
+
+
 def run_fashion_motion_project_on_flow(
     project_id_slug: str,
     profile_name: str = "",
@@ -2333,12 +2869,34 @@ def run_fashion_motion_project_on_flow(
     generation_mode: str = "",
 ) -> dict:
     """
-    Thực thi tự động dự án Fashion Video trực tiếp trên Google Flow (`flow.google.com`) với 2 chế độ tuỳ chọn:
-      - `chained_i2v`: Hoàn toàn từ Img2Video (`MZZa6b` / `macaron_cookie_r2v_8s`) + Timeline 0.1s chuẩn nhạc (không dùng Video Ref).
-                       Phân cảnh 1 xong tự động cắt Frame cuối (`scene_s1_last_frame_2k.png`), upload `maseQ` để nối tiếp Phân cảnh 2.
-      - `video_ref`:   Motion Control Video Ref (`jIps6` / `abra_edit`), dùng Video Gốc làm Ref + Phân cảnh 2 tự động dùng Frame cuối
-                       của Phân cảnh 1 (`scene_s1_last_frame_2k.png`) để nối tiếp liền mạch hành động và trang phục!
+    Thực thi tự động dự án Fashion Video với 3 chế độ tuỳ chọn:
+      - `google_vids`: Google Vids Web (`docs.google.com/videos`) Omni 1080p Native — Không cần Chrome/Playwright, không reCAPTCHA, gắn 3 Chip Ảnh 2K gốc.
+      - `chained_i2v`: Google Flow Img2Video (`MZZa6b`) + Timeline 0.1s chuẩn nhạc (không dùng Video Ref).
+      - `video_ref`:   Google Flow Motion Control Video Ref (`jIps6` / `abra_edit`) + Nối Frame cuối Cảnh 1.
     """
+    proj_dir = os.path.join(FASHION_STUDIO_DIR, project_id_slug)
+    manifest_path = os.path.join(proj_dir, "fashion_project.json")
+    if not os.path.exists(manifest_path):
+        return {"ok": False, "error": f"Không tìm thấy project: {project_id_slug}"}
+
+    with open(manifest_path, "r", encoding="utf-8") as f:
+        manifest = json.load(f)
+
+    gen_mode_norm = normalize_fashion_generation_mode(
+        generation_mode or manifest.get("generation_mode") or "chained_i2v"
+    )
+    manifest["generation_mode"] = gen_mode_norm
+
+    if gen_mode_norm == "google_vids":
+        return _run_fashion_motion_project_on_google_vids(
+            project_id_slug=project_id_slug,
+            proj_dir=proj_dir,
+            manifest=manifest,
+            manifest_path=manifest_path,
+            profile_name=profile_name,
+            target_scene_id=target_scene_id,
+        )
+
     import fashion_ai_video_analyzer as fava
     import grok_video_tool as gvt
     from playwright.sync_api import sync_playwright
@@ -2348,18 +2906,6 @@ def run_fashion_motion_project_on_flow(
         generate_variant_ref_image_in_page,
         submit_upsample_1080p_in_page,
     )
-
-    proj_dir = os.path.join(FASHION_STUDIO_DIR, project_id_slug)
-    manifest_path = os.path.join(proj_dir, "fashion_project.json")
-    if not os.path.exists(manifest_path):
-        return {"ok": False, "error": f"Không tìm thấy project: {project_id_slug}"}
-
-    with open(manifest_path, "r", encoding="utf-8") as f:
-        manifest = json.load(f)
-
-    gen_mode_raw = (generation_mode or manifest.get("generation_mode") or "chained_i2v").strip().lower()
-    gen_mode_norm = "chained_i2v" if ("i2v" in gen_mode_raw or "chained" in gen_mode_raw) else "video_ref"
-    manifest["generation_mode"] = gen_mode_norm
 
     prof = (profile_name or "").strip() or "leviettung04"
     cookie_hdr = gvt._load_flow_cookie_header(prof)
@@ -3692,9 +4238,12 @@ def switch_fashion_project_generation_mode(project_id_slug: str, generation_mode
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
-    gen_mode_raw = str(generation_mode or "chained_i2v").strip().lower()
-    gen_mode_norm = "chained_i2v" if ("i2v" in gen_mode_raw or "chained" in gen_mode_raw) else "video_ref"
-    target_p_style = "chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro"
+    gen_mode_norm = normalize_fashion_generation_mode(generation_mode or "chained_i2v")
+    target_p_style = (
+        "google_vids"
+        if gen_mode_norm == "google_vids"
+        else ("chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro")
+    )
     manifest["generation_mode"] = gen_mode_norm
     manifest["prompt_style"] = target_p_style
 
@@ -3729,7 +4278,7 @@ def switch_fashion_project_generation_mode(project_id_slug: str, generation_mode
                     global_cuts_info=g_cuts,
                     clips_dir=os.path.join(proj_dir, "ref_clips"),
                     custom_scene_cuts=None,
-                    generation_mode=gen_mode_norm,
+                    generation_mode="chained_i2v" if gen_mode_norm in ("chained_i2v", "google_vids") else "video_ref",
                 )
                 for idx_c, sc_c in enumerate(all_scenes):
                     if idx_c < len(smart_tr_map) and smart_tr_map[idx_c]:
@@ -3763,8 +4312,11 @@ def switch_fashion_project_generation_mode(project_id_slug: str, generation_mode
             "action_description": manifest.get("source_template_action") or sc.get("ai_motion_summary_vn") or "",
         }
 
+        p_vids = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="google_vids", bpm_info=bpm_info)
         p_i2v = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="chained_i2v", bpm_info=bpm_info)
         p_vref = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="timeline_pro", bpm_info=bpm_info)
+        sc["prompt_google_vids"] = p_vids["display_prompt"]
+        sc["segments_google_vids"] = p_vids["segments_spec"]
         sc["prompt_chained_i2v"] = p_i2v["display_prompt"]
         sc["segments_chained_i2v"] = p_i2v["segments_spec"]
         sc["prompt_timeline_pro"] = p_vref["display_prompt"]
@@ -3774,7 +4326,10 @@ def switch_fashion_project_generation_mode(project_id_slug: str, generation_mode
         sc["generation_mode"] = gen_mode_norm
         sc["active_prompt_style"] = target_p_style
         sc["user_edited_prompt"] = False
-        if gen_mode_norm == "chained_i2v":
+        if gen_mode_norm == "google_vids":
+            sc["prompt"] = p_vids["display_prompt"]
+            sc["segments_spec"] = p_vids["segments_spec"]
+        elif gen_mode_norm == "chained_i2v":
             sc["prompt"] = p_i2v["display_prompt"]
             sc["segments_spec"] = p_i2v["segments_spec"]
         else:
@@ -3813,10 +4368,9 @@ def apply_fashion_video_template_to_project(
     if not project_id_slug:
         project_id_slug = f"fashion_tpl_{code_norm.lower()}"
 
-    gen_mode_raw = str(generation_mode or "chained_i2v").strip().lower()
-    gen_mode_norm = "chained_i2v" if ("i2v" in gen_mode_raw or "chained" in gen_mode_raw) else "video_ref"
+    gen_mode_norm = normalize_fashion_generation_mode(generation_mode or "chained_i2v")
 
-    # Nếu ở chế độ `video_ref`, lấy mốc cắt của template; nếu ở chế độ `chained_i2v`, để bộ dò 0.01s/0.1s Beat & Visual Cut phân tích chuẩn xác theo nhạc!
+    # Nếu ở chế độ `video_ref`, lấy mốc cắt của template; nếu ở chế độ `chained_i2v` / `google_vids`, để bộ dò 0.01s/0.1s Beat & Visual Cut phân tích chuẩn xác theo nhạc!
     custom_cuts = {}
     if gen_mode_norm == "video_ref":
         for sc_bp in tpl.get("scenes_blueprint") or []:
@@ -3832,7 +4386,7 @@ def apply_fashion_video_template_to_project(
         ref_video_path=tpl["video_path"],
         outfit_items=outfit_items,
         preferred_chunk_sec="8",
-        prompt_style="chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro",
+        prompt_style="google_vids" if gen_mode_norm == "google_vids" else ("chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro"),
         generation_mode=gen_mode_norm,
         custom_scene_cuts=custom_cuts if custom_cuts else None,
         ai_provider="template_preanalyzed",
@@ -3877,15 +4431,21 @@ def apply_fashion_video_template_to_project(
             "category": tpl.get("category") or "",
             "action_description": tpl.get("action_description") or sc["ai_motion_summary_vn"],
         }
+        p_vids = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="google_vids", bpm_info=bpm_info)
         p_i2v = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="chained_i2v", bpm_info=bpm_info)
         p_vref = build_scene_timeline_prompt(sc, start_char_ref, char_sheet_ref_obj, prompt_style="timeline_pro", bpm_info=bpm_info)
+        sc["prompt_google_vids"] = p_vids["display_prompt"]
+        sc["segments_google_vids"] = p_vids["segments_spec"]
         sc["prompt_chained_i2v"] = p_i2v["display_prompt"]
         sc["segments_chained_i2v"] = p_i2v["segments_spec"]
         sc["prompt_timeline_pro"] = p_vref["display_prompt"]
         sc["segments_timeline_pro"] = p_vref["segments_spec"]
         sc["prompt_concise_flow"] = p_vref["display_prompt"]
         sc["segments_concise_flow"] = p_vref["segments_spec"]
-        if gen_mode_norm == "chained_i2v":
+        if gen_mode_norm == "google_vids":
+            sc["prompt"] = p_vids["display_prompt"]
+            sc["segments_spec"] = p_vids["segments_spec"]
+        elif gen_mode_norm == "chained_i2v":
             sc["prompt"] = p_i2v["display_prompt"]
             sc["segments_spec"] = p_i2v["segments_spec"]
         else:

@@ -1,0 +1,20 @@
+{
+  "provider": "built-in image_gen",
+  "style_id": "food_macro_magazine",
+  "project_id": "pov_cooking_v2_20261110",
+  "reference_images": [
+    "projects\\pov_cooking_v2_20261110\\s3_opening.jpg"
+  ],
+  "generation_prompt": "Create ONE complete professional vertical 9:16 Vietnamese AI thumbnail, production-ready photography and typography integrated as a single designed image. Premium food magazine cover with tight appetizing macro food photography. The reference is a video contact strip: use its rightmost cooked-food frame as FOOD IDENTITY ONLY; generate ONE seamless full-screen scene, absolutely no panel grid or contact strip. Same warm ivory pot, orange-red broth, pink cooked shrimp, mushrooms and yellow corn as the reference. Oblique close camera at food level with one hero cooked shrimp and mushrooms, translucent steam, beautiful separate oil ribbons, natural wet highlights, cozy softly blurred bright kitchen. Foreground food occupies lower two thirds, upper quarter has softly lit ivory negative space for rich dark brick-red editorial typography. Large exact Vietnamese heading 'LẨU THÁI' and next line 'TÔM NẤM'. Small subtitle 'Ấm nồi, đậm vị'. One tiny restrained editorial line and delicate ingredient-inspired graphic accents only. Warm ivory, rich tomato orange, shrimp coral and natural greens, neutral whites, no overall yellow cast, no oversaturation, no hands, person, face, package, price, claims or cooking-time claims. Tasteful modern Vietnamese food editorial, no cluttered retail badges. Use references only for the stated roles, preserve actual identity and product shapes. Correct Vietnamese diacritics, polished readable mobile hierarchy, no watermark. Generate a new complete composition, not just text over the original reference.",
+  "reusable_style_prompt": "Premium food magazine editorial, one seamless macro food photograph matching the supplied dish, cookware, ingredient state and video kitchen. Tight oblique close-up, realistic moist texture and translucent steam where appropriate, readable ingredient layers. Let the dish dominate the lower two thirds; reserve upper negative space for rich dark brick-red refined editorial typography. Warm ivory, natural ingredient colors, neutral whites, restrained highlights and no overall yellow cast. No face, presenter, contact sheet, storyboard grid, fabricated ingredients or cooking-time claims.",
+  "prompt_structure": [
+    "REFERENCE ROLES: exact product / actual character if requested / video environment",
+    "SUBJECT: {product_name}; verified facts: {product_info}",
+    "ART DIRECTION: selected style, camera, lighting, palette, materials and composition",
+    "TEXT: exact Vietnamese headline {hook_text}; optional verified supporting copy",
+    "CONTINUITY: preserve reference identity, product geometry and video context",
+    "OUTPUT: one complete 9:16 thumbnail; mobile readability; 8% safe margins",
+    "NEGATIVE: no false price/claims, invented gifts, extra fingers or watermark"
+  ],
+  "demo_path": "Template\\Thumbnail_Templates\\samples\\food_macro_magazine_demo.png"
+}

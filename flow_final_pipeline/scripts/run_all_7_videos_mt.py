@@ -349,6 +349,8 @@ def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
                 time.sleep(3.0)
 
         if not (ok_2k and nbytes_2k > 50000):
+            if task.get("require_native_2k"):
+                return False, None, f"Native 2K download required; SPrCad failed: {err_2k}"
             print(f"   [2K-FALLBACK {pid} | {v_key}] SPrCad returned {err_2k} after 4 tries, downloading & upscaling to 2K (1536x2752)...", flush=True)
             r_img = s.get(img_url, headers=dl_headers, timeout=60, allow_redirects=True)
             if r_img.status_code != 200 or len(r_img.content) < 5000:
@@ -388,7 +390,8 @@ def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
         if not uploaded_2k_ok:
             print(f"   [WARN {pid} | {v_key}] 2K re-upload fallback to gen_uuid", flush=True)
 
-    print(f"🖼️ [{pid} | {v_key.upper()}] Generated, downloaded 2K (1536x2752) & re-uploaded 2K Ref Image {os.path.basename(out_file)} ({nbytes_2k//1024} KB) -> uuid_2k={gen_uuid}", flush=True)
+    upload_label = "downloaded 2K (explicit upload follows)" if task.get("skip_reupload_2k") else "downloaded 2K & re-uploaded 2K Ref Image"
+    print(f"🖼️ [{pid} | {v_key.upper()}] Generated, {upload_label} {os.path.basename(out_file)} ({nbytes_2k//1024} KB) -> media_uuid={gen_uuid}", flush=True)
     return True, gen_uuid, None
 
 
@@ -409,7 +412,7 @@ def submit_scene_in_page(page, wiz, task):
         except Exception:
             pass
 
-    if not prod_uuid or prod_uuid == ref_uuid:
+    if (not prod_uuid or prod_uuid == ref_uuid) and not task.get("storyboard_only"):
         return False, None, "Missing prod_uuid (Standard workflow requires [2K Ref Image + Product Image + Voice])"
 
     rcap = page.evaluate(
@@ -432,7 +435,7 @@ def submit_scene_in_page(page, wiz, task):
     #   1) [None, ref_uuid]  -> 2K Reference Image of Character holding Product (1536x2752)
     #   2) [None, prod_uuid] -> Product Reference Image (prod_1.jpg)
     #   3) [[voice_id]]      -> Character Voice
-    ref_list = [[None, ref_uuid], [None, prod_uuid]]
+    ref_list = [[None, ref_uuid]] if task.get("storyboard_only") else [[None, ref_uuid], [None, prod_uuid]]
     voice_list = [[voice_id]] if voice_id else []
     item_g = [
         h_prompt,
@@ -697,6 +700,8 @@ def is_ref_image_2k(img_path):
 def main():
     only_pids = sys.argv[1:] if len(sys.argv) > 1 else ALL_PIDS
     cfg = _esm.load_engine_settings() if _esm is not None else {}
+    VIDEO_PROVIDER = str(cfg.get("video_provider") or "google_flow").strip().lower()
+    VIDS_MODEL = str(cfg.get("google_vids_model") or "omni").strip().lower()
     MAX_INFLIGHT = int(cfg.get("max_total_inflight") or 20)
     SUBMIT_DELAY_SEC = float(cfg.get("submit_delay_sec") or 12.0)
     FFMPEG_WORKERS = int(cfg.get("ffmpeg_render_workers") or 4)
@@ -707,13 +712,37 @@ def main():
         active_flow_accs = [{"name": f"Google_{PROF_NAME}", "profile_name": PROF_NAME, "active": True}]
 
     print(
-        f"⚙️ [ENGINE CONFIG] FFmpeg Workers={FFMPEG_WORKERS} | Max Inflight={MAX_INFLIGHT} | "
-        f"Submit Delay={SUBMIT_DELAY_SEC}s | Active Flow Accounts={len(active_flow_accs)} ({', '.join(a['profile_name'] for a in active_flow_accs)})",
+        f"⚙️ [ENGINE CONFIG] Video Provider={VIDEO_PROVIDER} ({VIDS_MODEL if VIDEO_PROVIDER == 'google_vids' else 'flow'}) | "
+        f"FFmpeg Workers={FFMPEG_WORKERS} | Max Inflight={MAX_INFLIGHT} | "
+        f"Submit Delay={SUBMIT_DELAY_SEC}s | Active Accounts={len(active_flow_accs)} ({', '.join(a['profile_name'] for a in active_flow_accs)})",
         flush=True,
     )
 
     ffmpeg_pool = concurrent.futures.ThreadPoolExecutor(max_workers=FFMPEG_WORKERS)
     poll_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(15, MAX_INFLIGHT))
+    vids_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(2, min(8, MAX_INFLIGHT)))
+    vids_rr_box = [0]
+
+    def _run_google_vids_scene_task(task_item: dict, prof_name: str, fb_profs: list, model_name: str):
+        import google_vids_client as _gvc
+        client = _gvc.get_google_vids_client()
+        imgs = [p for p in [task_item.get("ref_img_abs"), task_item.get("primary_prod_img")] if p and os.path.isfile(p)]
+        if task_item.get("sc", {}).get("storyboard_only") and imgs:
+            imgs = imgs[:1]
+        dur = int(task_item.get("scene_duration_sec") or (task_item.get("sc") or {}).get("duration_sec") or 10)
+        return client.generate_video(
+            out_mp4=task_item["out_mp4"],
+            prompt=str((task_item.get("sc") or {}).get("prompt") or ""),
+            image_paths=imgs,
+            profile_name=prof_name,
+            fallback_profiles=fb_profs,
+            model=model_name,
+            aspect_ratio="9:16",
+            resolution="1080p",
+            duration_sec=dur,
+            ingredient_role="product",
+            max_retries=2,
+        )
     ffmpeg_futures = []
 
     pending_queue = []
@@ -1157,6 +1186,29 @@ def main():
                 t = pending_queue.pop(pick_idx)
                 pid = t["pid"]
                 pdir, prompts_data, state, refs_state = prod_meta[pid]
+                t_type = t.get("type")
+
+                # Fast path: Google Vids Web Native 1080p video generation (Zero Playwright, Zero reCAPTCHA, Zero 720p->1080p upsample)
+                if t_type == "vid_scene" and VIDEO_PROVIDER == "google_vids":
+                    sc_id = t["sc"]["id"]
+                    chosen_prof = active_flow_accs[vids_rr_box[0] % len(active_flow_accs)]["profile_name"]
+                    vids_rr_box[0] += 1
+                    fb_profs = [a["profile_name"] for a in active_flow_accs if a["profile_name"] != chosen_prof]
+                    last_submit_ts[0] = time.time()
+                    t["stage"] = "vids_1080p"
+                    t["submitted_at"] = time.time()
+                    t["account_name"] = chosen_prof
+                    t["_vids_future"] = vids_pool.submit(_run_google_vids_scene_task, t, chosen_prof, fb_profs, VIDS_MODEL)
+                    inflight_tasks[t["key"]] = t
+                    print(
+                        f"🌐 [{pid} | {sc_id}] Dispatched Native 1080p scene ({t.get('scene_duration_sec', 10)}s) via Google Vids Web ({chosen_prof})!",
+                        flush=True,
+                    )
+                    write_pipeline_heartbeat(
+                        f"🌐 [{pid} | {sc_id}] Đang tạo cảnh Native 1080p qua Google Vids Web ({chosen_prof})",
+                        is_running=True,
+                    )
+                    continue
 
                 if ctx_uses[0] >= 12 or cur_proj_box[0] != t["project_id"]:
                     open_fresh_clean_context(t["project_id"])
@@ -1164,7 +1216,6 @@ def main():
                 ctx_uses[0] += 1
                 last_submit_ts[0] = time.time()
 
-                t_type = t.get("type")
                 if t_type == "upsample_ref_2k":
                     v_key = t["v_key"]
                     ok_2k, nbytes_2k, err_2k = upsample_image_2k_in_page(
@@ -1301,47 +1352,20 @@ def main():
                         open_fresh_clean_context(t["project_id"])
 
                 elif t_type == "thumb_img":
-                    v_key = t["v_key"]
-                    char_v = t["char_v"]
-                    out_thumb_proj = t["out_file"]
-                    os.makedirs(os.path.dirname(out_thumb_proj), exist_ok=True)
-                    thumbs_central_dir = os.path.join(WS_DIR, "thumbnails")
-                    os.makedirs(thumbs_central_dir, exist_ok=True)
-                    out_thumb_central = os.path.join(thumbs_central_dir, os.path.basename(out_thumb_proj))
-
-                    u_id = t.get("prod_uuid") or ensure_single_prod_uuid(
-                        pid, pdir, state, refs_state, t["base_char"], t["project_id"], t["primary_prod_img"]
-                    )
-                    ref_uuids_th = [x for x in [t.get("ref_uuid"), u_id] if x]
-                    meta_th = _esm.build_thumbnail_prompt_for_variant(pid=pid, vkey=v_key) if _esm else {"prompt": f"9:16 commercial TikTok Shop thumbnail of {pid}"}
-                    th_task = {
-                        "pid": pid,
-                        "v_key": f"{v_key}_thumb",
-                        "project_id": t["project_id"],
-                        "char_id": t.get("char_id") or "",
-                        "prod_uuids": ref_uuids_th,
-                        "allow_multi_refs": True,
-                        "skip_reupload_2k": True,
-                        "prompt_str": meta_th["prompt"],
-                        "out_file": out_thumb_proj,
-                    }
-                    write_pipeline_heartbeat(f"🖼️ [{pid} | {char_v}] Đang tạo Ảnh Thumbnail AI 2K ({cur_acc_box[0]})...", is_running=True)
-                    ok_th, th_uuid, err_th = generate_variant_ref_image_in_page(
-                        page_box[0], wiz_box[0], cookie_hdr_box[0], dl_headers_box[0], th_task
-                    )
-                    if ok_th and os.path.isfile(out_thumb_proj) and os.path.getsize(out_thumb_proj) > 10000:
-                        shutil.copy2(out_thumb_proj, out_thumb_central)
-                        print(f"🖼️ [{pid} | {char_v}] Generated 2K AI Thumbnail -> {os.path.basename(out_thumb_central)} ({os.path.getsize(out_thumb_central)//1024} KB)!", flush=True)
-                        final_mp4 = os.path.join(WS_DIR, "final_videos", f"{pid}_{char_v}.mp4")
-                        if os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 50000 and _esm is not None:
-                            _esm.inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=float(cfg.get("thumbnail_duration_sec") or 0.1))
+                    # All entry points use the same AI-first renderer and selected provider.
+                    v_key = t['v_key']
+                    write_pipeline_heartbeat(f"Thumbnail AI: {pid} / {v_key}", is_running=True)
+                    result = _esm.generate_thumbnail_for_variant(
+                        pid=pid, vkey=v_key, provider=cfg.get('thumbnail_provider','google_flow'),
+                        inject_01s=bool(cfg.get('auto_inject_thumbnail_01s',False)),
+                        add_text_badge=False,
+                    ) if _esm else {'ok':False,'error':'Thumbnail engine unavailable'}
+                    if result.get('ok'):
+                        print(f"Thumbnail AI saved: {result.get('thumbnail_path')}", flush=True)
                         safe_sync_ui()
                     else:
-                        t["retries"] += 1
-                        print(f"⚠️ [{pid} | {char_v} THUMB] Thumbnail gen failed ({err_th}) ({t['retries']}/4)...", flush=True)
-                        if t["retries"] <= 4:
-                            pending_queue.append(t)
-                        open_fresh_clean_context(t["project_id"])
+                        # Do not automatically resubmit paid image jobs.
+                        print(f"Thumbnail AI failed: {result.get('error')}", flush=True)
 
                 elif t_type == "upsample_1080p":
                     sc_id = t["sc"]["id"]
@@ -1442,8 +1466,24 @@ def main():
             if not inflight_tasks:
                 continue
 
+            def _poll_inflight_item(tk):
+                vfut = tk.get("_vids_future")
+                if vfut is not None:
+                    if not vfut.done():
+                        return "running_vids_1080p", None
+                    try:
+                        vres = vfut.result()
+                    except Exception as vexc:
+                        print(f"⚠️ [VIDS-ERR {tk.get('key')}] {vexc}", flush=True)
+                        return "failed_vids", None
+                    if vres and vres.get("ok"):
+                        return "done", vres.get("bytes") or os.path.getsize(tk["out_mp4"])
+                    print(f"⚠️ [VIDS-FAIL {tk.get('key')}] {(vres or {}).get('error')}", flush=True)
+                    return "failed_vids", None
+                return poll_and_download_one(cookie_hdr_box[0], wiz_box[0], dl_headers_box[0], tk)
+
             poll_futs = {
-                poll_pool.submit(poll_and_download_one, cookie_hdr_box[0], wiz_box[0], dl_headers_box[0], t): t
+                poll_pool.submit(_poll_inflight_item, t): t
                 for t in list(inflight_tasks.values())
             }
             status_summary = []
@@ -1487,8 +1527,9 @@ def main():
                         prompts_data["videos"][v_key]["scenes"],
                     )
 
-                elif res_state.startswith("failed_") or ("rpc_err:[5]" in res_state and elapsed >= 15) or elapsed > 120:
+                elif res_state.startswith("failed_") or ("rpc_err:[5]" in res_state and elapsed >= 15) or elapsed > (300 if t.get("stage") == "vids_1080p" else 120):
                     inflight_tasks.pop(t_key, None)
+                    t.pop("_vids_future", None)
                     freed_slot = True
                     t["retries"] += 1
                     if t.get("stage") == "upsample_1080p":
@@ -1562,6 +1603,7 @@ def main():
     concurrent.futures.wait(ffmpeg_futures)
     ffmpeg_pool.shutdown(wait=True)
     poll_pool.shutdown(wait=False)
+    vids_pool.shutdown(wait=False)
     write_pipeline_heartbeat("🎉 Đã hoàn tất toàn bộ tiến trình sản xuất Video Final & Thumbnail!", is_running=False)
     safe_sync_ui()
     print("\n🎉 ALL PRODUCTS × UNIQUE 2K REF IMAGES & FINAL 1080P VIDEOS COMPLETED AND SYNCED TO WEB UI!", flush=True)

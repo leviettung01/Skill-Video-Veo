@@ -917,8 +917,55 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     vkey=vkey,
                     preset_id=preset_id,
                     custom_product_info=custom_info,
+                    subject_mode=(qs.get("subject_mode") or ["auto"])[0],
+                    headline=(qs.get("headline") or [""])[0],
                 ),
             })
+            return
+
+        if path == "/api/cooking/default":
+            import cooking_storyboard_engine as cooking
+            from cooking_recipe_ai import SUGGESTED_DISHES
+            voices = cooking.list_cooking_voices()
+            accounts = cooking.list_cooking_flow_accounts()
+            default_acc = next((a["profile_name"] for a in accounts if a.get("has_cookies")), (accounts[0]["profile_name"] if accounts else "leviettung04"))
+            default_voice = next((v["key"] for v in voices if v.get("recommended_for_cooking")), (voices[0]["key"] if voices else ""))
+            default_vid_prov = (_esm.load_engine_settings() or {}).get("video_provider", "google_flow")
+            self._send_json({
+                "ok": True,
+                "recipe": cooking.DEFAULT_RECIPE,
+                "demo_project_id": "pov_cooking_v2_20261110",
+                "voices": voices,
+                "accounts": accounts,
+                "default_profile": default_acc,
+                "default_voice_key": default_voice,
+                "default_video_provider": default_vid_prov,
+                "suggested_dishes": SUGGESTED_DISHES,
+                "recent_projects": cooking.list_recent_cooking_projects(limit=25),
+            })
+            return
+
+        if path == "/api/google_vids/status":
+            try:
+                import google_vids_client as _gvc
+                probe = (qs.get("probe") or ["0"])[0].strip() in ("1", "true", "yes")
+                prof = (qs.get("profile") or [""])[0].strip()
+                accs = _gvc.list_available_vids_accounts()
+                out_payload = {"ok": True, "accounts": accs}
+                if probe:
+                    out_payload["quota"] = _gvc.get_google_vids_client().get_quota_summary(profile_name=prof)
+                self._send_json(out_payload)
+            except Exception as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 500)
+            return
+
+        if path == "/api/cooking/status":
+            try:
+                import cooking_storyboard_engine as cooking
+                project_id = (qs.get("project_id") or [""])[0]
+                self._send_json({"ok": True, "project": cooking.get_status(project_id)})
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
             return
 
         if path == "/api/templates":
@@ -996,6 +1043,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                             "id": pr.get("id", ""),
                             "vkey": pr.get("vkey", ""),
                             "char_v_code": pr.get("char_v_code", ""),
+                            "pipeline_kind": pr.get("pipeline_kind", ""),
                             "product_name": pr.get("product_name", ""),
                             "final_video_path": pr.get("final_video_path", ""),
                             "thumbnail_path": pr.get("thumbnail_path", ""),
@@ -1004,6 +1052,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         })
                     items.append({
                         "id": detail.get("id", p["id"]),
+                        "pipeline_kind": detail.get("pipeline_kind", ""),
                         "name": detail.get("name", p.get("name", p["id"])),
                         "primary_product_image_path": detail.get("primary_product_image_path", ""),
                         "products": slim_prods,
@@ -1298,6 +1347,115 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         path = parsed.path
         body = self._read_json_body()
 
+        if path == "/api/cooking/generate-script":
+            import cooking_storyboard_engine as cooking
+            from cooking_recipe_ai import generate_cooking_recipe_and_script
+            try:
+                dish = str(body.get("dish") or "").strip()
+                if not dish:
+                    self._send_json({"ok": False, "error": "Vui lòng nhập tên món ăn trước khi sinh kịch bản."}, 400)
+                    return
+                raw_voice = str(body.get("voice_id") or "").strip()
+                raw_mode = str(body.get("audio_mode") or "").strip().lower()
+                if raw_mode not in ("asmr", "voice"):
+                    raw_mode = "voice" if (raw_voice and raw_voice.lower() not in ("none", "asmr", "off")) else "asmr"
+                v_meta = cooking.resolve_cooking_voice(raw_voice) if raw_mode == "voice" else cooking.resolve_cooking_voice("")
+                num_clips = max(1, min(6, int(body.get("num_clips") or 3)))
+                gen_recipe = generate_cooking_recipe_and_script(
+                    dish_name=dish,
+                    num_clips=num_clips,
+                    audio_mode=raw_mode,
+                    voice_region=v_meta.get("region") or "north",
+                    custom_notes=str(body.get("custom_notes") or "").strip(),
+                    prefer_ai=body.get("prefer_ai", True) is not False,
+                )
+                ready = cooking.ensure_recipe_ready(
+                    recipe=gen_recipe,
+                    dish=dish,
+                    voice_id=raw_voice if raw_mode == "voice" else "",
+                    audio_mode=raw_mode,
+                    num_clips=num_clips,
+                    has_subtitles=bool(body.get("has_subtitles")),
+                )
+                self._send_json({"ok": True, "recipe": ready})
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
+            return
+
+        if path == "/api/cooking/prepare":
+            import cooking_storyboard_engine as cooking
+            try:
+                raw_recipe = body.get("recipe")
+                dish = str(body.get("dish") or (raw_recipe or {}).get("dish") or "").strip()
+                if body.get("auto_script") or (not raw_recipe and dish) or body.get("voice_id") or body.get("audio_mode"):
+                    raw_recipe = cooking.ensure_recipe_ready(
+                        recipe=raw_recipe,
+                        dish=dish,
+                        voice_id=str(body.get("voice_id") or (raw_recipe or {}).get("voice_id") or "").strip(),
+                        audio_mode=str(body.get("audio_mode") or (raw_recipe or {}).get("audio_mode") or "").strip(),
+                        num_clips=int(body.get("num_clips") or len((raw_recipe or {}).get("clips") or []) or 3),
+                        custom_notes=str(body.get("custom_notes") or "").strip(),
+                        has_subtitles=bool(body.get("has_subtitles") or (raw_recipe or {}).get("has_subtitles")),
+                    )
+                pid = str(body.get("project_id") or "").strip() or cooking.make_cooking_project_id((raw_recipe or cooking.DEFAULT_RECIPE)["dish"])
+                manifest = cooking.prepare(pid, raw_recipe)
+                self._send_json({"ok": True, "project": manifest})
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
+            return
+
+        if path == "/api/cooking/quick-run":
+            import cooking_storyboard_engine as cooking
+            try:
+                raw_recipe = body.get("recipe")
+                dish = str(body.get("dish") or (raw_recipe or {}).get("dish") or "").strip()
+                if not dish:
+                    self._send_json({"ok": False, "error": "Vui lòng nhập tên món ăn cần làm video."}, 400)
+                    return
+                result = cooking.auto_create_and_launch(
+                    dish=dish,
+                    voice_id=str(body.get("voice_id") or "").strip(),
+                    audio_mode=str(body.get("audio_mode") or "auto").strip(),
+                    profile=str(body.get("profile_name") or "").strip(),
+                    project_uuid=str(body.get("flow_project_id") or "auto").strip(),
+                    num_clips=max(1, min(6, int(body.get("num_clips") or 3))),
+                    custom_notes=str(body.get("custom_notes") or "").strip(),
+                    has_subtitles=bool(body.get("has_subtitles")),
+                    recipe=raw_recipe if isinstance(raw_recipe, dict) else None,
+                    project_id=str(body.get("project_id") or "").strip(),
+                    stage=str(body.get("stage") or "auto").strip() or "auto",
+                    video_provider=str(body.get("video_provider") or "").strip(),
+                )
+                self._send_json(result)
+            except ValueError as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
+            return
+
+        if path == "/api/cooking/run":
+            import cooking_storyboard_engine as cooking
+            try:
+                result = cooking.launch_stage(
+                    str(body.get("project_id") or "").strip(),
+                    str(body.get("stage") or "").strip(),
+                    profile=str(body.get("profile_name") or "").strip(),
+                    project_uuid=str(body.get("flow_project_id") or "auto").strip(),
+                    reviewed=body.get("storyboards_reviewed") is True,
+                    video_provider=str(body.get("video_provider") or "").strip(),
+                )
+                self._send_json(result)
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
+            return
+
+        if path == "/api/cooking/stop":
+            import cooking_storyboard_engine as cooking
+            try:
+                result = cooking.stop_stage(str(body.get("project_id") or "").strip())
+                self._send_json(result)
+            except (ValueError, FileNotFoundError) as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
+            return
+
         if path == "/api/projects/create":
             name = (body.get("name") or "").strip()
             if not name:
@@ -1456,8 +1614,13 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 ref_video_path = (body.get("ref_video_path") or "").strip().strip('"')
                 outfit_items = body.get("outfit_items") if isinstance(body.get("outfit_items"), list) else None
                 preferred_chunk_sec = str(body.get("preferred_chunk_sec") or "auto").strip()
-                generation_mode = str(body.get("generation_mode") or "chained_i2v").strip()
-                prompt_style = str(body.get("prompt_style") or ("chained_i2v" if "i2v" in generation_mode.lower() else "timeline_pro")).strip()
+                generation_mode = _fmce.normalize_fashion_generation_mode(str(body.get("generation_mode") or "chained_i2v").strip())
+                default_pstyle = (
+                    "google_vids"
+                    if generation_mode == "google_vids"
+                    else ("chained_i2v" if generation_mode == "chained_i2v" else "timeline_pro")
+                )
+                prompt_style = str(body.get("prompt_style") or default_pstyle).strip()
                 custom_scene_cuts = body.get("custom_scene_cuts") if isinstance(body.get("custom_scene_cuts"), dict) else None
                 ai_provider = str(body.get("ai_provider") or "auto").strip()
                 ai_model = str(body.get("ai_model") or "gemini-2.5-flash").strip()
@@ -1518,16 +1681,25 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                             with open(m_path, "r", encoding="utf-8") as f:
                                 cur_manifest = json.load(f)
                             if gen_mode:
-                                cur_manifest["generation_mode"] = "chained_i2v" if "i2v" in gen_mode.lower() else "video_ref"
+                                cur_manifest["generation_mode"] = _fmce.normalize_fashion_generation_mode(gen_mode)
+                            eff_sc_m = cur_manifest.get("generation_mode") or "chained_i2v"
                             cur_manifest["status"] = "running_flow"
-                            cur_manifest["status_message"] = f"🚀 Đang khởi động trình duyệt Google Flow cho Phân Cảnh {scene_id.upper()}..."
+                            cur_manifest["status_message"] = (
+                                f"🌐 Đang kết nối Google Vids Web (Omni 1080p • Không reCAPTCHA) cho Phân Cảnh {scene_id.upper()}..."
+                                if eff_sc_m == "google_vids"
+                                else f"🚀 Đang khởi động trình duyệt Google Flow cho Phân Cảnh {scene_id.upper()}..."
+                            )
                             cur_manifest["updated_at"] = time.strftime("%H:%M:%S")
                             for sc_obj in cur_manifest.get("scenes") or []:
                                 if sc_obj.get("id") == scene_id:
                                     sc_obj["status"] = "preparing"
                                     sc_obj["attempt"] = 1
-                                    sc_obj["max_attempts"] = 4
-                                    sc_obj["status_detail"] = "🚀 Đang kết nối Google Flow & chuẩn bị ảnh tham chiếu 2K..."
+                                    sc_obj["max_attempts"] = 3 if eff_sc_m == "google_vids" else 4
+                                    sc_obj["status_detail"] = (
+                                        "🌐 Đang kết nối Google Vids Web & tải ảnh 2K qua Scotty..."
+                                        if eff_sc_m == "google_vids"
+                                        else "🚀 Đang kết nối Google Flow & chuẩn bị ảnh tham chiếu 2K..."
+                                    )
                             with open(m_path, "w", encoding="utf-8") as f:
                                 json.dump(cur_manifest, f, ensure_ascii=False, indent=2)
                         except Exception:
@@ -1539,13 +1711,18 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         except Exception as exc:
                             print(f"[FASHION-SCENE-FLOW ERR] {exc}", flush=True)
                     threading.Thread(target=_bg_scene_run, daemon=True).start()
+                    is_vids_s = "vids" in gen_mode.lower() or (cur_manifest or {}).get("generation_mode") == "google_vids"
                     self._send_json({
                         "ok": True,
                         "async": True,
                         "project_id": slug,
                         "scene_id": scene_id,
                         "project": cur_manifest,
-                        "message": f"🚀 Đang chạy tạo Video Phân Cảnh {scene_id.upper()} trên Google Flow!",
+                        "message": (
+                            f"🌐 Đang tạo Video Phân Cảnh {scene_id.upper()} Native 1080p trên Google Vids Web (Không reCAPTCHA)!"
+                            if is_vids_s
+                            else f"🚀 Đang chạy tạo Video Phân Cảnh {scene_id.upper()} trên Google Flow!"
+                        ),
                     })
                 else:
                     res = _fmce.run_single_fashion_motion_scene_on_flow(slug, scene_id, profile_name=prof, generation_mode=gen_mode)
@@ -1619,20 +1796,28 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         with open(m_path, "r", encoding="utf-8") as f:
                             cur_manifest = json.load(f)
                         if gen_mode:
-                            cur_manifest["generation_mode"] = "chained_i2v" if "i2v" in gen_mode.lower() else "video_ref"
+                            cur_manifest["generation_mode"] = _fmce.normalize_fashion_generation_mode(gen_mode)
                         eff_m = cur_manifest.get("generation_mode") or "chained_i2v"
                         cur_manifest["status"] = "running_flow"
                         cur_manifest["status_message"] = (
-                            "🚀 Đang khởi động Google Flow (Chế độ Chained Img2Video 0.1s Chuẩn Nhạc — Cắt Frame cuối Cảnh 1 nối Cảnh 2)..."
-                            if eff_m == "chained_i2v"
-                            else "🚀 Đang khởi động Google Flow (Chế độ Motion Control Video Ref — Cắt Frame cuối Cảnh 1 nối Cảnh 2)..."
+                            "🌐 Đang kết nối Google Vids Web (Omni 1080p Native • Không reCAPTCHA • Gắn 3 Chip Ảnh 2K)..."
+                            if eff_m == "google_vids"
+                            else (
+                                "🚀 Đang khởi động Google Flow (Chế độ Chained Img2Video 0.1s Chuẩn Nhạc — Cắt Frame cuối Cảnh 1 nối Cảnh 2)..."
+                                if eff_m == "chained_i2v"
+                                else "🚀 Đang khởi động Google Flow (Chế độ Motion Control Video Ref — Cắt Frame cuối Cảnh 1 nối Cảnh 2)..."
+                            )
                         )
                         cur_manifest["updated_at"] = time.strftime("%H:%M:%S")
                         for sc_obj in cur_manifest.get("scenes") or []:
                             sc_obj["status"] = "preparing"
                             sc_obj["attempt"] = 1
-                            sc_obj["max_attempts"] = 4
-                            sc_obj["status_detail"] = "🚀 Đang kết nối Google Flow & chuẩn bị nguyên liệu 2K..."
+                            sc_obj["max_attempts"] = 3 if eff_m == "google_vids" else 4
+                            sc_obj["status_detail"] = (
+                                "🌐 Đang kết nối Google Vids Web & chuẩn bị 3 ảnh 2K..."
+                                if eff_m == "google_vids"
+                                else "🚀 Đang kết nối Google Flow & chuẩn bị nguyên liệu 2K..."
+                            )
                         with open(m_path, "w", encoding="utf-8") as f:
                             json.dump(cur_manifest, f, ensure_ascii=False, indent=2)
                     except Exception:
@@ -1645,11 +1830,16 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         print(f"[FASHION-FLOW ERR] {exc}", flush=True)
 
                 threading.Thread(target=_bg_run, daemon=True).start()
+                is_vids_p = "vids" in gen_mode.lower() or (cur_manifest or {}).get("generation_mode") == "google_vids"
                 self._send_json({
                     "ok": True,
                     "project_id": slug,
                     "project": cur_manifest,
-                    "message": f"🚀 Đã kích hoạt chạy tạo Video Thời Trang '{slug}' trên Google Flow!",
+                    "message": (
+                        f"🌐 Đã kích hoạt chạy tạo Video Thời Trang '{slug}' Native 1080p trên Google Vids Web (Không reCAPTCHA)!"
+                        if is_vids_p
+                        else f"🚀 Đã kích hoạt chạy tạo Video Thời Trang '{slug}' trên Google Flow!"
+                    ),
                 })
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -1909,16 +2099,24 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     eff_m = manifest.get("generation_mode") or "chained_i2v"
                     manifest["status"] = "running_flow"
                     manifest["status_message"] = (
-                        f"🚀 Đang khởi động Google Flow cho Template {template_code} (Chế độ Chained Img2Video 0.1s Chuẩn Nhạc)..."
-                        if eff_m == "chained_i2v"
-                        else f"🚀 Đang khởi động Google Flow cho Template {template_code} (Chế độ Motion Control Video Ref)..."
+                        f"🌐 Đang kết nối Google Vids Web cho Template {template_code} (Omni 1080p • Không reCAPTCHA)..."
+                        if eff_m == "google_vids"
+                        else (
+                            f"🚀 Đang khởi động Google Flow cho Template {template_code} (Chế độ Chained Img2Video 0.1s Chuẩn Nhạc)..."
+                            if eff_m == "chained_i2v"
+                            else f"🚀 Đang khởi động Google Flow cho Template {template_code} (Chế độ Motion Control Video Ref)..."
+                        )
                     )
                     manifest["updated_at"] = time.strftime("%H:%M:%S")
                     for sc_obj in manifest.get("scenes") or []:
                         sc_obj["status"] = "preparing"
                         sc_obj["attempt"] = 1
-                        sc_obj["max_attempts"] = 4
-                        sc_obj["status_detail"] = "🚀 Đang kết nối Google Flow & chuẩn bị ảnh tham chiếu 2K..."
+                        sc_obj["max_attempts"] = 3 if eff_m == "google_vids" else 4
+                        sc_obj["status_detail"] = (
+                            "🌐 Đang kết nối Google Vids Web & chuẩn bị 3 ảnh 2K..."
+                            if eff_m == "google_vids"
+                            else "🚀 Đang kết nối Google Flow & chuẩn bị ảnh tham chiếu 2K..."
+                        )
                     try:
                         m_path = os.path.join(_fmce.FASHION_STUDIO_DIR, target_slug, "fashion_project.json")
                         with open(m_path, "w", encoding="utf-8") as f:
@@ -2154,6 +2352,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     custom_master_prompt=custom_master,
                     preset_id=preset_id,
                     custom_product_info=custom_prod_info,
+                    subject_mode=str(body.get("subject_mode") or "auto"),
+                    headline=str(body.get("headline") or ""),
                     add_text_badge=add_badge,
                     inject_01s=inject_01s,
                     apply_template_only=apply_template_only,
@@ -2166,6 +2366,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     custom_master_prompt=custom_master,
                     preset_id=preset_id,
                     custom_product_info=custom_prod_info,
+                    subject_mode=str(body.get("subject_mode") or "auto"),
+                    headline=str(body.get("headline") or ""),
                     add_text_badge=add_badge,
                     inject_01s=inject_01s,
                     prefer_existing_ref=prefer_ref,
