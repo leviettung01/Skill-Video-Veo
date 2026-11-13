@@ -1616,15 +1616,23 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         <aside class="proj-sidebar">
           <div class="proj-sidebar-head">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span style="font-size:11.5px; font-weight:700; color:var(--muted);">📁 SẢN PHẨM (<span id="projCountLabel">0 dự án</span>)</span>
+              <span style="font-size:11.5px; font-weight:700; color:var(--muted);">📁 DỰ ÁN STUDIO (<span id="projCountLabel">0 dự án</span>)</span>
               <div style="display:flex; gap:4px; align-items:center;">
-                <button class="btn btn-xs btn-outline" id="navBtn-matrix" style="padding:2px 6px; font-size:10px;" onclick="switchTab('matrix', this)" title="Mở bảng Tổng Quan Matrix toàn bộ sản phẩm">🌐 Matrix</button>
+                <button class="btn btn-xs btn-outline" id="navBtn-matrix" style="padding:2px 6px; font-size:10px;" onclick="switchTab('matrix', this)" title="Mở bảng Tổng Quan Matrix toàn bộ dự án">🌐 Matrix</button>
                 <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:10px;" onclick="copyFinalVideosPath()" title="Copy đường dẫn thư mục Video Final">📋 Path</button>
                 <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:10px;" onclick="if (typeof refreshAll === 'function') refreshAll(false);" title="Làm mới dữ liệu">🔄</button>
               </div>
             </div>
-            <input id="inpProjFilter" class="proj-search" placeholder="🔍 Tìm ID hoặc tên sản phẩm..."
+            <input id="inpProjFilter" class="proj-search" placeholder="🔍 Tìm dự án theo tên, ID hoặc FVT..."
               oninput="renderProjectsList()" />
+            <div id="studioFilterPills" style="display:flex; gap:4px; flex-wrap:wrap; margin-top:6px;">
+              <button class="btn btn-xs btn-primary studio-filter-btn" data-filter="all" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('all')">Tất cả</button>
+              <button class="btn btn-xs btn-outline studio-filter-btn" data-filter="running" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('running')">⚡ Đang chạy</button>
+              <button class="btn btn-xs btn-outline studio-filter-btn" data-filter="done" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('done')">✅ Có Video</button>
+              <button class="btn btn-xs btn-outline studio-filter-btn" data-filter="pending" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('pending')">📝 Chờ chạy</button>
+              <button class="btn btn-xs btn-outline studio-filter-btn" data-filter="fashion" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('fashion')">👗 Thời trang</button>
+              <button class="btn btn-xs btn-outline studio-filter-btn" data-filter="cooking" style="padding:2px 7px; font-size:10px;" onclick="setStudioProjectFilter('cooking')">🍳 Cooking</button>
+            </div>
           </div>
           <div class="proj-list-scroll" id="projectList"></div>
         </aside>
@@ -1922,332 +1930,558 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
     </section>
 
     <!-- =========================================================================================
-         TAB RIÊNG: VIDEO THỜI TRANG TỪ VIDEO THAM CHIẾU (4 BƯỚC CHUẨN: AI PHÂN TÍCH VIDEO -> NHÂN VẬT + 4-5 BỘ ĐỒ -> TẠO VIDEO PHÂN CẢNH -> RENDER HẬU KỲ VIDEO FINAL)
+         TAB RIÊNG: STUDIO VIDEO THỜI TRANG (#004) — QUY TRÌNH 4 BƯỚC TỐI GIẢN & CHUYÊN NGHIỆP
+         1. Chọn Mẫu Chuyển Động -> 2. Chọn Nhân Vật -> 3. Thêm Sản Phẩm -> 4. Bấm Tạo Video
          ========================================================================================= -->
     <section id="tab-fashion" class="tab-pane" style="overflow-y:auto; padding:12px 16px;">
       <style>
-        /* Ngăn trình duyệt Chrome mở menu trắng 3 chấm (⋮) khổng lồ che mất giao diện khi video dọc hẹp */
         #tab-fashion video::-webkit-media-controls-overflow-button,
         .fashion-clean-video::-webkit-media-controls-overflow-button {
           display: none !important;
         }
-        #tab-fashion .f-action-btn {
+        #tab-fashion .f-studio-shell {
+          display: flex;
+          flex-direction: column;
+          gap: 12px;
+          max-width: 1680px;
+          margin: 0 auto;
+          padding-bottom: 24px;
+        }
+        #tab-fashion .f-step-card {
+          background: linear-gradient(160deg, #0d1322 0%, #080c16 100%);
+          border: 1px solid rgba(148, 163, 184, 0.2);
+          border-radius: 12px;
+          padding: 13px 15px;
+          box-shadow: 0 8px 24px rgba(0, 0, 0, 0.35);
+        }
+        #tab-fashion .f-step-head {
+          display: flex;
+          justify-content: space-between;
+          align-items: center;
+          gap: 10px;
+          flex-wrap: wrap;
+          padding-bottom: 9px;
+          margin-bottom: 10px;
+          border-bottom: 1px solid rgba(255, 255, 255, 0.07);
+        }
+        #tab-fashion .f-step-num {
           display: inline-flex;
           align-items: center;
           justify-content: center;
-          gap: 4px;
-          font-size: 10.5px;
-          font-weight: 800;
-          padding: 4px 8px;
+          width: 22px;
+          height: 22px;
           border-radius: 6px;
+          font-size: 11.5px;
+          font-weight: 900;
+          background: linear-gradient(135deg, #ec4899, #f59e0b);
+          color: #090d16;
+          flex-shrink: 0;
+        }
+        #tab-fashion .f-tpl-card {
           cursor: pointer;
-          transition: all 0.14s;
+          background: #090e1a;
+          border: 1.5px solid rgba(255, 255, 255, 0.09);
+          border-radius: 10px;
+          padding: 6px;
+          display: flex;
+          flex-direction: column;
+          gap: 5px;
+          transition: all 0.16s ease;
+        }
+        #tab-fashion .f-tpl-card:hover {
+          border-color: rgba(236, 72, 153, 0.55);
+          transform: translateY(-2px);
+          background: #0e1526;
+        }
+        #tab-fashion .f-tpl-card.selected {
+          background: linear-gradient(160deg, rgba(236, 72, 153, 0.2), rgba(15, 23, 42, 0.96));
+          border-color: #ec4899;
+          box-shadow: 0 0 18px rgba(236, 72, 153, 0.32);
+        }
+        #tab-fashion .f-char-tile {
+          cursor: pointer;
+          background: #090e1b;
+          border: 1.5px solid rgba(255, 255, 255, 0.1);
+          border-radius: 10px;
+          padding: 5px;
+          display: flex;
+          flex-direction: column;
+          gap: 4px;
+          transition: all 0.15s ease;
+          position: relative;
+        }
+        #tab-fashion .f-char-tile:hover {
+          border-color: rgba(244, 114, 182, 0.6);
+          background: #10182b;
+        }
+        #tab-fashion .f-char-tile.selected {
+          border-color: #ec4899;
+          background: linear-gradient(160deg, rgba(236, 72, 153, 0.22), rgba(15, 23, 42, 0.95));
+          box-shadow: 0 0 14px rgba(236, 72, 153, 0.32);
+        }
+        #tab-fashion .f-char-upload-tile {
+          cursor: pointer;
+          background: rgba(245, 158, 11, 0.07);
+          border: 1.5px dashed rgba(245, 158, 11, 0.55);
+          border-radius: 10px;
+          padding: 8px 6px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 5px;
+          color: #fde68a;
+          transition: all 0.15s ease;
+          min-height: 132px;
+        }
+        #tab-fashion .f-char-upload-tile:hover {
+          background: rgba(245, 158, 11, 0.15);
+          border-color: #fbbf24;
+        }
+        #tab-fashion .f-prod-empty-drop {
+          cursor: pointer;
+          border: 1.5px dashed rgba(245, 158, 11, 0.45);
+          background: rgba(15, 23, 42, 0.45);
+          border-radius: 10px;
+          padding: 26px 18px;
+          display: flex;
+          flex-direction: column;
+          align-items: center;
+          justify-content: center;
+          text-align: center;
+          gap: 7px;
+          transition: all 0.15s ease;
+          grid-column: 1 / -1;
+        }
+        #tab-fashion .f-prod-empty-drop:hover {
+          border-color: #fbbf24;
+          background: rgba(245, 158, 11, 0.08);
+        }
+        #tab-fashion .f-cta-run {
+          padding: 11px 22px;
+          font-size: 13.5px;
+          font-weight: 900;
+          letter-spacing: 0.2px;
+          border-radius: 10px;
+          background: linear-gradient(135deg, #10b981 0%, #059669 55%, #0d9488 100%);
+          color: #ffffff;
+          border: 1px solid rgba(110, 231, 183, 0.55);
+          box-shadow: 0 6px 22px rgba(16, 185, 129, 0.38);
+          cursor: pointer;
+          transition: all 0.16s ease;
           white-space: nowrap;
         }
-        #tab-fashion .f-action-btn:hover {
-          filter: brightness(1.16);
+        #tab-fashion .f-cta-run:hover:not(:disabled) {
+          filter: brightness(1.1);
           transform: translateY(-1px);
+          box-shadow: 0 8px 26px rgba(16, 185, 129, 0.5);
+        }
+        #tab-fashion .f-cta-run:disabled {
+          opacity: 0.42;
+          cursor: not-allowed;
+          box-shadow: none;
+          filter: grayscale(0.25);
+        }
+        #tab-fashion .f-step-pill {
+          display: inline-flex;
+          align-items: center;
+          gap: 5px;
+          padding: 4px 10px;
+          border-radius: 999px;
+          font-size: 11.5px;
+          font-weight: 700;
+          border: 1px solid rgba(255, 255, 255, 0.12);
+          background: #0a101d;
+          color: #cbd5e1;
+        }
+        #tab-fashion .f-step-pill.ready {
+          border-color: rgba(16, 185, 129, 0.5);
+          background: rgba(16, 185, 129, 0.13);
+          color: #6ee7b7;
+        }
+        #tab-fashion .f-step-pill.missing {
+          border-color: rgba(245, 158, 11, 0.48);
+          background: rgba(245, 158, 11, 0.12);
+          color: #fde68a;
+        }
+        @media (max-width: 1180px) {
+          #tab-fashion .f-tpl-split,
+          #tab-fashion .f-mid-split {
+            grid-template-columns: 1fr !important;
+          }
         }
       </style>
-      <div class="card" id="cardFashionMotionStudio" style="border:1px solid rgba(236,72,153,0.55); background:linear-gradient(145deg, rgba(38,14,35,0.42), rgba(10,15,28,0.98)); box-shadow:0 12px 32px rgba(0,0,0,0.45);">
-        <!-- Header Tab Video Thời Trang + Thanh Công Cụ Đầy Đủ Tất Cả Các Nút -->
-        <div style="display:flex; flex-direction:column; gap:9px; border-bottom:1px solid rgba(236,72,153,0.28); padding-bottom:10px; margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+
+      <div class="f-studio-shell" id="cardFashionMotionStudio">
+        <!-- HEADER GỌN GÀNG, HIỆN ĐẠI, KHÔNG RỐI NÚT -->
+        <div class="f-step-card" style="padding:11px 15px; border-color:rgba(236,72,153,0.42); background:linear-gradient(135deg, rgba(38,14,35,0.45), rgba(10,15,28,0.98));">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:12px; flex-wrap:wrap;">
             <div>
               <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:900; font-size:12px; padding:3px 10px; border-radius:6px;">👗 TAB CHUYÊN DỤNG #004</span>
-                <span style="font-size:15.5px; font-weight:900; color:#fdf2f8;">STUDIO TẠO VIDEO THỜI TRANG TỪ VIDEO THAM CHIẾU (AI PHÂN TÍCH ➔ 4–5 BỘ ĐỒ 2K ➔ HẬU KỲ VIDEO FINAL)</span>
-                <span class="badge" style="background:rgba(16,185,129,0.2); color:#34d399; border:1px solid rgba(16,185,129,0.45);">CLIProxy Vision AI + AI Agent</span>
-                <span class="badge" style="background:rgba(6,182,212,0.2); color:#67e8f9; border:1px solid rgba(6,182,212,0.45);">1080×1920 • 24 FPS • Nhạc Gốc</span>
+                <span style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:900; font-size:11px; padding:3px 9px; border-radius:6px;">👗 TEMPLATE #004</span>
+                <span style="font-size:15px; font-weight:900; color:#fdf2f8;">Studio Video Thời Trang AI</span>
+                <span class="badge" style="background:rgba(16,185,129,0.16); color:#34d399; border:1px solid rgba(16,185,129,0.38); font-size:10px;">9:16 • 1080p • Giữ Nhạc Gốc</span>
               </div>
-              <div style="font-size:11.5px; color:#cbd5e1; margin-top:4px; line-height:1.45;">
-                <b>Quy trình 4 bước chuẩn:</b> <b>(1)</b> Chọn <b>Template FVT_001..252</b> (hoặc đưa Video gốc bất kỳ) ➔ <b>(2)</b> Chọn <b>Ảnh Ref Nhân Vật 2K + 4–5 Bộ Đồ 2K</b> ➔ <b>(3)</b> Tạo <b>Video Phân Cảnh</b> khớp nhịp beat chuyển đồ ➔ <b>(4)</b> <b>Render Hậu Kỳ</b> ghép phân cảnh + nhạc gốc thành <b>Video Final 1080p 24FPS</b>!
+              <div style="font-size:11.5px; color:#94a3b8; margin-top:3px;">
+                Quy trình 4 bước: <b style="color:#f8fafc;">1. Chọn mẫu video</b> → <b style="color:#f8fafc;">2. Chọn nhân vật</b> → <b style="color:#f8fafc;">3. Thêm quần áo</b> → <b style="color:#34d399;">4. Bấm Tạo Video</b>
               </div>
             </div>
-          </div>
 
-          <!-- THANH ĐIỀU KHIỂN NHANH ĐẦY ĐỦ CÁC NÚT THAO TÁC TRÊN ĐẦU TAB -->
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; background:#060a14; border:1px solid rgba(236,72,153,0.42); border-radius:9px; padding:7px 10px;">
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <span style="font-size:11px; font-weight:900; color:#f9a8d4;">📂 Dự án:</span>
-              <select id="selFashionProjectSlug" onchange="onSelectFashionProjectSlug(this.value)" style="min-width:255px; max-width:360px; font-size:11.5px; font-weight:800; color:#fde68a; background:#090d18; border-color:rgba(236,72,153,0.55); padding:5px 10px; border-radius:7px;">
-                <option value="fashion_lookbook_chan_vay_6e19">👗 Dự án: Lookbook Phối Đồ Đi Làm Tủ Gỗ (Video 6e19 - 16.77s)</option>
-              </select>
-              <span style="font-size:11px; font-weight:900; color:#67e8f9;">🎛️ Phương pháp tạo:</span>
-              <select id="selFashionGenerationMode" onchange="onChangeFashionGenerationMode(this.value)" style="min-width:290px; max-width:420px; font-size:11px; font-weight:800; color:#34d399; background:#051412; border:1.5px solid rgba(16,185,129,0.65); padding:5px 9px; border-radius:7px;">
-                <option value="chained_i2v" selected>✨ Chained Img2Video + Timeline 0.1s Chuẩn Nhạc (Google Flow)</option>
-                <option value="google_vids">🌐 Google Vids Web Omni 1080p (Không reCAPTCHA • Gắn 3 Chip Ảnh 2K)</option>
-                <option value="video_ref">🎬 Motion Control Video Ref (Dùng Video Gốc làm Ref + Nối Frame Cuối)</option>
-              </select>
-              <button class="btn btn-xs btn-success" style="font-weight:900; padding:5px 11px; box-shadow:0 3px 12px rgba(16,185,129,0.35);" onclick="runFashionProjectOnFlow()" title="Bấm Render chạy tạo Video AI trên Google Flow cho dự án đang mở">
-                🚀 Bấm Render Video AI Ngay
+            <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+              <div style="display:inline-flex; align-items:center; gap:6px; background:#070b14; border:1px solid rgba(255,255,255,0.12); border-radius:8px; padding:3px 8px;">
+                <span style="font-size:11px; font-weight:700; color:#94a3b8;">📂 Dự án:</span>
+                <select id="selFashionProjectSlug" onchange="onSelectFashionProjectSlug(this.value)" style="min-width:210px; max-width:290px; font-size:11px; font-weight:700; color:#fde68a; background:transparent; border:none; padding:3px 4px; outline:none;">
+                  <option value="">✨ Dự án mới (Đang soạn)</option>
+                </select>
+              </div>
+              <button class="btn btn-xs btn-amber" style="padding:5px 10px; font-weight:800;" onclick="startFreshFashionDraft(true)" title="Làm mới để tạo một video thời trang hoàn toàn mới">
+                ➕ Làm Mới
               </button>
-              <button class="btn btn-xs btn-primary" style="font-weight:800; padding:5px 10px; background:linear-gradient(135deg,#ec4899,#8b5cf6); border:none;" onclick="renderFashionFinalPostProd()" title="Ghép nối Cảnh 1 + Cảnh 2 + Nhạc gốc thành Video Final 1080p mượt mà">
-                🎞️ Ghép Hậu Kỳ Final
+              <button id="btnToggleFashionDoneGallery" class="btn btn-xs btn-outline" style="padding:5px 10px; color:#6ee7b7; border-color:rgba(16,185,129,0.4);" onclick="toggleFashionCompletedGallery()">
+                🏆 Video Đã Tạo (<span id="badgeFashionDoneVideosCount">0</span>)
               </button>
-              <button class="btn btn-xs btn-amber" style="font-weight:800; padding:5px 9px;" onclick="retryAllFailedFashionScenes()" title="Kiểm tra và chạy Retry ngay các phân cảnh lỗi hoặc chưa xong">
-                🔁 Retry Cảnh Lỗi
+              <button id="btnFashionAdvanced" class="btn btn-xs btn-outline" style="padding:5px 10px;" onclick="toggleFashionAdvanced()">
+                ⚙️ Nâng cao
               </button>
-              <button class="btn btn-xs btn-outline" style="font-weight:800; padding:5px 9px; color:#67e8f9; border-color:rgba(6,182,212,0.5);" onclick="analyzeAndBuildFashionProject()" title="Cập nhật lại Phân cảnh & Prompt theo Nhân vật + Bộ đồ đang chọn">
-                ✂️ Cập Nhật Kịch Bản & Prompt
-              </button>
-            </div>
-
-            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-              <button class="btn btn-xs btn-amber" onclick="promptAddNewFashionCharacter()" title="Thêm 1 Nhân Vật mới từ máy tính">👤 + Thêm Nhân Vật</button>
-              <button class="btn btn-xs btn-success" onclick="pickAndDeconstructNewOutfit2K()" title="Chọn ảnh quần áo mới và tự động tách ra ảnh nền trắng 2K">✨ + Tách Quần Áo 2K</button>
-              <button class="btn btn-xs btn-primary" onclick="promptCreateNewFashionProject()" title="Tạo 1 dự án Video Thời Trang mới từ bất kỳ video tham chiếu nào">➕ Dự Án Mới</button>
-              <button class="btn btn-xs btn-outline" onclick="openFolderEncoded(encodeURIComponent('ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K'))" title="Mở thư mục chứa bộ 7 ảnh chuẩn 2K">📂 Kho Ảnh 2K</button>
-              <button class="btn btn-xs btn-success" onclick="openFolder('final_videos')" title="Mở thư mục chứa các file Video Final đã hoàn tất">📂 Mở Folder Final</button>
-              <button class="btn btn-xs btn-primary" style="background:#4f46e5; border-color:#818cf8;" onclick="switchTab('dashboard', document.getElementById('navBtn-dashboard')); if(STATE.fashionProject?.project_id) loadProjectDetail(STATE.fashionProject.project_id, false);" title="Chuyển sang Tab Studio Dự Án Tổng Hợp">📊 Mở Tổng Hợp</button>
-              <button class="btn btn-xs btn-outline" style="color:#fde68a; border-color:rgba(245,158,11,0.5);" onclick="switchTab('matrix', document.getElementById('navBtn-matrix'));" title="Chuyển sang Bảng Matrix Video Final">🌐 Mở Matrix</button>
-              <button class="btn btn-xs btn-amber" onclick="loadFashionMotionStudio(true)" title="Tải lại dữ liệu mới nhất">🔄 Làm Mới</button>
             </div>
           </div>
         </div>
 
-        <div id="fashionStudioStatusBanner" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:7px; background:#090d16; border:1px solid rgba(236,72,153,0.45); color:#f9a8d4; font-size:11.5px;"></div>
-        <div id="fashionLiveMonitorBarTop" style="display:none; margin-bottom:12px; padding:10px 14px; border-radius:9px; background:linear-gradient(90deg, rgba(16,185,129,0.16), rgba(6,182,212,0.16)); border:1.5px solid rgba(6,182,212,0.65); font-size:11.5px; color:#e2e8f0; box-shadow:0 6px 20px rgba(6,182,212,0.22);"></div>
-        <div id="fashionCompletedFinalsTopBar" style="display:none; margin-bottom:12px;"></div>
+        <!-- THÔNG BÁO TRẠNG THÁI & TIẾN TRÌNH TẠO VIDEO TRỰC TIẾP -->
+        <div id="fashionStudioStatusBanner" style="display:none; padding:9px 13px; border-radius:9px; background:#0a101d; border:1px solid rgba(236,72,153,0.45); color:#f9a8d4; font-size:12px; line-height:1.45;"></div>
+        <div id="fashionLiveMonitorBarTop" style="display:none; padding:12px 15px; border-radius:11px; background:linear-gradient(90deg, rgba(16,185,129,0.16), rgba(6,182,212,0.16)); border:1.5px solid rgba(6,182,212,0.65); font-size:12px; color:#e2e8f0; box-shadow:0 8px 24px rgba(6,182,212,0.2);"></div>
+
+        <!-- NGĂN KÉO VIDEO ĐÃ HOÀN TẤT (ẨN MẶC ĐỊNH ĐỂ MÀN HÌNH GỌN SẠCH) -->
+        <div id="fashionCompletedGalleryWrap" style="display:none;">
+          <div id="fashionCompletedFinalsTopBar"></div>
+        </div>
 
         <!-- =====================================================================================
-             KHO 30+ TEMPLATE VIDEO THỜI TRANG ĐÃ PHÂN TÍCH SẴN (MÃ FVT_001 – FVT_030+)
+             BƯỚC 1: CHỌN MẪU VIDEO THỜI TRANG (252 MẪU FVT_001 -> FVT_252)
              ===================================================================================== -->
-        <div id="cardFashionVideoTemplatesHub" style="background:linear-gradient(145deg, rgba(14,21,38,0.96), rgba(8,12,22,0.99)); border:1.5px solid rgba(236,72,153,0.55); border-radius:11px; padding:12px 14px; margin-bottom:14px; box-shadow:0 8px 26px rgba(0,0,0,0.45);">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:8px; padding-bottom:7px; border-bottom:1px solid rgba(255,255,255,0.09);">
+        <div class="f-step-card" id="cardFashionVideoTemplatesHub" style="border-color:rgba(236,72,153,0.38);">
+          <div class="f-step-head">
             <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span id="badgeFashionTplHubTitle" class="badge" style="background:linear-gradient(135deg,#ec4899,#f59e0b); color:#050811; font-weight:900; font-size:11.5px; padding:3px 10px;">🎬 KHO 250+ TEMPLATE VIDEO MẪU (FVT_001 ➔ FVT_252)</span>
-              <span style="font-size:13.5px; font-weight:900; color:#fdf2f8;">CHỌN TEMPLATE VIDEO GỐC ĐÃ PHÂN TÍCH SẴN HÀNH ĐỘNG + BỐI CẢNH + PROMPT MẪU</span>
-              <span id="badgeFashionTplTotalCount" class="badge badge-done">252 Template Đã Phân Tích Sẵn</span>
-            </div>
-            <div style="font-size:10.5px; color:#93c5fd;">
-              🔊 <b>Có tiếng nhạc gốc</b> khi xem Demo • Chọn <b>Nhân Vật + Bộ Đồ 2K</b> bên dưới ➔ Bấm <b>Render</b> là ra Video Final!
-            </div>
-          </div>
-
-          <!-- Thanh Lọc Danh Mục + Tìm Kiếm + Quét Folder trên cùng 1 hàng gọn gàng (Không thừa khoảng đen) -->
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:10px; background:#070b15; padding:6px 10px; border-radius:8px; border:1px solid rgba(255,255,255,0.08);">
-            <div id="fashionTplCategoryBar" style="display:flex; gap:5px; align-items:center; flex-wrap:wrap;">
-              <button class="btn-filter active" onclick="setFashionTplCategoryFilter('all', this)">🌟 Tất cả (252)</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('office', this)">💼 Đi Làm / Công Sở</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('date', this)">💕 Đi Date / Hẹn Hò</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('travel', this)">✈️ Đi Chơi / Du Lịch</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('party', this)">🥂 Đi Tiệc / Sang Chảnh</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('winter', this)">❄️ Mùa Đông / Hàn Quốc</button>
-              <button class="btn-filter" onclick="setFashionTplCategoryFilter('glowup', this)">✨ Biến Hình Glow-up</button>
+              <span class="f-step-num">1</span>
+              <span id="badgeFashionTplHubTitle" style="font-size:13.5px; font-weight:900; color:#fdf2f8;">Chọn Mẫu Chuyển Động Thời Trang</span>
+              <span id="badgeFashionTplTotalCount" class="badge badge-done" style="font-size:10.5px;">252 mẫu có sẵn</span>
+              <span style="font-size:11px; color:#94a3b8;">• Bấm chọn mẫu bất kỳ để lấy chuyển động, nhịp cắt biến hình & nhạc gốc</span>
             </div>
             <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <input id="inpFashionTplSearch" type="text" placeholder="🔍 Tìm mã FVT_001..252, tên, bối cảnh..." oninput="filterFashionVideoTemplatesGrid()" style="width:210px; font-size:11px; padding:4px 9px; border-radius:6px; background:#04070f; border:1px solid rgba(236,72,153,0.45); color:#fff;" />
-              <button class="btn btn-xs btn-amber" onclick="rescanFashionVideoTemplates(false)" title="Quét thư mục Template Thời Trang Video, tự động đặt mã FVT_xxx và phân tích các video mới">🔄 Quét Video Mới</button>
-              <button class="btn btn-xs btn-outline" onclick="openFolderEncoded(encodeURIComponent('Template Thời Trang Video'))" title="Mở thư mục chứa các video template gốc trên máy tính">📂 Mở Folder</button>
+              <input id="inpFashionTplSearch" type="text" placeholder="🔍 Tìm mã FVT_001, tên, bối cảnh..." oninput="filterFashionVideoTemplatesGrid()" style="width:215px; font-size:11px; padding:5px 10px; border-radius:7px; background:#060a13; border:1px solid rgba(236,72,153,0.4); color:#fff;" />
+              <button class="btn btn-xs btn-outline" onclick="rescanFashionVideoTemplates(false)" title="Quét thêm video mẫu mới từ thư mục Template Thời Trang Video">🔄 Quét mẫu mới</button>
             </div>
           </div>
 
-          <!-- Bố Cục 2 Cột Đồng Bộ Chiều Cao (530px): Cột Trái (5 Cột Template Cards) + Cột Phải (Xem Video Demo Có Tiếng & Prompt Mẫu) -->
-          <div style="display:grid; grid-template-columns: 1.42fr 1fr; gap:12px; align-items:stretch;">
-            <!-- Cột Trái: Lưới 30+ Template Video (5 cột chuẩn tỷ lệ 9:16, không hở khoảng đen) -->
-            <div id="fashionVideoTemplatesGrid" style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:8px; height:530px; max-height:530px; align-content:start; overflow-y:auto; padding:4px 6px 4px 2px; background:#050811; border:1px solid rgba(255,255,255,0.07); border-radius:9px;"></div>
+          <!-- Thanh Lọc Danh Mục Ngắn Gọn -->
+          <div id="fashionTplCategoryBar" style="display:flex; gap:6px; align-items:center; flex-wrap:wrap; margin-bottom:10px;">
+            <button class="btn-filter active" onclick="setFashionTplCategoryFilter('all', this)">🌟 Tất cả</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('office', this)">💼 Đi làm / Công sở</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('date', this)">💕 Đi Date / Hẹn hò</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('travel', this)">✈️ Du lịch / Dạo phố</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('party', this)">🥂 Đi tiệc / Sang chảnh</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('winter', this)">❄️ Thu Đông / Hàn Quốc</button>
+            <button class="btn-filter" onclick="setFashionTplCategoryFilter('glowup', this)">✨ Biến hình Glow-up</button>
+          </div>
 
-            <!-- Cột Phải: Trình Phát Video Demo Template Đang Chọn (Có Tiếng) + Hành Động/Bối Cảnh/Prompt Mẫu + Nút Bấm Render -->
-            <div id="fashionSelectedTemplateDetailBox" style="background:#060913; border:1px solid rgba(6,182,212,0.45); border-radius:9px; padding:10px; height:530px; max-height:530px; overflow-y:auto;"></div>
+          <!-- Bố Cục 2 Cột Cân Đối (365px): Lưới Mẫu 9:16 Bên Trái + Xem Thử Mẫu Đang Chọn Bên Phải -->
+          <div class="f-tpl-split" style="display:grid; grid-template-columns: 1.52fr 1fr; gap:12px; align-items:stretch;">
+            <div id="fashionVideoTemplatesGrid" style="display:grid; grid-template-columns: repeat(5, minmax(0, 1fr)); gap:8px; height:365px; max-height:365px; align-content:start; overflow-y:auto; padding:5px; background:#060912; border:1px solid rgba(255,255,255,0.07); border-radius:10px;"></div>
+            <div id="fashionSelectedTemplateDetailBox" style="background:#060912; border:1px solid rgba(6,182,212,0.35); border-radius:10px; padding:10px 12px; height:365px; max-height:365px; overflow-y:auto;"></div>
           </div>
         </div>
 
-        <!-- BƯỚC 1 & BƯỚC 2: PHÂN TÍCH VIDEO THAM CHIẾU BẰNG AI + CHỌN NHÂN VẬT 2K -->
-        <div style="display:grid; grid-template-columns: 1.25fr 1.1fr 0.95fr; gap:12px; margin-bottom:12px;">
-          <!-- Cột 1 (Bước 1): Đưa Video Gốc Cho AI Phân Tích & Chia Phân Cảnh -->
-          <div style="background:#080c16; border:1px solid rgba(6,182,212,0.42); border-radius:8px; padding:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-              <span style="font-size:12px; font-weight:900; color:#67e8f9;">🎬 BƯỚC 1: VIDEO THAM CHIẾU GỐC & AI PHÂN TÍCH CHIA CẢNH</span>
-              <select id="selFashionRefVideoLib" onchange="onSelectFashionRefVideoFromLib(this.value)" style="font-size:10.5px; background:#0d1322; color:#a5f3fc; border-color:rgba(6,182,212,0.4); padding:2px 6px; border-radius:5px; max-width:215px;">
-                <option value="">-- Chọn nhanh Video Gốc có sẵn --</option>
-              </select>
-            </div>
-            <div style="display:flex; gap:6px; margin-bottom:7px;">
-              <input id="inpFashionRefVideo" placeholder="Đường dẫn video gốc (.mp4) bất kỳ để AI phân tích..." style="font-size:11px; flex:1;" />
-              <button class="btn btn-xs btn-primary" onclick="pickFashionFile('inpFashionRefVideo', 'video')">📂 Chọn Video (.MP4)</button>
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; margin-bottom:7px;">
-              <div>
-                <label style="font-size:10px; color:#fcd34d;">🧠 Nguồn AI Phân Tích Video</label>
-                <select id="selFashionAiProvider" style="font-size:10.5px;">
-                  <option value="auto" selected>🤖 Tự động (CLIProxy ➔ AI Agent)</option>
-                  <option value="cliproxy">⚡ CLIProxy Vision (:8317)</option>
-                  <option value="agent">🧠 AI Agent Deep Vision</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:10px; color:#a5b4fc;">🤖 Model Vision (CLIProxy)</label>
-                <select id="selFashionAiModel" style="font-size:10.5px;">
-                  <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash Vision</option>
-                  <option value="gemini-2.5-pro">Gemini 2.5 Pro Vision</option>
-                  <option value="gpt-4o">ChatGPT (gpt-4o Vision)</option>
-                  <option value="grok-2-vision-1212">Grok 2 Vision</option>
-                </select>
-              </div>
-              <div>
-                <label style="font-size:10px; color:#67e8f9;">⏱️ Chia Phân Cảnh</label>
-                <select id="selFashionChunkSec" style="font-size:10.5px;">
-                  <option value="auto" selected>Tự động 8s / 10s</option>
-                  <option value="15">Cố định 15s / cảnh (Omni 1.2 Flash)</option>
-                  <option value="10">Cố định 10s / cảnh</option>
-                  <option value="8">Cố định 8s / cảnh</option>
-                  <option value="6">Cố định 6s / cảnh</option>
-                </select>
-              </div>
-            </div>
-            <div id="fashionVideoSplitSummary" style="padding:6px 8px; border-radius:6px; background:rgba(6,182,212,0.1); border:1px solid rgba(6,182,212,0.3); font-size:11px; color:#a5f3fc;"></div>
-          </div>
+        <!-- =====================================================================================
+             BƯỚC 2 & BƯỚC 3 SONG SONG: CHỌN NHÂN VẬT + THÊM SẢN PHẨM QUẦN ÁO
+             ===================================================================================== -->
+        <div class="f-mid-split" style="display:grid; grid-template-columns: 1fr 1.38fr; gap:12px; align-items:stretch;">
 
-          <!-- Cột 2 (Bước 2A): Chọn Nhân Vật & Ảnh Ref Nhân Vật Chuẩn 2K -->
-          <div style="background:#080c16; border:1px solid rgba(236,72,153,0.38); border-radius:8px; padding:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
-              <span style="font-size:12px; font-weight:900; color:#f9a8d4;">👤 BƯỚC 2A: CHỌN / THÊM NHÂN VẬT THỜI TRANG 2K</span>
-              <div style="display:flex; gap:4px;">
-                <button class="btn btn-xs btn-amber" style="font-size:10px; padding:2px 7px;" onclick="promptAddNewFashionCharacter()" title="Thêm 1 Nhân Vật mới từ máy tính vào Thư Viện Nhân Vật Thời Trang">➕ Thêm NV Mới</button>
-                <button class="btn btn-xs btn-outline" style="font-size:10px; padding:2px 7px;" onclick="switchTab('characters', document.getElementById('navBtn-characters'))">👤 Kho NV</button>
+          <!-- BƯỚC 2: CHỌN NHÂN VẬT (NGƯỜI MẪU) -->
+          <div class="f-step-card" style="border-color:rgba(244,114,182,0.35); display:flex; flex-direction:column;">
+            <div class="f-step-head">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="f-step-num">2</span>
+                <span style="font-size:13.5px; font-weight:900; color:#fdf2f8;">Chọn Nhân Vật (Người Mẫu)</span>
+                <span id="badgeFashionCharStatus" class="badge badge-wait" style="font-size:10px;">Chưa chọn</span>
               </div>
-            </div>
-            <div style="margin-bottom:6px;">
-              <label style="font-size:10px; color:#fde68a;">🌟 Chọn Nhân Vật Từ Thư Viện (Mặc định: Bộ Nhân Vật Mới 02 + Phòng Ngủ 07):</label>
-              <select id="selFashionCharFromLib" onchange="onSelectFashionCharacterFromLibrary(this.value)" style="font-size:11px; font-weight:700; color:#f9a8d4; background:#0d1322; border-color:rgba(236,72,153,0.45);">
-                <option value="char_default_nv5_2k">⭐ Mặc Định: 02_Character_Sheet_Basic_Poses_2K.png + Bối Cảnh 07</option>
-              </select>
-            </div>
-            <div style="font-size:10px; font-weight:700; color:#f9a8d4; margin-bottom:2px;">🧍‍♀️ Ảnh Ref Nhân Vật 2K (Mặc định: <code>02_Character_Sheet_Basic_Poses_2K.png</code>):</div>
-            <div style="display:flex; gap:6px; margin-bottom:5px;">
-              <input id="inpFashionBaseChar" placeholder="Đường dẫn ảnh nhân vật 2K (02_Character_Sheet_Basic_Poses_2K.png)" style="font-size:11px; flex:1;" />
-              <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionBaseChar', 'image')">📂 Chọn</button>
-            </div>
-            <div style="font-size:10px; font-weight:700; color:#a5b4fc; margin-bottom:2px;">🏠 Ảnh Bối Cảnh Phòng Tham Chiếu 2K (Mặc định: <code>07_Nhan_Vat_Basic_Phong_Ngu_2K.png</code>):</div>
-            <div style="display:flex; gap:6px;">
-              <input id="inpFashionCharSheet" placeholder="Đường dẫn ảnh bối cảnh 2K (07_Nhan_Vat_Basic_Phong_Ngu_2K.png)" style="font-size:11px; flex:1;" />
-              <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionCharSheet', 'image')">📂 Chọn</button>
-            </div>
-            <div id="fashionCharPreviewBox" style="margin-top:7px; display:flex; gap:8px; align-items:center;"></div>
-          </div>
-
-          <!-- Cột 3: Bảng Điều Khiển Phân Tích AI -> Tạo Phân Cảnh -> Render Hậu Kỳ Video Final -->
-          <div style="background:#080c16; border:1px solid rgba(16,185,129,0.42); border-radius:8px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
-            <div>
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:4px;">
-                <span style="font-size:12px; font-weight:900; color:#34d399;">⚡ ĐIỀU KHIỂN PIPELINE & RENDER FINAL</span>
-                <select id="selFashionPromptStyle" onchange="switchFashionPromptStyleUI(this.value)" style="font-size:10px; width:auto; padding:2px 6px;">
-                  <option value="chained_i2v" selected>✨ Chained I2V (Timeline 0.1s Chuẩn Nhạc)</option>
-                  <option value="google_vids">🌐 Google Vids Omni 1080p (3 Chip Ảnh 2K)</option>
-                  <option value="timeline_pro">🎬 Motion Video Ref (Nối Frame Cuối Cảnh 1)</option>
-                  <option value="concise_flow">🎬 Motion Video Ref (Gắn Chip Google Flow)</option>
-                </select>
-              </div>
-              <div style="font-size:10.5px; color:var(--muted); line-height:1.4;">
-                1️⃣ <b>Tuỳ chọn Phương pháp</b>: <b>Chained Img2Video + Timeline 0.1s chuẩn nhạc</b> (không dùng Video Ref) hoặc <b>Motion Control Video Ref</b>.<br/>
-                2️⃣ <b>Cả 2 chế độ</b> đều tự động cắt <b>Frame cuối Cảnh 1 (`scene_s1_last_frame_2k.png`)</b> làm ảnh mở đầu nối tiếp cho <b>Cảnh 2</b> và ghép nhạc gốc mượt mà (24 FPS CFR)!
-              </div>
-            </div>
-            <div style="display:flex; flex-direction:column; gap:6px;">
-              <button class="btn btn-success" style="width:100%; padding:8px 10px; font-weight:900; justify-content:center; font-size:12px; box-shadow:0 4px 16px rgba(16,185,129,0.35);" onclick="runFashionProjectOnFlow()">
-                🚀 BẤM RENDER VIDEO FINAL (CHẠY TỰ ĐỘNG GOOGLE FLOW OMNI 1.1 FLASH)
-              </button>
-              <button class="btn btn-amber" style="width:100%; padding:6px 10px; font-weight:800; justify-content:center;" onclick="analyzeAndBuildFashionProject()">
-                ✂️ Cập Nhật Phân Cảnh & Prompt Theo Nhân Vật / Bộ Đồ Đang Chọn
-              </button>
-              <div style="display:grid; grid-template-columns: 1fr auto; gap:6px;">
-                <button class="btn btn-primary" style="padding:6px 8px; font-weight:800; justify-content:center; font-size:11px; background:linear-gradient(135deg,#ec4899,#8b5cf6); border:none;" onclick="renderFashionFinalPostProd()">
-                  🎞️ Ghép Hậu Kỳ Video Final (24FPS)
+              <div style="display:flex; gap:6px; align-items:center;">
+                <button class="btn btn-xs btn-amber" style="font-weight:800; padding:4px 9px;" onclick="startFashionCharacterUpload()">
+                  📤 + Tải Ảnh Nhân Vật
                 </button>
-                <button class="btn btn-outline" style="padding:6px 8px; font-size:10.5px;" onclick="copyFashionAiAgentCommand()" title="Copy câu lệnh gửi AI Agent phân tích sâu video này">
-                  🤖 Lệnh Agent
+                <button class="btn btn-xs btn-outline" style="padding:4px 8px;" onclick="switchTab('characters', document.getElementById('navBtn-characters'))" title="Mở Kho Nhân Vật chung để quản lý">
+                  👤 Kho NV
                 </button>
               </div>
             </div>
-          </div>
-        </div>
 
-        <!-- BƯỚC 2B: DANH SÁCH 4–5 BỘ ĐỒ THAY THEO NHẠC (OUTFIT PRODUCT SHEETS 2K + TÁCH NỀN TRẮNG BẰNG CHATGPT / BANANA) -->
-        <div style="background:#070b14; border:1px solid rgba(245,158,11,0.38); border-radius:8px; padding:10px; margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; margin-bottom:8px; flex-wrap:wrap;">
-            <div>
-              <span style="font-size:12.5px; font-weight:900; color:#fde68a;">👗 BƯỚC 2B: CHỌN SẢN PHẨM QUẦN ÁO (MẶC ĐỊNH 5 BỘ ĐỒ NỀN TRẮNG 2K • HỖ TRỢ THÊM MỚI & TỰ TÁCH NỀN TRẮNG BẰNG CHATGPT / BANANA)</span>
+            <!-- Ô Tóm Tắt Nhân Vật Đang Chọn -->
+            <div id="fashionCharPreviewBox" style="background:#070b14; border:1px solid rgba(236,72,153,0.3); border-radius:9px; padding:8px 10px; margin-bottom:10px; min-height:74px; display:flex; align-items:center; gap:10px;"></div>
+
+            <!-- Lưới Thẻ Ảnh Nhân Vật Trực Quan (Bấm 1 Chạm Là Chọn) -->
+            <div style="font-size:11px; font-weight:700; color:#94a3b8; margin-bottom:6px;">
+              👇 Chọn nhanh người mẫu có sẵn hoặc tải ảnh người mẫu của bạn:
             </div>
-            <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
-              <select id="selDeconstructOutfitModel" style="width:auto; font-size:10.5px; font-weight:700; background:#0d1322; color:#fde68a; border-color:rgba(245,158,11,0.45); padding:4px 8px; border-radius:6px;" title="Chọn Model AI để tách ảnh quần áo người dùng tải lên thành ảnh tham chiếu quần áo tiêu chuẩn (nền trắng tinh, chỉ sản phẩm)">
-                <option value="nano_banana" selected>🍌 Model Tách Nền Trắng: Nano Banana 2.1 (Google Flow 2K)</option>
-                <option value="chatgpt">🤖 Model Tách Nền Trắng: ChatGPT Vision (gpt-4o) + Banana 2K</option>
-              </select>
-              <button class="btn btn-xs btn-success" style="font-weight:900; padding:5px 10px;" onclick="pickAndDeconstructNewOutfit2K()" title="Chọn ảnh quần áo mới bất kỳ (ảnh mẫu mặc hoặc ảnh shop) -> Tự động tách thành ảnh tham chiếu quần áo tiêu chuẩn nền trắng 2K (như 03_Product_Sheet_Quan_Xanh_2K.png)">
-                ✨ + Thêm Quần Áo Mới & Tách Ra Ảnh Nền Trắng Chuẩn 2K
-              </button>
-              <button class="btn btn-xs btn-amber" onclick="addCustomFashionOutfitFromDisk()" title="Thêm ảnh sản phẩm đã có sẵn nền trắng từ máy tính">➕ Thêm Ảnh SP Có Sẵn</button>
-              <button class="btn btn-xs btn-outline" onclick="toggleAllFashionOutfits(true)">✅ Chọn Hết</button>
-              <button class="btn btn-xs btn-outline" onclick="selectFirstNFashionOutfits(4)">4️⃣ Chọn 4 Bộ</button>
-            </div>
+            <div id="fashionCharCardsGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(92px, 1fr)); gap:8px; max-height:230px; overflow-y:auto; padding:2px;"></div>
           </div>
-          <div id="fashionOutfitsGrid" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(245px, 1fr)); gap:10px;"></div>
-        </div>
 
-        <!-- BƯỚC 3: CÁC VIDEO PHÂN CẢNH ĐÃ CHIA CẮT + BẢNG KEYFRAME AI VISION + TIMELINE PROMPT & VIDEO PHÂN CẢNH -->
-        <div style="margin-bottom:12px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:8px; flex-wrap:wrap; gap:8px;">
-            <span style="font-size:13px; font-weight:900; color:#67e8f9;">🎞️ BƯỚC 3: KỊCH BẢN & VIDEO TỪNG PHÂN CẢNH (SO SÁNH CLIP THAM CHIẾU GỐC ↔ VIDEO PHÂN CẢNH MỚI 2K)</span>
-            <div style="display:flex; gap:8px; align-items:center; flex-wrap:wrap;">
-              <label style="display:inline-flex; align-items:center; gap:5px; background:rgba(16,185,129,0.14); border:1px solid rgba(16,185,129,0.45); border-radius:6px; padding:3px 9px; font-size:11px; font-weight:800; color:#34d399; cursor:pointer; margin:0;"
-                     title="Khi bật, Tool sẽ liên tục theo dõi trạng thái tạo video trên Google Flow (mỗi 3–5 giây) và tự động Retry ngay lập tức khi phát hiện lỗi tạo không thành công">
-                <input id="chkFashionAutoRetryWatchdog" type="checkbox" checked />
-                <span>🔁 Tự động theo dõi & Retry ngay khi lỗi (Tối đa 4 lần/cảnh)</span>
-              </label>
-              <button class="btn btn-xs btn-amber" onclick="retryAllFailedFashionScenes()" title="Kiểm tra và chạy Retry ngay cho tất cả các phân cảnh đang lỗi hoặc chưa có video">
-                🔁 Retry Ngay Các Cảnh Lỗi
-              </button>
-              <button class="btn btn-xs btn-outline" onclick="openFolderEncoded(encodeURIComponent((STATE.fashionProject?.project_dir || 'fashion_motion_projects/fashion_lookbook_chan_vay_6e19') + '/ref_clips'))">📂 Mở Folder Clip Phân Cảnh & Bảng Keyframe</button>
+          <!-- BƯỚC 3: THÊM SẢN PHẨM QUẦN ÁO -->
+          <div class="f-step-card" style="border-color:rgba(245,158,11,0.38); display:flex; flex-direction:column;">
+            <div class="f-step-head">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="f-step-num">3</span>
+                <span style="font-size:13.5px; font-weight:900; color:#fdf2f8;">Sản Phẩm Quần Áo Cần Phối</span>
+                <span id="badgeFashionSelectedOutfitsCount" class="badge badge-wait" style="font-size:10px;">0 sản phẩm</span>
+              </div>
+              <div style="display:flex; gap:6px; align-items:center; flex-wrap:wrap;">
+                <button class="btn btn-xs btn-amber" style="font-weight:900; padding:5px 11px;" onclick="startFashionProductUpload()" title="Chọn 1 hoặc nhiều ảnh quần áo từ máy tính của bạn">
+                  📤 + Tải Ảnh Sản Phẩm Từ Máy
+                </button>
+                <button id="btnToggleFashionStorePicker" class="btn btn-xs btn-outline" style="padding:5px 10px; color:#93c5fd; border-color:rgba(96,165,250,0.45); font-weight:700;" onclick="toggleFashionStorePicker()">
+                  🛍️ Chọn Từ Kho SP (<span id="lblFashionStoreCount">0</span>)
+                </button>
+                <button id="btnLoadDemoFashionOutfits" class="btn btn-xs btn-outline" style="padding:5px 8px; font-size:10px;" onclick="loadSampleFourFashionOutfits()" title="Nạp thử 4 bộ đồ mẫu 2K để test nhanh quy trình">
+                  ✨ Thử 4 bộ mẫu
+                </button>
+                <button id="btnClearAllFashionOutfits" class="btn btn-xs btn-danger" style="display:none; padding:5px 8px; font-size:10px;" onclick="clearAllFashionOutfits()" title="Xoá toàn bộ danh sách sản phẩm đang chọn">
+                  🗑️ Xoá hết
+                </button>
+              </div>
             </div>
-          </div>
-          <!-- Thanh Theo Dõi Trạng Thái Tạo Video & Tự Động Retry Theo Thời Gian Thực -->
-          <div id="fashionLiveMonitorBar" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:8px; background:linear-gradient(90deg, rgba(16,185,129,0.12), rgba(6,182,212,0.12)); border:1px solid rgba(6,182,212,0.45); font-size:11.5px; color:#e2e8f0;"></div>
-          <div id="fashionScenesTimelineContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(480px, 1fr)); gap:12px;"></div>
-        </div>
 
-        <!-- BƯỚC 4: RENDER HẬU KỲ GHÉP CÁC PHÂN CẢNH + NHẠC GỐC THÀNH VIDEO FINAL HOÀN CHỈNH (1080P • 60FPS) -->
-        <div id="cardFashionPostProdFinal" style="background:linear-gradient(135deg, rgba(6,28,24,0.92), rgba(9,14,26,0.98)); border:1px solid rgba(16,185,129,0.55); border-radius:10px; padding:12px; margin-bottom:12px;">
-          <div id="fashionFinalVideoPreviewBox"></div>
-        </div>
-
-        <!-- PHẦN PHỤ TRỢ Ở DƯỚI CÙNG (THU GỌN MẶC ĐỊNH THEO YÊU CẦU "NHỮNG THỨ KHÔNG CẦN THIẾT CHO XUỐNG DƯỚI ĐI") -->
-        <details id="detailsFashionAuxTools" style="background:#070a12; border:1px solid rgba(139,92,246,0.35); border-radius:9px; padding:10px 12px;">
-          <summary style="cursor:pointer; font-size:12px; font-weight:800; color:#c4b5fd; user-select:none;">
-            🛠️ CÔNG CỤ BỔ TRỢ MỞ RỘNG (Lấy Ảnh Quần Áo Từ Kho Sản Phẩm & Kho 4 Prompt Chuẩn Tạo Ảnh Tách Phụ Kiện / Character Sheet 2K) — Bấm để mở/đóng
-          </summary>
-          <div style="margin-top:10px; display:flex; flex-direction:column; gap:10px;">
-            <!-- Thanh lấy ảnh sản phẩm gốc từ Kho Sản Phẩm Đã Crawl / Studio Dự Án -->
-            <div style="background:#0c1220; border:1px solid rgba(99,102,241,0.35); border-radius:7px; padding:8px 10px;">
-              <div style="display:grid; grid-template-columns: 1fr auto; gap:8px; align-items:end;">
-                <div>
-                  <label style="font-size:10.5px; color:#93c5fd; font-weight:700;">🛍️ Lấy Ảnh Sản Phẩm Quần Áo Gốc Từ Kho Sản Phẩm Đã Crawl / Dự Án Để Biến Thành Ảnh Tách Quần Áo & Phụ Kiện 2K:</label>
-                  <select id="selFashionProdFromStore" onchange="onSelectFashionProductFromStore(this.value)" style="font-size:11px; background:#070a12; color:#e2e8f0;">
-                    <option value="">-- Chọn sản phẩm từ Kho Sản Phẩm / Studio Dự Án để lấy ảnh quần áo gốc --</option>
-                  </select>
-                </div>
-                <button class="btn btn-xs btn-outline" style="padding:6px 10px;" onclick="populateFashionProductStorePicker(true)">🔄 Làm Mới DS Sản Phẩm</button>
+            <!-- Khung Chọn Nhanh Từ Kho Sản Phẩm Đã Crawl (176 SP) — Bấm Mới Mở Cho Gọn -->
+            <div id="fashionStorePickerPanel" style="display:none; background:#09101f; border:1px solid rgba(99,102,241,0.45); border-radius:9px; padding:9px 11px; margin-bottom:10px;">
+              <div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap;">
+                <input id="inpFashionStoreSearch" type="text" placeholder="🔍 Gõ tên hoặc ID sản phẩm trong kho..." oninput="filterFashionStoreProductsDropdown()" style="width:210px; font-size:11px; padding:5px 9px; border-radius:6px; background:#050811; border:1px solid rgba(99,102,241,0.45); color:#fff;" />
+                <select id="selFashionProdFromStore" onchange="onSelectFashionProductFromStore(this.value)" style="font-size:11px; background:#050811; color:#e2e8f0; flex:1; min-width:220px; padding:5px 8px; border-radius:6px;">
+                  <option value="">-- Chọn sản phẩm trong Kho Sản Phẩm để lấy ảnh --</option>
+                </select>
+                <button class="btn btn-xs btn-outline" onclick="populateFashionProductStorePicker(true)" title="Tải lại Kho Sản Phẩm">🔄</button>
+                <button class="btn btn-xs btn-danger" onclick="toggleFashionStorePicker(false)">✕ Đóng</button>
               </div>
               <div id="fashionStoreProdImagesStrip" style="display:none; margin-top:8px; padding-top:8px; border-top:1px dashed rgba(255,255,255,0.12);"></div>
             </div>
 
-            <!-- Bộ 4 Prompt Chuẩn Thời Trang 2K -->
-            <div id="cardFashionPromptsBuilder" style="background:linear-gradient(145deg, rgba(16,22,38,0.96), rgba(9,13,24,0.98)); border:1px solid rgba(139,92,246,0.48); border-radius:9px; padding:11px 13px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; margin-bottom:8px;">
+            <!-- Danh Sách Thẻ Sản Phẩm Đã Chọn -->
+            <div id="fashionOutfitsGrid" style="display:grid; grid-template-columns: repeat(auto-fill, minmax(240px, 1fr)); gap:9px; max-height:315px; overflow-y:auto; padding:2px; flex:1;"></div>
+          </div>
+        </div>
+
+        <!-- =====================================================================================
+             PHÂN TÍCH TOÀN DIỆN TỪNG PHÂN CẢNH, DẢI FRAME & KỊCH BẢN BIẾN HÌNH THEO NHẠC (HIỂN THỊ TRỰC TIẾP)
+             ===================================================================================== -->
+        <div id="cardFashionSceneFrameAnalysis" class="f-step-card" style="border-color:rgba(6,182,212,0.42); background:linear-gradient(180deg, rgba(10,16,30,0.98), rgba(7,11,21,0.99));">
+          <div class="f-step-head" style="margin-bottom:10px;">
+            <div style="display:flex; align-items:center; gap:9px; flex-wrap:wrap;">
+              <span style="font-size:13.5px; font-weight:900; color:#67e8f9;">🎞️ Phân Tích Toàn Diện Từng Cảnh, Frame &amp; Kịch Bản Biến Hình Theo Nhạc</span>
+              <span id="fashionSceneAnalysisSubBadge" class="f-step-pill" style="color:#a5f3fc; border-color:rgba(6,182,212,0.4); background:rgba(6,182,212,0.12);">Tự động đồng bộ theo Mẫu + Nhân vật + Sản phẩm</span>
+            </div>
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <label style="display:inline-flex; align-items:center; gap:5px; font-size:11px; color:#34d399; cursor:pointer; margin:0;" title="Tự động theo dõi và đổi tài khoản / chạy lại nếu có phân cảnh lỗi">
+                <input id="chkFashionAutoRetryWatchdog" type="checkbox" checked style="width:auto;" />
+                <span>🔁 Tự động Retry &amp; Đổi Acc khi cảnh lỗi</span>
+              </label>
+              <button class="btn btn-xs btn-outline" style="color:#67e8f9; border-color:rgba(6,182,212,0.5); font-weight:800;" onclick="previewOrRebuildFashionScenes()" title="Cắt video mẫu thành từng clip 8s và trích xuất bảng Keyframe 0.5s chi tiết cho từng cảnh">
+                ✂️ Cắt Clip Mẫu &amp; Trích Xuất Bảng Frame 0.5s
+              </button>
+              <button class="btn btn-xs btn-outline" style="color:#f9a8d4; border-color:rgba(236,72,153,0.45);" onclick="renderFashionFinalPostProd()" title="Ghép các phân cảnh đã tạo kèm nhạc gốc thành Video Final 1080p">
+                🎞️ Ghép Hậu Kỳ Final
+              </button>
+            </div>
+          </div>
+          <div id="fashionLiveMonitorBar" style="display:none; margin-bottom:10px; padding:8px 12px; border-radius:8px; background:rgba(6,182,212,0.12); border:1px solid rgba(6,182,212,0.4); font-size:11.5px; color:#e2e8f0;"></div>
+          <div id="fashionScenesTimelineContainer" style="display:grid; grid-template-columns: repeat(auto-fit, minmax(460px, 1fr)); gap:12px;"></div>
+        </div>
+
+        <!-- =====================================================================================
+             BƯỚC 4: THANH CHẠY DUY NHẤT (1 NÚT RÕ RÀNG) + KẾT QUẢ VIDEO FINAL
+             ===================================================================================== -->
+        <div class="f-step-card" style="border:1.5px solid rgba(16,185,129,0.55); background:linear-gradient(145deg, rgba(6,34,29,0.72), rgba(9,14,26,0.98));">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:14px; flex-wrap:wrap;">
+            <!-- Cột Trái: Trạng Thái Đủ Điều Kiện Chạy -->
+            <div style="display:flex; flex-direction:column; gap:7px; flex:1; min-width:280px;">
+              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+                <span class="f-step-num" style="background:linear-gradient(135deg,#10b981,#06b6d4);">4</span>
+                <span style="font-size:14px; font-weight:900; color:#ecfdf5;">Tạo Video Thời Trang Hoàn Chỉnh</span>
+              </div>
+              <div id="fashionSimpleSummary" style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+                <span class="f-step-pill">Đang tải cấu hình...</span>
+              </div>
+            </div>
+
+            <!-- Cột Giữa: Chọn Nguồn Tạo & Tài Khoản Google (Đồng Bộ Như Template #005) -->
+            <div style="display:flex; flex-direction:column; gap:6px; min-width:300px;">
+              <div style="display:flex; gap:7px; align-items:center; flex-wrap:wrap;">
+                <select id="selFashionGenerationMode" onchange="onChangeFashionGenerationMode(this.value)" title="Chọn công nghệ tạo video thời trang" style="font-size:11.5px; font-weight:800; color:#6ee7b7; background:#051310; border:1px solid rgba(16,185,129,0.55); padding:6px 10px; border-radius:8px; min-width:240px;">
+                  <option value="chained_i2v" selected>✨ Google Flow · Chained I2V (Chuẩn Nhạc 0.1s)</option>
+                  <option value="google_vids">🌐 Google Vids Web · 1080p (Không reCAPTCHA)</option>
+                  <option value="video_ref">🎬 Google Flow · Motion Video Ref</option>
+                </select>
+                <select id="selFashionAccountProfile" onchange="onChangeFashionAccountProfile(this.value)" title="Chọn tài khoản Google hoặc để tự động xoay vòng đa tài khoản (acc lỗi tự đổi sang acc khác)" style="font-size:11.5px; font-weight:700; color:#fde68a; background:#090e1a; border:1px solid rgba(245,158,11,0.45); padding:6px 10px; border-radius:8px; min-width:235px;">
+                  <option value="">🔄 Đa luồng Đa tài khoản · Tự đổi Acc khi lỗi</option>
+                </select>
+              </div>
+              <label id="lblFashionAutoPrepare2K" style="display:inline-flex; align-items:center; gap:6px; font-size:11px; color:#cbd5e1; cursor:pointer; user-select:none; margin:0;" title="Mặc định TẮT để upload trực tiếp ảnh Nhân vật & Sản phẩm của bạn làm ảnh tham chiếu gốc. Bật nếu muốn AI trên Google Flow vẽ lại ảnh mở đầu 9:16 và tách nền trắng sản phẩm trước khi dựng video.">
+                <input type="checkbox" id="chkFashionAutoPrepare2K" onchange="onToggleFashionAutoPrepare2K(this.checked)" style="width:auto;" />
+                <span>🪄 AI vẽ lại ảnh mở đầu & tách nền trắng sản phẩm trước (Tắt = Dùng trực tiếp ảnh Nhân vật & SP của bạn)</span>
+              </label>
+            </div>
+
+            <!-- Cột Phải: MỘT NÚT CHẠY CHÍNH DUY NHẤT -->
+            <div style="display:flex; align-items:center; gap:8px;">
+              <button id="btnFashionSimpleRun" class="f-cta-run" onclick="runFashionProjectOnFlow()" disabled>
+                🚀 Tạo Video Thời Trang Ngay
+              </button>
+            </div>
+          </div>
+
+          <!-- Khung Hiển Thị Video Final Sau Khi Hoàn Tất (Tự Ẩn Khi Đang Soạn Dự Án Mới) -->
+          <div id="cardFashionPostProdFinal" style="display:none; margin-top:14px; padding-top:14px; border-top:1px solid rgba(16,185,129,0.3);">
+            <div id="fashionFinalVideoPreviewBox"></div>
+          </div>
+        </div>
+
+        <!-- =====================================================================================
+             BẢNG TÙY CHỈNH NÂNG CAO (ẨN MẶC ĐỊNH — DÀNH CHO NGƯỜI DÙNG CHUYÊN SÂU)
+             ===================================================================================== -->
+        <div id="fashionAdvancedPanel" class="f-step-card" style="display:none; border-color:rgba(99,102,241,0.45); background:#080c17;">
+          <div class="f-step-head">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span style="font-size:13.5px; font-weight:900; color:#a5b4fc;">⚙️ Tùy Chỉnh Chuyên Sâu (Kịch Bản Từng Cảnh, Video Riêng & Prompt 2K)</span>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">
+              <button class="btn btn-xs btn-outline" style="color:#67e8f9; border-color:rgba(6,182,212,0.5);" onclick="previewOrRebuildFashionScenes()">
+                ✂️ Xem Trước / Cập Nhật Kịch Bản Phân Cảnh
+              </button>
+              <button class="btn btn-xs btn-outline" style="color:#f9a8d4; border-color:rgba(236,72,153,0.45);" onclick="renderFashionFinalPostProd()">
+                🎞️ Ghép Hậu Kỳ Thủ Công
+              </button>
+              <button class="btn btn-xs btn-amber" onclick="retryAllFailedFashionScenes()">
+                🔁 Retry Cảnh Lỗi
+              </button>
+              <button class="btn btn-xs btn-outline" onclick="openFolder('final_videos')">
+                📂 Mở Folder Final
+              </button>
+              <button class="btn btn-xs btn-outline" onclick="toggleFashionAdvanced()">
+                ✕ Thu gọn
+              </button>
+            </div>
+          </div>
+
+          <!-- Cấu Hình Nâng Cao: Video Gốc Tùy Chỉnh + Đường Dẫn Nhân Vật / Bối Cảnh + Tách Nền Riêng -->
+          <div id="fashionInputColumns" style="display:grid; grid-template-columns: 1.15fr 1fr 0.95fr; gap:12px; margin-bottom:14px;">
+            <!-- Cột A: Video Tham Chiếu Ngoài Kho Mẫu -->
+            <div style="background:#060a13; border:1px solid rgba(6,182,212,0.32); border-radius:9px; padding:10px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:6px; flex-wrap:wrap;">
+                <span style="font-size:11.5px; font-weight:800; color:#67e8f9;">🎬 Dùng Video Tham Chiếu Riêng (.MP4)</span>
+                <select id="selFashionRefVideoLib" onchange="onSelectFashionRefVideoFromLib(this.value)" style="font-size:10.5px; background:#0d1322; color:#a5f3fc; max-width:190px; padding:2px 6px; border-radius:5px;">
+                  <option value="">-- Chọn từ thư viện --</option>
+                </select>
+              </div>
+              <div style="display:flex; gap:6px; margin-bottom:7px;">
+                <input id="inpFashionRefVideo" placeholder="Đường dẫn video gốc (.mp4)..." style="font-size:11px; flex:1;" />
+                <button class="btn btn-xs btn-primary" onclick="pickFashionFile('inpFashionRefVideo', 'video')">📂 Chọn MP4</button>
+              </div>
+              <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:6px; margin-bottom:7px;">
                 <div>
-                  <span style="font-size:12px; font-weight:900; color:#ddd6fe;">🪄 KHO 4 PROMPT CHUẨN TẠO ẢNH SẢN PHẨM TÁCH PHỤ KIỆN & CHARACTER SHEET MẶC FULL ĐỒ 2K</span>
+                  <label style="font-size:10px; color:#fcd34d;">Nguồn AI</label>
+                  <select id="selFashionAiProvider" style="font-size:10.5px;">
+                    <option value="auto" selected>Tự động</option>
+                    <option value="cliproxy">CLIProxy (:8317)</option>
+                    <option value="agent">AI Agent</option>
+                  </select>
                 </div>
-                <div style="display:flex; gap:6px; flex-wrap:wrap;" id="fashionStdPromptTabs">
-                  <button class="btn btn-xs btn-amber" onclick="selectFashionPromptBuilderTab('deconstructed_outfit_flatlay_2k', this)">👕 Prompt #1: Tách Quần Áo + Phụ Kiện 2K</button>
-                  <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('wardrobe_4looks_character_sheet_2k', this)">👗 Prompt #2: Character Sheet Mặc Full Đồ</button>
-                  <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('fashion_model_turnaround_5poses_2k', this)">🧍‍♀️ Prompt #3: Character Sheet NV5 5 Poses</button>
-                  <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('base_char_bedroom_2k', this)">🏠 Prompt #4: Ảnh Nhân Vật Mở Đầu 2K</button>
+                <div>
+                  <label style="font-size:10px; color:#a5b4fc;">Model Vision</label>
+                  <select id="selFashionAiModel" style="font-size:10.5px;">
+                    <option value="gemini-2.5-flash" selected>Gemini 2.5 Flash</option>
+                    <option value="gemini-2.5-pro">Gemini 2.5 Pro</option>
+                    <option value="gpt-4o">GPT-4o Vision</option>
+                  </select>
                 </div>
+                <div>
+                  <label style="font-size:10px; color:#67e8f9;">Độ dài cảnh</label>
+                  <select id="selFashionChunkSec" style="font-size:10.5px;">
+                    <option value="auto" selected>Tự động 8s</option>
+                    <option value="15">15s / cảnh</option>
+                    <option value="10">10s / cảnh</option>
+                    <option value="8">8s / cảnh</option>
+                  </select>
+                </div>
+              </div>
+              <div style="display:flex; gap:6px; margin-bottom:7px;">
+                <button class="btn btn-xs btn-primary" onclick="promptCreateNewFashionProject()">➕ Tạo Dự Án Từ Video MP4 Riêng</button>
+                <button class="btn btn-xs btn-outline" onclick="copyFashionAiAgentCommand()">🤖 Copy Lệnh Agent</button>
+              </div>
+              <div id="fashionVideoSplitSummary" style="padding:6px 8px; border-radius:6px; background:rgba(6,182,212,0.08); border:1px solid rgba(6,182,212,0.25); font-size:10.5px; color:#a5f3fc;"></div>
+            </div>
+
+            <!-- Cột B: Đường Dẫn Nhân Vật & Ảnh Bối Cảnh Mở Đầu Riêng -->
+            <div style="background:#060a13; border:1px solid rgba(236,72,153,0.32); border-radius:9px; padding:10px;">
+              <div style="font-size:11.5px; font-weight:800; color:#f9a8d4; margin-bottom:6px;">👤 Đường Dẫn Ảnh Nhân Vật & Bối Cảnh Mở Đầu</div>
+              <div style="margin-bottom:6px;">
+                <label style="font-size:10px; color:#94a3b8;">Danh sách nhân vật:</label>
+                <select id="selFashionCharFromLib" onchange="onSelectFashionCharacterFromLibrary(this.value)" style="font-size:11px; background:#0d1322; color:#f9a8d4;">
+                  <option value="">-- Chọn nhân vật --</option>
+                </select>
+              </div>
+              <div style="margin-bottom:6px;">
+                <label style="font-size:10px; color:#94a3b8;">Ảnh nhân vật chính:</label>
+                <div style="display:flex; gap:5px;">
+                  <input id="inpFashionBaseChar" placeholder="Đường dẫn ảnh nhân vật..." onchange="onCustomFashionCharacterPathChange(false)" style="font-size:11px; flex:1;" />
+                  <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionBaseChar', 'character')">📂</button>
+                </div>
+              </div>
+              <div>
+                <label style="font-size:10px; color:#94a3b8;">Ảnh bối cảnh mở đầu (mặc định tự lấy theo ảnh nhân vật):</label>
+                <div style="display:flex; gap:5px;">
+                  <input id="inpFashionCharSheet" placeholder="Đường dẫn ảnh bối cảnh mở đầu..." onchange="renderFashionCharacterPreview(); updateFashionSimpleSummary();" style="font-size:11px; flex:1;" />
+                  <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionCharSheet', 'bg')" title="Chọn ảnh bối cảnh riêng">📂</button>
+                  <button class="btn btn-xs btn-outline" onclick="useBaseCharAsFashionBg()" title="Đặt bối cảnh trùng ảnh nhân vật">🔁</button>
+                </div>
+              </div>
+            </div>
+
+            <!-- Cột C: Công Cụ Tách Nền Trắng 2K & Kiểu Prompt -->
+            <div style="background:#060a13; border:1px solid rgba(245,158,11,0.32); border-radius:9px; padding:10px; display:flex; flex-direction:column; justify-content:space-between; gap:8px;">
+              <div>
+                <div style="font-size:11.5px; font-weight:800; color:#fde68a; margin-bottom:6px;">🪄 Công Cụ Tách Nền Trắng Sản Phẩm 2K & Kiểu Prompt</div>
+                <label style="font-size:10px; color:#94a3b8;">Model tách nền trắng sản phẩm:</label>
+                <select id="selDeconstructOutfitModel" style="font-size:11px; background:#0d1322; color:#fde68a; margin-bottom:8px;">
+                  <option value="local_2k" selected>⚡ Chuẩn hóa khung nền trắng 2K Local (Nhanh 0s)</option>
+                  <option value="nano_banana">🍌 Nano Banana 2.1 (Google Flow 2K)</option>
+                  <option value="chatgpt">🤖 ChatGPT Vision + Banana 2K</option>
+                </select>
+                <label style="font-size:10px; color:#94a3b8;">Kiểu hiển thị Prompt phân cảnh:</label>
+                <select id="selFashionPromptStyle" onchange="switchFashionPromptStyleUI(this.value)" style="font-size:11px; background:#0d1322; color:#67e8f9;">
+                  <option value="chained_i2v" selected>✨ Chained I2V (Timeline 0.1s)</option>
+                  <option value="google_vids">🌐 Google Vids Omni 1080p</option>
+                  <option value="timeline_pro">🎬 Motion Video Ref</option>
+                  <option value="concise_flow">🎬 Motion Video Ref (Ngắn gọn)</option>
+                </select>
+              </div>
+              <button class="btn btn-xs btn-success" style="width:100%; padding:6px 10px; font-weight:800;" onclick="pickAndDeconstructNewOutfit2K()">
+                ✨ Tải Ảnh & Tách Nền Trắng 2K Ngay
+              </button>
+            </div>
+          </div>
+
+          <!-- Kho 4 Prompt Chuẩn Tạo Ảnh Studio 2K -->
+          <details id="detailsFashionAuxTools" style="background:#060912; border:1px solid rgba(139,92,246,0.35); border-radius:9px; padding:10px 12px;">
+            <summary style="cursor:pointer; font-size:12px; font-weight:800; color:#c4b5fd; user-select:none;">
+              🪄 Kho 4 Prompt Chuẩn Tạo Ảnh Tách Phụ Kiện & Character Sheet 2K
+            </summary>
+            <div style="margin-top:10px;" id="cardFashionPromptsBuilder">
+              <div style="display:flex; gap:6px; flex-wrap:wrap; margin-bottom:8px;" id="fashionStdPromptTabs">
+                <button class="btn btn-xs btn-amber" onclick="selectFashionPromptBuilderTab('deconstructed_outfit_flatlay_2k', this)">👕 Prompt #1: Tách Quần Áo 2K</button>
+                <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('wardrobe_4looks_character_sheet_2k', this)">👗 Prompt #2: Sheet Mặc Full Đồ</button>
+                <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('fashion_model_turnaround_5poses_2k', this)">🧍‍♀️ Prompt #3: Sheet 5 Dáng Đứng</button>
+                <button class="btn btn-xs btn-outline" onclick="selectFashionPromptBuilderTab('base_char_bedroom_2k', this)">🏠 Prompt #4: Ảnh Mở Đầu 2K</button>
               </div>
               <div id="fashionStdPromptBody"></div>
             </div>
-          </div>
-        </details>
+          </details>
+        </div>
       </div>
     </section>
 
@@ -2387,7 +2621,7 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
           <button class="btn btn-xs btn-success" id="btnMatrixModeVideos" onclick="renderMatrixOverview(true, 'videos')">🎬 Đã có Video Final</button>
           <button class="btn btn-xs btn-outline" id="btnMatrixModeActive" onclick="renderMatrixOverview(true, 'active')">📦 Có Video + File Render</button>
-          <button class="btn btn-xs btn-outline" id="btnMatrixModeAll" onclick="renderMatrixOverview(true, 'all')">🗂️ Tất cả 179 SP</button>
+          <button class="btn btn-xs btn-outline" id="btnMatrixModeAll" onclick="renderMatrixOverview(true, 'all')">🗂️ Tất cả Dự án</button>
           <button class="btn btn-xs btn-amber" onclick="openFolder('final_videos')">📂 Mở Folder Video Final</button>
           <button class="btn btn-xs btn-primary" onclick="renderMatrixOverview(true)">🔄 Làm Mới</button>
         </div>
@@ -2580,21 +2814,21 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
           </div>
           <div class="modal-body" style="display:flex; flex-direction:column; gap:10px;">
             <div style="background:rgba(59,130,246,0.1); border:1px solid rgba(59,130,246,0.35); border-radius:8px; padding:9px 12px; font-size:11.5px; color:#bfdbfe; line-height:1.45;">
-              💡 <b>Hướng dẫn chạy Đa Tài Khoản Google Flow:</b> Bạn có thể thêm bao nhiêu tài khoản Google Flow tuỳ ý (VD: <code>leviettung04</code>, <code>flow_acc_2</code>, <code>flow_acc_3</code>...). Mỗi tài khoản có 1 Profile Chrome riêng và có thể mở trình duyệt đăng nhập trực tiếp hoặc dán Cookie/Bearer Token.
+              💡 <b>Hướng dẫn chạy Đa Tài Khoản Google Flow:</b> Bạn có thể thêm bao nhiêu tài khoản Google Flow tuỳ ý (VD: <code>flow_acc_1</code>, <code>flow_acc_2</code>, <code>flow_acc_3</code>...). Mỗi tài khoản có 1 Profile Chrome riêng và có thể mở trình duyệt đăng nhập trực tiếp hoặc dán Cookie/Bearer Token.
             </div>
             <div class="grid-2">
               <div>
                 <label>👤 Mã Profile Chrome Riêng (Không dấu, viết liền)</label>
-                <input id="inpModalGoogleProfile" placeholder="VD: flow_acc_2 hoặc leviettung05" />
+                <input id="inpModalGoogleProfile" placeholder="VD: flow_acc_1 hoặc flow_acc_2" />
               </div>
               <div>
                 <label>📧 Tên Hiển Thị / Email Tài Khoản</label>
-                <input id="inpModalGoogleEmail" placeholder="VD: leviettung05@gmail.com" />
+                <input id="inpModalGoogleEmail" placeholder="VD: your_email@gmail.com" />
               </div>
             </div>
             <div>
-              <label>📁 Google Flow Project ID (Mặc định dùng Project chuẩn nếu để trống)</label>
-              <input id="inpModalGoogleProjId" placeholder="VD: bf4979d1-548a-44bd-a265-3927bba76dc1" value="bf4979d1-548a-44bd-a265-3927bba76dc1" />
+              <label>📁 Google Flow Project ID (Mặc định tự nhận theo tài khoản nếu để trống)</label>
+              <input id="inpModalGoogleProjId" placeholder="VD: UUID Project từ flow.google.com/project/... (để trống nếu tự tạo)" value="" />
             </div>
             <div>
               <label>🔑 Bearer Token `ya29...` (Tuỳ chọn — Tự động lấy nếu đăng nhập bằng Chrome)</label>
@@ -3779,7 +4013,7 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
           </div>
           <div>
             <label>Project ID (Dự án chứa Nhân vật trên Flow)</label>
-            <input id="inpEditCharProjId" placeholder="VD: 932bc2a1-07ea-4199-b147-80ab0018d41c" />
+            <input id="inpEditCharProjId" placeholder="VD: UUID Project Google Flow (tự động nếu để trống)" />
           </div>
         </div>
         <div style="background:#090d16; border:1px solid rgba(16,185,129,0.35); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
@@ -4948,15 +5182,28 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         const img = e.target.closest("img");
         if (!img) return;
         if (img.id === "imgLbMainEl" || img.closest("#modalImageLightbox")) return;
+        if (img.closest("button, a, label")) return;
         // Nếu là thumbnail chọn ảnh nhỏ trong PDP Gallery hoặc trong card danh sách SP (để mở modal SP) thì giữ nguyên hành vi của nó
         if (img.closest("[onclick*='switchPgGalleryImage']") || img.closest("[onclick*='openProductGalleryModal']")) return;
-        // Nếu chính thẻ img hoặc cha gần nhất chưa mở Lightbox nhưng có src hợp lệ -> mở Lightbox
+        // Kiểm tra cả onclick trên chính <img> và ancestor (nhưng bỏ qua modal-backdrop) để không cướp click của card template/nhân vật
+        let clickAncestor = img.closest("[onclick]");
+        if (clickAncestor && (clickAncestor.classList.contains("modal-backdrop") || clickAncestor.classList.contains("img-lightbox-backdrop") || (clickAncestor.getAttribute("onclick") || "").includes("event.target===this"))) {
+          clickAncestor = null;
+        }
+        const ownOnclick = img.getAttribute("onclick") || "";
+        const ancestorOnclick = clickAncestor ? (clickAncestor.getAttribute("onclick") || "") : "";
+        const combinedOnclick = `${ownOnclick} ${ancestorOnclick}`.trim();
+        if (
+          combinedOnclick.includes("openImageLightbox") ||
+          combinedOnclick.includes("openLightbox") ||
+          combinedOnclick.includes("openCharacterRefLightbox") ||
+          combinedOnclick.includes("openProductGalleryLightbox")
+        ) return;
+        const isFileOpen = combinedOnclick.includes("openFileEncoded") || combinedOnclick.includes("openFolderEncoded");
+        if (clickAncestor && !isFileOpen) return;
         const src = img.getAttribute("src") || "";
         if (!src) return;
-        const inlineOnclick = (img.getAttribute("onclick") || "") + " " + (img.parentElement?.getAttribute("onclick") || "");
-        if (inlineOnclick.includes("openImageLightbox")) return;
-        // Chặn các lệnh mở Explorer cũ khi click trực tiếp vào ảnh để ưu tiên mở Lightbox trên UI
-        if (inlineOnclick.includes("openFileEncoded") || inlineOnclick.includes("openFolderEncoded") || !inlineOnclick.trim()) {
+        if (isFileOpen || !combinedOnclick) {
           e.stopPropagation();
           e.preventDefault();
           const title = img.getAttribute("title") || img.getAttribute("alt") || "Xem Ảnh Chi Tiết";
@@ -5193,7 +5440,7 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
       if (!st || !st.ok) return;
 
       STATE.projects = st.projects || [];
-      STATE.finalVideosDir = st.final_videos_dir || "c:\\Users\\ADMIN\\Desktop\\Python\\Veo 3 Tool\\AutoVeo3Pro_v6\\Auto_Veo_3_Pro\\Grok\\Skill Video Veo\\final_videos";
+      STATE.finalVideosDir = st.final_videos_dir || "final_videos";
       STATE.roles = st.role_skills || [];
       STATE.accounts = st.accounts || {};
       STATE.voicesAndChars = st.voices_and_characters || { saved_characters: [], custom_voices: [], builtin_voices: [] };
@@ -5272,14 +5519,14 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         <span class="dot ${cp ? 'ok' : 'err'}" style="margin-left:4px;"></span>Proxy
       `;
 
-      const bSecret = cb.secret || "ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d";
+      const bSecret = cb.secret || "";
       document.getElementById("bridgeStatusBox").innerHTML = `
         <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:6px;">
           <div>🔌 <b>Bridge URL:</b> <code>http://127.0.0.1:${cb.port || 4000}</code> | <b>Extension:</b> ${cb.extension_connected ? '<span style="color:#34d399; font-weight:800;">✓ Đã kết nối</span>' : '<span style="color:#fbbf24">Chờ Extension / Tự động qua Chrome</span>'}</div>
-          <button class="btn btn-xs btn-outline" onclick="navigator.clipboard.writeText('${bSecret}'); showToast('✅ Đã copy Bridge Secret vào Clipboard!')">📋 Copy Bridge Secret</button>
+          ${bSecret ? `<button class="btn btn-xs btn-outline" onclick="navigator.clipboard.writeText('${bSecret}'); showToast('✅ Đã copy Bridge Secret vào Clipboard!')">📋 Copy Bridge Secret</button>` : ''}
         </div>
-        <div style="margin-top:4px; word-break:break-all;">🔑 <b>Bridge Secret:</b> <code style="color:#93c5fd; font-size:10.5px;">${bSecret}</code></div>
-        <div style="margin-top:4px;">🍪 <b>Cookies đồng bộ:</b> ${cb.has_cookies ? '<span style="color:#34d399">Đã có cookies</span>' : 'Tự động lấy từ profile leviettung04'}</div>
+        <div style="margin-top:4px; word-break:break-all;">🔑 <b>Bridge Secret:</b> <code style="color:#93c5fd; font-size:10.5px;">${bSecret || "(Chưa khởi tạo — tự sinh khi chạy Bridge)"}</code></div>
+        <div style="margin-top:4px;">🍪 <b>Cookies đồng bộ:</b> ${cb.has_cookies ? '<span style="color:#34d399">Đã có cookies</span>' : 'Chưa có cookies — hãy đăng nhập tài khoản Google Flow'}</div>
       `;
 
       if (st.login_status && st.login_status.message) {
@@ -5364,33 +5611,67 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
       `;
     }
 
+    function setStudioProjectFilter(mode) {
+      STATE.studioFilter = mode || "all";
+      document.querySelectorAll("#studioFilterPills .studio-filter-btn").forEach(btn => {
+        const active = btn.dataset.filter === STATE.studioFilter;
+        btn.classList.toggle("btn-primary", active);
+        btn.classList.toggle("btn-outline", !active);
+      });
+      renderProjectsList();
+    }
+
+    function _matchesStudioProjectFilter(p, mode) {
+      if (!mode || mode === "all") return true;
+      const isFashion = !!p.is_fashion_motion_project || String(p.id || "").startsWith("fashion_") || String(p.template_code || "") === "004" || String(p.template_code || "").toLowerCase().startsWith("fvt_");
+      const isCooking = p.pipeline_kind === "cooking_storyboard" || String(p.id || "").startsWith("cooking_") || String(p.id || "").startsWith("pov_cooking_") || String(p.template_code || "") === "005";
+      if (mode === "running") return !!p.is_running;
+      if (mode === "done") return (p.done_products || 0) > 0;
+      if (mode === "pending") return !p.is_running && (p.done_products || 0) === 0;
+      if (mode === "fashion") return isFashion;
+      if (mode === "cooking") return isCooking;
+      return true;
+    }
+
     function renderProjectsList() {
       const box = document.getElementById("projectList");
       const q = (document.getElementById("inpProjFilter")?.value || "").trim().toLowerCase();
-      document.getElementById("projCountLabel").textContent = `${STATE.projects.length} SP`;
+      const filterMode = STATE.studioFilter || "all";
 
       const filtered = STATE.projects.filter(p => {
+        if (!_matchesStudioProjectFilter(p, filterMode)) return false;
         if (!q) return true;
-        return (p.name || "").toLowerCase().includes(q) || (p.id || "").toLowerCase().includes(q);
+        return (p.name || "").toLowerCase().includes(q)
+          || (p.id || "").toLowerCase().includes(q)
+          || (p.template_code || "").toLowerCase().includes(q)
+          || (p.template_name || "").toLowerCase().includes(q);
       });
 
+      const countLbl = document.getElementById("projCountLabel");
+      if (countLbl) {
+        countLbl.textContent = (filtered.length === STATE.projects.length)
+          ? `${STATE.projects.length} dự án`
+          : `${filtered.length}/${STATE.projects.length} dự án`;
+      }
+
       if (!filtered.length) {
-        box.innerHTML = `<div style="color:var(--muted); font-size:11.5px; padding:8px;">Không tìm thấy sản phẩm.</div>`;
+        box.innerHTML = `<div style="color:var(--muted); font-size:11.5px; padding:12px 8px; line-height:1.5;">Không có dự án phù hợp trong Studio.<br/><span style="font-size:10.5px;">Chọn sản phẩm ở tab <b>🛍️ Sản Phẩm</b>, <b>👗 Video Thời Trang</b> hoặc <b>🧩 Chợ Template</b> để khởi tạo dự án mới.</span></div>`;
         return;
       }
 
-      const runningList = filtered.filter(p => !!p.is_running || ((p.done_products || 0) > 0 && (p.done_products || 0) < (p.total_products || 0) && (p.progress_pct || 0) < 100 && p.id === "1736467481808438427"));
+      const runningList = filtered.filter(p => !!p.is_running);
       const runningIds = new Set(runningList.map(p => p.id));
       const withVideos = filtered.filter(p => !runningIds.has(p.id) && (p.done_products || 0) > 0);
-      const uploadedAll = filtered.filter(p => !runningIds.has(p.id) && (p.done_products || 0) === 0 && !p.is_clean_new);
-      const cleanNew = filtered.filter(p => !runningIds.has(p.id) && (p.done_products || 0) === 0 && !!p.is_clean_new);
-      const anyEmptyHasCache = uploadedAll.some(p => p.has_rendered_cache);
+      const uploadedEmpty = filtered.filter(p => !runningIds.has(p.id) && (p.done_products || 0) === 0 && (p.deleted_finals_count || 0) > 0);
+      const uploadedIds = new Set(uploadedEmpty.map(p => p.id));
+      const queuedOrScripted = filtered.filter(p => !runningIds.has(p.id) && (p.done_products || 0) === 0 && !uploadedIds.has(p.id));
+      const anyEmptyHasCache = uploadedEmpty.some(p => p.has_rendered_cache);
 
       let html = "";
       if (runningList.length > 0) {
         html += `
           <div style="font-size:10.5px; font-weight:800; color:#60a5fa; padding:4px 4px 6px 4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>⚡ ĐANG XỬ LÝ / ĐANG CHẠY DỞ (${runningList.length} SP)</span>
+            <span>⚡ ĐANG XỬ LÝ / ĐANG CHẠY (${runningList.length} dự án)</span>
           </div>
           ${runningList.map(renderProjectItemCard).join("")}
         `;
@@ -5398,28 +5679,28 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
       if (withVideos.length > 0) {
         html += `
           <div style="font-size:10.5px; font-weight:700; color:#34d399; padding:6px 4px 6px 4px; display:flex; justify-content:space-between; align-items:center;">
-            <span>🟢 CÒN VIDEO FINAL (${withVideos.length} SP)</span>
+            <span>✅ DỰ ÁN ĐÃ CÓ VIDEO (${withVideos.length} dự án)</span>
           </div>
           ${withVideos.map(renderProjectItemCard).join("")}
         `;
       }
 
-      if (uploadedAll.length > 0) {
+      if (queuedOrScripted.length > 0) {
         html += `
-          <div style="font-size:10.5px; font-weight:700; color:#fbbf24; padding:10px 4px 6px 4px; margin-top:6px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:4px;">
-            <span>📦 SẢN PHẨM ĐÃ UPLOAD HẾT VIDEO FINAL (${uploadedAll.length} SP)</span>
-            ${anyEmptyHasCache ? `<button class="btn btn-xs btn-danger" style="padding:2px 6px; font-size:9.5px;" onclick="cleanAllEmptyProjects()" title="Xoá ảnh/video render cũ của tất cả sản phẩm đã upload hết Video Final">🧹 Dọn Tất Cả</button>` : ''}
+          <div style="font-size:10.5px; font-weight:700; color:#67e8f9; padding:10px 4px 6px 4px; margin-top:6px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:4px;">
+            <span>📝 ĐÃ TẠO KỊCH BẢN / CHỜ CHẠY (${queuedOrScripted.length} dự án)</span>
           </div>
-          ${uploadedAll.map(renderProjectItemCard).join("")}
+          ${queuedOrScripted.map(renderProjectItemCard).join("")}
         `;
       }
 
-      if (cleanNew.length > 0) {
+      if (uploadedEmpty.length > 0) {
         html += `
-          <div style="font-size:10.5px; font-weight:700; color:#67e8f9; padding:10px 4px 6px 4px; margin-top:6px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:4px;">
-            <span>🆕 SẢN PHẨM MỚI (${cleanNew.length} SP)</span>
+          <div style="font-size:10.5px; font-weight:700; color:#fbbf24; padding:10px 4px 6px 4px; margin-top:6px; border-top:1px solid var(--border); display:flex; justify-content:space-between; align-items:center; gap:4px;">
+            <span>📦 ĐÃ UPLOAD / XOÁ HẾT VIDEO FINAL (${uploadedEmpty.length} dự án)</span>
+            ${anyEmptyHasCache ? `<button class="btn btn-xs btn-danger" style="padding:2px 6px; font-size:9.5px;" onclick="cleanAllEmptyProjects()" title="Xoá ảnh/video render cũ của các dự án đã upload hết Video Final">🧹 Dọn Tất Cả</button>` : ''}
           </div>
-          ${cleanNew.map(renderProjectItemCard).join("")}
+          ${uploadedEmpty.map(renderProjectItemCard).join("")}
         `;
       }
 
@@ -6018,11 +6299,16 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         return;
       }
 
-      const otherRunningHtml = runningAll.filter(r => !proj || r.pid !== proj.id).map(r => `
-        <span onclick="loadProjectDetail('${r.pid}', false)" style="cursor:pointer; background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; padding:2px 8px; border-radius:999px; font-size:10.5px; font-weight:700;">
-          ⚡ SP ${r.pid.slice(-6)}: ${r.done_finals}/${r.total_variants} Video (${r.progress_pct}%)
+      const otherRunningHtml = runningAll.filter(r => !proj || r.pid !== proj.id).map(r => {
+        const pMeta = (STATE.projects || []).find(x => x.id === r.pid);
+        const rawTitle = r.product_name || (pMeta && pMeta.name) || r.pid;
+        const shortName = String(rawTitle).slice(0, 26);
+        return `
+        <span onclick="loadProjectDetail('${r.pid}', false)" style="cursor:pointer; background:rgba(59,130,246,0.2); border:1px solid rgba(59,130,246,0.5); color:#93c5fd; padding:2px 8px; border-radius:999px; font-size:10.5px; font-weight:700;" title="Bấm để xem tiến trình của ${String(rawTitle).replace(/"/g, '&quot;')}">
+          ⚡ ${shortName}: ${r.progress_pct || 0}%
         </span>
-      `).join(" ");
+      `;
+      }).join(" ");
 
       bannerEl.style.display = "block";
       bannerEl.style.background = isRunning
@@ -7407,6 +7693,19 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         || "001";
       const tpl = String(rawTpl).replace(/^#/, "");
       if (tpl === "004" || (proj && proj.is_fashion_motion_project && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        if (proj && proj.is_fashion_motion_project && (proj.products || []).length > 0) {
+          const hasFailed = (proj.products || []).some(p => p.status === "failed" || (p.scenes || []).some(s => s.status === "error"));
+          const endpoint = hasFailed ? "/api/fashion_motion/retry_failed" : "/api/fashion_motion/run_flow";
+          const rRun = await apiPost(endpoint, { project_id: projectId });
+          if (rRun && rRun.ok) {
+            if (typeof toast === "function") toast(rRun.message || "🚀 Đã khởi chạy dự án Thời trang ngầm!", "ok");
+            delete STATE.projectDetailsCache[projectId];
+            STATE.renderedProjectSig = "";
+            await refreshAll(false);
+            await loadProjectDetail(projectId, false);
+            return;
+          }
+        }
         switchTab("fashion", document.getElementById("navBtn-fashion"));
         setTimeout(() => {
           if (proj && proj.is_fashion_motion_project && typeof onSelectFashionProjectSlug === "function") {
@@ -7416,6 +7715,17 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
         return;
       }
       if (tpl === "005" || (proj && proj.pipeline_kind === "cooking_storyboard" && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {
+        if (proj && proj.pipeline_kind === "cooking_storyboard" && (proj.products || []).length > 0) {
+          const rCook = await apiPost("/api/cooking/run", { project_id: projectId, stage: "auto" });
+          if (rCook && rCook.ok) {
+            if (typeof toast === "function") toast("🚀 Đã tiếp tục chạy dự án Nấu Ăn POV ngầm!", "ok");
+            delete STATE.projectDetailsCache[projectId];
+            STATE.renderedProjectSig = "";
+            await refreshAll(false);
+            await loadProjectDetail(projectId, false);
+            return;
+          }
+        }
         if (typeof window.openCookingStudio === "function") {
           window.openCookingStudio((proj && proj.pipeline_kind === "cooking_storyboard") ? projectId : null);
         }
@@ -7489,8 +7799,8 @@ label:has(#chkThumbCompositeInsets){display:none!important}.thumb-ai-style{backg
     }
   </script>
   <link rel="stylesheet" href="/static/workflow_studio.css?v=20261105_1800" />
-  <script src="/static/studio_app_part2.js?v=20261112_v5"></script>
-  <script src="/static/cooking_studio.js?v=20261112_v5"></script>
+  <script src="/static/studio_app_part2.js?v=20261112_multitask_v6"></script>
+  <script src="/static/cooking_studio.js?v=20261112_multitask_v6"></script>
   <link rel="stylesheet" href="/static/template_explorer.css?v=20261110_1" />
   <script src="/static/template_explorer.js?v=20261112_v5"></script>
   <script src="/static/workflow_studio.js?v=20261106_0906"></script>

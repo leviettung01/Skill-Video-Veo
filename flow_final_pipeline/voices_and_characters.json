@@ -1,4 +1,7 @@
 {
+  "default_videos_per_character": 1,
+  "default_image_model": "nano_banana",
+  "default_sheet_template_id": "sheet_6panel_studio",
   "voices": {
     "nv1": {
       "key": "nv1",
@@ -408,9 +411,6 @@
       "subtitle": "Tóc xoăn sóng nâu hạt dẻ • Chuyên Thời Trang & Biến Hình 2K"
     }
   },
-  "default_videos_per_character": 1,
-  "default_image_model": "nano_banana",
-  "default_sheet_template_id": "sheet_6panel_studio",
   "custom_voices": [
     {
       "key": "nv1",
@@ -419,9 +419,9 @@
       "gender": "female",
       "region": "north",
       "flow_slug": "erinome",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ miền Bắc chuẩn Hà Nội (Nhân Vật 1 Affi Giọng Bắc), phát âm tròn vành rõ chữ, nhấn giá cực chuẩn khi giới thiệu hàng xuất xưởng, báo giá bậc thang và miễn phí ship."
     },
     {
@@ -431,9 +431,9 @@
       "gender": "female",
       "region": "north",
       "flow_slug": "zephyr",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ miền Bắc trẻ trung, tiết tấu nhanh, dồn dập tạo hiệu ứng FOMO cực mạnh cho các video xả kho, flash sale, báo giá bậc thang."
     },
     {
@@ -443,9 +443,9 @@
       "gender": "male",
       "region": "north",
       "flow_slug": "fenrir",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nam miền Bắc trẻ trung, nam tính, năng lượng cao (Fenrir), nhấn nhá giá tiền và ưu đãi cực bốc như giọng Nữ Affi, chuyên chốt đơn đồ Nam & gia dụng."
     },
     {
@@ -455,9 +455,9 @@
       "gender": "male",
       "region": "south",
       "flow_slug": "puck",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nam miền Nam (Sài Gòn - Puck) hào hứng, nam tính, tốc độ nhanh vừa phải, cực bắt tai khi chốt sale xả kho và review đồ ăn, gia dụng."
     },
     {
@@ -467,9 +467,9 @@
       "gender": "male",
       "region": "north",
       "flow_slug": "alnilam",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nam miền Bắc trầm đĩnh đạc, quyết đoán (Alnilam), chuyên phân tích chất liệu da bò, hợp kim, thông số kỹ thuật tại xưởng cực kỳ uy tín."
     },
     {
@@ -479,9 +479,9 @@
       "gender": "male",
       "region": "north",
       "flow_slug": "sadachbia",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nam miền Bắc sôi động, tiết tấu nhanh dồn dập (Sadachbia), nhấn mạnh câu 'không phải hai trăm đâu' tạo hiệu ứng chốt đơn tức thì."
     },
     {
@@ -491,9 +491,9 @@
       "gender": "female",
       "region": "south",
       "flow_slug": "leda",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ miền Nam dễ thương, thân thiện, nhấn nhá cảm xúc vị giác cực hợp cho video quay POV Đồ Ăn Vặt (#002) và review mỹ phẩm."
     },
     {
@@ -503,9 +503,9 @@
       "gender": "female",
       "region": "south",
       "flow_slug": "laomedeia",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ Sài Gòn năng lượng cao, hoạt ngôn, tạo không khí săn sale sôi động cho tệp khách hàng miền Nam và toàn quốc."
     },
     {
@@ -515,9 +515,9 @@
       "gender": "female",
       "region": "north",
       "flow_slug": "autonoe",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ GenZ Hà Nội tươi sáng, bắt trend, cực hợp với bối cảnh bàn học GenZ, tiệm ăn vặt Hà Nội và trà trái cây."
     },
     {
@@ -527,9 +527,9 @@
       "gender": "female",
       "region": "central",
       "flow_slug": "sulafat",
-      "owner_profile": "leviettung04",
+      "owner_profile": "",
       "account_voice_ids": {},
-      "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+      "project_id": "7f17875b-4450-40a4-9362-d504f82eda57",
       "description": "Giọng nữ nhẹ nhàng, sâu lắng, tạo cảm giác chân thật và trân quý cho các dòng sản phẩm truyền thống, sức khỏe, tâm linh."
     }
   ]

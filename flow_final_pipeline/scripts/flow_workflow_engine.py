@@ -1231,7 +1231,9 @@ def call_cliproxy_chat_or_vision(
     hỗ trợ cả ChatGPT (`gpt-4o`, `gpt-4o-mini`), Gemini (`gemini-2.5-flash`, `gemini-2.5-pro`) và Grok (`grok-3`).
     Trả về `(ok: bool, output_text: str, error_str: str)`.
     """
-    url = "http://127.0.0.1:8317/v1/chat/completions"
+    import engine_settings_manager as _esm
+    _cp_cfg = _esm.get_cliproxy_config()
+    url = f"{_cp_cfg['url']}/v1/chat/completions"
     messages = []
     if system_instruction:
         messages.append({"role": "system", "content": system_instruction})
@@ -1249,34 +1251,38 @@ def call_cliproxy_chat_or_vision(
     user_content.append({"type": "text", "text": prompt_text})
     messages.append({"role": "user", "content": user_content if len(user_content) > 1 else prompt_text})
 
-    payload = json.dumps(
-        {
-            "model": model_name or "gpt-4o-mini",
-            "messages": messages,
-            "temperature": 0.6,
-        }
-    ).encode("utf-8")
+    candidates = _esm.resolve_cliproxy_chat_models([model_name] if model_name else ())
+    last_err = ""
+    for cand_model in candidates[:4]:
+        payload = json.dumps(
+            {
+                "model": cand_model,
+                "messages": messages,
+                "temperature": 0.6,
+            }
+        ).encode("utf-8")
 
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": "Bearer sk-cliproxy-local",
-        },
-        method="POST",
-    )
-    try:
-        with urllib.request.urlopen(req, timeout=max(15, int(timeout_sec or 60))) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            choices = data.get("choices") or []
-            if choices:
-                txt = ((choices[0].get("message") or {}).get("content") or "").strip()
-                if txt:
-                    return True, txt, None
-            return False, "", f"CLIProxy phản hồi rỗng: {str(data)[:200]}"
-    except Exception as e:
-        return False, "", str(e)
+        req = urllib.request.Request(
+            url,
+            data=payload,
+            headers={
+                "Content-Type": "application/json",
+                "Authorization": f"Bearer {_cp_cfg['api_key']}",
+            },
+            method="POST",
+        )
+        try:
+            with urllib.request.urlopen(req, timeout=max(15, int(timeout_sec or 60))) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                choices = data.get("choices") or []
+                if choices:
+                    txt = ((choices[0].get("message") or {}).get("content") or "").strip()
+                    if txt:
+                        return True, txt, None
+                last_err = f"CLIProxy phản hồi rỗng: {str(data)[:200]}"
+        except Exception as e:
+            last_err = str(e)
+    return False, "", last_err or "CLIProxy offline hoặc không có model khả dụng"
 
 
 def call_cliproxy_image_generation(prompt_text: str, out_file: str, model_name: str = "gpt-image-1", ratio: str = "9:16") -> tuple:
@@ -1284,7 +1290,9 @@ def call_cliproxy_image_generation(prompt_text: str, out_file: str, model_name: 
     Thử gọi tạo ảnh qua CLIProxy (`/v1/images/generations`) cho các node `GPT Image 2` / `Grok Image`.
     Nếu CLIProxy không bật endpoint tạo ảnh trực tiếp, trả về `(False, ...)` để Engine tự động chuyển sang Google Flow Nano Banana 2.1 2K!
     """
-    url = "http://127.0.0.1:8317/v1/images/generations"
+    import engine_settings_manager as _esm
+    _cp_cfg = _esm.get_cliproxy_config()
+    url = f"{_cp_cfg['url']}/v1/images/generations"
     size_str = "1024x1792" if ratio in ("9:16", "4:5", "3:4") else ("1792x1024" if ratio == "16:9" else "1024x1024")
     payload = json.dumps(
         {
@@ -1300,7 +1308,7 @@ def call_cliproxy_image_generation(prompt_text: str, out_file: str, model_name: 
         data=payload,
         headers={
             "Content-Type": "application/json",
-            "Authorization": "Bearer sk-cliproxy-local",
+            "Authorization": f"Bearer {_cp_cfg['api_key']}",
         },
         method="POST",
     )
@@ -1346,29 +1354,44 @@ def _get_profile_lock(prof_key: str) -> threading.Lock:
 
 def _resolve_account_and_project_id(requested_prof: str, gvt_mod) -> tuple:
     """
-    Trả về `(prof_name, project_id)` từ `Flow_nhieu_worker_accounts.json`.
-    Nếu đang chạy song song và profile mặc định đang bận mở trình duyệt, tự động luân chuyển sang tài khoản rảnh (`capcutpro` / `leviettung04`).
+    Trả về `(prof_name, project_id)` từ danh sách tài khoản Google Flow hiện có.
+    Nếu đang chạy song song và profile mặc định đang bận mở trình duyệt, tự động luân chuyển sang tài khoản rảnh.
     """
-    acc_path = os.path.join(WS_DIR, "data", "google_flow_grok", "Flow_nhieu_worker_accounts.json")
     accounts = []
-    if os.path.exists(acc_path):
-        try:
-            with open(acc_path, "r", encoding="utf-8") as f:
-                raw_accs = json.load(f)
-            if isinstance(raw_accs, list):
-                for a in raw_accs:
-                    if isinstance(a, dict) and not a.get("is_grok") and a.get("status") == "ready":
-                        p_dir = str(a.get("profile_dir") or "")
-                        p_name = os.path.basename(p_dir.rstrip("\\/")) or str(a.get("email") or "").split("@")[0]
-                        proj_id = str(a.get("project_id") or gvt_mod.DEFAULT_PROJECT_ID)
-                        if p_name:
-                            accounts.append((p_name, proj_id))
-        except Exception:
-            pass
+    try:
+        import engine_settings_manager as _esm
+        for acc in _esm.list_available_flow_accounts():
+            p_name = str(acc.get("profile_name") or "").strip()
+            proj_id = str(acc.get("project_id") or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or "").strip()
+            if p_name:
+                accounts.append((p_name, proj_id))
+    except Exception:
+        pass
     if not accounts:
-        accounts = [("leviettung04", gvt_mod.DEFAULT_PROJECT_ID)]
+        acc_path = os.path.join(WS_DIR, "data", "google_flow_grok", "Flow_nhieu_worker_accounts.json")
+        if os.path.exists(acc_path):
+            try:
+                with open(acc_path, "r", encoding="utf-8") as f:
+                    raw_accs = json.load(f)
+                if isinstance(raw_accs, list):
+                    for a in raw_accs:
+                        if isinstance(a, dict) and not a.get("is_grok") and a.get("status") == "ready":
+                            p_dir = str(a.get("profile_dir") or "")
+                            p_name = os.path.basename(p_dir.rstrip("\\/")) or str(a.get("email") or "").split("@")[0]
+                            proj_id = str(a.get("project_id") or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or "")
+                            if p_name:
+                                accounts.append((p_name, proj_id))
+            except Exception:
+                pass
 
     req = (requested_prof or "").strip()
+    def_proj = ""
+    try:
+        import engine_settings_manager as _esm2
+        def_proj = _esm2.get_default_flow_project_id(req)
+    except Exception:
+        def_proj = ""
+    def_proj = def_proj or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or ""
     if req:
         for p_name, proj_id in accounts:
             if p_name == req or req.startswith(p_name):
@@ -1378,12 +1401,124 @@ def _resolve_account_and_project_id(requested_prof: str, gvt_mod) -> tuple:
                         if not _get_profile_lock(alt_p).locked():
                             return alt_p, alt_proj
                 return p_name, proj_id
-        return req, gvt_mod.DEFAULT_PROJECT_ID
+        return req, def_proj
 
     for p_name, proj_id in accounts:
         if not _get_profile_lock(p_name).locked():
             return p_name, proj_id
-    return accounts[0]
+    return accounts[0] if accounts else ("", def_proj)
+
+
+def _is_flow_account_error_wf(err_msg: str) -> bool:
+    low = str(err_msg or "").lower()
+    if not low:
+        return False
+    return any(
+        k in low
+        for k in (
+            "snlm0e",
+            "hết hạn",
+            "cookie",
+            "401",
+            "403",
+            "unauthenticated",
+            "unusual_activity",
+            "recaptcha",
+            "cookiemismatch",
+            "accounts.google.com",
+            "credit",
+            "quota",
+            "insufficient",
+            "404",
+            "closed",
+        )
+    )
+
+
+def _mark_flow_profile_unhealthy_wf(prof: str, reason: str = "") -> None:
+    if not prof:
+        return
+    try:
+        import fashion_motion_control_engine as _fmce
+        _fmce._mark_flow_profile_unhealthy(prof, reason or "workflow_failover")
+    except Exception:
+        pass
+
+
+def _apply_flow_init_script_wf(page_obj, gvt_mod) -> None:
+    """Nạp script bypass hijack reCAPTCHA của Google Flow nếu grok_video_tool cung cấp."""
+    bypass_js = getattr(gvt_mod, "_FLOW_HIJACK_BYPASS_JS", "") or ""
+    if bypass_js:
+        page_obj.add_init_script(bypass_js)
+
+
+def _get_ordered_flow_account_candidates_wf(requested_prof: str, gvt_mod) -> list:
+    """Trả về danh sách `(prof_name, project_id)` theo thứ tự ưu tiên khỏe mạnh -> rảnh -> bận -> cooldown."""
+    raw_map = {}
+    try:
+        import engine_settings_manager as _esm
+        for acc in _esm.list_available_flow_accounts():
+            if not acc.get("active", True):
+                continue
+            p_name = str(acc.get("profile_name") or "").strip()
+            proj_id = str(acc.get("project_id") or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or "").strip()
+            if p_name and p_name not in raw_map:
+                raw_map[p_name] = proj_id
+    except Exception:
+        pass
+    if not raw_map:
+        acc_path = os.path.join(WS_DIR, "data", "google_flow_grok", "Flow_nhieu_worker_accounts.json")
+        if os.path.exists(acc_path):
+            try:
+                raw_accs = json.load(open(acc_path, "r", encoding="utf-8"))
+                if isinstance(raw_accs, list):
+                    for a in raw_accs:
+                        if isinstance(a, dict) and not a.get("is_grok") and a.get("status") == "ready":
+                            p_dir = str(a.get("profile_dir") or "")
+                            p_name = os.path.basename(p_dir.rstrip("\\/")) or str(a.get("email") or "").split("@")[0]
+                            proj_id = str(a.get("project_id") or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or "")
+                            if p_name and p_name not in raw_map:
+                                raw_map[p_name] = proj_id
+            except Exception:
+                pass
+
+    req = (requested_prof or "").strip()
+    ordered_names = []
+    try:
+        import fashion_motion_control_engine as _fmce
+        ordered_names = _fmce._get_ordered_flow_account_candidates(preferred_profile=req, rotate_round_robin=False)
+    except Exception:
+        ordered_names = list(raw_map.keys())
+
+    if req and req not in ordered_names:
+        ordered_names.insert(0, req)
+    for k in raw_map:
+        if k not in ordered_names:
+            ordered_names.append(k)
+
+    def_proj_fallback = ""
+    try:
+        import engine_settings_manager as _esm2
+        def_proj_fallback = _esm2.get_default_flow_project_id(req)
+    except Exception:
+        def_proj_fallback = ""
+    def_proj_fallback = def_proj_fallback or getattr(gvt_mod, "DEFAULT_PROJECT_ID", "") or ""
+
+    unlocked = []
+    locked = []
+    for nm in ordered_names:
+        pid_v = raw_map.get(nm) or def_proj_fallback
+        pair = (nm, pid_v)
+        if _get_profile_lock(nm).locked():
+            locked.append(pair)
+        else:
+            unlocked.append(pair)
+    out = unlocked + locked
+    if not out:
+        p0, pid0 = _resolve_account_and_project_id(req, gvt_mod)
+        if p0:
+            out.append((p0, pid0))
+    return out
 
 
 def execute_flow_generation_node(
@@ -1395,7 +1530,7 @@ def execute_flow_generation_node(
 ) -> dict:
     """
     Thực thi 1 Node `generate` (`Flow - Image/Video Generate`, hoặc fallback cho `GPT Image 2` / `Grok` / `Gemini`)
-    trực tiếp trên Google Flow:
+    trực tiếp trên Google Flow (hỗ trợ tự động Failover sang tài khoản khỏe mạnh nếu acc hiện tại hết hạn/lỗi):
       - Nếu `media_type == "Image"`:
         + Upload tất cả ảnh tham chiếu (`IMAGE 01`, `IMAGE 02`, ...) qua `maseQ`.
         + Gọi `ogiZ0b` (`Nano Banana 2.1` / `Nano Banana Pro` / `Nano Banana 2 Lite`).
@@ -1418,88 +1553,118 @@ def execute_flow_generation_node(
 
     node_id = node["node_id"]
     media_type = str(node.get("media_type") or "Image").strip().capitalize()
-    model_label = str(node.get("model") or ("Omni 1.2 Flash" if media_type == "Video" else "Nano Banana 2.1")).strip()
     ratio = str(node.get("ratio") or "9:16").strip()
     vid_res = str(node.get("video_download_resolution") or "1080p").strip().lower()
     vid_dur_str = str(node.get("video_duration") or "10s").strip().lower().replace("s", "")
     vid_dur = int(vid_dur_str) if vid_dur_str.isdigit() else 10
 
     req_prof = (profile_name or node.get("profile_name") or "").strip()
-    prof, flow_project_id = _resolve_account_and_project_id(req_prof, gvt)
-    shared_dir = gvt._resolve_flow_shared_dir(prof)
-    profile_dir, _ = profile_paths(shared_dir, prof)
-    cookie_hdr = gvt._load_flow_cookie_header(prof)
-    if not cookie_hdr:
-        return {"ok": False, "error": f"Tài khoản Google Flow '{prof}' chưa có Cookie đăng nhập hợp lệ."}
-
-    dl_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
-        "Cookie": cookie_hdr,
-    }
+    candidate_accounts = _get_ordered_flow_account_candidates_wf(req_prof, gvt)
+    if not candidate_accounts:
+        return {"ok": False, "error": "Chưa có tài khoản Google Flow nào khả dụng. Vui lòng đăng nhập ở tab Tài Khoản!"}
 
     valid_img_refs = [p for p in (ref_media_paths or []) if p and os.path.exists(p) and not p.lower().endswith((".mp4", ".mov", ".webm"))]
     valid_vid_refs = [p for p in (ref_media_paths or []) if p and os.path.exists(p) and p.lower().endswith((".mp4", ".mov", ".webm"))]
-
-    prof_lock = _get_profile_lock(prof)
 
     # ------------------------------------------------------------------
     # TRƯỜNG HỢP A: TẠO ẢNH 2K (Flow - Images Generate: Nano Banana 2.1 / Pro)
     # ------------------------------------------------------------------
     if media_type != "Video":
         out_img_path = os.path.join(wf_out_dir, f"{node_id}_{int(time.time())}_2K.jpg")
-        with prof_lock:
-            with sync_playwright() as pw:
-                browser = pw.chromium.launch_persistent_context(
-                    user_data_dir=str(profile_dir),
-                    channel="chrome",
-                    headless=True,
-                    args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
-                )
+        last_img_err = "Không có tài khoản Google Flow nào tạo được ảnh."
+        used_prof = candidate_accounts[0][0]
+        media_uuid_2k = None
+        for prof, flow_project_id in candidate_accounts:
+            used_prof = prof
+            shared_dir = gvt._resolve_flow_shared_dir(prof)
+            profile_dir, _ = profile_paths(shared_dir, prof)
+            cookie_hdr = gvt._load_flow_cookie_header(prof)
+            if not cookie_hdr:
+                last_img_err = f"Tài khoản Google Flow '{prof}' chưa có Cookie đăng nhập hợp lệ."
+                _mark_flow_profile_unhealthy_wf(prof, last_img_err)
+                continue
+            dl_headers = {
+                "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+                "Cookie": cookie_hdr,
+            }
+            prof_lock = _get_profile_lock(prof)
+            ok_gen = False
+            err_gen = None
+            try:
+                with prof_lock:
+                    with sync_playwright() as pw:
+                        browser = pw.chromium.launch_persistent_context(
+                            user_data_dir=str(profile_dir),
+                            channel="chrome",
+                            headless=True,
+                            args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
+                        )
+                        try:
+                            page = browser.pages[0] if browser.pages else browser.new_page()
+                            _apply_flow_init_script_wf(page, gvt)
+                            target_u = f"https://flow.google.com/project/{flow_project_id}" if flow_project_id else "https://flow.google.com/"
+                            page.goto(target_u, wait_until="domcontentloaded", timeout=60000)
+                            page.wait_for_timeout(3500)
+
+                            wiz = page.evaluate(
+                                """() => {
+                                    const w = window.WIZ_global_data || {};
+                                    return {
+                                        at: w.SNlM0e || '',
+                                        bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
+                                        fsid: w.FdrFJe || '',
+                                        ua: navigator.userAgent
+                                    };
+                                }"""
+                            )
+                            if not wiz.get("at"):
+                                last_img_err = f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."
+                                _mark_flow_profile_unhealthy_wf(prof, last_img_err)
+                                continue
+
+                            uploaded_img_uuids = []
+                            for rp in valid_img_refs[:5]:
+                                ok_u, u_id, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, rp, quality=98)
+                                if ok_u and u_id:
+                                    uploaded_img_uuids.append(u_id)
+
+                            ref_task = {
+                                "pid": "workflow",
+                                "v_key": node_id,
+                                "project_id": flow_project_id,
+                                "char_id": "",
+                                "prod_uuids": uploaded_img_uuids,
+                                "allow_multi_refs": len(uploaded_img_uuids) > 1,
+                                "prompt_str": prompt_text or "Ultra-realistic commercial fashion photography, 2K resolution.",
+                                "out_file": out_img_path,
+                            }
+                            ok_gen, media_uuid_2k, err_gen = generate_variant_ref_image_in_page(
+                                page, wiz, cookie_hdr, dl_headers, ref_task
+                            )
+                            if not ok_gen:
+                                last_img_err = f"Tạo ảnh trên Google Flow thất bại ({prof}): {err_gen}"
+                                if _is_flow_account_error_wf(err_gen):
+                                    _mark_flow_profile_unhealthy_wf(prof, last_img_err)
+                                    continue
+                                return {"ok": False, "error": last_img_err}
+                        finally:
+                            browser.close()
+            except Exception as ex_img:
+                last_img_err = f"Google Flow Image ({prof}): {ex_img}"
+                if _is_flow_account_error_wf(last_img_err):
+                    _mark_flow_profile_unhealthy_wf(prof, last_img_err)
+                    continue
+                return {"ok": False, "error": last_img_err}
+
+            if ok_gen:
                 try:
-                    page = browser.pages[0] if browser.pages else browser.new_page()
-                    page.add_init_script(gvt._RECAPTCHA_BYPASS_INIT_SCRIPT)
-                    page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
-                    page.wait_for_timeout(3500)
-
-                    wiz = page.evaluate(
-                        """() => {
-                            const w = window.WIZ_global_data || {};
-                            return {
-                                at: w.SNlM0e || '',
-                                bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
-                                fsid: w.FdrFJe || '',
-                                ua: navigator.userAgent
-                            };
-                        }"""
-                    )
-                    if not wiz.get("at"):
-                        return {"ok": False, "error": f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."}
-
-                    uploaded_img_uuids = []
-                    for rp in valid_img_refs[:5]:
-                        ok_u, u_id, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, rp, quality=98)
-                        if ok_u and u_id:
-                            uploaded_img_uuids.append(u_id)
-
-                    primary_uuid = uploaded_img_uuids[0] if uploaded_img_uuids else None
-                    extra_uuids = uploaded_img_uuids[1:] if len(uploaded_img_uuids) > 1 else []
-                    ref_task = {
-                        "pid": "workflow",
-                        "v_key": node_id,
-                        "project_id": flow_project_id,
-                        "char_id": primary_uuid,
-                        "prod_uuids": extra_uuids,
-                        "allow_multi_refs": True,
-                        "prompt_str": prompt_text or "Ultra-realistic commercial fashion photography, 2K resolution.",
-                        "out_file": out_img_path,
-                    }
-                    ok_gen, media_uuid_2k, err_gen = generate_variant_ref_image_in_page(
-                        page, wiz, cookie_hdr, dl_headers, ref_task
-                    )
-                    if not ok_gen:
-                        return {"ok": False, "error": f"Tạo ảnh trên Google Flow thất bại: {err_gen}"}
-                finally:
-                    browser.close()
+                    import fashion_motion_control_engine as _fmce
+                    _fmce._mark_flow_profile_healthy(prof)
+                except Exception:
+                    pass
+                break
+        else:
+            return {"ok": False, "error": last_img_err}
 
         info_2k = ensure_image_is_2k(out_img_path)
         if node.get("auto_download"):
@@ -1517,7 +1682,7 @@ def execute_flow_generation_node(
             "width": info_2k.get("width", 1536),
             "height": info_2k.get("height", 2752),
             "prompt_used": prompt_text,
-            "account_used": prof,
+            "account_used": used_prof,
         }
 
     # ------------------------------------------------------------------
@@ -1528,149 +1693,203 @@ def execute_flow_generation_node(
     wiz = None
     ok_sub = False
     err_sub = None
+    prof = candidate_accounts[0][0]
+    flow_project_id = candidate_accounts[0][1]
+    cookie_hdr = ""
+    dl_headers = {}
+    profile_dir = None
+    prof_lock = _get_profile_lock(prof)
 
-    with prof_lock:
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch_persistent_context(
-                user_data_dir=str(profile_dir),
-                channel="chrome",
-                headless=True,
-                args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
-            )
-            try:
-                page = browser.pages[0] if browser.pages else browser.new_page()
-                page.add_init_script(gvt._RECAPTCHA_BYPASS_INIT_SCRIPT)
-                page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
-                page.wait_for_timeout(3500)
+    for cand_prof, cand_pid in candidate_accounts:
+        shared_dir = gvt._resolve_flow_shared_dir(cand_prof)
+        c_profile_dir, _ = profile_paths(shared_dir, cand_prof)
+        c_cookie_hdr = gvt._load_flow_cookie_header(cand_prof)
+        if not c_cookie_hdr:
+            err_sub = f"Tài khoản Google Flow '{cand_prof}' chưa có Cookie đăng nhập hợp lệ."
+            _mark_flow_profile_unhealthy_wf(cand_prof, err_sub)
+            continue
 
-                wiz = page.evaluate(
-                    """() => {
-                        const w = window.WIZ_global_data || {};
-                        return {
-                            at: w.SNlM0e || '',
-                            bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
-                            fsid: w.FdrFJe || '',
-                            ua: navigator.userAgent
-                        };
-                    }"""
-                )
-                if not wiz.get("at"):
-                    return {"ok": False, "error": f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."}
-
-                uploaded_img_uuids = []
-                for rp in valid_img_refs[:5]:
-                    ok_u, u_id, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, rp, quality=98)
-                    if ok_u and u_id:
-                        uploaded_img_uuids.append(u_id)
-
-                if valid_vid_refs:
-                    from fashion_motion_control_engine import (
-                        upload_reference_video_in_page,
-                        submit_fashion_motion_scene_in_page,
+        c_dl_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/134.0.0.0 Safari/537.36",
+            "Cookie": c_cookie_hdr,
+        }
+        c_lock = _get_profile_lock(cand_prof)
+        c_ok_sub = False
+        c_job_uuid = None
+        c_err_sub = None
+        c_wiz = None
+        try:
+            with c_lock:
+                with sync_playwright() as pw:
+                    browser = pw.chromium.launch_persistent_context(
+                        user_data_dir=str(c_profile_dir),
+                        channel="chrome",
+                        headless=True,
+                        args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
                     )
-                    ok_vr, vr_uuid, _, err_vr = upload_reference_video_in_page(page, wiz, flow_project_id, valid_vid_refs[0])
-                    if ok_vr and vr_uuid:
-                        ok_sub, job_uuid, err_sub = submit_fashion_motion_scene_in_page(
-                            page,
-                            wiz,
-                            {
-                                "project_id": flow_project_id,
-                                "ref_video_uuid": vr_uuid,
-                                "duration": vid_dur,
-                                "fps": 24,
-                                "start_frame": 0,
-                                "end_frame": vid_dur * 24,
-                                "image_ref_uuids": uploaded_img_uuids,
-                                "asset_uuid_map": {},
-                                "segments_spec": [{"type": "text", "text": prompt_text}],
-                                "display_prompt": prompt_text,
-                                "model_key": "macaron_cookie_edit" if ("1.2" in str(node.get("model") or "").lower() or "macaron" in str(node.get("model") or "").lower()) else "abra_edit",
-                            },
+                    try:
+                        page = browser.pages[0] if browser.pages else browser.new_page()
+                        _apply_flow_init_script_wf(page, gvt)
+                        target_u = f"https://flow.google.com/project/{cand_pid}" if cand_pid else "https://flow.google.com/"
+                        page.goto(target_u, wait_until="domcontentloaded", timeout=60000)
+                        page.wait_for_timeout(3500)
+
+                        c_wiz = page.evaluate(
+                            """() => {
+                                const w = window.WIZ_global_data || {};
+                                return {
+                                    at: w.SNlM0e || '',
+                                    bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
+                                    fsid: w.FdrFJe || '',
+                                    ua: navigator.userAgent
+                                };
+                            }"""
                         )
+                        if not c_wiz.get("at"):
+                            c_err_sub = f"Phiên đăng nhập Google Flow của '{cand_prof}' đã hết hạn (thiếu SNlM0e)."
+                            _mark_flow_profile_unhealthy_wf(cand_prof, c_err_sub)
+                            err_sub = c_err_sub
+                            continue
 
-                if not ok_sub:
-                    # Gửi lệnh tạo video Ingredients (IMAGE 01, IMAGE 02, ...) qua RPC `MZZa6b` (`abra_r2v_10s` / `8s` / `6s`)
-                    dur_clamped = 10 if vid_dur >= 9 else (6 if vid_dur <= 6 else 8)
-                    flow_vid_model = f"abra_r2v_{dur_clamped}s"
-                    rcap = page.evaluate(
-                        """async () => {
-                            const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
-                            return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'VIDEO_GENERATION'});
-                        }"""
-                    )
-                    wf_uuid = str(uuid.uuid4())
-                    m_uuid = str(uuid.uuid4())
-                    b_uuid = str(uuid.uuid4())
-                    aspect_int = 2 if ratio == "16:9" else 1
-                    h_prompt = [None, None, [[[prompt_text]]]]
-                    l_item = [None, None, None, None, m_uuid, wf_uuid]
-                    ref_list = [[None, u] for u in uploaded_img_uuids]
-                    voice_id = str(node.get("voice_id") or "").strip()
-                    if voice_id:
-                        try:
-                            import character_library_manager as _clm_wf
-                            voice_id = _clm_wf.resolve_voice_id_for_account(voice_id, prof)
-                        except Exception:
-                            pass
-                    voice_list = [[voice_id]] if voice_id else []
-                    item_g = [
-                        h_prompt,
-                        ref_list,
-                        flow_vid_model,
-                        aspect_int,
-                        None,
-                        l_item,
-                        None,
-                        voice_list,
-                        None,
-                        [],
-                        [],
-                    ]
-                    k_ctx = [None, 22, None, None, None, flow_project_id, None, None, None, None, [rcap, 1]]
-                    payload_v = [[item_g], k_ctx, [b_uuid, 1]]
-                    f_req_str = json.dumps(
-                        [[["MZZa6b", json.dumps(payload_v, separators=(",", ":")), None, "generic"]]],
-                        separators=(",", ":"),
-                    )
-                    resp_obj = page.evaluate(
-                        """async ({projectId, bl, fsid, fReq, at}) => {
-                            const sp = `/project/${projectId}`;
-                            const reqid = Math.floor(Math.random() * 800000) + 100000;
-                            const url = `/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=MZZa6b&source-path=${encodeURIComponent(sp)}&bl=${encodeURIComponent(bl)}&f.sid=${encodeURIComponent(fsid)}&hl=vi&_reqid=${reqid}&rt=c`;
-                            const body = `f.req=${encodeURIComponent(fReq)}&at=${encodeURIComponent(at)}&`;
-                            const r = await fetch(url, {
-                                method: 'POST',
-                                headers: {
-                                    'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                                    'x-same-domain': '1'
+                        uploaded_img_uuids = []
+                        for rp in valid_img_refs[:5]:
+                            ok_u, u_id, _ = upload_single_product_ref_in_page(page, c_wiz, cand_pid, rp, quality=98)
+                            if ok_u and u_id:
+                                uploaded_img_uuids.append(u_id)
+
+                        if valid_vid_refs:
+                            from fashion_motion_control_engine import (
+                                upload_reference_video_in_page,
+                                submit_fashion_motion_scene_in_page,
+                            )
+                            ok_vr, vr_uuid, _, err_vr = upload_reference_video_in_page(page, c_wiz, cand_pid, valid_vid_refs[0])
+                            if ok_vr and vr_uuid:
+                                c_ok_sub, c_job_uuid, c_err_sub = submit_fashion_motion_scene_in_page(
+                                    page,
+                                    c_wiz,
+                                    {
+                                        "project_id": cand_pid,
+                                        "ref_video_uuid": vr_uuid,
+                                        "duration": vid_dur,
+                                        "fps": 24,
+                                        "start_frame": 0,
+                                        "end_frame": vid_dur * 24,
+                                        "image_ref_uuids": uploaded_img_uuids,
+                                        "asset_uuid_map": {},
+                                        "segments_spec": [{"type": "text", "text": prompt_text}],
+                                        "display_prompt": prompt_text,
+                                        "model_key": "macaron_cookie_edit" if ("1.2" in str(node.get("model") or "").lower() or "macaron" in str(node.get("model") or "").lower()) else "abra_edit",
+                                    },
+                                )
+
+                        if not c_ok_sub:
+                            # Gửi lệnh tạo video Ingredients (IMAGE 01, IMAGE 02, ...) qua RPC `MZZa6b` (`abra_r2v_10s` / `8s` / `6s`)
+                            dur_clamped = 10 if vid_dur >= 9 else (6 if vid_dur <= 6 else 8)
+                            flow_vid_model = f"abra_r2v_{dur_clamped}s"
+                            rcap = page.evaluate(
+                                """async () => {
+                                    const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                                    return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'VIDEO_GENERATION'});
+                                }"""
+                            )
+                            wf_uuid = str(uuid.uuid4())
+                            m_uuid = str(uuid.uuid4())
+                            b_uuid = str(uuid.uuid4())
+                            aspect_int = 2 if ratio == "16:9" else 1
+                            h_prompt = [None, None, [[[prompt_text]]]]
+                            l_item = [None, None, None, None, m_uuid, wf_uuid]
+                            ref_list = [[None, u] for u in uploaded_img_uuids]
+                            voice_id = str(node.get("voice_id") or "").strip()
+                            if voice_id:
+                                try:
+                                    import character_library_manager as _clm_wf
+                                    voice_id = _clm_wf.resolve_voice_id_for_account(voice_id, cand_prof)
+                                except Exception:
+                                    pass
+                            voice_list = [[voice_id]] if voice_id else []
+                            item_g = [
+                                h_prompt,
+                                ref_list,
+                                flow_vid_model,
+                                aspect_int,
+                                None,
+                                l_item,
+                                None,
+                                voice_list,
+                                None,
+                                [],
+                                [],
+                            ]
+                            k_ctx = [None, 22, None, None, None, cand_pid, None, None, None, None, [rcap, 1]]
+                            payload_v = [[item_g], k_ctx, [b_uuid, 1]]
+                            f_req_str = json.dumps(
+                                [[["MZZa6b", json.dumps(payload_v, separators=(",", ":")), None, "generic"]]],
+                                separators=(",", ":"),
+                            )
+                            resp_obj = page.evaluate(
+                                """async ({projectId, bl, fsid, fReq, at}) => {
+                                    const sp = `/project/${projectId}`;
+                                    const reqid = Math.floor(Math.random() * 800000) + 100000;
+                                    const url = `/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=MZZa6b&source-path=${encodeURIComponent(sp)}&bl=${encodeURIComponent(bl)}&f.sid=${encodeURIComponent(fsid)}&hl=vi&_reqid=${reqid}&rt=c`;
+                                    const body = `f.req=${encodeURIComponent(fReq)}&at=${encodeURIComponent(at)}&`;
+                                    const r = await fetch(url, {
+                                        method: 'POST',
+                                        headers: {
+                                            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                                            'x-same-domain': '1'
+                                        },
+                                        body
+                                    });
+                                    return {status: r.status, text: await r.text()};
+                                }""",
+                                {
+                                    "projectId": cand_pid,
+                                    "bl": c_wiz["bl"],
+                                    "fsid": str(c_wiz["fsid"]),
+                                    "fReq": f_req_str,
+                                    "at": c_wiz["at"],
                                 },
-                                body
-                            });
-                            return {status: r.status, text: await r.text()};
-                        }""",
-                        {
-                            "projectId": flow_project_id,
-                            "bl": wiz["bl"],
-                            "fsid": str(wiz["fsid"]),
-                            "fReq": f_req_str,
-                            "at": wiz["at"],
-                        },
-                    )
-                    ok_v, inner_v, err_v = gvt._parse_batchexecute_wrb((resp_obj or {}).get("text", ""), "MZZa6b")
-                    if ok_v and isinstance(inner_v, list):
-                        job_uuid = m_uuid
-                        try:
-                            if len(inner_v) > 3 and isinstance(inner_v[3], list) and inner_v[3]:
-                                cand_u = inner_v[3][0][0]
-                                if isinstance(cand_u, str) and len(cand_u) >= 32:
-                                    job_uuid = cand_u
-                        except Exception:
-                            pass
-                        ok_sub, err_sub = True, None
-                    else:
-                        ok_sub, err_sub = False, f"MZZa6b: {err_v}"
-            finally:
-                browser.close()
+                            )
+                            ok_v, inner_v, err_v = gvt._parse_batchexecute_wrb((resp_obj or {}).get("text", ""), "MZZa6b")
+                            if ok_v and isinstance(inner_v, list):
+                                c_job_uuid = m_uuid
+                                try:
+                                    if len(inner_v) > 3 and isinstance(inner_v[3], list) and inner_v[3]:
+                                        cand_u = inner_v[3][0][0]
+                                        if isinstance(cand_u, str) and len(cand_u) >= 32:
+                                            c_job_uuid = cand_u
+                                except Exception:
+                                    pass
+                                c_ok_sub, c_err_sub = True, None
+                            else:
+                                c_ok_sub, c_err_sub = False, f"MZZa6b ({cand_prof}): {err_v}"
+                    finally:
+                        browser.close()
+        except Exception as ex_vid:
+            c_ok_sub, c_err_sub = False, f"Google Flow Video ({cand_prof}): {ex_vid}"
+
+        if c_ok_sub and c_job_uuid:
+            prof = cand_prof
+            flow_project_id = cand_pid
+            cookie_hdr = c_cookie_hdr
+            dl_headers = c_dl_headers
+            profile_dir = c_profile_dir
+            prof_lock = c_lock
+            wiz = c_wiz
+            ok_sub = True
+            job_uuid = c_job_uuid
+            try:
+                import fashion_motion_control_engine as _fmce
+                _fmce._mark_flow_profile_healthy(prof)
+            except Exception:
+                pass
+            break
+
+        err_sub = c_err_sub or err_sub
+        if _is_flow_account_error_wf(c_err_sub or ""):
+            _mark_flow_profile_unhealthy_wf(cand_prof, str(c_err_sub or ""))
+            continue
+        break
 
     if not ok_sub or not job_uuid:
         return {"ok": False, "error": f"Gửi lệnh tạo video thất bại: {err_sub}"}
@@ -1710,7 +1929,7 @@ def execute_flow_generation_node(
                             )
                             try:
                                 pg_up = br_up.pages[0] if br_up.pages else br_up.new_page()
-                                pg_up.add_init_script(gvt._RECAPTCHA_BYPASS_INIT_SCRIPT)
+                                _apply_flow_init_script_wf(pg_up, gvt)
                                 pg_up.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
                                 pg_up.wait_for_timeout(3000)
                                 ok_up, up_uid, _ = submit_upsample_1080p_in_page(

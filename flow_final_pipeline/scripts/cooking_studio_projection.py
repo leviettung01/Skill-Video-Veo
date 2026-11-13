@@ -88,7 +88,8 @@ def build_project(folder):
     done_refs = int(done_boards >= max(1, len(scenes))) if scenes else int(bool(ref))
     done_thumbs = int(bool(thumb_path))
     total_steps = max(1, len(scenes) * 2 + 1)
-    progress_pct = 100 if done else min(95, int(round((done_boards + done_vids) * 100.0 / total_steps)))
+    raw_pct = min(95, int(round((done_boards + done_vids) * 100.0 / total_steps)))
+    progress_pct = 100 if done else (max(8, raw_pct) if running else raw_pct)
 
     rendered_files = []
     for pat in ('storyboard_*.jpg', 'cooking_s*.mp4', '*_thumb*.jpg', '*_thumb*.png'):

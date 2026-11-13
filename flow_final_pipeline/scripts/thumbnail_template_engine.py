@@ -1593,7 +1593,23 @@ def composite_template_product_insets(
         canvas = cropped_bg.convert("RGBA")
         canvas.paste(upper_zone.convert("RGBA"), (0, 0))
 
-    palette = template_obj.get("palette") or THUMBNAIL_TEMPLATES[0]["palette"]
+    _default_palette = {
+        "dock_bg_top": (6, 78, 59, 242),
+        "dock_bg_bot": (4, 47, 36, 252),
+        "accent": (251, 191, 36),
+        "accent_rgb": (251, 191, 36),
+        "card_border": (255, 255, 255),
+        "pill_bg": (16, 185, 129),
+        "pill_text": (255, 255, 255),
+        "cta_bg": (220, 38, 38),
+        "cta_text": (255, 255, 255),
+    }
+    _leg_list = globals().get("_legacy_templates") or []
+    _cat_pal = next(
+        (t.get("palette") for t in _leg_list if t.get("category") == template_obj.get("category") and t.get("palette")),
+        None,
+    )
+    palette = template_obj.get("palette") or _cat_pal or (_leg_list[0].get("palette") if _leg_list else None) or _default_palette
     layout_type = str(template_obj.get("layout_type") or "grid_3_bottom")
     labels = _extract_short_usp_labels(product_name, product_info, price_str)
     is_mesh = bool(labels.get("is_mesh_cloth", False))
@@ -1960,7 +1976,7 @@ def _ai_master(style):
 THUMBNAIL_TEMPLATES = []
 for _style in AI_THUMBNAIL_STYLES:
     _index = _style.get('sample_index')
-    _sample = os.path.relpath(_source_files[_index-1],WS_DIR).replace(os.sep,'/') if _index else ''
+    _sample = os.path.relpath(_source_files[_index-1],WS_DIR).replace(os.sep,'/') if (_index and 0 < int(_index) <= len(_source_files)) else ''
     if _style.get('sample_image'):
         _sample = _style['sample_image']
     if _style['id']=='pastel_pov_handmade':

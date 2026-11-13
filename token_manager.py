@@ -455,13 +455,11 @@ class TokenManager:
             pass
         # Lọc chỉ giữ profiles có auth cookies thực sự
         valid = [p for p in candidates if self._has_auth_cookies(p)]
-        # Luôn include leviettung04 và Default nếu có cookie file (dù chưa có auth cookies)
-        for must_have in ["leviettung04", "Default"]:
-            if must_have not in valid:
-                cookie_f = COOKIES_DIR / f"{must_have}.json"
-                if cookie_f.exists() or must_have == "leviettung04":
-                    valid.append(must_have)
-        return list(dict.fromkeys(valid)) or ["leviettung04"]
+        # Giữ thêm các cookie file đang tồn tại (không tự bịa tài khoản dev khi máy sạch chưa có profile)
+        for p in candidates:
+            if p not in valid and (COOKIES_DIR / f"{p}.json").exists():
+                valid.append(p)
+        return list(dict.fromkeys(valid))
 
 
 # ── Singleton ──────────────────────────────────────────────────────────────

@@ -66,7 +66,7 @@
           </div>
         `;
         html += gAccs.map((a, idx) => {
-          const prof = a.profile_name || "leviettung04";
+          const prof = a.profile_name || `acc_${idx + 1}`;
           const projId = a.project_id || a.proxy_url || "";
           const cookieBadge = a.has_cookie
             ? `<span class="badge badge-done" style="font-size:9.5px;">🍪 Đã có Cookie</span>`
@@ -148,7 +148,12 @@
     }
 
     async function openChromeForProfile(profName) {
-      const prof = (profName || document.getElementById("inpGoogleProfile")?.value || "leviettung04").trim();
+      const defProf = ((STATE.accounts && STATE.accounts.google_accounts) || [])[0]?.profile_name || "";
+      const prof = (profName || document.getElementById("inpGoogleProfile")?.value || defProf).trim();
+      if (!prof) {
+        if (typeof toast === "function") toast("❌ Chưa có tên Profile Chrome. Hãy thêm tài khoản mới trước!", "err");
+        return;
+      }
       const banner = document.getElementById("loginStatusBanner");
       if (banner) banner.innerHTML = `🌐 Đang mở cửa sổ Chrome độc lập cho Profile <b>${prof}</b> (sau khi đăng nhập xong, hãy ĐÓNG cửa sổ Chrome này để tự động lưu Cookie)...`;
       if (typeof toast === "function") toast(`🌐 Đang mở Chrome độc lập cho Profile '${prof}'...`, "info");
@@ -232,10 +237,11 @@
       if (typeof toast === "function") {
         toast(`🚀 Đang tạo Profile Chrome mới '${cleanProf}' và mở trình duyệt...`, "info");
       }
+      const defProjId = (gAccs[0] && (gAccs[0].project_id || gAccs[0].proxy_url)) || "";
       const res = await apiPost("/api/accounts/add-google-account", {
         profile_name: cleanProf,
         email: cleanProf,
-        project_id: "bf4979d1-548a-44bd-a265-3927bba76dc1",
+        project_id: defProjId,
         open_browser: true,
       });
       if (res && res.ok) {
@@ -258,7 +264,7 @@
       }
       document.getElementById("inpModalGoogleProfile").value = defProf;
       document.getElementById("inpModalGoogleEmail").value = email || `Google_${defProf}`;
-      document.getElementById("inpModalGoogleProjId").value = projId || "bf4979d1-548a-44bd-a265-3927bba76dc1";
+      document.getElementById("inpModalGoogleProjId").value = projId || (gAccs[0] && (gAccs[0].project_id || gAccs[0].proxy_url)) || "";
       document.getElementById("inpModalGoogleToken").value = "";
       document.getElementById("inpModalGoogleCookie").value = "";
       openModal("modalAddGoogleAccount");
@@ -510,28 +516,50 @@
       }
       const tpl = document.getElementById("selQuickTemplate")?.value || "001";
       const vpc = document.getElementById("selQuickVideosPerChar")?.value || "";
-      if (!confirm(`🎬 Khởi tạo kịch bản (Template: ${tpl}) cho ${selectedIds.length} sản phẩm đã chọn và chạy tạo Video?`)) return;
-      showProdBanner(`🚀 Đang khởi tạo kịch bản cho <b>${selectedIds.length} sản phẩm</b> theo Template <b>${tpl}</b>...`);
-      let lastPid = selectedIds[0];
-      for (let i = 0; i < selectedIds.length; i++) {
-        const pid = selectedIds[i];
-        lastPid = pid;
-        await apiPost("/api/products-store/create-video", {
-          input: pid,
+      if (!confirm(`🎬 Khởi tạo kịch bản (Template: ${tpl}) cho ${selectedIds.length} sản phẩm đã chọn và đẩy sang Studio chạy Đa Luồng / Đa Tài Khoản?`)) return;
+      showProdBanner(`🚀 Đang chuẩn bị kịch bản cho <b>${selectedIds.length} sản phẩm</b> (Template <b>${tpl}</b>) & xếp hàng chạy Đa Luồng...`);
+      try {
+        const res = await apiPost("/api/products-store/batch-create-video", {
+          product_ids: selectedIds,
           template_name: tpl,
           method: "auto",
           videos_per_character: vpc ? parseInt(vpc, 10) : null,
           force_regenerate_prompts: true,
-          auto_run: (i === 0), // Chạy luồng tự động cho SP đầu tiên ngay lập tức
+          auto_run: true,
         });
+        if (!res || !res.ok) {
+          showProdBanner(`❌ Không khởi tạo được hàng loạt: ${(res && res.error) || "Lỗi không xác định"}`, true);
+          return;
+        }
+        const firstPid = (res.pids && res.pids[0]) || selectedIds[0];
+        showProdBanner(`🎉 Đã đẩy <b>${res.count || selectedIds.length} dự án</b> sang chạy Đa Luồng chung & hiển thị tiến trình tại <b>Studio Dự Án</b>!`);
+        await loadProductsStore(false);
+        await refreshAll(false);
+        STATE.currentProjectId = firstPid;
+        switchTab("dashboard", document.getElementById("navBtn-dashboard"));
+        loadProjectDetail(firstPid, false);
+      } catch (e) {
+        showProdBanner(`❌ Lỗi tạo video hàng loạt: ${e.message || e}`, true);
       }
-      showProdBanner(`🎉 Đã tạo xong kịch bản cho <b>${selectedIds.length} sản phẩm</b> và bắt đầu chạy đa luồng!`);
-      await loadProductsStore(false);
-      await refreshAll(false);
-      STATE.currentProjectId = lastPid;
-      switchTab("dashboard", document.getElementById("navBtn-dashboard"));
-      loadProjectDetail(lastPid, false);
     }
+
+    async function openProjectInStudio(projectId) {
+      if (!projectId) return;
+      try {
+        document.getElementById("cookingStudioModal")?.remove();
+      } catch (e) {}
+      try {
+        if (typeof closeModal === "function") closeModal("modalTemplatePreview");
+      } catch (e) {}
+      STATE.currentProjectId = projectId;
+      switchTab("dashboard", document.getElementById("navBtn-dashboard"));
+      await refreshAll(false);
+      await loadProjectDetail(projectId, false);
+      setTimeout(() => {
+        document.querySelector("#projectList .proj-item.active")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }, 120);
+    }
+    window.openProjectInStudio = openProjectInStudio;
 
     async function deleteSelectedStoreProducts() {
       const selectedIds = Array.from(STATE.selectedStorePids);
@@ -2475,7 +2503,7 @@
       document.getElementById("inpEditCharKey").value = `nv${nextNum}`;
       document.getElementById("inpEditCharName").value = `Nhân Vật ${nextNum}`;
       document.getElementById("inpEditCharUuid").value = "";
-      document.getElementById("inpEditCharProjId").value = "932bc2a1-07ea-4199-b147-80ab0018d41c";
+      document.getElementById("inpEditCharProjId").value = ((STATE.accounts?.google_accounts || [])[0]?.project_id || "");
       populateEditCharVoiceDropdown("v3_nu_nam_foodie");
       onEditCharVoiceKeyChange();
       document.getElementById("chkEditCharLockVoice").checked = true;
@@ -3117,16 +3145,24 @@
     }
 
     // -----------------------------------------------------------------------------------------
-    // BỘ HÀM ĐIỀU KHIỂN VIDEO & FILE TRỰC TIẾP TRONG TAB THỜI TRANG (KHÔNG CẦN BẤM MENU ⋮)
+    // BỘ HÀM ĐIỀU KHIỂN STUDIO VIDEO THỜI TRANG (#004) — TỐI GIẢN 4 BƯỚC & CHUYÊN NGHIỆP
     // -----------------------------------------------------------------------------------------
+    function _escFashionHtml(val) {
+      return String(val ?? "").replace(/[&<>"']/g, ch => ({
+        "&": "&amp;",
+        "<": "&lt;",
+        ">": "&gt;",
+        '"': "&quot;",
+        "'": "&#39;",
+      }[ch]));
+    }
+
     function toggleFashionInlineVideo(vidId, btnId = "") {
       const v = typeof vidId === "string" ? document.getElementById(vidId) : vidId;
       if (!v) return;
       if (v.paused || v.ended) {
         document.querySelectorAll("#tab-fashion video").forEach(other => {
-          if (other !== v && !other.paused) {
-            other.pause();
-          }
+          if (other !== v && !other.paused) other.pause();
         });
         v.muted = false;
         v.volume = 1.0;
@@ -3151,7 +3187,7 @@
       if (!v.muted) v.volume = 1.0;
       if (btnId) {
         const btn = document.getElementById(btnId);
-        if (btn) btn.innerHTML = v.muted ? "🔇 Bật tiếng" : "🔊 Có tiếng";
+        if (btn) btn.innerHTML = v.muted ? "🔇 Bật tiếng" : "🔊 Tiếng";
       }
     }
 
@@ -3176,8 +3212,54 @@
       if (!encodedPath) return;
       const rawPath = decodeURIComponent(encodedPath);
       navigator.clipboard.writeText(rawPath);
-      showFashionBanner(`📋 Đã copy đường dẫn file vào Clipboard: <code>${rawPath}</code>`);
+      showFashionBanner(`📋 Đã copy đường dẫn file: <code>${_escFashionHtml(rawPath)}</code>`);
       if (typeof toast === "function") toast(`📋 Đã copy đường dẫn: ${rawPath.split(/[\\/]/).pop()}`, "ok");
+    }
+
+    function stopFashionUiMonitor() {
+      for (const key of ["_fashionFlowPollTimer", "_fashionElapsedTicker"]) {
+        if (STATE[key]) clearInterval(STATE[key]);
+        STATE[key] = null;
+      }
+    }
+
+    function toggleFashionCompletedGallery(forceOpen) {
+      const wrap = document.getElementById("fashionCompletedGalleryWrap");
+      if (!wrap) return;
+      const nextOpen = typeof forceOpen === "boolean" ? forceOpen : wrap.style.display === "none";
+      wrap.style.display = nextOpen ? "block" : "none";
+      if (nextOpen) {
+        renderFashionFinalPostProdCard();
+        wrap.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      }
+    }
+
+    function toggleFashionAdvanced(forceOpen) {
+      const panel = document.getElementById("fashionAdvancedPanel");
+      const btn = document.getElementById("btnFashionAdvanced");
+      const root = document.getElementById("cardFashionMotionStudio");
+      if (!panel) return;
+      const nextOpen = typeof forceOpen === "boolean" ? forceOpen : panel.style.display === "none";
+      panel.style.display = nextOpen ? "block" : "none";
+      if (root) root.classList.toggle("fashion-advanced-open", nextOpen);
+      if (btn) btn.innerHTML = nextOpen ? "⚙️ Thu gọn nâng cao" : "⚙️ Nâng cao";
+      if (nextOpen) {
+        renderFashionScenesTimeline();
+        renderFashionStandardPromptBox();
+        panel.scrollIntoView({ behavior: "smooth", block: "start" });
+      }
+    }
+
+    function toggleFashionStorePicker(forceOpen) {
+      const panel = document.getElementById("fashionStorePickerPanel");
+      if (!panel) return;
+      const nextOpen = typeof forceOpen === "boolean" ? forceOpen : panel.style.display === "none";
+      panel.style.display = nextOpen ? "block" : "none";
+      if (nextOpen) {
+        populateFashionProductStorePicker(false).then(() => {
+          document.getElementById("inpFashionStoreSearch")?.focus();
+        });
+      }
     }
 
     function openFashionSceneVideoModal(projectId, sceneIdx = 0) {
@@ -3188,89 +3270,333 @@
       if (!sc) return;
       const vidPath = sc.output_video_path || sc.ref_clip_path || "";
       if (!vidPath) {
-        showFashionBanner(`⚠️ Phân cảnh ${sceneIdx + 1} của dự án <b>${projectId}</b> chưa có file video.`, true);
+        showFashionBanner(`⚠️ Phân cảnh ${sceneIdx + 1} chưa có file video.`, true);
         return;
       }
-      const refImgPath = fp.char_sheet_2k?.path || "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/07_Nhan_Vat_Basic_Phong_Ngu_2K.png";
-      const ovImgPath = "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/01_Character_Sheet_4_Outfits_2K.png";
+      const refImgPath = fp.char_sheet_2k?.path || fp.base_char_2k?.path || "";
       openVerticalVideoModal(
         encodeURIComponent(vidPath),
         encodeURIComponent(refImgPath),
-        encodeURIComponent(ovImgPath),
+        "",
         `${fp.title || projectId} — Phân Cảnh ${sceneIdx + 1} (${sc.duration || 8}s)`,
         "",
         ""
       );
     }
 
-    async function renderFashionFinalForProject(projectId) {
-      const slug = projectId || STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      showFashionBanner(`⏳ Đang Render Hậu Kỳ ghép nối các Video Phân Cảnh + Nhạc Gốc thành Video Final 1080p 60FPS cho dự án <b>${slug}</b>...`);
-      if (typeof toast === "function") toast(`🎞️ Đang ghép hậu kỳ Video Final 60FPS (${slug})...`, "info");
-      const res = await apiPost("/api/fashion_motion/render_final", { project_id: slug });
-      if (res && res.ok) {
-        await loadFashionMotionStudio(false, slug);
-        showFashionBanner(`🎉 ${res.message || 'Đã Render Hậu Kỳ xong Video Final 1080p 60FPS!'}`);
-        if (typeof toast === "function") toast("🎉 Đã ghép xong Video Final 1080p 60FPS!", "ok");
+    function _getSelectedFashionAccountProfile() {
+      return (document.getElementById("selFashionAccountProfile")?.value || "").trim();
+    }
+
+    function onChangeFashionAccountProfile(val) {
+      const v = (val || "").trim();
+      STATE.selectedFashionAccountProfile = v;
+      STATE.userExplicitlyPickedFashionAccount = !!v;
+    }
+
+    function onToggleFashionAutoPrepare2K(checked) {
+      STATE.fashionAutoPrepare2K = !!checked;
+      STATE.fashionPreparedSignature = "";
+      renderFashionScenesTimeline();
+      updateFashionSimpleSummary();
+    }
+
+    function populateFashionAccountSelector() {
+      const sel = document.getElementById("selFashionAccountProfile");
+      if (!sel) return;
+      const mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+      const flowAccs = Array.isArray(STATE.fashionFlowAccounts) ? STATE.fashionFlowAccounts : [];
+      const vidsAccs = Array.isArray(STATE.fashionVidsAccounts) ? STATE.fashionVidsAccounts : [];
+      const vidsMap = new Map(vidsAccs.map(v => [v.profile_name, v]));
+
+      const prevVal = STATE.userExplicitlyPickedFashionAccount ? (STATE.selectedFashionAccountProfile || sel.value || "") : "";
+      const opts = [];
+
+      if (mode === "google_vids") {
+        const mergedNames = new Set([
+          ...vidsAccs.map(v => v.profile_name),
+          ...flowAccs.map(f => f.profile_name),
+        ]);
+        const items = Array.from(mergedNames).filter(Boolean).map(pName => {
+          const fObj = flowAccs.find(x => x.profile_name === pName) || {};
+          const vObj = vidsMap.get(pName) || {};
+          const ready = !!vObj.ready_for_vids;
+          const emailLbl = fObj.email ? `${fObj.email} (${pName})` : pName;
+          return {
+            profile_name: pName,
+            ready,
+            label: `${ready ? "✅" : "⚠️"} ${emailLbl}${ready ? " · Sẵn sàng Vids" : " · Chưa có Cookie Vids"}`,
+          };
+        });
+        items.sort((a, b) => Number(b.ready) - Number(a.ready));
+        opts.push(`<option value="">🔄 Đa luồng Đa tài khoản Google Vids · Tự đổi Acc khi lỗi</option>`);
+        items.forEach(it => {
+          opts.push(`<option value="${_escFashionHtml(it.profile_name)}">${_escFashionHtml(it.label)}</option>`);
+        });
+        sel.innerHTML = opts.join("");
+        const prevReady = prevVal ? items.find(x => x.profile_name === prevVal) : null;
+        sel.value = prevReady ? prevReady.profile_name : "";
       } else {
-        showFashionBanner(`❌ Lỗi Render Hậu Kỳ: ${(res && res.error) || 'Không xác định'}`, true);
-      }
-    }
-
-    async function runFashionFlowForProject(projectId) {
-      if (projectId && STATE.fashionProject?.project_id !== projectId) {
-        await loadFashionMotionStudio(false, projectId);
-      }
-      STATE.lastUserClickedTemplateCode = "";
-      await runFashionProjectOnFlow();
-    }
-
-    async function changeSingleFashionOutfitImage(idx) {
-      const item = (STATE.fashionOutfits || [])[idx];
-      if (!item) return;
-      const res = await apiGet("/api/pick_file?kind=image");
-      if (!res || !res.ok || !res.path) return;
-      const fn = res.path.split(/[\\/]/).pop();
-      item.path = res.path;
-      item.filename = fn;
-      item.name = `Bộ ${idx + 1}: ${fn}`;
-      renderFashionOutfitsList();
-      showFashionBanner(`👗 Đã đổi ảnh Bộ #${idx + 1} thành <b>${fn}</b>!`);
-    }
-
-    function removeSingleFashionOutfit(idx) {
-      if (!Array.isArray(STATE.fashionOutfits) || idx < 0 || idx >= STATE.fashionOutfits.length) return;
-      const removed = STATE.fashionOutfits.splice(idx, 1)[0];
-      renderFashionOutfitsList();
-      showFashionBanner(`🗑️ Đã xoá <b>${removed?.name || removed?.filename || 'Bộ đồ'}</b> khỏi danh sách phối đồ.`);
-    }
-
-    function syncFashionOutfitsWithDefaults(projOutfits, defaultOutfits) {
-      const activeList = Array.isArray(projOutfits) ? projOutfits : [];
-      const defList = Array.isArray(defaultOutfits) ? defaultOutfits : [];
-      const activeIds = new Set(activeList.map(o => o.id || o.filename));
-      const merged = activeList.map(o => ({ ...o, enabled: true }));
-      defList.forEach(d => {
-        const key = d.id || d.filename;
-        if (!activeIds.has(key) && !activeList.some(x => x.filename === d.filename)) {
-          merged.push({
-            ...d,
-            path: d.path || `ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/${d.filename}`,
-            lookbook_model_path: d.lookbook_model_path || (d.lookbook_model_filename ? `ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/${d.lookbook_model_filename}` : ""),
-            width: d.width || 2048,
-            height: d.height || 2559,
-            is_2k: true,
-            enabled: merged.length < 5,
-          });
+        opts.push(`<option value="">🔄 Đa luồng Đa tài khoản (${flowAccs.length} Acc) · Tự đổi Acc khi lỗi</option>`);
+        flowAccs.forEach(a => {
+          const pName = a.profile_name || a.name || "";
+          if (!pName) return;
+          const okCookie = a.has_cookies !== false;
+          const lbl = a.display_label || (a.email ? `${a.email} (${pName})` : pName);
+          opts.push(`<option value="${_escFashionHtml(pName)}">${okCookie ? "✅" : "⬜"} ${_escFashionHtml(lbl)} (Lỗi tự chuyển Acc khác)</option>`);
+        });
+        sel.innerHTML = opts.join("");
+        if (prevVal && flowAccs.some(a => a.profile_name === prevVal)) {
+          sel.value = prevVal;
+        } else {
+          sel.value = "";
         }
+      }
+      STATE.selectedFashionAccountProfile = sel.value || "";
+
+      const chkPrep = document.getElementById("chkFashionAutoPrepare2K");
+      const lblPrep = document.getElementById("lblFashionAutoPrepare2K");
+      if (chkPrep) {
+        if (mode === "google_vids") {
+          chkPrep.checked = false;
+          chkPrep.disabled = true;
+          if (lblPrep) lblPrep.style.opacity = "0.55";
+        } else {
+          chkPrep.disabled = false;
+          chkPrep.checked = typeof STATE.fashionAutoPrepare2K === "boolean" ? STATE.fashionAutoPrepare2K : false;
+          if (lblPrep) lblPrep.style.opacity = "1";
+        }
+      }
+    }
+
+    function _pickBrowserFiles({ accept = "image/*", multiple = false } = {}) {
+      return new Promise(resolve => {
+        const inp = document.createElement("input");
+        inp.type = "file";
+        inp.accept = accept;
+        inp.multiple = !!multiple;
+        inp.style.display = "none";
+        document.body.appendChild(inp);
+        let settled = false;
+        const finish = files => {
+          if (settled) return;
+          settled = true;
+          try { document.body.removeChild(inp); } catch (e) {}
+          resolve(files || []);
+        };
+        inp.onchange = () => finish(Array.from(inp.files || []));
+        window.addEventListener("focus", () => setTimeout(() => {
+          if (!settled && (!inp.files || !inp.files.length)) finish([]);
+        }, 700), { once: true });
+        inp.click();
       });
-      return merged;
+    }
+
+    function _readFileAsDataUrl(fileObj) {
+      return new Promise((resolve, reject) => {
+        const reader = new FileReader();
+        reader.onload = () => resolve(String(reader.result || ""));
+        reader.onerror = err => reject(err);
+        reader.readAsDataURL(fileObj);
+      });
+    }
+
+    async function _uploadFashionFileObjects(fileList, { kind = "outfit", autoWhiteBgLocal = false, customName = "" } = {}) {
+      const files = Array.from(fileList || []).filter(Boolean);
+      if (!files.length) return [];
+      const uploaded = [];
+      for (let i = 0; i < files.length; i++) {
+        const f = files[i];
+        showFashionBanner(`⏳ Đang tải ảnh <b>${_escFashionHtml(f.name)}</b> (${i + 1}/${files.length})...`);
+        const dataUrl = await _readFileAsDataUrl(f);
+        const res = await apiPost("/api/fashion_motion/upload_file", {
+          filename: f.name,
+          data_base64: dataUrl,
+          kind,
+          name: files.length === 1 && customName ? customName : f.name.replace(/\.[^.]+$/, ""),
+          project_id: STATE.fashionProject?.project_id || "",
+          auto_white_bg_local: !!autoWhiteBgLocal,
+        });
+        if (res && res.ok) {
+          if (res.library) STATE.fashionLibrary = res.library;
+          uploaded.push(res);
+        } else {
+          showFashionBanner(`❌ Không tải được file ${_escFashionHtml(f.name)}: ${(res && res.error) || "Lỗi không xác định"}`, true);
+        }
+      }
+      return uploaded;
+    }
+
+    async function uploadFashionFileViaBrowser({ kind = "outfit", accept = "image/*", multiple = false, autoWhiteBgLocal = false, customName = "" } = {}) {
+      const files = await _pickBrowserFiles({ accept, multiple });
+      if (!files.length) return [];
+      return _uploadFashionFileObjects(files, { kind, autoWhiteBgLocal, customName });
+    }
+
+    function _isDefaultDemoOutfitItem(o) {
+      if (!o) return false;
+      const defFns = new Set([
+        "03_Product_Sheet_Quan_Xanh_2K.png",
+        "04_Product_Sheet_Vay_Vang_2K.png",
+        "05_Product_Sheet_Quan_Sooc_Trang_2K.png",
+        "06_Product_Sheet_Chan_Vay_Den_2K.png",
+        "06_Product_Sheet_Quan_Be_2K.png",
+        "08_Product_Sheet_Set_Cong_So_Chan_Vay_Kem_2K.png",
+        "08_Product_Sheet_Ao_So_Mi_Trang_2K.png",
+      ]);
+      return !!o.is_default || defFns.has(o.filename);
+    }
+
+    function _autoRemoveDefaultOutfitsWhenAddingCustom() {
+      if (!Array.isArray(STATE.fashionOutfits)) {
+        STATE.fashionOutfits = [];
+        return;
+      }
+      if (STATE.fashionOutfits.length > 0 && STATE.fashionOutfits.every(o => _isDefaultDemoOutfitItem(o))) {
+        STATE.fashionOutfits = [];
+      }
+    }
+
+    function syncFashionOutfitsWithDefaults(projOutfits) {
+      return (Array.isArray(projOutfits) ? projOutfits : []).map(o => ({ ...o, enabled: o.enabled !== false }));
+    }
+
+    function ensureFashionEditableDraft({ preserveInputs = true, targetTemplateCode = "" } = {}) {
+      const p = STATE.fashionProject;
+      if (p && p.project_id && p.status === "running_flow") {
+        if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+        STATE.runningFashionSlugs.add(p.project_id);
+        if (!Array.isArray(STATE.fashionProjectsList)) STATE.fashionProjectsList = [];
+        const exIdx = STATE.fashionProjectsList.findIndex(x => x && x.project_id === p.project_id);
+        if (exIdx >= 0) STATE.fashionProjectsList[exIdx] = p;
+        else STATE.fashionProjectsList.unshift(p);
+      }
+      const allTpls = STATE.fashionVideoTemplatesCatalog?.templates || [];
+      const code = targetTemplateCode || STATE.selectedFashionTemplateCode || p?.source_template_code || (allTpls[0]?.code || "FVT_001");
+      const tpl = allTpls.find(x => x.code === code) || allTpls[0] || { code, title: code, video_path: "", duration: 16 };
+
+      const prevCharPath = preserveInputs ? (document.getElementById("inpFashionBaseChar")?.value || p?.base_char_2k?.path || "").trim() : "";
+      const prevSheetPath = preserveInputs ? (document.getElementById("inpFashionCharSheet")?.value || p?.char_sheet_2k?.path || prevCharPath).trim() : "";
+      const prevOutfits = preserveInputs && Array.isArray(STATE.fashionOutfits) ? [...STATE.fashionOutfits] : [];
+      const curMode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || p?.generation_mode || "chained_i2v");
+
+      const needNewDraft = !p || p.status !== "draft" || !!p.final_video_ready || !p.source_template_code;
+      if (needNewDraft) {
+        const newId = `fashion_${code.toLowerCase()}_${Date.now()}`;
+        STATE.fashionProject = {
+          project_id: newId,
+          title: `[${code}] ${tpl.title || code}`,
+          source_template_code: code,
+          source_template_title: tpl.title || code,
+          status: "draft",
+          reference_video: {
+            path: tpl.video_path || "",
+            filename: tpl.filename || "",
+            duration: tpl.duration || 16,
+            width: tpl.width || 1080,
+            height: tpl.height || 1920,
+            fps: 30,
+          },
+          base_char_2k: prevCharPath ? { filename: prevCharPath.split(/[\\/]/).pop(), path: prevCharPath, width: 1536, height: 2752, is_2k: true } : null,
+          char_sheet_2k: prevSheetPath ? { filename: prevSheetPath.split(/[\\/]/).pop(), path: prevSheetPath } : null,
+          outfits: prevOutfits,
+          scenes: [],
+          generation_mode: curMode,
+          final_video_ready: false,
+          final_video_path: "",
+        };
+        STATE.fashionOutfits = prevOutfits;
+      } else {
+        STATE.fashionProject.source_template_code = code;
+        STATE.fashionProject.source_template_title = tpl.title || code;
+        STATE.fashionProject.title = `[${code}] ${tpl.title || code}`;
+        STATE.fashionProject.reference_video = {
+          path: tpl.video_path || "",
+          filename: tpl.filename || "",
+          duration: tpl.duration || 16,
+          width: tpl.width || 1080,
+          height: tpl.height || 1920,
+          fps: 30,
+        };
+      }
+
+      STATE.selectedFashionTemplateCode = code;
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+
+      const inpVid = document.getElementById("inpFashionRefVideo");
+      if (inpVid && tpl.video_path) inpVid.value = tpl.video_path;
+      const inpChar = document.getElementById("inpFashionBaseChar");
+      if (inpChar) inpChar.value = prevCharPath;
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      if (inpSheet) inpSheet.value = prevSheetPath;
+
+      populateFashionProjectDropdown();
+      return true;
+    }
+
+    function startFreshFashionDraft(showMsg = true) {
+      if (!STATE.runningFashionSlugs || STATE.runningFashionSlugs.size === 0) {
+        stopFashionUiMonitor();
+      }
+      document.getElementById("fashionTplDemoVideoPlayer")?.pause();
+      const allTpls = STATE.fashionVideoTemplatesCatalog?.templates || [];
+      const code = STATE.selectedFashionTemplateCode || allTpls[0]?.code || "FVT_001";
+      if (STATE.fashionProject?.status === "running_flow" && STATE.fashionProject?.project_id) {
+        if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+        STATE.runningFashionSlugs.add(STATE.fashionProject.project_id);
+      }
+      STATE.fashionProject = null;
+      STATE.fashionOutfits = [];
+      STATE.selectedFashionCharKey = "";
+      const inpChar = document.getElementById("inpFashionBaseChar");
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      if (inpChar) inpChar.value = "";
+      if (inpSheet) inpSheet.value = "";
+      ensureFashionEditableDraft({ preserveInputs: false, targetTemplateCode: code });
+      filterFashionVideoTemplatesGrid();
+      renderSelectedFashionTemplateDetail(false);
+      populateFashionCharacterPicker();
+      renderFashionMotionStudio();
+      if (showMsg) {
+        showFashionBanner(`✨ Đã tạo bản nháp mới với mẫu <b>${_escFashionHtml(code)}</b>. Các tác vụ đang chạy vẫn tiếp tục xử lý ngầm tại <b>Studio Dự Án</b>!`);
+      }
+    }
+
+    function useFashionTemplateForNewVideo(code, playSound = false) {
+      if (!STATE.runningFashionSlugs || STATE.runningFashionSlugs.size === 0) {
+        stopFashionUiMonitor();
+      }
+      const allTpls = STATE.fashionVideoTemplatesCatalog?.templates || [];
+      const tpl = allTpls.find(x => x.code === code);
+      if (!tpl) return;
+
+      STATE.selectedFashionTemplateCode = code;
+      STATE.lastUserClickedTemplateCode = code;
+      ensureFashionEditableDraft({ preserveInputs: true, targetTemplateCode: code });
+
+      filterFashionVideoTemplatesGrid();
+      renderSelectedFashionTemplateDetail(playSound);
+      renderFashionMotionStudio();
+
+      const hasChar = !!(document.getElementById("inpFashionBaseChar")?.value || "").trim();
+      const outCnt = (STATE.fashionOutfits || []).filter(o => o.enabled !== false).length;
+      if (hasChar && outCnt > 0) {
+        showFashionBanner(`✅ Đã chuyển sang mẫu <b>${_escFashionHtml(code)}</b> (Giữ nguyên nhân vật & ${outCnt} sản phẩm của bạn). Bấm <b>🚀 Tạo Video Thời Trang Ngay</b> để đẩy thêm tác vụ mới!`);
+      } else {
+        showFashionBanner(`🎬 Đã chọn mẫu <b>${_escFashionHtml(code)} — ${_escFashionHtml(tpl.title)}</b> (${tpl.duration}s • gợi ý ${tpl.recommended_outfits || 4} bộ đồ). Hãy chọn nhân vật và thêm sản phẩm bên dưới!`);
+      }
+    }
+
+    function selectFashionVideoTemplate(code, playSound = false) {
+      useFashionTemplateForNewVideo(code, playSound);
     }
 
     async function loadFashionMotionStudio(forceToast = false, targetProjectId = "") {
-      const wantPid = targetProjectId || (STATE.fashionProject && STATE.fashionProject.project_id) || "";
+      const wantPid = targetProjectId || "";
       const res = await apiGet(`/api/fashion_motion/projects?project_id=${encodeURIComponent(wantPid)}`);
       if (!res || !res.ok) return;
+
       STATE.fashionStandardPrompts = res.standard_prompts || {};
       STATE.fashionCharacters = res.characters || (STATE.charLib?.characters) || [];
       STATE.fashionLibrary = res.fashion_library || { characters: [], outfits: [] };
@@ -3278,27 +3604,75 @@
       STATE.fashionProjectsList = res.projects || [];
       STATE.fashionRefVideosLib = res.ref_videos_library || [];
       STATE.fashionDefaultOutfits = res.default_outfits || [];
+      if (Array.isArray(res.flow_accounts) && res.flow_accounts.length) {
+        STATE.fashionFlowAccounts = res.flow_accounts;
+      }
+      if (Array.isArray(res.vids_accounts) && res.vids_accounts.length) {
+        STATE.fashionVidsAccounts = res.vids_accounts;
+      }
+      if (!STATE.fashionFlowAccounts || !STATE.fashionFlowAccounts.length) {
+        try {
+          const defRes = await apiGet("/api/cooking/default");
+          if (defRes && defRes.ok && Array.isArray(defRes.accounts)) {
+            STATE.fashionFlowAccounts = defRes.accounts;
+          }
+        } catch (e) {}
+      }
+
+      if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+      (STATE.fashionProjectsList || []).forEach(p => {
+        if (p && p.project_id && p.status === "running_flow") {
+          STATE.runningFashionSlugs.add(p.project_id);
+        }
+      });
+
+      const doneCount = (STATE.fashionProjectsList || []).filter(p => p.final_video_ready && p.final_video_path).length;
+      const doneBadge = document.getElementById("badgeFashionDoneVideosCount");
+      if (doneBadge) doneBadge.textContent = String(doneCount);
 
       const runningProj = !targetProjectId ? (STATE.fashionProjectsList || []).find(p => p.status === "running_flow") : null;
-      const proj = runningProj || res.active_project || res.current_project || STATE.fashionProjectsList[0] || null;
-      if (!proj) return;
-      STATE.fashionProject = proj;
-      if (proj.source_template_code) {
-        STATE.selectedFashionTemplateCode = proj.source_template_code;
-      } else if (!STATE.selectedFashionTemplateCode && (STATE.fashionVideoTemplatesCatalog.templates || []).length) {
-        STATE.selectedFashionTemplateCode = STATE.fashionVideoTemplatesCatalog.templates[0].code;
-      }
-      STATE.fashionOutfits = syncFashionOutfitsWithDefaults(proj.outfits || [], STATE.fashionDefaultOutfits);
 
+      if (targetProjectId) {
+        const foundTarget = (STATE.fashionProjectsList || []).find(p => p.project_id === targetProjectId) || res.active_project;
+        if (foundTarget) {
+          STATE.fashionProject = foundTarget;
+          if (foundTarget.source_template_code) STATE.selectedFashionTemplateCode = foundTarget.source_template_code;
+          STATE.fashionOutfits = syncFashionOutfitsWithDefaults(foundTarget.outfits || []);
+          const inpChar = document.getElementById("inpFashionBaseChar");
+          const inpSheet = document.getElementById("inpFashionCharSheet");
+          if (inpChar) inpChar.value = foundTarget.base_char_2k?.path || "";
+          if (inpSheet) inpSheet.value = foundTarget.char_sheet_2k?.path || foundTarget.base_char_2k?.path || "";
+        }
+      } else if (!STATE._fashionInitializedOnce || !STATE.fashionProject) {
+        if (runningProj) {
+          STATE.fashionProject = runningProj;
+          if (runningProj.source_template_code) STATE.selectedFashionTemplateCode = runningProj.source_template_code;
+          STATE.fashionOutfits = syncFashionOutfitsWithDefaults(runningProj.outfits || []);
+        } else {
+          const firstCode = STATE.selectedFashionTemplateCode || (STATE.fashionVideoTemplatesCatalog.templates || [])[0]?.code || "FVT_001";
+          STATE.selectedFashionTemplateCode = firstCode;
+          startFreshFashionDraft(false);
+        }
+      }
+
+      STATE._fashionInitializedOnce = true;
+
+      populateFashionAccountSelector();
       populateFashionProjectDropdown();
       populateFashionRefVideoLibDropdown();
       populateFashionCharacterPicker();
-      populateFashionProductStorePicker(false);
+      await populateFashionProductStorePicker(false);
       renderFashionVideoTemplatesHub();
       renderFashionMotionStudio();
       renderFashionStandardPromptBox();
-      if (forceToast) {
-        showFashionBanner(`👗 Đã tải dự án Video Thời Trang: <b>${proj.title}</b> (${(proj.scenes || []).length} phân cảnh × ${proj.split_plan?.scene_duration || 8}s • ${(proj.outfits || []).length} Bộ Đồ 2K • Kho ${STATE.fashionVideoTemplatesCatalog.total || 30} Template Video)`);
+
+      if (STATE.runningFashionSlugs.size > 0 && !STATE._fashionFlowPollTimer) {
+        const firstSlug = Array.from(STATE.runningFashionSlugs)[0];
+        startFashionLiveStatusMonitor(firstSlug);
+      }
+
+      if (forceToast && STATE.fashionProject) {
+        showFashionBanner(`👗 Đã đồng bộ Studio Thời Trang (${STATE.fashionVideoTemplatesCatalog.total || 252} mẫu video • ${doneCount} video đã tạo).`);
       }
     }
 
@@ -3316,14 +3690,8 @@
       const cat = STATE.fashionVideoTemplatesCatalog || { total: 0, templates: [] };
       const allTpls = cat.templates || [];
       const badgeEl = document.getElementById("badgeFashionTplTotalCount");
-      if (badgeEl) {
-        badgeEl.textContent = `${allTpls.length} Template Đã Phân Tích Sẵn`;
-      }
-      const hubTitleEl = document.getElementById("badgeFashionTplHubTitle");
-      if (hubTitleEl && allTpls.length > 0) {
-        const lastCode = allTpls[allTpls.length - 1]?.code || `FVT_${String(allTpls.length).padStart(3, "0")}`;
-        hubTitleEl.textContent = `🎬 KHO ${allTpls.length} TEMPLATE VIDEO MẪU (FVT_001 ➔ ${lastCode})`;
-      }
+      if (badgeEl) badgeEl.textContent = `${allTpls.length} mẫu có sẵn`;
+
       const bar = document.getElementById("fashionTplCategoryBar");
       if (bar && Array.isArray(cat.categories) && cat.categories.length) {
         const counts = { all: allTpls.length };
@@ -3335,11 +3703,11 @@
           const isAct = (STATE.activeFashionTplCategory || "all") === c.key;
           const cnt = counts[c.key] || 0;
           const labelTxt = c.key === "all" ? `🌟 Tất cả (${cnt})` : `${c.label} (${cnt})`;
-          return `<button class="btn-filter ${isAct ? 'active' : ''}" onclick="setFashionTplCategoryFilter('${c.key}', this)">${labelTxt}</button>`;
+          return `<button class="btn-filter ${isAct ? "active" : ""}" onclick="setFashionTplCategoryFilter('${_escFashionHtml(c.key)}', this)">${_escFashionHtml(labelTxt)}</button>`;
         }).join("");
       }
       filterFashionVideoTemplatesGrid();
-      renderSelectedFashionTemplateDetail();
+      renderSelectedFashionTemplateDetail(false);
     }
 
     function filterFashionVideoTemplatesGrid() {
@@ -3357,70 +3725,54 @@
       });
 
       if (!filtered.length) {
-        grid.innerHTML = `<div style="grid-column:1/-1; padding:24px; text-align:center; color:#94a3b8; font-size:12px;">Không tìm thấy Template Video phù hợp. Hãy thử từ khóa khác hoặc bấm <b>🔄 Quét Video Mới Trong Folder</b>.</div>`;
+        grid.innerHTML = `<div style="grid-column:1/-1; padding:28px; text-align:center; color:#94a3b8; font-size:12px;">Không tìm thấy mẫu phù hợp. Hãy thử từ khóa khác hoặc chọn danh mục <b>Tất cả</b>.</div>`;
         return;
       }
 
-      const curCode = STATE.selectedFashionTemplateCode || filtered[0].code;
+      const curCode = STATE.selectedFashionTemplateCode || STATE.fashionProject?.source_template_code || filtered[0].code;
       grid.innerHTML = filtered.map(t => {
         const isSel = t.code === curCode;
-        const thumbUrl = `/api/media?path=${encodeURIComponent(t.thumb_path || '')}`;
-        const vEnc = encodeURIComponent(t.video_path || '');
-        const thEnc = encodeURIComponent(t.thumb_path || '');
+        const thumbUrl = `/api/media?path=${encodeURIComponent(t.thumb_path || "")}`;
+        const vEnc = encodeURIComponent(t.video_path || "");
+        const thEnc = encodeURIComponent(t.thumb_path || "");
+        const safeTitle = _escFashionHtml(t.title || t.code);
         return `
-          <div onclick="selectFashionVideoTemplate('${t.code}')"
-               style="cursor:pointer; background:${isSel ? 'linear-gradient(160deg, rgba(236,72,153,0.22), rgba(15,23,42,0.96))' : '#080d18'}; border:1.5px solid ${isSel ? '#ec4899' : 'rgba(255,255,255,0.1)'}; border-radius:9px; padding:6px; display:flex; flex-direction:column; gap:5px; transition:all 0.15s; box-shadow:${isSel ? '0 0 16px rgba(236,72,153,0.35)' : 'none'};">
-            <div style="width:100%; aspect-ratio:9/14; border-radius:6px; overflow:hidden; background:#000; position:relative;">
+          <div class="f-tpl-card ${isSel ? "selected" : ""}" onclick="useFashionTemplateForNewVideo('${t.code}', false)">
+            <div style="width:100%; aspect-ratio:9/14; border-radius:7px; overflow:hidden; background:#000; position:relative;">
               <img src="${thumbUrl}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" />
-              <span style="position:absolute; top:5px; left:5px; background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-size:10px; font-weight:900; padding:1.5px 6px; border-radius:4px; box-shadow:0 2px 8px rgba(0,0,0,0.6);">
-                ${t.code}
+              <span style="position:absolute; top:5px; left:5px; background:${isSel ? "linear-gradient(135deg,#ec4899,#f59e0b)" : "rgba(9,14,26,0.86)"}; color:${isSel ? "#090d16" : "#f8fafc"}; font-size:9.5px; font-weight:900; padding:2px 6px; border-radius:4px;">
+                ${_escFashionHtml(t.code)}
               </span>
-              <span style="position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.82); color:#fde68a; font-size:9.5px; font-weight:800; padding:1.5px 5px; border-radius:4px; border:1px solid rgba(253,230,138,0.35);">
-                ${t.duration}s • ${t.num_scenes} cảnh
+              <span style="position:absolute; top:5px; right:5px; background:rgba(0,0,0,0.8); color:#fde68a; font-size:9px; font-weight:800; padding:1.5px 5px; border-radius:4px;">
+                ${t.duration}s · ${t.num_scenes} cảnh
               </span>
-              <button class="btn btn-xs btn-primary"
-                      style="position:absolute; bottom:26px; right:5px; padding:2px 6px; font-size:9px; font-weight:800; background:rgba(37,99,235,0.92); border-color:#60a5fa; box-shadow:0 2px 8px rgba(0,0,0,0.65);"
-                      onclick="event.stopPropagation(); openVerticalVideoModal('${vEnc}', '${thEnc}', '', '[${t.code}] ${(t.title || '').replace(/'/g, '')} (${t.duration}s)', '', '');"
-                      title="Mở xem phóng to dọc 9:16 có tiếng cho Template ${t.code}">
-                📱 9:16
+              <button class="btn btn-xs"
+                      style="position:absolute; bottom:25px; right:5px; padding:2px 6px; font-size:9px; font-weight:800; background:rgba(15,23,42,0.88); color:#67e8f9; border:1px solid rgba(103,232,249,0.45);"
+                      onclick="event.stopPropagation(); useFashionTemplateForNewVideo('${t.code}', true);"
+                      title="Chọn & nghe thử nhạc gốc của ${t.code}">
+                🔊 Nghe
               </button>
-              <span style="position:absolute; bottom:5px; left:5px; right:5px; background:rgba(4,7,14,0.85); color:#67e8f9; font-size:9px; font-weight:700; padding:2px 5px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
-                ${t.category_label || ''} • ${t.recommended_outfits || 4} bộ đồ
+              <button class="btn btn-xs"
+                      style="position:absolute; bottom:25px; left:5px; padding:2px 5px; font-size:9px; font-weight:800; background:rgba(15,23,42,0.88); color:#e2e8f0; border:1px solid rgba(255,255,255,0.2);"
+                      onclick="event.stopPropagation(); openVerticalVideoModal('${vEnc}', '${thEnc}', '', '[${t.code}] ${safeTitle.replace(/'/g, "")} (${t.duration}s)', '', '');"
+                      title="Phóng to video mẫu 9:16">
+                📱
+              </button>
+              <span style="position:absolute; bottom:4px; left:4px; right:4px; background:rgba(4,7,14,0.86); color:#cbd5e1; font-size:9px; font-weight:700; padding:2px 5px; border-radius:4px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">
+                👗 Gợi ý ${t.recommended_outfits || 4} bộ
               </span>
             </div>
-            <div style="font-size:11px; font-weight:800; color:#f8fafc; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:28px;" title="${(t.title || '').replace(/"/g, '&quot;')}">
-              ${t.title}
+            <div style="font-size:10.5px; font-weight:700; color:#f8fafc; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:27px;" title="${safeTitle}">
+              ${safeTitle}
             </div>
-            <div style="font-size:9.5px; color:#94a3b8; line-height:1.3; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;">
-              🏠 ${t.background_setting || ''}
-            </div>
-            <div style="display:grid; grid-template-columns: 1fr 1fr 1fr; gap:3px; margin-top:auto;">
-              <button class="btn btn-xs ${isSel ? 'btn-amber' : 'btn-outline'}" style="justify-content:center; font-size:9px; padding:3px 3px; font-weight:800;"
-                      onclick="event.stopPropagation(); selectFashionVideoTemplate('${t.code}');"
-                      title="Xem & nghe thử Video Mẫu ${t.code} có tiếng">
-                ${isSel ? '🔊 Đang Xem' : '▶️ Xem'}
-              </button>
-              <button class="btn btn-xs btn-primary" style="justify-content:center; font-size:9px; padding:3px 3px; font-weight:800;"
-                      onclick="event.stopPropagation(); selectFashionVideoTemplate('${t.code}'); applySelectedFashionTemplate(false);"
-                      title="Nạp ngay Template ${t.code} vào kịch bản (Cắt clip 30FPS + Tạo Prompt)">
-                ⚡ Nạp
-              </button>
-              <button class="btn btn-xs btn-success" style="justify-content:center; font-size:9px; padding:3px 3px; font-weight:900;"
-                      onclick="event.stopPropagation(); selectFashionVideoTemplate('${t.code}'); applySelectedFashionTemplate(true);"
-                      title="Bấm Render tạo ngay Video Final với Template ${t.code}">
-                🚀 Render
-              </button>
-            </div>
+            <button class="btn btn-xs ${isSel ? "btn-primary" : "btn-outline"}"
+                    style="width:100%; justify-content:center; font-size:9.5px; padding:4px 4px; font-weight:800; margin-top:auto;"
+                    onclick="event.stopPropagation(); useFashionTemplateForNewVideo('${t.code}', false);">
+              ${isSel ? "✓ Đang dùng mẫu" : "Chọn mẫu này"}
+            </button>
           </div>
         `;
       }).join("");
-    }
-
-    function selectFashionVideoTemplate(code) {
-      STATE.selectedFashionTemplateCode = code;
-      STATE.lastUserClickedTemplateCode = code;
-      filterFashionVideoTemplatesGrid();
-      renderSelectedFashionTemplateDetail(true);
     }
 
     function renderSelectedFashionTemplateDetail(playWithSound = false) {
@@ -3428,139 +3780,97 @@
       if (!box) return;
       const allTpls = (STATE.fashionVideoTemplatesCatalog && STATE.fashionVideoTemplatesCatalog.templates) || [];
       if (!allTpls.length) {
-        box.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8;">Đang tải danh mục 30+ Template Video Thời Trang...</div>`;
+        box.innerHTML = `<div style="padding:20px; text-align:center; color:#94a3b8;">Đang tải kho mẫu thời trang...</div>`;
         return;
       }
-      const curCode = STATE.selectedFashionTemplateCode || allTpls[0].code;
+      const curCode = STATE.selectedFashionTemplateCode || STATE.fashionProject?.source_template_code || allTpls[0].code;
       const tpl = allTpls.find(x => x.code === curCode) || allTpls[0];
-      const vidEnc = encodeURIComponent(tpl.video_path || '');
-      const stripEnc = encodeURIComponent(tpl.strip_path || '');
+      const vidEnc = encodeURIComponent(tpl.video_path || "");
+      const stripEnc = encodeURIComponent(tpl.strip_path || "");
       const vidUrl = `/api/media?path=${vidEnc}`;
       const stripUrl = `/api/media?path=${stripEnc}`;
       const bpList = tpl.scenes_blueprint || [];
-
-      const curGenMode = document.getElementById("selFashionGenerationMode")?.value || (STATE.fashionProject && STATE.fashionProject.generation_mode) || "chained_i2v";
-      const isI2vMode = curGenMode === "chained_i2v";
+      const curGenMode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+      const isI2vMode = curGenMode !== "video_ref";
 
       const bpHtml = bpList.map(bp => {
-        const activeBpPrompt = (isI2vMode ? (bp.prompt_chained_i2v || bp.prompt_template) : (bp.prompt_template || bp.prompt_chained_i2v)) || '';
+        const activeBpPrompt = (isI2vMode ? (bp.prompt_chained_i2v || bp.prompt_template) : (bp.prompt_template || bp.prompt_chained_i2v)) || "";
         const tsDisplay = isI2vMode
-          ? ((bp.transition_timestamps_sec && bp.transition_timestamps_sec.length) ? bp.transition_timestamps_sec.join(', ') : (bp.transition_timestamps || []).join(', '))
-          : (bp.transition_timestamps || []).join(', ');
-        const modeBadgeTxt = isI2vMode ? '⚡ I2V Timeline 0.1s' : '🎥 Video Ref';
+          ? ((bp.transition_timestamps_sec && bp.transition_timestamps_sec.length) ? bp.transition_timestamps_sec.join(", ") : (bp.transition_timestamps || []).join(", "))
+          : (bp.transition_timestamps || []).join(", ");
+        const sFrame = Math.round(Number(bp.start_sec || 0) * 30) + 1;
+        const eFrame = Math.round(Number(bp.end_sec || 8) * 30);
         return `
-        <div style="background:#0a0f1d; border:1px solid rgba(59,130,246,0.35); border-radius:7px; padding:7px 9px; margin-top:5px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; margin-bottom:3px; flex-wrap:wrap;">
-            <span style="font-size:10.5px; font-weight:800; color:#67e8f9;">✂️ Phân cảnh ${bp.scene_index} (${bp.start_sec}s – ${bp.end_sec}s) • <span style="color:#a78bfa;">${modeBadgeTxt}</span> • Đổi đồ tại: <b style="color:#fde68a;">${tsDisplay}</b></span>
-            <button class="btn btn-xs btn-outline" style="font-size:9px; padding:1px 6px;" onclick="navigator.clipboard.writeText(${JSON.stringify(activeBpPrompt).replace(/"/g, '&quot;')}); showFashionBanner('📋 Đã copy Prompt Mẫu Phân Cảnh ${bp.scene_index} của ${tpl.code}!');">📋 Copy Prompt</button>
+          <div style="background:#0a0f1d; border:1px solid rgba(59,130,246,0.35); border-radius:7px; padding:6px 8px; margin-top:5px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; font-size:10px; font-weight:800; color:#67e8f9; margin-bottom:3px;">
+              <span>✂️ Cảnh ${bp.scene_index} (${bp.start_sec}s–${bp.end_sec}s • Frame ${sFrame}–${eFrame})</span>
+              <span style="color:#fde68a;">🎵 Đổi đồ: ${_escFashionHtml(tsDisplay || "Theo nhịp nhạc")}</span>
+            </div>
+            ${bp.action_detail ? `<div style="font-size:9.5px; color:#a5f3fc; margin-bottom:3px;">💃 ${_escFashionHtml(bp.action_detail)}</div>` : ""}
+            <div style="font-size:9.5px; color:#cbd5e1; line-height:1.4; max-height:85px; overflow-y:auto; white-space:pre-wrap;">${formatPromptWithInlineChipsHtml(activeBpPrompt)}</div>
           </div>
-          <div style="font-size:10px; color:#e2e8f0; line-height:1.45; max-height:115px; overflow-y:auto; white-space:pre-wrap;">${formatPromptWithInlineChipsHtml(activeBpPrompt)}</div>
-        </div>
-      `;
+        `;
       }).join("");
 
       box.innerHTML = `
         <div style="display:flex; flex-direction:column; gap:8px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; border-bottom:1px solid rgba(255,255,255,0.08); padding-bottom:6px;">
-            <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-              <span class="badge" style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:900; font-size:11px;">🏷️ MÃ ${tpl.code}</span>
-              <span style="font-size:12.5px; font-weight:900; color:#fff;">${tpl.title}</span>
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:6px; flex-wrap:wrap; padding-bottom:6px; border-bottom:1px solid rgba(255,255,255,0.08);">
+            <div style="display:flex; align-items:center; gap:6px; min-width:0; flex:1;">
+              <span class="badge" style="background:linear-gradient(135deg,#10b981,#059669); color:#042f2e; font-weight:900; font-size:10px; flex-shrink:0;">✓ ĐANG CHỌN ${tpl.code}</span>
+              <span style="font-size:12px; font-weight:800; color:#fff; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${_escFashionHtml(tpl.title)}">${_escFashionHtml(tpl.title)}</span>
             </div>
-            <div style="display:flex; gap:4px; align-items:center;">
-              <span class="badge" style="background:rgba(6,182,212,0.18); color:#67e8f9; font-size:10px;">${tpl.category_label || ''}</span>
-              <button class="btn btn-xs btn-primary" style="font-size:9.5px; padding:2px 7px;" onclick="openVerticalVideoModal('${vidEnc}', '${stripEnc}', '', '[${tpl.code}] ${(tpl.title || '').replace(/'/g, '')} (${tpl.duration}s)', '', '')">📱 Phóng To 9:16</button>
-            </div>
+            <button class="btn btn-xs btn-outline" style="font-size:9.5px; padding:2px 7px;" onclick="openVerticalVideoModal('${vidEnc}', '${stripEnc}', '', '[${tpl.code}] ${_escFashionHtml(tpl.title).replace(/'/g, "")} (${tpl.duration}s)', '', '')">📱 Xem Rộng</button>
           </div>
 
-          <div style="display:grid; grid-template-columns: 162px 1fr; gap:10px; align-items:start;">
-            <!-- Video Demo 9:16 của Template (Có đầy đủ nút điều khiển bên dưới, không cần bấm ⋮) -->
+          <div style="display:grid; grid-template-columns: 132px 1fr; gap:10px; align-items:start;">
             <div style="display:flex; flex-direction:column; gap:4px;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:4px;">
-                <span style="font-size:9.5px; font-weight:800; color:#fde68a;">🔊 VIDEO DEMO (${tpl.duration}S)</span>
-                <span style="font-size:8.5px; color:#34d399; font-weight:700;">Bấm ảnh để Phát</span>
-              </div>
-              <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; border:1.5px solid #ec4899; box-shadow:0 6px 18px rgba(0,0,0,0.6); position:relative; cursor:pointer;"
+              <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:8px; overflow:hidden; border:1.5px solid #ec4899; cursor:pointer; position:relative;"
                    onclick="toggleFashionInlineVideo('fashionTplDemoVideoPlayer', 'btnPlayTplDemoVid')">
-                <video id="fashionTplDemoVideoPlayer" class="fashion-clean-video" controls controlslist="nodownload noplaybackrate" disablepictureinpicture ${playWithSound ? 'autoplay' : ''} loop playsinline preload="metadata"
+                <video id="fashionTplDemoVideoPlayer" class="fashion-clean-video" controls controlslist="nodownload noplaybackrate" disablepictureinpicture ${playWithSound ? "autoplay" : ""} loop playsinline preload="metadata"
                        onloadedmetadata="this.muted=false; this.volume=1.0;"
                        onplay="const b=document.getElementById('btnPlayTplDemoVid'); if(b) b.innerHTML='⏸️ Dừng';"
                        onpause="const b=document.getElementById('btnPlayTplDemoVid'); if(b) b.innerHTML='▶️ Phát';"
                        style="width:100%; height:100%; object-fit:cover;" src="${vidUrl}"></video>
               </div>
-              <!-- Thanh 6 Nút Điều Khiển Trực Tiếp Cho Video Demo -->
-              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:3px;">
-                <button id="btnPlayTplDemoVid" class="btn btn-xs btn-success" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="toggleFashionInlineVideo('fashionTplDemoVideoPlayer', 'btnPlayTplDemoVid')">
-                  ▶️ Phát
-                </button>
-                <button id="btnMuteTplDemoVid" class="btn btn-xs btn-amber" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="toggleFashionInlineMute('fashionTplDemoVideoPlayer', 'btnMuteTplDemoVid')">
-                  🔊 Tiếng
-                </button>
-                <button class="btn btn-xs btn-primary" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="openVerticalVideoModal('${vidEnc}', '${stripEnc}', '', '[${tpl.code}] ${(tpl.title || '').replace(/'/g, '')} (${tpl.duration}s)', '', '')">
-                  📱 9:16
-                </button>
-                <button class="btn btn-xs btn-outline" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="openFileEncoded('${vidEnc}')" title="Mở bằng trình phát video của máy tính">
-                  🖥️ Player
-                </button>
-                <button class="btn btn-xs btn-outline" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="openFolderEncoded('${vidEnc}')" title="Mở vị trí file video gốc trong Explorer">
-                  📂 File
-                </button>
-                <button class="btn btn-xs btn-outline" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="downloadFashionMedia('${vidEnc}')" title="Tải file video mẫu về máy">
-                  ⬇️ Tải
-                </button>
-              </div>
-              <div style="font-size:8.5px; color:#94a3b8; text-align:center; font-family:Consolas,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${tpl.filename}">
-                ${tpl.filename}
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
+                <button id="btnPlayTplDemoVid" class="btn btn-xs btn-success" style="padding:3px 4px; font-size:9.5px; justify-content:center;"
+                        onclick="toggleFashionInlineVideo('fashionTplDemoVideoPlayer', 'btnPlayTplDemoVid')">▶️ Phát</button>
+                <button id="btnMuteTplDemoVid" class="btn btn-xs btn-amber" style="padding:3px 4px; font-size:9.5px; justify-content:center;"
+                        onclick="toggleFashionInlineMute('fashionTplDemoVideoPlayer', 'btnMuteTplDemoVid')">🔊 Tiếng</button>
               </div>
             </div>
 
-            <!-- Thông Tin Phân Tích Sẵn: Bối Cảnh + Hành Động + Nhịp Cắt + Nút Chạy -->
-            <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
-              <div style="background:rgba(236,72,153,0.1); border-left:3px solid #ec4899; padding:5px 8px; border-radius:4px; font-size:10.5px; color:#f8fafc; line-height:1.4;">
-                <div><b style="color:#f9a8d4;">🏠 Bối cảnh gốc:</b> ${tpl.background_setting || ''}</div>
-                <div style="margin-top:3px;"><b style="color:#67e8f9;">💃 Hành động & Chuyển động:</b> ${tpl.action_description || ''}</div>
-                <div style="margin-top:3px; font-size:10px; color:#fde68a;">
-                  ⏱️ Thời lượng: <b>${tpl.duration}s</b> (${tpl.width}×${tpl.height}) ➔ Chia <b>${tpl.num_scenes} cảnh × 8s (30FPS)</b> • Phối <b>${tpl.recommended_outfits || 4} Bộ Đồ</b>
+            <div style="display:flex; flex-direction:column; gap:7px; min-width:0;">
+              <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                <span class="badge" style="background:rgba(6,182,212,0.16); color:#67e8f9; font-size:10px;">⏱️ ${tpl.duration}s · ${tpl.num_scenes} cảnh</span>
+                <span class="badge" style="background:rgba(245,158,11,0.16); color:#fde68a; font-size:10px;">👗 Gợi ý ${tpl.recommended_outfits || 4} bộ đồ</span>
+              </div>
+              <div style="background:rgba(255,255,255,0.03); border:1px solid rgba(255,255,255,0.08); padding:7px 9px; border-radius:7px; font-size:10.5px; color:#cbd5e1; line-height:1.45;">
+                <div><b style="color:#f9a8d4;">🏠 Bối cảnh:</b> ${_escFashionHtml(tpl.background_setting || "Phòng studio thời trang")}</div>
+                <div style="margin-top:4px; display:-webkit-box; -webkit-line-clamp:3; -webkit-box-orient:vertical; overflow:hidden;" title="${_escFashionHtml(tpl.action_description || "")}">
+                  <b style="color:#67e8f9;">💃 Chuyển động:</b> ${_escFashionHtml(tpl.action_description || "")}
                 </div>
               </div>
-
-              <!-- Dải 6 Khung Hình Keyframe Tóm Tắt Video -->
-              <div onclick="openLightbox('${stripUrl}', 'Dải 6 Khung Hình Phân Tích Template ${tpl.code}: ${(tpl.title || '').replace(/'/g, "\\'")}')"
-                   style="cursor:pointer; background:#090d18; border:1px solid rgba(255,255,255,0.12); border-radius:6px; padding:4px; display:flex; flex-direction:column; gap:3px;"
-                   title="Bấm để phóng to dải 6 khung hình của Template ${tpl.code}">
-                <div style="display:flex; justify-content:space-between; font-size:9.5px; color:#cbd5e1; font-weight:700;">
-                  <span>🎞️ Dải 6 Keyframe Biến Hình Của ${tpl.code}:</span>
-                  <span style="color:#93c5fd;">🔍 Phóng to</span>
+              ${tpl.strip_path ? `
+                <div onclick="openLightbox('${stripUrl}', 'Dải phân tích khung hình biến hình của mẫu ${tpl.code}')"
+                     style="cursor:pointer; background:#090d18; border:1px solid rgba(6,182,212,0.35); border-radius:7px; padding:5px;"
+                     title="Bấm để phóng to dải khung hình chuyển động">
+                  <div style="display:flex; justify-content:space-between; font-size:9.5px; font-weight:700; color:#a5f3fc; margin-bottom:3px;">
+                    <span>🎞️ Dải khung hình biến hình (Keyframe Strip • ${Math.round(Number(tpl.duration || 16) * 30)} frames)</span>
+                    <span style="color:#fde68a;">🔍 Phóng to</span>
+                  </div>
+                  <img src="${stripUrl}" style="width:100%; height:72px; object-fit:cover; border-radius:4px; border:1px solid rgba(255,255,255,0.12);" />
                 </div>
-                <img src="${stripUrl}" style="width:100%; height:56px; object-fit:cover; border-radius:4px;" />
-              </div>
-
-              <!-- Các Nút Thao Tác Chính: Áp Dụng Template Hoặc Bấm Render Ra Video Final Luôn -->
-              <div style="display:flex; flex-direction:column; gap:5px; margin-top:2px;">
-                <button class="btn btn-amber" style="width:100%; justify-content:center; font-weight:900; font-size:11px; padding:7px 10px;"
-                        onclick="applySelectedFashionTemplate(false)">
-                  ⚡ Nạp Template ${tpl.code} Vào Dự Án (Cắt Clip 30FPS + Tạo Prompt Mẫu)
-                </button>
-                <button class="btn btn-success" style="width:100%; justify-content:center; font-weight:900; font-size:11.5px; padding:8px 10px; box-shadow:0 4px 14px rgba(16,185,129,0.4);"
-                        onclick="applySelectedFashionTemplate(true)">
-                  🚀 BẤM RENDER RA VIDEO FINAL NGAY VỚI TEMPLATE ${tpl.code}
-                </button>
-              </div>
+              ` : ""}
+              <details open style="font-size:10.5px;">
+                <summary style="cursor:pointer; color:#67e8f9; font-weight:800;">📝 Phân tích từng cảnh &amp; mốc frame gốc của ${tpl.code} (${bpList.length} cảnh)</summary>
+                ${bpHtml}
+              </details>
             </div>
-          </div>
-
-          <!-- Prompt Mẫu Đã Tạo Sẵn Cho Từng Phân Cảnh -->
-          <div style="margin-top:2px;">
-            <div style="font-size:10.5px; font-weight:800; color:#a5b4fc;">📝 PROMPT & TIMELINE MẪU ĐÃ TẠO SẴN CHO ${tpl.code} (TỰ ĐỘNG GẮN NHÂN VẬT & BỘ ĐỒ CỦA BẠN):</div>
-            ${bpHtml}
           </div>
         </div>
       `;
+
       if (playWithSound) {
         const vidEl = document.getElementById("fashionTplDemoVideoPlayer");
         if (vidEl) {
@@ -3572,126 +3882,51 @@
     }
 
     async function rescanFashionVideoTemplates(force = false) {
-      showFashionBanner("⏳ Đang quét thư mục <code>Template Thời Trang Video</code>, chuẩn hóa mã FVT_xxx và phân tích sẵn Hành động + Bối cảnh + Prompt mẫu...");
+      showFashionBanner("⏳ Đang quét thư mục <code>Template Thời Trang Video</code> để cập nhật các mẫu mới...");
       const res = await apiPost("/api/fashion_motion/scan_templates", { force: !!force });
       if (res && res.ok && res.video_templates_catalog) {
         STATE.fashionVideoTemplatesCatalog = res.video_templates_catalog;
         if (res.fashion_library) STATE.fashionLibrary = res.fashion_library;
         renderFashionVideoTemplatesHub();
-        showFashionBanner(`✅ Đã đồng bộ xong <b>${res.video_templates_catalog.total} Template Video Thời Trang</b> (Mã <code>FVT_001</code> ➔ <code>FVT_${String(res.video_templates_catalog.total).padStart(3, '0')}</code>)!`);
+        showFashionBanner(`✅ Đã đồng bộ <b>${res.video_templates_catalog.total} mẫu video thời trang</b>!`);
       } else {
-        showFashionBanner(`❌ Lỗi quét thư mục Template: ${(res && res.error) || 'Không xác định'}`, true);
+        showFashionBanner(`❌ Lỗi quét thư mục mẫu: ${(res && res.error) || "Không xác định"}`, true);
       }
     }
 
     async function applySelectedFashionTemplate(autoRunFlow = false) {
-      const code = STATE.selectedFashionTemplateCode || "FVT_001";
-      const base_char_path = document.getElementById("inpFashionBaseChar")?.value || "";
-      const char_sheet_path = document.getElementById("inpFashionCharSheet")?.value || "";
-      const enabledOutfits = (STATE.fashionOutfits || []).filter(o => o.enabled !== false);
-
-      const prepHtml = `
-        <div style="display:flex; flex-direction:column; gap:6px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-            <span style="font-weight:900; color:#fde68a; font-size:12px;">
-              ⏳ ĐANG XỬ LÝ TEMPLATE ${code}: Đang cắt các phân cảnh 8s chuẩn 30FPS & gắn 5 Ảnh Tham Chiếu 2K vào kịch bản...
-            </span>
-            <span class="badge" style="background:rgba(245,158,11,0.25); color:#fde68a; border:1px solid #f59e0b;">Đang cắt Clip 30FPS...</span>
-          </div>
-          <div style="width:100%; height:7px; background:#090e1a; border-radius:99px; overflow:hidden; border:1px solid rgba(255,255,255,0.1);">
-            <div style="width:35%; height:100%; background:linear-gradient(90deg,#f59e0b,#ec4899,#06b6d4); border-radius:99px; transition:width 0.3s;"></div>
-          </div>
-        </div>
-      `;
-      ["fashionLiveMonitorBarTop", "fashionLiveMonitorBar"].forEach(id => {
-        const el = document.getElementById(id);
-        if (el) {
-          el.style.display = "block";
-          el.innerHTML = prepHtml;
-        }
-      });
-
-      showFashionBanner(
-        autoRunFlow
-          ? `🚀 Đang áp dụng Template <b>${code}</b> (kèm Nhân vật + ${enabledOutfits.length} Bộ Đồ 2K), cắt clip 30FPS và gửi thẳng lên <b>Google Flow (Omni 1.1 Flash)</b> để Render ra Video Final...`
-          : `⚡ Đang nạp Template <b>${code}</b>, cắt các phân cảnh 8s chuẩn 30FPS và gắn Nhân vật + ${enabledOutfits.length} Bộ Đồ 2K vào kịch bản...`
-      );
-
-      const generation_mode = document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v";
-      const res = await apiPost("/api/fashion_motion/apply_template", {
-        template_code: code,
-        base_char_path,
-        char_sheet_path,
-        outfit_items: enabledOutfits,
-        generation_mode,
-        auto_run_flow: !!autoRunFlow,
-      });
-
-      if (res && res.ok) {
-        STATE.fashionProject = res;
-        if (Array.isArray(res.projects)) {
-          STATE.fashionProjectsList = res.projects;
-        }
-        STATE.fashionOutfits = syncFashionOutfitsWithDefaults(res.outfits || [], STATE.fashionDefaultOutfits);
-        populateFashionProjectDropdown();
-
-        if (autoRunFlow) {
-          STATE.fashionProject.status = "running_flow";
-          STATE.fashionProject.status_message = `🚀 Đang khởi động trình duyệt Google Flow & tải 5 Ảnh Tham Chiếu 2K + Video Clip 30FPS cho Template ${code}...`;
-          (STATE.fashionProject.scenes || []).forEach(s => {
-            s.status = "preparing";
-            s.attempt = 1;
-            s.max_attempts = 4;
-            s.status_detail = "🚀 Đang kết nối Google Flow & tải 5 ảnh tham chiếu 2K...";
-          });
-          renderFashionMotionStudio();
-          showFashionBanner(`🚀 Đã khởi tạo xong kịch bản từ Template <b>${code}</b> (${res.title}) và đang chạy tự động trên <b>Google Flow (Omni 1.1 Flash)</b>! Theo dõi tiến trình trực tiếp bên dưới.`);
-          startFashionLiveStatusMonitor(res.project_id);
-          document.getElementById("fashionLiveMonitorBarTop")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
-        } else {
-          renderFashionMotionStudio();
-          const readyHtml = `
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-              <div style="display:flex; flex-direction:column; gap:3px;">
-                <div style="font-weight:900; color:#34d399; font-size:12px;">
-                  ✅ ĐÃ NẠP XONG TEMPLATE ${code}: <span style="color:#fff;">${res.title}</span> (${(res.scenes || []).length} phân cảnh × 8s • 30FPS)
-                </div>
-                <div style="font-size:11px; color:#cbd5e1;">
-                  Đã cắt sẵn Clip Tham Chiếu 30FPS và gắn đủ 5 Ảnh Tham Chiếu 2K cho từng cảnh. Bấm nút <b>🚀 BẤM RENDER VIDEO FINAL NGAY</b> bên phải để bắt đầu tạo video!
-                </div>
-              </div>
-              <button class="btn btn-success" style="font-weight:900; font-size:12px; padding:8px 16px; box-shadow:0 4px 16px rgba(16,185,129,0.45);" onclick="runFashionProjectOnFlow()">
-                🚀 BẤM RENDER VIDEO FINAL NGAY (${code})
-              </button>
-            </div>
-          `;
-          ["fashionLiveMonitorBarTop", "fashionLiveMonitorBar"].forEach(id => {
-            const el = document.getElementById(id);
-            if (el) {
-              el.style.display = "block";
-              el.innerHTML = readyHtml;
-            }
-          });
-          showFashionBanner(`✅ Đã áp dụng Template <b>${code}</b> (${res.title}) — Đã cắt sẵn <b>${(res.scenes || []).length} phân cảnh 8s (30FPS)</b> và tạo xong Prompt mẫu. Bấm <b>🚀 BẤM RENDER VIDEO FINAL</b> để chạy Google Flow!`);
-        }
-      } else {
-        showFashionBanner(`❌ Lỗi áp dụng Template ${code}: ${(res && res.error) || 'Không xác định'}`, true);
+      if (!STATE.fashionProject?.source_template_code) {
+        useFashionTemplateForNewVideo(STATE.selectedFashionTemplateCode || "FVT_001");
       }
+      const ok = await prepareFashionTemplateInputs();
+      if (ok && autoRunFlow) return runFashionProjectOnFlow();
     }
 
     function populateFashionProjectDropdown() {
       const sel = document.getElementById("selFashionProjectSlug");
       if (!sel) return;
       const projs = STATE.fashionProjectsList || [];
-      const curSlug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      if (!projs.length) return;
-      sel.innerHTML = projs.map(p => {
+      const curProj = STATE.fashionProject;
+      const curSlug = curProj?.project_id || "";
+      const opts = [];
+
+      if (curProj && curProj.status === "draft") {
+        opts.push(`<option value="${_escFashionHtml(curSlug)}" selected>✨ Đang soạn mới: ${_escFashionHtml(curProj.title || curProj.source_template_code || "Dự án mới")}</option>`);
+      }
+
+      projs.forEach(p => {
+        if (!p || !p.project_id) return;
+        if (curProj && curProj.status === "draft" && p.project_id === curSlug) return;
+        const stIcon = p.status === "running_flow" ? "🔄 Đang tạo" : (p.final_video_ready ? "✅ Hoàn tất" : "📝 Đã lưu");
         const scCnt = (p.scenes || []).length;
-        const outCnt = (p.outfits || []).length;
-        const dur = p.reference_video?.duration || 0;
-        const hasFinal = p.final_video_ready ? "✅ Có Video Final" : "⏳ Chờ Render";
-        return `<option value="${p.project_id}" ${p.project_id === curSlug ? "selected" : ""}>👗 [${p.project_id}] ${p.title || p.project_id} (${dur}s • ${scCnt} cảnh • ${outCnt} bộ đồ • ${hasFinal})</option>`;
-      }).join("");
+        const label = `${stIcon} · ${p.title || p.project_id}${scCnt ? ` (${scCnt} cảnh)` : ""}`;
+        opts.push(`<option value="${_escFashionHtml(p.project_id)}" ${p.project_id === curSlug ? "selected" : ""}>${_escFashionHtml(label)}</option>`);
+      });
+
+      if (!opts.length) {
+        opts.push(`<option value="">✨ Dự án mới (Đang soạn)</option>`);
+      }
+      sel.innerHTML = opts.join("");
     }
 
     function populateFashionRefVideoLibDropdown() {
@@ -3699,17 +3934,28 @@
       if (!sel) return;
       const vids = STATE.fashionRefVideosLib || [];
       const curRefName = STATE.fashionProject?.reference_video?.filename || "";
-      const opts = [`<option value="">-- 🎬 Chọn nhanh Video Gốc trong thư viện (${vids.length} video) --</option>`];
+      const opts = [`<option value="">-- Chọn video gốc (${vids.length}) --</option>`];
       vids.forEach(v => {
         const isCur = curRefName && v.filename === curRefName;
-        opts.push(`<option value="${v.path.replace(/"/g, '&quot;')}" ${isCur ? "selected" : ""}>🎞️ ${v.filename} (${v.size_mb} MB)</option>`);
+        opts.push(`<option value="${_escFashionHtml(v.path)}" ${isCur ? "selected" : ""}>🎞️ ${_escFashionHtml(v.filename)} (${v.size_mb} MB)</option>`);
       });
       sel.innerHTML = opts.join("");
     }
 
     async function onSelectFashionProjectSlug(slug) {
-      if (!slug) return;
-      await loadFashionMotionStudio(true, slug);
+      stopFashionUiMonitor();
+      if (!slug) {
+        startFreshFashionDraft(true);
+        return;
+      }
+      if (STATE.fashionProject?.status === "draft" && STATE.fashionProject.project_id === slug) {
+        return;
+      }
+      await loadFashionMotionStudio(false, slug);
+      const p = STATE.fashionProject;
+      if (p?.final_video_ready) {
+        showFashionBanner(`🎬 Đang xem dự án đã hoàn tất: <b>${_escFashionHtml(p.title || slug)}</b>. Nếu bạn đổi Nhân vật hoặc Sản phẩm, hệ thống sẽ tự tạo bản mới để không ghi đè video cũ!`);
+      }
     }
 
     async function onSelectFashionRefVideoFromLib(videoPath) {
@@ -3717,13 +3963,17 @@
       const inpVid = document.getElementById("inpFashionRefVideo");
       if (inpVid) inpVid.value = videoPath;
       const fn = videoPath.split(/[\\/]/).pop();
-      showFashionBanner(`🎬 Đã chọn Video Tham Chiếu Gốc: <b>${fn}</b>. Bấm <b>✂️ Bước 1+3: AI Phân Tích Video & Tạo Các Phân Cảnh</b> để AI chia cảnh và tạo video ngay!`);
+      showFashionBanner(`🎬 Đã chọn video tham chiếu riêng: <b>${_escFashionHtml(fn)}</b>. Bấm <b>✂️ Xem Trước / Cập Nhật Kịch Bản Phân Cảnh</b> để phân tích!`);
     }
 
     async function promptCreateNewFashionProject() {
-      const pickRes = await apiGet("/api/pick_file?kind=video");
-      if (!pickRes || !pickRes.ok || !pickRes.path) return;
-      const vPath = pickRes.path;
+      const uploaded = await uploadFashionFileViaBrowser({ kind: "video", accept: "video/*", multiple: false });
+      let vPath = uploaded.length ? uploaded[0].path : "";
+      if (!vPath) {
+        const pickRes = await apiGet("/api/pick_file?kind=video");
+        if (pickRes && pickRes.ok && pickRes.path) vPath = pickRes.path;
+      }
+      if (!vPath) return;
       const fn = vPath.split(/[\\/]/).pop().replace(/\.[^.]+$/, "");
       const cleanSlug = "fashion_" + fn.toLowerCase().replace(/[^a-z0-9]+/g, "_").replace(/^_+|_+$/g, "").slice(0, 28) + "_" + String(Date.now()).slice(-4);
       const inpVid = document.getElementById("inpFashionRefVideo");
@@ -3731,236 +3981,609 @@
       await analyzeAndBuildFashionProject(cleanSlug, `Lookbook Thời Trang AI 2K (${fn})`);
     }
 
-    function toggleAllFashionOutfits(checked = true) {
-      (STATE.fashionOutfits || []).forEach(o => {
-        o.enabled = !!checked;
-      });
-      renderFashionOutfitsList();
-    }
-
-    function selectFirstNFashionOutfits(n = 4) {
-      (STATE.fashionOutfits || []).forEach((o, idx) => {
-        o.enabled = idx < n;
-      });
-      renderFashionOutfitsList();
-      showFashionBanner(`👗 Đã chọn <b>${n} Bộ Đồ 2K đầu tiên</b> để phân bổ vào các phân cảnh video!`);
-    }
-
-    function copyFashionAiAgentCommand() {
-      const cmd = STATE.fashionProject?.ai_agent_command
-        || `Phân tích video thời trang '${document.getElementById("inpFashionRefVideo")?.value || ""}' và tạo kịch bản chia phân cảnh thay 4-5 bộ đồ 2K rồi render hậu kỳ thành video final`;
-      navigator.clipboard.writeText(cmd);
-      showFashionBanner(`🤖 Đã copy câu lệnh gửi AI Agent vào Clipboard: <code>${cmd}</code>`);
-      if (typeof toast === "function") toast("🤖 Đã copy câu lệnh phân tích Video cho AI Agent!", "ok");
-    }
-
-    function populateFashionCharacterPicker() {
-      const sel = document.getElementById("selFashionCharFromLib");
-      if (!sel) return;
+    // -----------------------------------------------------------------------------------------
+    // BƯỚC 2: QUẢN LÝ & CHỌN NHÂN VẬT BẰNG THẺ ẢNH TRỰC QUAN
+    // -----------------------------------------------------------------------------------------
+    function _getMergedFashionCharacters() {
       const libChars = (STATE.fashionLibrary && Array.isArray(STATE.fashionLibrary.characters)) ? STATE.fashionLibrary.characters : [];
       const fallbackChars = (STATE.fashionCharacters && STATE.fashionCharacters.length)
         ? STATE.fashionCharacters
         : ((STATE.charLib && STATE.charLib.characters) || []);
 
       const merged = [];
-      const seen = new Set();
-      libChars.forEach(c => {
+      const seenKeys = new Set();
+      const seenPaths = new Set();
+
+      const normPathKey = p => String(p || "").replace(/\\/g, "/").toLowerCase().split("/").pop();
+      const cleanCharDisplayName = (rawName, fallbackKey) => {
+        let s = String(rawName || fallbackKey || "Người mẫu")
+          .replace(/^⭐\s*/g, "")
+          .replace(/^👤\s*Kho Nhân Vật:\s*/gi, "")
+          .replace(/\s*\([^)]*\.(?:png|jpg|jpeg|webp)[^)]*\)/gi, "")
+          .trim();
+        return s || fallbackKey || "Người mẫu";
+      };
+
+      // Ưu tiên đưa các nhân vật người dùng vừa tải lên lên đầu danh sách để dễ chọn ngay
+      const customLib = libChars.filter(c => !c.is_default && !String(c.id || "").startsWith("char_store_"));
+      const restLib = libChars.filter(c => c.is_default || String(c.id || "").startsWith("char_store_"));
+
+      [...customLib, ...restLib].forEach(c => {
         const k = c.id || c.key;
-        if (!k || seen.has(k)) return;
-        seen.add(k);
+        const charPath = c.char_path || c.pose_sheet_path || "";
+        const bgPath = c.bg_path || c.bg_ref_path || charPath || "";
+        const pKey = `${normPathKey(charPath)}|${normPathKey(bgPath)}`;
+        if (!k || !charPath || seenKeys.has(k) || seenPaths.has(pKey)) return;
+        seenKeys.add(k);
+        seenPaths.add(pKey);
         merged.push({
           key: k,
-          name: c.name || k,
-          subtitle: c.desc || (c.is_default ? "Mặc Định Chuẩn 2K" : "Nhân vật tùy chỉnh"),
-          pose_sheet_path: c.pose_sheet_path || "",
-          bg_ref_path: c.bg_ref_path || "",
+          name: cleanCharDisplayName(c.name, k),
+          subtitle: c.is_default ? "Mặc định 2K" : (String(k).startsWith("char_store_") ? "Kho Nhân Vật" : "Ảnh của bạn"),
+          char_path: charPath,
+          bg_ref_path: bgPath,
           is_default: !!c.is_default,
+          is_custom: !c.is_default && !String(k).startsWith("char_store_"),
         });
       });
+
       fallbackChars.forEach(c => {
         const k = c.key || c.id;
-        if (!k || seen.has(k)) return;
-        seen.add(k);
+        const charPath = c.ref_image_abs || c.wardrobe_sheet_abs || "";
+        const bgPath = c.bedroom_ref_abs || c.ref_image_abs || charPath || "";
+        const pKey = `${normPathKey(charPath)}|${normPathKey(bgPath)}`;
+        if (!k || !charPath || seenKeys.has(k) || seenPaths.has(pKey)) return;
+        seenKeys.add(k);
+        seenPaths.add(pKey);
         merged.push({
           key: k,
-          name: c.name || k,
-          subtitle: c.subtitle || "",
-          pose_sheet_path: c.wardrobe_sheet_abs || c.ref_image_abs || "",
-          bg_ref_path: c.bedroom_ref_abs || c.ref_image_abs || "",
+          name: cleanCharDisplayName(c.name, k.toUpperCase()),
+          subtitle: c.subtitle || k.toUpperCase(),
+          char_path: charPath,
+          bg_ref_path: bgPath,
           is_default: k === "nv5",
+          is_custom: false,
         });
       });
 
-      if (!merged.length) return;
-      const curVal = sel.value || merged[0].key;
-      sel.innerHTML = merged.map(c => {
-        const tag = c.is_default ? "👗 [MẶC ĐỊNH 2K]" : "👤";
-        return `<option value="${c.key}" ${c.key === curVal ? "selected" : ""}>${tag} ${c.name} (${c.subtitle || ""})</option>`;
-      }).join("");
+      return merged;
     }
 
-    function onSelectFashionCharacterFromLibrary(charKey) {
-      const libChars = (STATE.fashionLibrary && Array.isArray(STATE.fashionLibrary.characters)) ? STATE.fashionLibrary.characters : [];
-      const fallbackChars = (STATE.fashionCharacters && STATE.fashionCharacters.length)
-        ? STATE.fashionCharacters
-        : ((STATE.charLib && STATE.charLib.characters) || []);
+    function populateFashionCharacterPicker() {
+      const merged = _getMergedFashionCharacters();
+      const sel = document.getElementById("selFashionCharFromLib");
+      const cardsGrid = document.getElementById("fashionCharCardsGrid");
 
-      let found = libChars.find(c => (c.id || c.key) === charKey);
-      let baseImg = "";
-      let sheetImg = "";
-      let charName = charKey;
+      const curBaseVal = (document.getElementById("inpFashionBaseChar")?.value || STATE.fashionProject?.base_char_2k?.path || "").trim();
+      const curBaseFn = curBaseVal ? curBaseVal.split(/[\\/]/).pop().toLowerCase() : "";
+      const matched = curBaseFn
+        ? merged.find(c => (c.char_path || "").split(/[\\/]/).pop().toLowerCase() === curBaseFn)
+        : null;
+      const activeKey = matched ? matched.key : (curBaseVal ? "__custom_path__" : "");
+      STATE.selectedFashionCharKey = activeKey;
 
-      if (found) {
-        baseImg = found.bg_ref_path || found.pose_sheet_path || "";
-        sheetImg = found.pose_sheet_path || found.bg_ref_path || "";
-        charName = found.name || charKey;
-      } else {
-        found = fallbackChars.find(c => (c.key || c.id) === charKey);
-        if (!found) return;
-        baseImg = found.bedroom_ref_abs || found.ref_image_abs || "";
-        sheetImg = found.wardrobe_sheet_abs || found.ref_image_abs || "";
-        charName = found.name || charKey;
+      if (sel) {
+        const opts = [`<option value="" ${!activeKey ? "selected" : ""}>-- Chưa chọn nhân vật --</option>`];
+        merged.forEach(c => {
+          opts.push(`<option value="${_escFashionHtml(c.key)}" ${c.key === activeKey ? "selected" : ""}>${_escFashionHtml(c.name)} (${_escFashionHtml(c.subtitle)})</option>`);
+        });
+        sel.innerHTML = opts.join("");
       }
+
+      if (cardsGrid) {
+        const uploadTileHtml = `
+          <div class="f-char-upload-tile"
+               onclick="startFashionCharacterUpload()"
+               ondragover="event.preventDefault(); this.style.borderColor='#10b981';"
+               ondragleave="this.style.borderColor='rgba(245,158,11,0.55)';"
+               ondrop="event.preventDefault(); this.style.borderColor='rgba(245,158,11,0.55)'; handleFashionCharacterDrop(event);"
+               title="Bấm để chọn ảnh người mẫu từ máy tính hoặc kéo thả ảnh vào đây">
+            <div style="font-size:20px; line-height:1;">➕</div>
+            <div style="font-size:10.5px; font-weight:800; line-height:1.25;">Tải Ảnh<br/>Nhân Vật</div>
+            <div style="font-size:9px; color:#94a3b8;">Từ máy tính</div>
+          </div>
+        `;
+
+        const charTilesHtml = merged.map(c => {
+          const isSel = c.key === activeKey;
+          const imgUrl = `/api/media?path=${encodeURIComponent(c.bg_ref_path || c.char_path || "")}`;
+          const safeKey = _escFashionHtml(c.key);
+          const safeName = _escFashionHtml(c.name);
+          return `
+            <div class="f-char-tile ${isSel ? "selected" : ""}" onclick="onSelectFashionCharacterFromLibrary('${safeKey}')" title="${safeName} (${_escFashionHtml(c.subtitle)})">
+              <div style="width:100%; aspect-ratio:3/4; border-radius:7px; overflow:hidden; background:#000; position:relative;">
+                <img src="${imgUrl}" loading="lazy" style="width:100%; height:100%; object-fit:cover;" />
+                ${isSel ? `<span style="position:absolute; top:4px; right:4px; background:#10b981; color:#022c22; font-size:9px; font-weight:900; padding:1px 5px; border-radius:4px;">✓ Chọn</span>` : ""}
+                ${c.is_custom ? `<span style="position:absolute; bottom:3px; left:3px; background:rgba(245,158,11,0.88); color:#090d16; font-size:8px; font-weight:900; padding:1px 4px; border-radius:3px;">Của bạn</span>` : ""}
+              </div>
+              <div style="font-size:10px; font-weight:700; color:#f8fafc; line-height:1.25; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden; min-height:24px;">
+                ${safeName}
+              </div>
+            </div>
+          `;
+        }).join("");
+
+        cardsGrid.innerHTML = uploadTileHtml + charTilesHtml;
+      }
+    }
+
+    function clearSelectedFashionCharacter() {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const inpChar = document.getElementById("inpFashionBaseChar");
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      if (inpChar) inpChar.value = "";
+      if (inpSheet) inpSheet.value = "";
+      if (STATE.fashionProject) {
+        STATE.fashionProject.base_char_2k = null;
+        STATE.fashionProject.char_sheet_2k = null;
+      }
+      STATE.selectedFashionCharKey = "";
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      populateFashionCharacterPicker();
+      renderFashionCharacterPreview();
+      renderFashionScenesTimeline();
+      renderFashionScenesTimeline();
+      updateFashionSimpleSummary();
+    }
+
+    function renderFashionCharacterPreview() {
+      const charBox = document.getElementById("fashionCharPreviewBox");
+      const statusBadge = document.getElementById("badgeFashionCharStatus");
+      if (!charBox) return;
+
+      const basePath = (document.getElementById("inpFashionBaseChar")?.value || STATE.fashionProject?.base_char_2k?.path || "").trim();
+      const sheetPath = (document.getElementById("inpFashionCharSheet")?.value || STATE.fashionProject?.char_sheet_2k?.path || basePath).trim();
+
+      if (!basePath) {
+        if (statusBadge) {
+          statusBadge.className = "badge badge-wait";
+          statusBadge.textContent = "Chưa chọn";
+        }
+        charBox.innerHTML = `
+          <div style="display:flex; align-items:center; justify-content:space-between; gap:10px; width:100%; flex-wrap:wrap;">
+            <div style="font-size:11.5px; color:#94a3b8; line-height:1.45;">
+              👉 Chưa chọn người mẫu. Hãy <b>bấm chọn 1 người mẫu bên dưới</b> hoặc bấm <b>📤 + Tải Ảnh Nhân Vật</b> từ máy tính.
+            </div>
+          </div>
+        `;
+        return;
+      }
+
+      const merged = _getMergedFashionCharacters();
+      const baseFn = basePath.split(/[\\/]/).pop();
+      const matched = merged.find(c => (c.char_path || "").split(/[\\/]/).pop().toLowerCase() === baseFn.toLowerCase());
+      const displayName = matched ? matched.name : baseFn.replace(/\.[^.]+$/, "");
+      const cUrl = `/api/media?path=${encodeURIComponent(sheetPath || basePath)}`;
+
+      if (statusBadge) {
+        statusBadge.className = "badge badge-done";
+        statusBadge.textContent = "✓ Đã chọn";
+      }
+
+      charBox.innerHTML = `
+        <div style="width:48px; height:66px; border-radius:7px; overflow:hidden; border:1.5px solid #ec4899; cursor:pointer; flex-shrink:0; background:#000;"
+             onclick="openLightbox('${cUrl}', 'Nhân vật đang chọn: ${_escFashionHtml(displayName).replace(/'/g, "")}')">
+          <img src="${cUrl}" style="width:100%; height:100%; object-fit:cover;" />
+        </div>
+        <div style="flex:1; min-width:0;">
+          <div style="font-size:12px; font-weight:800; color:#fdf2f8; white-space:nowrap; overflow:hidden; text-overflow:ellipsis;">
+            ✅ ${_escFashionHtml(displayName)}
+          </div>
+          <div style="font-size:10.5px; color:#94a3b8; margin-top:2px;">
+            Giữ nguyên khuôn mặt, vóc dáng & thần thái xuyên suốt các phân cảnh
+          </div>
+          <div style="display:flex; gap:5px; margin-top:5px; flex-wrap:wrap;">
+            <button class="btn btn-xs btn-outline" style="font-size:9.5px; padding:2px 7px;" onclick="openLightbox('${cUrl}', '${_escFashionHtml(displayName).replace(/'/g, "")}')">🔍 Xem ảnh</button>
+            <button class="btn btn-xs btn-outline" style="font-size:9.5px; padding:2px 7px;" onclick="startFashionCharacterUpload()">📂 Đổi ảnh khác</button>
+            <button class="btn btn-xs btn-danger" style="font-size:9.5px; padding:2px 7px;" onclick="clearSelectedFashionCharacter()">✕ Bỏ chọn</button>
+          </div>
+        </div>
+      `;
+    }
+
+    function useBaseCharAsFashionBg() {
+      const inpChar = document.getElementById("inpFashionBaseChar");
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      if (!inpChar || !inpChar.value.trim()) return;
+      const p = inpChar.value.trim();
+      if (inpSheet) inpSheet.value = p;
+      onCustomFashionCharacterPathChange(false);
+      showFashionBanner(`🔁 Đã đặt ảnh bối cảnh mở đầu trùng với ảnh nhân vật.`);
+    }
+
+    async function onCustomFashionCharacterPathChange(rebuildNow = false) {
+      const baseImg = (document.getElementById("inpFashionBaseChar")?.value || "").trim();
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      let sheetImg = (inpSheet?.value || "").trim();
+      const nv5DefaultBgs = new Set([
+        "07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "09_NV5_Phong_Tu_Go_Mo_Dau_2K.png",
+        "01_Character_Sheet_4_Outfits_2K.png",
+      ]);
+      const baseFn = baseImg.split(/[\\/]/).pop();
+      const sheetFn = sheetImg.split(/[\\/]/).pop();
+      if (baseImg && (!sheetImg || (nv5DefaultBgs.has(sheetFn) && baseFn !== "02_Character_Sheet_Basic_Poses_2K.png" && baseFn !== "nv5_ref.png"))) {
+        sheetImg = baseImg;
+        if (inpSheet) inpSheet.value = sheetImg;
+      }
+      if (STATE.fashionProject) {
+        STATE.fashionProject.base_char_2k = baseImg ? {
+          filename: baseFn,
+          path: baseImg,
+          width: 1536,
+          height: 2752,
+          is_2k: true,
+        } : null;
+        STATE.fashionProject.char_sheet_2k = sheetImg ? {
+          asset_key: "char_sheet_2k",
+          filename: sheetImg.split(/[\\/]/).pop(),
+          path: sheetImg,
+        } : null;
+      }
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      populateFashionCharacterPicker();
+      renderFashionCharacterPreview();
+      renderFashionScenesTimeline();
+      updateFashionSimpleSummary();
+      if (rebuildNow && STATE.fashionProject && !STATE.fashionProject.source_template_code) {
+        await analyzeAndBuildFashionProject();
+      }
+    }
+
+    async function onSelectFashionCharacterFromLibrary(charKey) {
+      if (!charKey) {
+        clearSelectedFashionCharacter();
+        return;
+      }
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+
+      const merged = _getMergedFashionCharacters();
+      const found = merged.find(c => c.key === charKey);
+      if (!found) return;
 
       const inpChar = document.getElementById("inpFashionBaseChar");
       const inpSheet = document.getElementById("inpFashionCharSheet");
-      if (inpChar && baseImg) inpChar.value = baseImg;
-      if (inpSheet && sheetImg) inpSheet.value = sheetImg;
+      if (inpChar) inpChar.value = found.char_path || "";
+      if (inpSheet) inpSheet.value = found.bg_ref_path || found.char_path || "";
 
-      if (STATE.fashionProject) {
-        if (baseImg) {
-          STATE.fashionProject.base_char_2k = {
-            filename: baseImg.split(/[\\/]/).pop(),
-            path: baseImg,
-            width: 1536,
-            height: 2752,
-            is_2k: true,
-          };
-        }
-        if (sheetImg) {
-          STATE.fashionProject.char_sheet_2k = {
-            asset_key: "char_sheet_2k",
-            filename: sheetImg.split(/[\\/]/).pop(),
-            path: sheetImg,
-          };
-        }
-        renderFashionMotionStudio();
+      await onCustomFashionCharacterPathChange(false);
+      renderFashionFinalPostProdCard();
+      showFashionBanner(`👤 Đã chọn nhân vật <b>${_escFashionHtml(found.name)}</b>.`);
+    }
+
+    async function _applyUploadedFashionCharacter(u) {
+      if (!u || !u.path) return;
+      const charObj = u.character || {
+        id: `char_${Date.now()}`,
+        name: (u.filename || "Người mẫu").replace(/\.[^.]+$/, ""),
+        char_path: u.path,
+        pose_sheet_path: u.path,
+        bg_path: u.path,
+        bg_ref_path: u.path,
+        is_default: false,
+      };
+      if (!STATE.fashionLibrary) STATE.fashionLibrary = { characters: [], outfits: [] };
+      if (!Array.isArray(STATE.fashionLibrary.characters)) STATE.fashionLibrary.characters = [];
+      if (!STATE.fashionLibrary.characters.some(c => (c.id || c.key) === charObj.id)) {
+        STATE.fashionLibrary.characters.unshift(charObj);
       }
-      showFashionBanner(`👤 Đã chọn Nhân Vật <b>${charName}</b> từ Thư Viện Nhân Vật và tự động gắn Ảnh Character Sheet 2K + Bối Cảnh 2K!`);
+      const inpChar = document.getElementById("inpFashionBaseChar");
+      const inpSheet = document.getElementById("inpFashionCharSheet");
+      if (inpChar) inpChar.value = charObj.char_path || u.path;
+      if (inpSheet) inpSheet.value = charObj.bg_path || charObj.char_path || u.path;
+      await onCustomFashionCharacterPathChange(false);
+      renderFashionFinalPostProdCard();
+      showFashionBanner(`✅ Đã tải lên và chọn nhân vật <b>${_escFashionHtml(charObj.name || u.filename)}</b>!`);
     }
 
     async function promptAddNewFashionCharacter() {
-      const pickPose = await apiGet("/api/pick_file?kind=image");
-      if (!pickPose || !pickPose.ok || !pickPose.path) return;
-      const fn = pickPose.path.split(/[\\/]/).pop();
-      const defaultName = fn.replace(/\.[^.]+$/, "").replace(/[_-]+/g, " ");
-      const charName = window.prompt("Nhập tên Nhân Vật Thời Trang mới:", `Người Mẫu ${defaultName}`);
-      if (!charName) return;
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const uploaded = await uploadFashionFileViaBrowser({ kind: "character", accept: "image/*", multiple: false });
+      if (!uploaded.length) return;
+      await _applyUploadedFashionCharacter(uploaded[0]);
+    }
 
-      const curBg = document.getElementById("inpFashionBaseChar")?.value || pickPose.path;
-      showFashionBanner(`⏳ Đang lưu nhân vật mới <b>${charName}</b> vào Thư Viện Nhân Vật Thời Trang...`);
-      const res = await apiPost("/api/fashion_motion/add_character", {
-        name: charName.trim(),
-        pose_sheet_path: pickPose.path,
-        bg_ref_path: curBg,
-        desc: `Nhân vật thời trang (${fn})`,
+    async function handleFashionCharacterDrop(ev) {
+      const files = Array.from(ev?.dataTransfer?.files || []).filter(f => /^image\//i.test(f.type || "") || /\.(png|jpe?g|webp)$/i.test(f.name || ""));
+      if (!files.length) return;
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const uploaded = await _uploadFashionFileObjects([files[0]], { kind: "character" });
+      if (uploaded.length) await _applyUploadedFashionCharacter(uploaded[0]);
+    }
+
+    // -----------------------------------------------------------------------------------------
+    // BƯỚC 3: QUẢN LÝ & THÊM SẢN PHẨM QUẦN ÁO (UPLOAD MÁY TÍNH + KHO 176 SP + DRAG & DROP)
+    // -----------------------------------------------------------------------------------------
+    function _appendUploadedOutfitsToState(uploadedList) {
+      if (!Array.isArray(uploadedList) || !uploadedList.length) return 0;
+      _autoRemoveDefaultOutfitsWhenAddingCustom();
+      if (!Array.isArray(STATE.fashionOutfits)) STATE.fashionOutfits = [];
+      uploadedList.forEach(u => {
+        const outObj = u.outfit || {};
+        const fn = u.filename || outObj.filename || (u.path || "").split(/[\\/]/).pop();
+        const idx = STATE.fashionOutfits.length + 1;
+        const cleanTitle = (outObj.name || fn.replace(/\.[^.]+$/, "")).replace(/^Outfit_/, "");
+        STATE.fashionOutfits.push({
+          id: outObj.id || `outfit_custom_${idx}_${Date.now()}`,
+          filename: fn,
+          path: u.path,
+          name: cleanTitle,
+          short_desc: outObj.short_desc || "",
+          en_desc: outObj.en_desc || `exact fashion outfit matching product reference image ${fn}`,
+          width: outObj.width || 1536,
+          height: outObj.height || 2752,
+          is_2k: true,
+          is_default: false,
+          enabled: true,
+        });
       });
-      if (res && res.ok && res.character) {
-        if (!STATE.fashionLibrary) STATE.fashionLibrary = { characters: [], outfits: [] };
-        if (!Array.isArray(STATE.fashionLibrary.characters)) STATE.fashionLibrary.characters = [];
-        STATE.fashionLibrary.characters.push(res.character);
-        populateFashionCharacterPicker();
-        const sel = document.getElementById("selFashionCharFromLib");
-        if (sel) sel.value = res.character.id;
-        onSelectFashionCharacterFromLibrary(res.character.id);
-        showFashionBanner(`✅ Đã thêm Nhân Vật <b>${res.character.name}</b> vào Thư Viện và chọn làm Nhân Vật hiện tại!`);
-      } else {
-        showFashionBanner(`❌ Lỗi thêm nhân vật: ${(res && res.error) || "Không xác định"}`, true);
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      renderFashionFinalPostProdCard();
+      return uploadedList.length;
+    }
+
+    async function addCustomFashionOutfitFromDisk() {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const uploaded = await uploadFashionFileViaBrowser({
+        kind: "outfit",
+        accept: "image/*",
+        multiple: true,
+        autoWhiteBgLocal: false,
+      });
+      if (!uploaded.length) return;
+      const added = _appendUploadedOutfitsToState(uploaded);
+      showFashionBanner(`👗 Đã thêm <b>${added} sản phẩm</b> vào kịch bản thay đồ!`);
+    }
+
+    async function handleFashionProductDrop(ev) {
+      const files = Array.from(ev?.dataTransfer?.files || []).filter(f => /^image\//i.test(f.type || "") || /\.(png|jpe?g|webp)$/i.test(f.name || ""));
+      if (!files.length) return;
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const uploaded = await _uploadFashionFileObjects(files, { kind: "outfit", autoWhiteBgLocal: false });
+      if (!uploaded.length) return;
+      const added = _appendUploadedOutfitsToState(uploaded);
+      showFashionBanner(`👗 Đã kéo thả thêm <b>${added} sản phẩm</b> vào danh sách!`);
+    }
+
+    async function changeSingleFashionOutfitImage(idx) {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const item = (STATE.fashionOutfits || [])[idx];
+      if (!item) return;
+      const uploaded = await uploadFashionFileViaBrowser({ kind: "outfit", accept: "image/*", multiple: false });
+      if (!uploaded.length) return;
+      const u = uploaded[0];
+      const outObj = u.outfit || {};
+      const fn = u.filename || outObj.filename || u.path.split(/[\\/]/).pop();
+      item.path = u.path;
+      item.filename = fn;
+      item.name = outObj.name || fn.replace(/\.[^.]+$/, "");
+      item.short_desc = outObj.short_desc || "";
+      item.en_desc = outObj.en_desc || `exact fashion outfit matching product reference image ${fn}`;
+      item.is_default = false;
+      item.lookbook_model_path = "";
+      item.lookbook_model_filename = "";
+      item.enabled = true;
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      showFashionBanner(`👗 Đã đổi ảnh Bộ #${idx + 1} thành <b>${_escFashionHtml(item.name)}</b>.`);
+    }
+
+    function removeSingleFashionOutfit(idx) {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      if (!Array.isArray(STATE.fashionOutfits) || idx < 0 || idx >= STATE.fashionOutfits.length) return;
+      const removed = STATE.fashionOutfits.splice(idx, 1)[0];
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      renderFashionFinalPostProdCard();
+      showFashionBanner(`🗑️ Đã xoá <b>${_escFashionHtml(removed?.name || removed?.filename || "sản phẩm")}</b> khỏi danh sách.`);
+    }
+
+    function clearAllFashionOutfits() {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      STATE.fashionOutfits = [];
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      renderFashionFinalPostProdCard();
+      showFashionBanner(`🧹 Đã xoá danh sách sản phẩm. Hãy tải lên ảnh sản phẩm mới của bạn!`);
+    }
+
+    function clearDefaultFashionOutfitsOnly() {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      STATE.fashionOutfits = (STATE.fashionOutfits || []).filter(o => !_isDefaultDemoOutfitItem(o));
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      renderFashionFinalPostProdCard();
+    }
+
+    function loadSampleFourFashionOutfits() {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const defList = (STATE.fashionDefaultOutfits || []).filter(d => _isDefaultDemoOutfitItem(d)).slice(0, 4);
+      if (!defList.length) {
+        showFashionBanner("⚠️ Không tìm thấy bộ ảnh mẫu thử nghiệm trong kho.", true);
+        return;
       }
+      STATE.fashionOutfits = defList.map(d => ({
+        ...d,
+        path: d.path || `ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/${d.filename}`,
+        is_default: true,
+        enabled: true,
+      }));
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      renderFashionFinalPostProdCard();
+      showFashionBanner(`✨ Đã nạp <b>${STATE.fashionOutfits.length} bộ trang phục mẫu 2K</b> để bạn test thử! Bạn có thể xoá hoặc đổi bằng ảnh sản phẩm thật bất kỳ lúc nào.`);
+    }
+
+    function restoreDefaultFashionOutfits() {
+      loadSampleFourFashionOutfits();
+    }
+
+    function toggleAllFashionOutfits(checked = true) {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      (STATE.fashionOutfits || []).forEach(o => { o.enabled = !!checked; });
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+    }
+
+    function selectFirstNFashionOutfits(n = 4) {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      (STATE.fashionOutfits || []).forEach((o, idx) => { o.enabled = idx < n; });
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
     }
 
     async function pickAndDeconstructNewOutfit2K() {
-      const pickRes = await apiGet("/api/pick_file?kind=image");
-      if (!pickRes || !pickRes.ok || !pickRes.path) return;
-      const rawPath = pickRes.path;
-      const fn = rawPath.split(/[\\/]/).pop();
-      const defaultName = `Bộ ${(STATE.fashionOutfits || []).length + 1}: ${fn.replace(/\.[^.]+$/, "")}`;
-      const outfitName = window.prompt("Nhập tên Bộ Đồ / Sản Phẩm Mới (sẽ tự động tách nền trắng 2K chỉ giữ quần áo + phụ kiện):", defaultName) || defaultName;
-      const modelMode = document.getElementById("selDeconstructOutfitModel")?.value || "nano_banana";
-
-      showFashionBanner(`⏳ Đang tách quần áo <b>${fn}</b> ra Ảnh Tham Chiếu Nền Trắng 2K bằng <b>${modelMode.toUpperCase()}</b>...`);
-      if (typeof toast === "function") toast("🪄 Đang tách sản phẩm ra ảnh nền trắng 2K...", "info");
-
-      const res = await apiPost("/api/fashion_motion/deconstruct_outfit_2k", {
-        raw_image_path: rawPath,
-        outfit_name: outfitName,
-        model_mode: modelMode,
-        project_id: STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19",
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+      const modelMode = document.getElementById("selDeconstructOutfitModel")?.value || "local_2k";
+      const isLocalFast = modelMode === "local_2k";
+      const prof = _getSelectedFashionAccountProfile();
+      const uploaded = await uploadFashionFileViaBrowser({
+        kind: "outfit",
+        accept: "image/*",
+        multiple: true,
+        autoWhiteBgLocal: isLocalFast,
       });
+      if (!uploaded.length) return;
 
-      if (res && res.ok && res.outfit) {
-        const newOutfit = Object.assign({}, res.outfit, { enabled: true });
-        if (!Array.isArray(STATE.fashionOutfits)) STATE.fashionOutfits = [];
-        STATE.fashionOutfits.push(newOutfit);
-        renderFashionOutfitsList();
-        showFashionBanner(`✅ Đã tách thành công Sản Phẩm Nền Trắng 2K: <b>${newOutfit.filename}</b> (${res.method_used || modelMode}) và thêm vào Bộ #${STATE.fashionOutfits.length}!`);
-        if (typeof toast === "function") toast(`✅ Đã tạo Product Sheet 2K: ${newOutfit.filename}`, "ok");
-      } else {
-        const err = (res && res.error) || "Không thể tách ảnh sản phẩm";
-        showFashionBanner(`❌ Lỗi tách sản phẩm nền trắng 2K: ${err}`, true);
+      _autoRemoveDefaultOutfitsWhenAddingCustom();
+      if (!Array.isArray(STATE.fashionOutfits)) STATE.fashionOutfits = [];
+
+      for (let i = 0; i < uploaded.length; i++) {
+        const u = uploaded[i];
+        const rawPath = u.path;
+        const fn = u.filename || rawPath.split(/[\\/]/).pop();
+        const defaultName = fn.replace(/\.[^.]+$/, "");
+
+        if (isLocalFast && u.outfit) {
+          STATE.fashionOutfits.push(Object.assign({}, u.outfit, { is_default: false, enabled: true }));
+          continue;
+        }
+
+        showFashionBanner(`⏳ Đang tách quần áo <b>${_escFashionHtml(fn)}</b> (${i + 1}/${uploaded.length}) ra nền trắng 2K...`);
+        const res = await apiPost("/api/fashion_motion/deconstruct_outfit_2k", {
+          raw_image_path: rawPath,
+          outfit_name: defaultName,
+          model_mode: modelMode,
+          profile_name: prof,
+          project_id: STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19",
+        });
+        if (res && res.ok && res.outfit) {
+          STATE.fashionOutfits.push(Object.assign({}, res.outfit, { is_default: false, enabled: true }));
+        } else if (u.outfit) {
+          STATE.fashionOutfits.push(Object.assign({}, u.outfit, { is_default: false, enabled: true }));
+        }
       }
+
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
+      renderFashionOutfitsList();
+      showFashionBanner(`✅ Đã tách nền trắng 2K và thêm <b>${uploaded.length} sản phẩm</b>!`);
     }
 
     async function deconstructSingleOutfitToWhiteBg2K(idx) {
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
       const item = (STATE.fashionOutfits || [])[idx];
       if (!item || !item.path) return;
       const modelMode = document.getElementById("selDeconstructOutfitModel")?.value || "nano_banana";
-      showFashionBanner(`⏳ Đang chuẩn hóa Bộ #${idx + 1} (<b>${item.filename}</b>) thành Ảnh Tham Chiếu Quần Áo Nền Trắng 2K (${modelMode.toUpperCase()})...`);
+      const prof = _getSelectedFashionAccountProfile();
+      showFashionBanner(`⏳ Đang tách nền trắng 2K cho Bộ #${idx + 1} (<b>${_escFashionHtml(item.name || item.filename)}</b>)...`);
       const res = await apiPost("/api/fashion_motion/deconstruct_outfit_2k", {
         raw_image_path: item.path,
         outfit_name: item.name || `Bộ ${idx + 1}`,
         outfit_desc: item.short_desc || "",
         model_mode: modelMode,
+        profile_name: prof,
         project_id: STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19",
       });
       if (res && res.ok && res.outfit) {
         STATE.fashionOutfits[idx] = Object.assign({}, item, res.outfit, { enabled: item.enabled !== false });
+        STATE.fashionInputsDirty = true;
+        STATE.fashionPreparedSignature = "";
         renderFashionOutfitsList();
-        showFashionBanner(`✅ Đã chuẩn hóa Bộ #${idx + 1} thành ảnh nền trắng 2K: <b>${res.outfit.filename}</b>!`);
+        showFashionBanner(`✅ Đã chuẩn hóa nền trắng 2K cho Bộ #${idx + 1}!`);
       } else {
         showFashionBanner(`❌ Lỗi tách nền trắng 2K: ${(res && res.error) || "Không xác định"}`, true);
       }
     }
 
     async function populateFashionProductStorePicker(forceReload = false) {
-      const sel = document.getElementById("selFashionProdFromStore");
-      if (!sel) return;
-      if (forceReload || !STATE.productsStore || !STATE.productsStore.length) {
+      if (forceReload || !Array.isArray(STATE.productsStore) || !STATE.productsStore.length) {
         try {
           const r = await apiGet("/api/products-store");
-          if (r && r.ok && Array.isArray(r.items)) {
-            STATE.productsStore = r.items;
+          if (r && r.ok) {
+            const arr = Array.isArray(r.products) ? r.products : (Array.isArray(r.items) ? r.items : []);
+            STATE.productsStore = arr;
           }
         } catch (e) {}
       }
       const storeItems = STATE.productsStore || [];
-      const projItems = STATE.projects || [];
-      const options = [`<option value="">-- 🛍️ Chọn sản phẩm từ Kho Sản Phẩm (${storeItems.length} SP) / Dự Án (${projItems.length} SP) để lấy ảnh quần áo gốc --</option>`];
+      const projItems = (STATE.projects || []).filter(p => !p.is_fashion_motion_project && p.pipeline_kind !== "cooking_storyboard");
       const seen = new Set();
+      const combined = [];
+
       storeItems.forEach(it => {
         const pid = String(it.product_id || it.id || "");
         if (!pid || seen.has(pid)) return;
         seen.add(pid);
-        const imgCnt = (it.local_images || []).length;
-        options.push(`<option value="${pid}">🛍️ [${pid}] ${(it.title || it.name || pid).slice(0, 68)} (${imgCnt} ảnh gốc)</option>`);
+        const imgs = Array.isArray(it.local_images) ? it.local_images : [];
+        combined.push({
+          pid,
+          title: it.title || it.name || pid,
+          imgCount: imgs.length || it.image_count || 0,
+          source: "store",
+        });
       });
       projItems.forEach(p => {
         const pid = String(p.id || "");
         if (!pid || seen.has(pid)) return;
         seen.add(pid);
-        options.push(`<option value="${pid}">📁 [${pid}] ${(p.name || pid).slice(0, 68)}</option>`);
+        combined.push({
+          pid,
+          title: p.name || pid,
+          imgCount: 0,
+          source: "project",
+        });
       });
-      sel.innerHTML = options.join("");
+
+      STATE._fashionCombinedStoreList = combined;
+      const cntEl = document.getElementById("lblFashionStoreCount");
+      if (cntEl) cntEl.textContent = String(combined.length);
+
+      filterFashionStoreProductsDropdown();
+    }
+
+    function filterFashionStoreProductsDropdown() {
+      const sel = document.getElementById("selFashionProdFromStore");
+      if (!sel) return;
+      const q = (document.getElementById("inpFashionStoreSearch")?.value || "").trim().toLowerCase();
+      const all = STATE._fashionCombinedStoreList || [];
+      const filtered = q
+        ? all.filter(x => `${x.pid} ${x.title}`.toLowerCase().includes(q))
+        : all;
+
+      const curVal = sel.value;
+      const opts = [`<option value="">-- Chọn sản phẩm trong kho (${filtered.length} SP phù hợp) --</option>`];
+      filtered.slice(0, 250).forEach(it => {
+        const cntTxt = it.imgCount ? ` (${it.imgCount} ảnh)` : "";
+        opts.push(`<option value="${_escFashionHtml(it.pid)}" ${it.pid === curVal ? "selected" : ""}>🛍️ [${_escFashionHtml(it.pid.slice(-6))}] ${_escFashionHtml(String(it.title).slice(0, 68))}${cntTxt}</option>`);
+      });
+      sel.innerHTML = opts.join("");
+
+      if (q && filtered.length === 1 && sel.value !== filtered[0].pid) {
+        sel.value = filtered[0].pid;
+        onSelectFashionProductFromStore(filtered[0].pid);
+      }
     }
 
     async function onSelectFashionProductFromStore(pid) {
@@ -3972,7 +4595,7 @@
         return;
       }
       strip.style.display = "block";
-      strip.innerHTML = `<div style="font-size:11px; color:#93c5fd;">⏳ Đang tải danh sách ảnh sản phẩm gốc của <b>${pid}</b>...</div>`;
+      strip.innerHTML = `<div style="font-size:11px; color:#93c5fd;">⏳ Đang tải bộ ảnh của sản phẩm <b>${_escFashionHtml(pid)}</b>...</div>`;
 
       let images = [];
       let prodTitle = pid;
@@ -3984,39 +4607,36 @@
         const rProj = await apiGet(`/api/project?id=${encodeURIComponent(pid)}`);
         if (rProj && rProj.ok && rProj.project) {
           prodTitle = rProj.project.name || pid;
-          images = rProj.project.product_images || [];
+          images = rProj.project.product_images || rProj.project.all_product_image_paths || [];
         }
       }
 
       if (!images.length) {
-        strip.innerHTML = `<div style="font-size:11px; color:#fca5a5;">⚠️ Sản phẩm <b>${prodTitle}</b> chưa có ảnh tải về máy. Hãy bấm tải ảnh ở tab Sản Phẩm trước.</div>`;
+        strip.innerHTML = `<div style="font-size:11px; color:#fca5a5;">⚠️ Sản phẩm này chưa có ảnh lưu trên máy. Hãy chọn sản phẩm khác hoặc tải ảnh trực tiếp từ máy tính.</div>`;
         return;
       }
 
-      const safeTitle = String(prodTitle || pid).replace(/'/g, "\\'").replace(/"/g, "&quot;");
+      const existingPaths = new Set((STATE.fashionOutfits || []).map(o => String(o.path || "")));
+      const safeTitleAttr = _escFashionHtml(prodTitle).replace(/'/g, "");
+
       strip.innerHTML = `
-        <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:6px; flex-wrap:wrap; gap:6px;">
-          <span style="font-size:11px; font-weight:800; color:#fde68a;">🖼️ Ảnh Gốc Của Sản Phẩm: <span style="color:#fff;">${prodTitle}</span> (${images.length} ảnh) — Chọn ảnh để Tách Quần Áo + Phụ Kiện 2K hoặc Đưa Vào Bộ Đồ:</span>
+        <div style="font-size:11px; font-weight:700; color:#fde68a; margin-bottom:6px;">
+          🖼️ Bộ ảnh của <b style="color:#fff;">${_escFashionHtml(prodTitle)}</b> (${images.length} ảnh) — Bấm <b>+ Chọn ảnh này</b> để đưa vào danh sách phối đồ:
         </div>
         <div style="display:flex; gap:8px; overflow-x:auto; padding-bottom:4px;">
           ${images.map((imgP, iIdx) => {
             const u = `/api/media?path=${encodeURIComponent(imgP)}`;
             const safeP = String(imgP).replace(/\\/g, "\\\\").replace(/'/g, "\\'");
+            const alreadyAdded = existingPaths.has(String(imgP));
             return `
-              <div style="background:#070b14; border:1px solid rgba(99,102,241,0.45); border-radius:7px; padding:6px; width:155px; flex-shrink:0; display:flex; flex-direction:column; gap:5px;">
-                <div style="width:100%; height:135px; border-radius:5px; overflow:hidden; background:#000; cursor:pointer;"
-                     onclick="openLightbox('${u}', 'Ảnh SP Gốc #${iIdx + 1}: ${safeTitle}')">
+              <div style="background:#060a13; border:1px solid ${alreadyAdded ? "#10b981" : "rgba(99,102,241,0.4)"}; border-radius:8px; padding:5px; width:128px; flex-shrink:0; display:flex; flex-direction:column; gap:5px;">
+                <div style="width:100%; height:118px; border-radius:6px; overflow:hidden; background:#000; cursor:pointer;"
+                     onclick="openLightbox('${u}', 'Ảnh #${iIdx + 1}: ${safeTitleAttr}')">
                   <img src="${u}" style="width:100%; height:100%; object-fit:cover;" />
                 </div>
-                <div style="font-size:9.5px; color:#cbd5e1; text-align:center; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">Ảnh gốc #${iIdx + 1}</div>
-                <button class="btn btn-xs btn-amber" style="width:100%; justify-content:center; font-size:9.5px; padding:4px;"
-                        onclick="prepareDeconstructOutfitFromStoreImage('${safeP}', '${safeTitle}')"
-                        title="Biến ảnh quần áo gốc này thành Ảnh Product Sheet Tách Riêng Quần Áo + Phụ Kiện Nền Trắng 2K">
-                  🪄 Tách Quần Áo+Phụ Kiện 2K
-                </button>
-                <button class="btn btn-xs btn-success" style="width:100%; justify-content:center; font-size:9.5px; padding:4px;"
-                        onclick="addStoreImageDirectlyAsFashionOutfit('${safeP}', '${safeTitle}')">
-                  ➕ Đưa Luôn Vào Bộ Đồ
+                <button class="btn btn-xs ${alreadyAdded ? "btn-outline" : "btn-success"}" style="width:100%; justify-content:center; font-size:9.5px; padding:4px;"
+                        onclick="addStoreImageDirectlyAsFashionOutfit('${safeP}', '${safeTitleAttr}')">
+                  ${alreadyAdded ? "✓ Đã thêm" : "+ Chọn ảnh này"}
                 </button>
               </div>
             `;
@@ -4025,36 +4645,158 @@
       `;
     }
 
-    function addStoreImageDirectlyAsFashionOutfit(imgPath, prodTitle) {
+    async function addStoreImageDirectlyAsFashionOutfit(imgPath, prodTitle) {
       if (!imgPath) return;
+      if (!ensureFashionEditableDraft({ preserveInputs: true })) return;
+
+      _autoRemoveDefaultOutfitsWhenAddingCustom();
+      if (!Array.isArray(STATE.fashionOutfits)) STATE.fashionOutfits = [];
+
+      const already = STATE.fashionOutfits.find(o => String(o.path || "") === String(imgPath));
+      if (already) {
+        already.enabled = true;
+        renderFashionOutfitsList();
+        showFashionBanner(`ℹ️ Ảnh sản phẩm này đã có sẵn trong danh sách phối đồ!`);
+        return;
+      }
+
       const fn = imgPath.split(/[\\/]/).pop();
-      const idx = (STATE.fashionOutfits || []).length + 1;
+      const idx = STATE.fashionOutfits.length + 1;
+      const cleanName = String(prodTitle || fn).slice(0, 42);
       STATE.fashionOutfits.push({
         id: `outfit_store_${idx}_${Date.now()}`,
         filename: fn,
         path: imgPath,
-        name: `Bộ ${idx}: ${(prodTitle || fn).slice(0, 36)}`,
-        short_desc: `bộ trang phục ${prodTitle || fn} theo đúng ảnh tham chiếu ${fn}`,
-        en_desc: `exact fashion outfit from product reference image ${fn}`,
+        name: cleanName,
+        short_desc: "",
+        en_desc: `exact fashion outfit matching product reference image ${fn}`,
         width: 1536,
         height: 2752,
         is_2k: true,
+        is_default: false,
         enabled: true,
       });
+      STATE.fashionInputsDirty = true;
+      STATE.fashionPreparedSignature = "";
       renderFashionOutfitsList();
-      showFashionBanner(`👗 Đã thêm ảnh sản phẩm <b>${fn}</b> vào Danh Sách Bộ Đồ Thay Theo Nhạc (Bộ #${idx})!`);
+      renderFashionFinalPostProdCard();
+
+      const curStorePid = document.getElementById("selFashionProdFromStore")?.value || "";
+      if (curStorePid) onSelectFashionProductFromStore(curStorePid);
+
+      showFashionBanner(`👗 Đã thêm <b>${_escFashionHtml(cleanName)}</b> (Bộ #${idx}) vào danh sách phối đồ!`);
+    }
+
+    function renderFashionOutfitsList() {
+      const grid = document.getElementById("fashionOutfitsGrid");
+      const countBadge = document.getElementById("badgeFashionSelectedOutfitsCount");
+      const btnClear = document.getElementById("btnClearAllFashionOutfits");
+      const btnDemo = document.getElementById("btnLoadDemoFashionOutfits");
+      if (!grid) return;
+
+      const list = STATE.fashionOutfits || [];
+      const enabledCount = list.filter(o => o.enabled !== false).length;
+      const allTpls = STATE.fashionVideoTemplatesCatalog?.templates || [];
+      const curCode = STATE.selectedFashionTemplateCode || STATE.fashionProject?.source_template_code || "FVT_001";
+      const curTpl = allTpls.find(x => x.code === curCode);
+      const recCnt = curTpl?.recommended_outfits || 4;
+
+      if (countBadge) {
+        if (enabledCount > 0) {
+          countBadge.className = "badge badge-done";
+          countBadge.textContent = `✓ Đã chọn ${enabledCount} bộ đồ`;
+        } else {
+          countBadge.className = "badge badge-wait";
+          countBadge.textContent = `Chưa có SP · Mẫu ${curCode} gợi ý ${recCnt} bộ`;
+        }
+      }
+      if (btnClear) btnClear.style.display = list.length > 0 ? "inline-flex" : "none";
+      if (btnDemo) btnDemo.style.display = list.length === 0 ? "inline-flex" : "none";
+
+      if (!list.length) {
+        grid.innerHTML = `
+          <div class="f-prod-empty-drop"
+               onclick="startFashionProductUpload()"
+               ondragover="event.preventDefault(); this.style.borderColor='#10b981';"
+               ondragleave="this.style.borderColor='rgba(245,158,11,0.45)';"
+               ondrop="event.preventDefault(); this.style.borderColor='rgba(245,158,11,0.45)'; handleFashionProductDrop(event);">
+            <div style="font-size:26px; line-height:1;">👗</div>
+            <div style="font-size:13px; font-weight:800; color:#fde68a;">
+              Bấm vào đây để tải 1–5 ảnh sản phẩm quần áo từ máy tính
+            </div>
+            <div style="font-size:11px; color:#94a3b8; max-width:460px; line-height:1.45;">
+              Có thể chọn nhiều ảnh cùng lúc, kéo thả ảnh trực tiếp vào khung này, hoặc bấm <b>🛍️ Chọn Từ Kho SP</b> phía trên. (Mẫu <b>${_escFashionHtml(curCode)}</b> đẹp nhất khi phối khoảng <b>${recCnt} bộ đồ</b>).
+            </div>
+          </div>
+        `;
+        renderFashionScenesTimeline();
+        updateFashionSimpleSummary();
+        return;
+      }
+
+      grid.innerHTML = list.map((o, idx) => {
+        const isEn = o.enabled !== false;
+        const oEnc = encodeURIComponent(o.path || "");
+        const imgUrl = `/api/media?path=${oEnc}`;
+        const safeName = _escFashionHtml(o.name || o.filename || `Bộ ${idx + 1}`);
+        const noteVal = _escFashionHtml(o.short_desc || "");
+        return `
+          <div style="background:#090f1d; border:1.5px solid ${isEn ? "rgba(245,158,11,0.52)" : "rgba(148,163,184,0.2)"}; border-radius:10px; padding:8px; display:flex; gap:9px; align-items:center; opacity:${isEn ? "1" : "0.58"};">
+            <div style="width:58px; height:78px; border-radius:7px; overflow:hidden; background:#000; cursor:pointer; border:1px solid rgba(245,158,11,0.4); position:relative; flex-shrink:0;"
+                 onclick="openLightbox('${imgUrl}', '${safeName.replace(/'/g, "")}')"
+                 title="Bấm để phóng to ảnh sản phẩm">
+              <img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;" />
+              <span style="position:absolute; top:3px; left:3px; background:rgba(9,14,26,0.88); color:#fde68a; font-size:8.5px; font-weight:900; padding:1px 5px; border-radius:4px;">Bộ ${idx + 1}</span>
+            </div>
+
+            <div style="flex:1; min-width:0; display:flex; flex-direction:column; gap:5px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:5px;">
+                <label style="display:inline-flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:#f8fafc; cursor:pointer; margin:0; min-width:0; flex:1;">
+                  <input type="checkbox" style="width:auto;" ${isEn ? "checked" : ""}
+                         onchange="if(ensureFashionEditableDraft({preserveInputs:true})){ STATE.fashionOutfits[${idx}].enabled = this.checked; STATE.fashionInputsDirty=true; STATE.fashionPreparedSignature=''; renderFashionOutfitsList(); }" />
+                  <span style="white-space:nowrap; overflow:hidden; text-overflow:ellipsis;" title="${safeName}">${safeName}</span>
+                </label>
+                <div style="display:flex; gap:3px; flex-shrink:0;">
+                  <button class="btn btn-xs btn-outline" style="padding:2px 6px; font-size:9px;" onclick="changeSingleFashionOutfitImage(${idx})" title="Đổi sang ảnh sản phẩm khác">Đổi</button>
+                  <button class="btn btn-xs btn-danger" style="padding:2px 6px; font-size:9px;" onclick="removeSingleFashionOutfit(${idx})" title="Xoá sản phẩm này">✕</button>
+                </div>
+              </div>
+
+              <input value="${noteVal}"
+                     onchange="if(ensureFashionEditableDraft({preserveInputs:true})){ STATE.fashionOutfits[${idx}].short_desc = this.value; STATE.fashionOutfits[${idx}].en_desc = this.value || STATE.fashionOutfits[${idx}].en_desc; STATE.fashionInputsDirty=true; STATE.fashionPreparedSignature=''; }"
+                     placeholder="Ghi chú trang phục (tuỳ chọn, VD: đầm hoa hồng...)"
+                     style="font-size:10px; padding:4px 7px; width:100%; border-radius:6px; background:#050811; border:1px solid rgba(255,255,255,0.1); color:#e2e8f0;" />
+            </div>
+          </div>
+        `;
+      }).join("");
+
+      renderFashionScenesTimeline();
+      updateFashionSimpleSummary();
+    }
+
+
+    // -----------------------------------------------------------------------------------------
+    // CÔNG CỤ NÂNG CAO, CHẾ ĐỘ ENGINE (FLOW / GOOGLE VIDS) & TIMELINE PHÂN CẢNH
+    // -----------------------------------------------------------------------------------------
+    function copyFashionAiAgentCommand() {
+      const cmd = STATE.fashionProject?.ai_agent_command
+        || `Phân tích video thời trang '${document.getElementById("inpFashionRefVideo")?.value || ""}' và tạo kịch bản chia phân cảnh thay đồ 2K rồi render hậu kỳ thành video final`;
+      navigator.clipboard.writeText(cmd);
+      showFashionBanner(`🤖 Đã copy câu lệnh AI Agent vào Clipboard.`);
+      if (typeof toast === "function") toast("🤖 Đã copy câu lệnh AI Agent!", "ok");
     }
 
     function prepareDeconstructOutfitFromStoreImage(imgPath, prodTitle) {
       STATE.selectedFashionRawProdImage = imgPath;
+      toggleFashionAdvanced(true);
       const det = document.getElementById("detailsFashionAuxTools");
       if (det) det.open = true;
       selectFashionPromptBuilderTab("deconstructed_outfit_flatlay_2k");
       const inpRef = document.getElementById("inpFashionStdPromptRefImg");
       if (inpRef) inpRef.value = imgPath;
-      const card = document.getElementById("cardFashionPromptsBuilder");
-      if (card) card.scrollIntoView({ behavior: "smooth" });
-      showFashionBanner(`🪄 Đã nạp ảnh gốc <b>${imgPath.split(/[\\/]/).pop()}</b> vào <b>Prompt #1 (Tách Quần Áo + Phụ Kiện Nền Trắng 2K)</b>!`);
+      document.getElementById("cardFashionPromptsBuilder")?.scrollIntoView({ behavior: "smooth" });
+      showFashionBanner(`🪄 Đã nạp ảnh <b>${_escFashionHtml(imgPath.split(/[\\/]/).pop())}</b> vào Prompt #1 (Tách Quần Áo 2K).`);
     }
 
     function selectFashionPromptBuilderTab(promptKey, btnEl) {
@@ -4063,9 +4805,7 @@
       if (det) det.open = true;
       const tabsBar = document.getElementById("fashionStdPromptTabs");
       if (tabsBar && btnEl) {
-        tabsBar.querySelectorAll("button").forEach(b => {
-          b.className = "btn btn-xs btn-outline";
-        });
+        tabsBar.querySelectorAll("button").forEach(b => { b.className = "btn btn-xs btn-outline"; });
         btnEl.className = "btn btn-xs btn-amber";
       }
       renderFashionStandardPromptBox();
@@ -4084,7 +4824,6 @@
         guide_vn: "Đính kèm ảnh sản phẩm gốc hoặc Character Sheet để tạo ảnh 2K chuẩn thương mại.",
         rendered_prompt: "",
       };
-
       const sampleMap = {
         deconstructed_outfit_flatlay_2k: "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/05_Product_Sheet_Quan_Sooc_Trang_2K.png",
         wardrobe_4looks_character_sheet_2k: "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/01_Character_Sheet_4_Outfits_2K.png",
@@ -4094,46 +4833,43 @@
       const sampleRel = sampleMap[key] || sampleMap.deconstructed_outfit_flatlay_2k;
       const sampleUrl = `/api/media?path=${encodeURIComponent(sampleRel)}`;
       const defaultRefImg = STATE.selectedFashionRawProdImage
-        || (key === "wardrobe_4looks_character_sheet_2k" ? (document.getElementById("inpFashionCharSheet")?.value || "flow_final_pipeline/characters/nv5_ref.png") : "")
-        || (key === "base_char_bedroom_2k" ? "flow_final_pipeline/characters/nv5_ref.png" : "");
+        || (document.getElementById("inpFashionBaseChar")?.value || "");
 
       box.innerHTML = `
-        <div style="display:grid; grid-template-columns: 165px 1fr; gap:12px; align-items:start; background:#070a14; border:1px solid rgba(139,92,246,0.35); border-radius:8px; padding:10px;">
+        <div style="display:grid; grid-template-columns: 150px 1fr; gap:12px; align-items:start; background:#070a14; border:1px solid rgba(139,92,246,0.35); border-radius:8px; padding:10px;">
           <div style="display:flex; flex-direction:column; gap:5px;">
-            <div style="font-size:10px; font-weight:800; color:#c4b5fd; text-align:center;">🖼️ ẢNH MẪU KẾT QUẢ 2K</div>
             <div style="width:100%; aspect-ratio:4/5; border-radius:7px; overflow:hidden; background:#000; border:1px solid rgba(139,92,246,0.5); cursor:pointer;"
-                 onclick="openLightbox('${sampleUrl}', '${(item.title || '').replace(/'/g, "\\'")}')">
+                 onclick="openLightbox('${sampleUrl}', '${_escFashionHtml(item.title || "").replace(/'/g, "")}')">
               <img src="${sampleUrl}" style="width:100%; height:100%; object-fit:cover;" />
             </div>
-            <span class="badge" style="background:rgba(16,185,129,0.18); color:#34d399; text-align:center; justify-content:center; font-size:9.5px;">${item.aspect_ratio || '2048×2559 2K'}</span>
+            <span class="badge" style="background:rgba(16,185,129,0.18); color:#34d399; justify-content:center; font-size:9.5px;">${_escFashionHtml(item.aspect_ratio || "2048×2559 2K")}</span>
           </div>
-
           <div style="display:flex; flex-direction:column; gap:7px;">
             <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap;">
-              <span style="font-size:12px; font-weight:800; color:#fde68a;">${item.title || ''}</span>
-              <span class="badge" style="background:rgba(236,72,153,0.2); color:#f9a8d4; border:1px solid rgba(236,72,153,0.45);">${item.badge || '2K'}</span>
+              <span style="font-size:12px; font-weight:800; color:#fde68a;">${_escFashionHtml(item.title || "")}</span>
+              <span class="badge" style="background:rgba(236,72,153,0.2); color:#f9a8d4;">${_escFashionHtml(item.badge || "2K")}</span>
             </div>
             <div style="font-size:11px; color:#cbd5e1; line-height:1.4; background:rgba(139,92,246,0.1); border-left:3px solid #8b5cf6; padding:5px 8px; border-radius:4px;">
-              💡 ${item.guide_vn || ''}
+              💡 ${_escFashionHtml(item.guide_vn || "")}
             </div>
             <div style="display:flex; gap:6px; align-items:center;">
-              <span style="font-size:10.5px; font-weight:700; color:#93c5fd; white-space:nowrap;">📎 Ảnh Gốc Đính Kèm (SP Quần Áo / NV5):</span>
-              <input id="inpFashionStdPromptRefImg" value="${(defaultRefImg || '').replace(/"/g, '&quot;')}" placeholder="Chọn ảnh quần áo gốc từ Kho SP hoặc bấm Chọn Ảnh từ máy..." style="font-size:11px; flex:1;" />
-              <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionStdPromptRefImg', 'image')">📂 Chọn Ảnh Gốc</button>
+              <span style="font-size:10.5px; font-weight:700; color:#93c5fd; white-space:nowrap;">📎 Ảnh đính kèm:</span>
+              <input id="inpFashionStdPromptRefImg" value="${_escFashionHtml(defaultRefImg)}" placeholder="Chọn ảnh gốc từ máy tính..." style="font-size:11px; flex:1;" />
+              <button class="btn btn-xs btn-outline" onclick="pickFashionFile('inpFashionStdPromptRefImg', 'image')">📂 Chọn ảnh</button>
             </div>
             <div>
               <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
-                <span style="font-size:10.5px; font-weight:800; color:#a5b4fc;">📝 PROMPT CHUẨN 2K (CÓ THỂ CHỈNH SỬA MÔ TẢ QUẦN ÁO & PHỤ KIỆN):</span>
+                <span style="font-size:10.5px; font-weight:800; color:#a5b4fc;">📝 Prompt 2K (Có thể chỉnh sửa):</span>
                 <button class="btn btn-xs btn-primary" style="padding:2px 9px; font-size:10px;"
-                        onclick="navigator.clipboard.writeText(document.getElementById('txtFashionStdPromptEditor').value); showFashionBanner('📋 Đã copy Prompt Chuẩn Thời Trang 2K vào Clipboard!');">
-                  📋 Copy Prompt Chuẩn
+                        onclick="navigator.clipboard.writeText(document.getElementById('txtFashionStdPromptEditor').value); showFashionBanner('📋 Đã copy Prompt 2K vào Clipboard!');">
+                  📋 Copy Prompt
                 </button>
               </div>
-              <textarea id="txtFashionStdPromptEditor" rows="5" style="font-family:Consolas,monospace; font-size:11px; line-height:1.45; width:100%; background:#050811; color:#f1f5f9; border:1px solid rgba(99,102,241,0.4); border-radius:6px; padding:8px;">${(item.rendered_prompt || '').replace(/</g, '&lt;')}</textarea>
+              <textarea id="txtFashionStdPromptEditor" rows="4" style="font-family:Consolas,monospace; font-size:11px; line-height:1.45; width:100%; background:#050811; color:#f1f5f9; border:1px solid rgba(99,102,241,0.4); border-radius:6px; padding:8px;">${_escFashionHtml(item.rendered_prompt || "")}</textarea>
             </div>
             <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
-              <button class="btn btn-xs btn-success" style="padding:6px 12px; font-weight:800;" onclick="runGenerateFashion2kAssetOnFlow('${key}')">
-                ✨ Tạo Ảnh 2K Trực Tiếp Trên Google Flow (Nano Banana 2.1 2K) & Đưa Vào Dự Án
+              <button class="btn btn-xs btn-success" style="padding:6px 12px; font-weight:800;" onclick="runGenerateFashion2kAssetOnFlow('${_escFashionHtml(key)}')">
+                ✨ Tạo Ảnh 2K Trên Google Flow & Đưa Vào Dự Án
               </button>
               <span id="fashionStdPromptGenStatus" style="font-size:11px; color:#34d399;"></span>
             </div>
@@ -4153,123 +4889,64 @@
           if (o.path && !refs.includes(o.path)) refs.push(o.path);
         });
       }
-      if (stEl) stEl.innerHTML = "⏳ Đang gửi lên Google Flow tạo ảnh 2K (Nano Banana 2.1 + Upscale 2K)...";
-      showFashionBanner("⏳ Đang tạo ảnh Thời Trang Chuẩn 2K trên Google Flow...");
+      if (stEl) stEl.innerHTML = "⏳ Đang gửi lên Google Flow tạo ảnh 2K...";
+      showFashionBanner("⏳ Đang tạo ảnh 2K trên Google Flow...");
 
       const res = await apiPost("/api/fashion_motion/generate_2k_asset", {
         asset_type: assetType,
         prompt: promptStr,
         ref_image_paths: refs,
+        profile_name: _getSelectedFashionAccountProfile(),
         project_id: STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19",
       });
       if (res && res.ok && res.path) {
-        if (stEl) stEl.innerHTML = `✅ Đã tạo xong ảnh 2K: <b>${res.filename}</b> (${res.width}×${res.height})`;
+        if (stEl) stEl.innerHTML = `✅ Đã tạo xong ảnh 2K: <b>${_escFashionHtml(res.filename)}</b>`;
         if (assetType === "deconstructed_outfit_flatlay_2k") {
-          addStoreImageDirectlyAsFashionOutfit(res.path, `Product Sheet 2K (${res.filename})`);
+          await addStoreImageDirectlyAsFashionOutfit(res.path, `Product Sheet 2K (${res.filename})`);
         } else if (assetType === "wardrobe_4looks_character_sheet_2k" || assetType === "fashion_model_turnaround_5poses_2k") {
           const inpSheet = document.getElementById("inpFashionCharSheet");
           if (inpSheet) inpSheet.value = res.path;
+          await onCustomFashionCharacterPathChange(false);
         } else if (assetType === "base_char_bedroom_2k") {
           const inpChar = document.getElementById("inpFashionBaseChar");
           if (inpChar) inpChar.value = res.path;
+          await onCustomFashionCharacterPathChange(false);
         }
-        showFashionBanner(`✅ Đã tạo thành công ảnh 2K <b>${res.filename}</b> (${res.width}×${res.height}) và tự động gắn vào dự án!`);
+        showFashionBanner(`✅ Đã tạo thành công ảnh 2K <b>${_escFashionHtml(res.filename)}</b> và gắn vào dự án!`);
       } else {
         const errMsg = (res && res.error) || "Không thể tạo ảnh 2K";
-        if (stEl) stEl.innerHTML = `<span style="color:#f87171;">❌ Lỗi: ${errMsg}</span>`;
-        showFashionBanner(`❌ Lỗi tạo ảnh 2K: ${errMsg}`, true);
+        if (stEl) stEl.innerHTML = `<span style="color:#f87171;">❌ ${_escFashionHtml(errMsg)}</span>`;
+        showFashionBanner(`❌ Lỗi tạo ảnh 2K: ${_escFashionHtml(errMsg)}`, true);
       }
     }
 
     async function pickFashionFile(inputId, kind = "image") {
-      const res = await apiGet(`/api/pick_file?kind=${encodeURIComponent(kind)}`);
-      if (res && res.ok && res.path) {
-        const inp = document.getElementById(inputId);
-        if (inp) inp.value = res.path;
-      }
-    }
-
-    async function addCustomFashionOutfitFromDisk() {
-      const res = await apiGet("/api/pick_file?kind=image");
-      if (!res || !res.ok || !res.path) return;
-      const fn = res.path.split(/[\\/]/).pop();
-      const idx = (STATE.fashionOutfits || []).length + 1;
-      STATE.fashionOutfits.push({
-        id: `outfit_custom_${idx}_${Date.now()}`,
-        filename: fn,
-        path: res.path,
-        name: `Bộ ${idx}: ${fn}`,
-        short_desc: `trang phục thời trang theo đúng ảnh tham chiếu ${fn}`,
-        en_desc: `exact fashion outfit matching reference image ${fn}`,
-        width: 1536,
-        height: 2752,
-        is_2k: true,
-        enabled: true,
+      const uploadKind = kind === "video"
+        ? "video"
+        : (kind === "character" || inputId === "inpFashionBaseChar"
+          ? "character"
+          : (kind === "bg" || inputId === "inpFashionCharSheet" ? "bg" : "outfit"));
+      const uploaded = await uploadFashionFileViaBrowser({
+        kind: uploadKind,
+        accept: kind === "video" ? "video/*" : "image/*",
+        multiple: false,
       });
-      renderFashionOutfitsList();
-      showFashionBanner(`👗 Đã thêm Bộ Đồ #${idx} (<b>${fn}</b>) vào danh sách phối đồ!`);
-    }
-
-    function renderFashionOutfitsList() {
-      const grid = document.getElementById("fashionOutfitsGrid");
-      if (!grid) return;
-      const list = STATE.fashionOutfits || [];
-      grid.innerHTML = list.map((o, idx) => {
-        const oEnc = encodeURIComponent(o.path || '');
-        const imgUrl = `/api/media?path=${oEnc}`;
-        const lbPath = o.lookbook_model_path || (o.lookbook_model_filename ? `ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/${o.lookbook_model_filename}` : "");
-        const lbUrl = lbPath ? `/api/media?path=${encodeURIComponent(lbPath)}` : "";
-        const safeName = (o.name || o.filename || '').replace(/'/g, "\\'");
-        return `
-          <div style="background:#0a0f1d; border:1px solid ${o.enabled !== false ? 'rgba(245,158,11,0.55)' : 'var(--border)'}; border-radius:8px; padding:8px; display:flex; gap:8px; align-items:center;">
-            <div style="display:flex; gap:4px; flex-shrink:0;">
-              <div style="width:54px; height:76px; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; border:1px solid rgba(245,158,11,0.45); position:relative;"
-                   onclick="openLightbox('${imgUrl}', '${safeName} (Product Sheet 2K)')"
-                   title="Bấm để xem Ảnh Tách Quần Áo & Phụ Kiện 2K">
-                <img src="${imgUrl}" style="width:100%; height:100%; object-fit:cover;" />
-                <span style="position:absolute; bottom:2px; left:2px; background:rgba(0,0,0,0.78); color:#fde68a; font-size:8px; font-weight:800; padding:0 4px; border-radius:3px;">Đồ 2K</span>
-              </div>
-              ${lbUrl ? `
-                <div style="width:54px; height:76px; border-radius:6px; overflow:hidden; background:#000; cursor:pointer; border:1px solid rgba(236,72,153,0.5); position:relative;"
-                     onclick="openLightbox('${lbUrl}', 'NV5 Mặc ${safeName} (2K Lookbook)')"
-                     title="Bấm để xem Ảnh NV5 Mặc Bộ Đồ Này Trong Phòng Thay Đồ 2K">
-                  <img src="${lbUrl}" style="width:100%; height:100%; object-fit:cover;" />
-                  <span style="position:absolute; bottom:2px; left:2px; background:rgba(236,72,153,0.85); color:#fff; font-size:8px; font-weight:800; padding:0 4px; border-radius:3px;">Mẫu 2K</span>
-                </div>
-              ` : ''}
-            </div>
-            <div style="flex:1; min-width:0;">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:4px; flex-wrap:wrap;">
-                <label style="display:flex; align-items:center; gap:5px; font-size:11px; font-weight:800; color:#fde68a; cursor:pointer; margin:0;">
-                  <input type="checkbox" ${o.enabled !== false ? 'checked' : ''} onchange="STATE.fashionOutfits[${idx}].enabled = this.checked" />
-                  <span>Bộ #${idx + 1}</span>
-                </label>
-                <div style="display:flex; gap:3px; align-items:center; flex-wrap:wrap;">
-                  <button class="btn btn-xs btn-outline" style="padding:1px 5px; font-size:8.5px; color:#93c5fd;"
-                          onclick="openLightbox('${imgUrl}', '${safeName} (Product Sheet 2K)')" title="Xem phóng to ảnh 2K">🔍 Xem</button>
-                  <button class="btn btn-xs btn-outline" style="padding:1px 5px; font-size:8.5px; color:#fde68a;"
-                          onclick="changeSingleFashionOutfitImage(${idx})" title="Chọn ảnh sản phẩm khác từ máy tính cho Bộ #${idx + 1}">📂 Đổi</button>
-                  <button class="btn btn-xs btn-outline" style="padding:1px 5px; font-size:8.5px; color:#f9a8d4; border-color:rgba(236,72,153,0.45);"
-                          onclick="deconstructSingleOutfitToWhiteBg2K(${idx})"
-                          title="Tách sản phẩm này ra Ảnh Tham Chiếu Nền Trắng Chuẩn 2K (ChatGPT / Banana 2K)">
-                    🪄 Tách 2K
-                  </button>
-                  <button class="btn btn-xs btn-outline" style="padding:1px 5px; font-size:8.5px;"
-                          onclick="openFolderEncoded('${oEnc}')" title="Mở vị trí file ảnh trong Explorer">📂</button>
-                  <button class="btn btn-xs btn-danger" style="padding:1px 5px; font-size:8.5px;"
-                          onclick="removeSingleFashionOutfit(${idx})" title="Xoá Bộ #${idx + 1} khỏi danh sách">🗑️</button>
-                </div>
-              </div>
-              <div style="font-size:10.5px; font-weight:700; color:#fff; margin-top:2px; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;" title="${o.name || o.filename}">${o.name || o.filename}</div>
-              <div style="font-size:9.5px; color:#93c5fd; font-family:Consolas,monospace; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">[${o.filename}]</div>
-              <input value="${(o.short_desc || '').replace(/"/g, '&quot;')}"
-                     onchange="STATE.fashionOutfits[${idx}].short_desc = this.value"
-                     placeholder="Mô tả chi tiết bộ đồ..."
-                     style="margin-top:4px; font-size:10px; padding:3px 6px; width:100%;" />
-            </div>
-          </div>
-        `;
-      }).join("");
+      if (!uploaded.length) return;
+      const u = uploaded[0];
+      const inp = document.getElementById(inputId);
+      if (inp) inp.value = u.path;
+      if (inputId === "inpFashionBaseChar") {
+        await _applyUploadedFashionCharacter(u);
+      } else if (inputId === "inpFashionCharSheet") {
+        await onCustomFashionCharacterPathChange(false);
+        showFashionBanner(`🏠 Đã cập nhật ảnh bối cảnh mở đầu: <b>${_escFashionHtml(u.filename)}</b>.`);
+      } else if (inputId === "inpFashionRefVideo") {
+        if (STATE.fashionProject) {
+          STATE.fashionProject.source_template_code = "";
+        }
+        showFashionBanner(`🎬 Đã chọn video tham chiếu riêng <b>${_escFashionHtml(u.filename)}</b>! Đang phân tích nhịp cắt...`);
+        await analyzeAndBuildFashionProject();
+      }
     }
 
     function _normFashionModeUI(modeVal) {
@@ -4280,9 +4957,9 @@
     }
 
     function _fashionModeLabelUI(normMode) {
-      if (normMode === "google_vids") return "Google Vids Web Omni 1080p (Không reCAPTCHA • 3 Chip Ảnh 2K)";
-      if (normMode === "chained_i2v") return "Chained Img2Video 0.1s Chuẩn Nhạc (Google Flow)";
-      return "Motion Control Video Ref (Google Flow)";
+      if (normMode === "google_vids") return "Google Vids Web 1080p (Không reCAPTCHA)";
+      if (normMode === "chained_i2v") return "Google Flow · Chained I2V (Chuẩn Nhạc 0.1s)";
+      return "Google Flow · Motion Video Ref";
     }
 
     async function onChangeFashionGenerationMode(modeVal) {
@@ -4293,29 +4970,34 @@
       const selStyle = document.getElementById("selFashionPromptStyle");
       if (selStyle) selStyle.value = targetStyle;
 
-      if (!STATE.fashionProject) return;
-      const slug = STATE.fashionProject.project_id || "fashion_lookbook_chan_vay_6e19";
-      STATE.fashionProject.generation_mode = normMode;
-      STATE.fashionProject.prompt_style = targetStyle;
+      STATE.fashionPreparedSignature = "";
+      populateFashionAccountSelector();
 
-      try {
-        const res = await apiPost("/api/fashion_motion/switch_mode", {
-          project_id: slug,
-          generation_mode: normMode,
-        });
-        if (res && res.ok && res.project) {
-          STATE.fashionProject = res.project;
-          if (Array.isArray(res.projects)) STATE.fashionProjectsList = res.projects;
+      if (STATE.fashionProject) {
+        STATE.fashionProject.generation_mode = normMode;
+        STATE.fashionProject.prompt_style = targetStyle;
+        if (STATE.fashionProject.status !== "draft" && STATE.fashionProject.project_id) {
+          try {
+            const res = await apiPost("/api/fashion_motion/switch_mode", {
+              project_id: STATE.fashionProject.project_id,
+              generation_mode: normMode,
+            });
+            if (res && res.ok && res.project) {
+              STATE.fashionProject = res.project;
+              if (Array.isArray(res.projects)) STATE.fashionProjectsList = res.projects;
+            }
+          } catch (e) {}
         }
-      } catch (e) {}
+      }
 
+      renderSelectedFashionTemplateDetail(false);
       renderFashionMotionStudio();
       showFashionBanner(
         normMode === "google_vids"
-          ? `🌐 Đã chuyển sang chế độ <b>Google Vids Web Omni 1080p</b> (100% HTTP Cookie thuần • Không cần reCAPTCHA • Gắn trực tiếp 3 Chip Ảnh 2K gốc + Nối Frame cuối Cảnh 1)!`
+          ? `🌐 Đã chọn <b>Google Vids Web 1080p</b> (Chạy bằng Cookie Google • Không cần reCAPTCHA • Tự động nối Frame cuối Cảnh 1 sang Cảnh 2).`
           : normMode === "chained_i2v"
-            ? `✨ Đã chuyển sang chế độ <b>Chained Img2Video + Timeline 0.1s Chuẩn Nhạc</b> (Không dùng Video Ref • Phân cảnh 2 tự động cắt Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> để nối tiếp liền mạch)!`
-            : `🎬 Đã chuyển sang chế độ <b>Motion Control Video Ref</b> (Dùng Video Gốc làm Ref • Phân cảnh 2 tự động dùng Frame cuối Cảnh 1 <code>scene_s1_last_frame_2k.png</code> làm ảnh mở đầu nối tiếp)!`
+            ? `✨ Đã chọn <b>Google Flow · Chained I2V</b> ( Biến hình khớp nhạc 0.1s • Cảnh 2 nối tiếp Frame cuối Cảnh 1).`
+            : `🎬 Đã chọn <b>Google Flow · Motion Video Ref</b> (Dùng trực tiếp Video Mẫu làm tham chiếu chuyển động).`
       );
     }
 
@@ -4326,18 +5008,14 @@
       if (selMode && selMode.value !== normMode) selMode.value = normMode;
       STATE.fashionProject.generation_mode = normMode;
       STATE.fashionProject.prompt_style = styleVal;
+      populateFashionAccountSelector();
       (STATE.fashionProject.scenes || []).forEach(sc => {
         sc.active_prompt_style = styleVal;
         sc.generation_mode = normMode;
-        if (styleVal === "google_vids") {
-          sc.prompt = sc.prompt_google_vids || sc.prompt_chained_i2v || sc.prompt;
-        } else if (styleVal === "chained_i2v") {
-          sc.prompt = sc.prompt_chained_i2v || sc.prompt;
-        } else if (styleVal === "concise_flow") {
-          sc.prompt = sc.prompt_concise_flow || sc.prompt_timeline_pro || sc.prompt;
-        } else {
-          sc.prompt = sc.prompt_timeline_pro || sc.prompt;
-        }
+        if (styleVal === "google_vids") sc.prompt = sc.prompt_google_vids || sc.prompt_chained_i2v || sc.prompt;
+        else if (styleVal === "chained_i2v") sc.prompt = sc.prompt_chained_i2v || sc.prompt;
+        else if (styleVal === "concise_flow") sc.prompt = sc.prompt_concise_flow || sc.prompt_timeline_pro || sc.prompt;
+        else sc.prompt = sc.prompt_timeline_pro || sc.prompt;
       });
       renderFashionScenesTimeline();
     }
@@ -4346,7 +5024,7 @@
       const proj = STATE.fashionProject;
       if (!proj) return;
 
-      const curGenMode = proj.generation_mode || "chained_i2v";
+      const curGenMode = _normFashionModeUI(proj.generation_mode || document.getElementById("selFashionGenerationMode")?.value || "chained_i2v");
       const selGenMode = document.getElementById("selFashionGenerationMode");
       if (selGenMode) selGenMode.value = curGenMode;
       const selPStyle = document.getElementById("selFashionPromptStyle");
@@ -4357,81 +5035,40 @@
       }
 
       const inpChar = document.getElementById("inpFashionBaseChar");
-      if (inpChar && proj.base_char_2k?.path) inpChar.value = proj.base_char_2k.path;
-
+      if (inpChar) inpChar.value = proj.base_char_2k?.path || inpChar.value || "";
       const inpSheet = document.getElementById("inpFashionCharSheet");
-      if (inpSheet && proj.char_sheet_2k?.path) inpSheet.value = proj.char_sheet_2k.path;
-
+      if (inpSheet) inpSheet.value = proj.char_sheet_2k?.path || inpSheet.value || inpChar?.value || "";
       const inpVid = document.getElementById("inpFashionRefVideo");
       if (inpVid && proj.reference_video?.path) inpVid.value = proj.reference_video.path;
 
-      const charBox = document.getElementById("fashionCharPreviewBox");
-      if (charBox && proj.base_char_2k) {
-        const cEnc = encodeURIComponent(proj.base_char_2k.path || '');
-        const cUrl = `/api/media?path=${cEnc}`;
-        const csEnc = proj.char_sheet_2k?.path ? encodeURIComponent(proj.char_sheet_2k.path) : "";
-        const csUrl = csEnc ? `/api/media?path=${csEnc}` : "";
-        charBox.innerHTML = `
-          <div style="width:52px; height:74px; border-radius:6px; overflow:hidden; border:1px solid #ec4899; cursor:pointer; flex-shrink:0;"
-               onclick="openLightbox('${cUrl}', 'Ảnh Nhân Vật Gốc 2K: ${proj.base_char_2k.filename} (${proj.base_char_2k.width}×${proj.base_char_2k.height})')">
-            <img src="${cUrl}" style="width:100%; height:100%; object-fit:cover;" />
-          </div>
-          ${csUrl ? `
-            <div style="width:52px; height:74px; border-radius:6px; overflow:hidden; border:1px solid #8b5cf6; cursor:pointer; flex-shrink:0;"
-                 onclick="openLightbox('${csUrl}', 'Ảnh Bối Cảnh Phòng Tham Chiếu 2K: ${proj.char_sheet_2k.filename}')">
-              <img src="${csUrl}" style="width:100%; height:100%; object-fit:cover;" />
-            </div>
-          ` : ''}
-          <div style="font-size:10.5px; color:#cbd5e1; line-height:1.35; flex:1; min-width:0;">
-            <div>✅ <b>Nhân vật 2K:</b> <code style="color:#f9a8d4;">${proj.base_char_2k.filename}</code> (${proj.base_char_2k.width}×${proj.base_char_2k.height})</div>
-            ${proj.char_sheet_2k ? `<div>🏠 <b>Bối cảnh 2K:</b> <code style="color:#c4b5fd;">${proj.char_sheet_2k.filename}</code></div>` : ''}
-            <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-              <button class="btn btn-xs btn-outline" style="font-size:9px; padding:2px 6px;" onclick="openLightbox('${cUrl}', 'Ảnh Nhân Vật 2K: ${proj.base_char_2k.filename}')">🔍 Xem NV</button>
-              ${csUrl ? `<button class="btn btn-xs btn-outline" style="font-size:9px; padding:2px 6px;" onclick="openLightbox('${csUrl}', 'Ảnh Bối Cảnh 2K: ${proj.char_sheet_2k.filename}')">🔍 Xem Bối Cảnh</button>` : ''}
-              <button class="btn btn-xs btn-outline" style="font-size:9px; padding:2px 6px;" onclick="openFolderEncoded('${cEnc}')">📂 Mở Folder</button>
-            </div>
-          </div>
-        `;
-      }
+      populateFashionAccountSelector();
+      populateFashionCharacterPicker();
+      renderFashionCharacterPreview();
 
       const sumBox = document.getElementById("fashionVideoSplitSummary");
-      if (sumBox && proj.split_plan && proj.reference_video) {
-        const sp = proj.split_plan;
+      if (sumBox) {
         const rv = proj.reference_video;
-        const gCuts = (proj.global_cuts_info?.visual_cuts || []).map(c => `${c.timestamp_colon}s`).join(", ") || "Tự động theo nhịp";
-        const gBeats = (proj.global_cuts_info?.audio_beats || []).slice(0, 6).map(b => `${b.timestamp_colon}s`).join(", ") || "Tự động";
-        const rvEnc = encodeURIComponent(rv.path || '');
-        const refVidUrl = `/api/media?path=${rvEnc}#t=0.5`;
-        sumBox.innerHTML = `
-          <div style="display:flex; gap:10px; align-items:center;">
-            <div style="width:56px; height:92px; border-radius:6px; overflow:hidden; background:#000; border:1px solid rgba(6,182,212,0.5); flex-shrink:0; cursor:pointer; position:relative;"
-                 onclick="toggleFashionInlineVideo('fStep1RefVid', 'btnStep1RefPlay')"
-                 title="Bấm vào video để Phát/Dừng có tiếng">
-              <video id="fStep1RefVid" class="fashion-clean-video" preload="metadata" onloadedmetadata="if(this.currentTime===0){try{this.currentTime=0.5;}catch(e){}}" style="width:100%; height:100%; object-fit:cover;" src="${refVidUrl}"></video>
-              <span style="position:absolute; bottom:2px; left:2px; right:2px; background:rgba(0,0,0,0.78); color:#67e8f9; font-size:8px; font-weight:800; text-align:center; border-radius:3px;">▶️ Bấm phát</span>
-            </div>
-            <div style="flex:1; min-width:0; line-height:1.4;">
-              <div>🎯 <b>Video Gốc:</b> <code style="color:#fff;">${rv.filename}</code> — Dài <b>${rv.duration}s</b> (${rv.width}×${rv.height} • ${rv.fps} FPS)</div>
-              <div style="color:#fde68a; font-weight:800;">✂️ ${sp.reason} (Model: <code>${sp.model_key_edit}</code>)</div>
-              <div style="font-size:10px; color:#cbd5e1;">👁️ Điểm cắt cảnh: <b style="color:#34d399;">${gCuts}</b> | 🎵 Nhịp Beat: <b>${gBeats}</b></div>
-              <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:4px;">
-                <button id="btnStep1RefPlay" class="btn btn-xs btn-success" style="font-size:9px; padding:2px 7px;" onclick="toggleFashionInlineVideo('fStep1RefVid', 'btnStep1RefPlay')">▶️ Phát</button>
-                <button class="btn btn-xs btn-primary" style="font-size:9px; padding:2px 7px;" onclick="openVerticalVideoModal('${rvEnc}', '', '', 'Video Tham Chiếu Gốc: ${(rv.filename || '').replace(/'/g, '')} (${rv.duration}s)', '', '')">📱 Xem Dọc 9:16</button>
-                <button class="btn btn-xs btn-outline" style="font-size:9px; padding:2px 7px;" onclick="openFileEncoded('${rvEnc}')">🖥️ Player Máy</button>
-                <button class="btn btn-xs btn-outline" style="font-size:9px; padding:2px 7px;" onclick="openFolderEncoded('${rvEnc}')">📂 Mở File</button>
-              </div>
-            </div>
-          </div>
-        `;
+        const sp = proj.split_plan;
+        if (rv && rv.path) {
+          sumBox.innerHTML = `
+            <div>🎯 <b>Video mẫu:</b> <code>${_escFashionHtml(rv.filename || rv.path.split(/[\\/]/).pop())}</code> (${rv.duration || 16}s)</div>
+            ${sp?.reason ? `<div style="color:#fde68a; margin-top:2px;">✂️ ${_escFashionHtml(sp.reason)}</div>` : `<div style="color:#94a3b8; margin-top:2px;">Sẽ tự động cắt cảnh & căn nhịp khi bấm Tạo Video.</div>`}
+          `;
+        } else {
+          sumBox.innerHTML = `<span style="color:#94a3b8;">Chưa chọn video tham chiếu riêng.</span>`;
+        }
       }
 
       renderFashionOutfitsList();
       renderFashionLiveMonitorBar();
       renderFashionScenesTimeline();
       renderFashionFinalPostProdCard();
+
       if (proj.status === "running_flow" && !STATE._fashionFlowPollTimer) {
         startFashionLiveStatusMonitor(proj.project_id);
       }
+      renderFashionScenesTimeline();
+      updateFashionSimpleSummary();
     }
 
     function _getFashionSceneStatusBadgeHtml(sc, outVidUrl) {
@@ -4439,26 +5076,36 @@
       const attempt = sc.attempt || 1;
       const maxAtt = sc.max_attempts || 4;
       const elapsed = sc.elapsed_sec ? ` • ${sc.elapsed_sec}s` : "";
-
       if (st.startsWith("retrying")) {
-        return `<span class="badge" style="background:rgba(245,158,11,0.28); color:#fde68a; border:1px solid #f59e0b; font-weight:900;">🔁 Đang tự động Retry ngay (Lần ${attempt}/${maxAtt})</span>`;
+        return `<span class="badge" style="background:rgba(245,158,11,0.28); color:#fde68a; border:1px solid #f59e0b; font-weight:900;">🔁 Đang Retry (${attempt}/${maxAtt})</span>`;
       }
       if (st === "preparing" || st === "uploading_video" || st === "submitting") {
-        return `<span class="badge" style="background:rgba(6,182,212,0.22); color:#67e8f9; border:1px solid #06b6d4; font-weight:800;">🚀 Đang gửi lên Google Flow (Lần ${attempt}/${maxAtt})</span>`;
+        return `<span class="badge" style="background:rgba(6,182,212,0.22); color:#67e8f9; border:1px solid #06b6d4; font-weight:800;">🚀 Đang gửi dữ liệu (${attempt}/${maxAtt})</span>`;
       }
       if (st === "submitted_720p" || st.startsWith("rendering")) {
-        return `<span class="badge" style="background:rgba(59,130,246,0.24); color:#93c5fd; border:1px solid #3b82f6; font-weight:800;">⏳ Đang tạo Video (Lần ${attempt}/${maxAtt}${elapsed})</span>`;
+        return `<span class="badge" style="background:rgba(59,130,246,0.24); color:#93c5fd; border:1px solid #3b82f6; font-weight:800;">⏳ Đang render (${attempt}/${maxAtt}${elapsed})</span>`;
       }
       if (st === "upsampling_1080p") {
         return `<span class="badge" style="background:rgba(168,85,247,0.25); color:#e9d5ff; border:1px solid #a855f7; font-weight:800;">✨ Đang nâng cấp 1080p...</span>`;
       }
       if (st.startsWith("failed")) {
-        return `<span class="badge" style="background:rgba(239,68,68,0.22); color:#fca5a5; border:1px solid #ef4444; font-weight:800;">❌ Lỗi (${st.replace('failed:', '')}) — Có thể Retry</span>`;
+        return `<span class="badge" style="background:rgba(239,68,68,0.22); color:#fca5a5; border:1px solid #ef4444; font-weight:800;">❌ Lỗi (${_escFashionHtml(st.replace("failed:", ""))})</span>`;
       }
       if (outVidUrl || st === "done") {
-        return `<span class="badge badge-done">✅ Đã tạo Video Phân Cảnh (${sc.duration}s)</span>`;
+        return `<span class="badge badge-done">✅ Hoàn tất (${sc.duration}s)</span>`;
       }
-      return `<span class="badge badge-wait">⏳ Chờ tạo Video</span>`;
+      return `<span class="badge badge-wait">⏳ Chờ tạo</span>`;
+    }
+
+    function _isFashionProjectActivelyRunningOrFailed(proj) {
+      if (!proj || !proj.project_id || proj.status === "draft") return false;
+      const scenes = proj.scenes || [];
+      const hasActive = scenes.some(s => {
+        const st = String(s.status || "");
+        return st === "preparing" || st === "uploading_video" || st === "submitting" || st === "submitted_720p" || st === "upsampling_1080p" || st.startsWith("rendering") || st.startsWith("retrying");
+      });
+      const hasFailed = scenes.some(s => String(s.status || "").startsWith("failed"));
+      return proj.status === "running_flow" || hasActive || (hasFailed && !proj.final_video_ready);
     }
 
     function renderFashionLiveMonitorBar() {
@@ -4466,103 +5113,181 @@
         document.getElementById("fashionLiveMonitorBarTop"),
         document.getElementById("fashionLiveMonitorBar"),
       ].filter(Boolean);
-      const proj = STATE.fashionProject;
-      if (!bars.length || !proj) return;
+      if (!bars.length) return;
 
-      const scenes = proj.scenes || [];
-      const activeScenes = scenes.filter(s => {
-        const st = String(s.status || "");
-        return st === "preparing" || st === "uploading_video" || st === "submitting" || st === "submitted_720p" || st === "upsampling_1080p" || st.startsWith("rendering") || st.startsWith("retrying");
-      });
-      const failedScenes = scenes.filter(s => String(s.status || "").startsWith("failed"));
-      const doneScenes = scenes.filter(s => String(s.status || "") === "done" || !!s.output_video_path);
+      const seenIds = new Set();
+      const monitorProjs = [];
+      const pushCandidate = (p) => {
+        if (!p || !p.project_id || seenIds.has(p.project_id)) return;
+        if (p.status === "running_flow" || (STATE.runningFashionSlugs && STATE.runningFashionSlugs.has(p.project_id)) || (p.project_id === STATE.fashionProject?.project_id && _isFashionProjectActivelyRunningOrFailed(p))) {
+          seenIds.add(p.project_id);
+          monitorProjs.push(p);
+        }
+      };
 
-      if (!activeScenes.length && !failedScenes.length && proj.status !== "running_flow") {
-        bars.forEach(b => {
-          b.style.display = "none";
-          b.innerHTML = "";
-        });
+      if (STATE.fashionProject) pushCandidate(STATE.fashionProject);
+      (STATE.fashionProjectsList || []).forEach(pushCandidate);
+
+      if (!monitorProjs.length) {
+        bars.forEach(b => { b.style.display = "none"; b.innerHTML = ""; });
         return;
       }
 
-      // Tính phần trăm tiến trình trực quan
-      let totalScore = 0;
-      scenes.forEach(s => {
-        const st = String(s.status || "");
-        if (st === "done" || s.output_video_path) totalScore += 100;
-        else if (st === "upsampling_1080p") totalScore += 84;
-        else if (st.startsWith("rendering") || st === "submitted_720p") {
-          const elSec = Number(s.elapsed_sec || 0);
-          totalScore += Math.min(78, 35 + Math.floor(elSec * 0.4));
-        } else if (st.startsWith("retrying")) totalScore += 32;
-        else if (st === "submitting") totalScore += 28;
-        else if (st === "uploading_video") totalScore += 20;
-        else if (st === "preparing") totalScore += 12;
-      });
-      const pct = scenes.length
-        ? (proj.final_video_ready && doneScenes.length === scenes.length ? 100 : Math.max(10, Math.min(96, Math.round(totalScore / scenes.length))))
-        : 15;
       const elapsedSecTotal = STATE._fashionRunStartTs ? Math.max(1, Math.round((Date.now() - STATE._fashionRunStartTs) / 1000)) : 0;
 
-      const scenePills = scenes.map(s => {
-        const st = String(s.status || "ready");
-        const att = s.attempt || 1;
-        const maxAtt = s.max_attempts || 4;
-        let color = "#94a3b8";
-        let bg = "rgba(148,163,184,0.12)";
-        let icon = "⏳";
-        if (st === "done" || s.output_video_path) {
-          color = "#34d399";
-          bg = "rgba(16,185,129,0.16)";
-          icon = "✅";
-        } else if (st.startsWith("retrying")) {
-          color = "#fde68a";
-          bg = "rgba(245,158,11,0.22)";
-          icon = "🔁";
-        } else if (st.startsWith("failed")) {
-          color = "#fca5a5";
-          bg = "rgba(239,68,68,0.22)";
-          icon = "❌";
-        } else if (activeScenes.includes(s)) {
-          color = "#67e8f9";
-          bg = "rgba(6,182,212,0.18)";
-          icon = "🔄";
-        }
+      const rowsHtml = monitorProjs.map(proj => {
+        const scenes = proj.scenes || [];
+        const activeScenes = scenes.filter(s => {
+          const st = String(s.status || "");
+          return st === "preparing" || st === "uploading_video" || st === "submitting" || st === "submitted_720p" || st === "upsampling_1080p" || st.startsWith("rendering") || st.startsWith("retrying");
+        });
+        const failedScenes = scenes.filter(s => String(s.status || "").startsWith("failed"));
+        const doneScenes = scenes.filter(s => String(s.status || "") === "done" || !!s.output_video_path);
+
+        let totalScore = 0;
+        scenes.forEach(s => {
+          const st = String(s.status || "");
+          if (st === "done" || s.output_video_path) totalScore += 100;
+          else if (st === "upsampling_1080p") totalScore += 85;
+          else if (st.startsWith("rendering") || st === "submitted_720p") totalScore += Math.min(78, 35 + Math.floor(Number(s.elapsed_sec || 0) * 0.4));
+          else if (st.startsWith("retrying")) totalScore += 32;
+          else if (st === "submitting") totalScore += 28;
+          else if (st === "uploading_video") totalScore += 20;
+          else if (st === "preparing") totalScore += 12;
+        });
+        const pct = scenes.length
+          ? (proj.final_video_ready && doneScenes.length === scenes.length ? 100 : Math.max(10, Math.min(96, Math.round(totalScore / scenes.length))))
+          : 15;
+        const engineTitle = _normFashionModeUI(proj.generation_mode) === "google_vids" ? "GOOGLE VIDS WEB 1080P" : "GOOGLE FLOW";
+
+        const scenePills = scenes.map(s => {
+          const st = String(s.status || "ready");
+          let color = "#94a3b8", bg = "rgba(148,163,184,0.12)", icon = "⏳";
+          if (st === "done" || s.output_video_path) { color = "#34d399"; bg = "rgba(16,185,129,0.16)"; icon = "✅"; }
+          else if (st.startsWith("retrying")) { color = "#fde68a"; bg = "rgba(245,158,11,0.22)"; icon = "🔁"; }
+          else if (st.startsWith("failed")) { color = "#fca5a5"; bg = "rgba(239,68,68,0.22)"; icon = "❌"; }
+          else if (activeScenes.includes(s)) { color = "#67e8f9"; bg = "rgba(6,182,212,0.18)"; icon = "🔄"; }
+          return `
+            <span style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}66; font-size:11px; font-weight:800;">
+              ${icon} Cảnh ${s.scene_index}: ${_escFashionHtml(s.status_detail || st)}
+            </span>
+          `;
+        }).join("");
+
+        const safeSlug = _escFashionHtml(proj.project_id);
+        const safeTitle = _escFashionHtml(proj.title || proj.project_id);
+
         return `
-          <span style="display:inline-flex; align-items:center; gap:5px; padding:4px 10px; border-radius:6px; background:${bg}; color:${color}; border:1px solid ${color}66; font-size:11px; font-weight:800;">
-            ${icon} Cảnh ${s.scene_index}: ${s.status_detail || st} (Lần ${att}/${maxAtt})
-          </span>
+          <div style="display:flex; flex-direction:column; gap:7px; padding:${monitorProjs.length > 1 ? "8px 10px" : "2px 0"}; background:${monitorProjs.length > 1 ? "rgba(6,10,20,0.65)" : "transparent"}; border:${monitorProjs.length > 1 ? "1px solid rgba(6,182,212,0.25)" : "none"}; border-radius:8px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+              <div style="font-weight:900; color:#67e8f9; font-size:12px;">
+                📡 [${safeTitle}] · ${engineTitle}${elapsedSecTotal ? ` (⏱️ ${elapsedSecTotal}s)` : ""}:
+                <span style="color:#fdf2f8; font-weight:800;">${_escFashionHtml(proj.status_message || "Đang xử lý phân cảnh...")}</span>
+              </div>
+              <div style="display:flex; align-items:center; gap:7px; flex-wrap:wrap;">
+                <span class="badge" style="background:linear-gradient(135deg,#06b6d4,#10b981); color:#04131a; font-weight:900; font-size:11px; padding:3px 9px;">
+                  ⚡ ${pct}% (${doneScenes.length}/${scenes.length} cảnh)
+                </span>
+                <button class="btn btn-xs btn-primary" style="font-weight:800; padding:4px 10px;" onclick="openProjectInStudio('${safeSlug}')" title="Chuyển qua tab Studio Dự Án để theo dõi tiến trình đa tác vụ">
+                  📊 Xem Tiến Trình Tại Studio Dự Án
+                </button>
+                ${failedScenes.length ? `
+                  <button class="btn btn-xs btn-amber" style="font-weight:900; padding:4px 10px;" onclick="retryAllFailedFashionScenes(false, '${safeSlug}')">
+                    🔁 Chạy Lại ${failedScenes.length} Cảnh Lỗi
+                  </button>
+                ` : ""}
+              </div>
+            </div>
+            <div style="width:100%; height:8px; background:#060a14; border-radius:99px; overflow:hidden; border:1px solid rgba(6,182,212,0.4);">
+              <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#ec4899,#06b6d4,#10b981); border-radius:99px; transition:width 0.4s;"></div>
+            </div>
+            <div style="display:flex; gap:6px; flex-wrap:wrap;">${scenePills}</div>
+          </div>
         `;
       }).join("");
 
-      const html = `
-        <div style="display:flex; flex-direction:column; gap:7px;">
-          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
-            <div style="font-weight:900; color:#67e8f9; font-size:12px;">
-              📡 TIẾN TRÌNH TẠO VIDEO GOOGLE FLOW (${proj.updated_at || 'Live'}${elapsedSecTotal ? ` • ⏱️ Đã chạy ${elapsedSecTotal}s` : ''}):
-              <span style="color:#fdf2f8; font-weight:800;">${proj.status_message || 'Đang chạy tạo video trên Google Flow (Omni 1.1 Flash)...'}</span>
-            </div>
-            <div style="display:flex; align-items:center; gap:8px;">
-              <span class="badge" style="background:linear-gradient(135deg,#06b6d4,#10b981); color:#04131a; font-weight:900; font-size:11px; padding:3px 9px;">
-                ⚡ Tiến độ: ${pct}% (${doneScenes.length}/${scenes.length} cảnh hoàn tất)
-              </span>
-              ${failedScenes.length ? `
-                <button class="btn btn-xs btn-amber" style="font-weight:900; padding:5px 11px;" onclick="retryAllFailedFashionScenes(false)">
-                  🔁 Retry Ngay ${failedScenes.length} Cảnh Lỗi
-                </button>
-              ` : ''}
-            </div>
-          </div>
-          <div style="width:100%; height:8px; background:#060a14; border-radius:99px; overflow:hidden; border:1px solid rgba(6,182,212,0.4);">
-            <div style="width:${pct}%; height:100%; background:linear-gradient(90deg,#ec4899,#06b6d4,#10b981); border-radius:99px; transition:width 0.4s;"></div>
-          </div>
-          <div style="display:flex; gap:6px; flex-wrap:wrap;">${scenePills}</div>
-        </div>
-      `;
+      const headerMultiHtml = monitorProjs.length > 1
+        ? `<div style="font-size:11px; font-weight:900; color:#fde68a; margin-bottom:4px;">⚡ ĐANG CHẠY ĐỒNG THỜI ${monitorProjs.length} TÁC VỤ VIDEO THỜI TRANG (Bạn vẫn có thể tạo tiếp video khác bên dưới)</div>`
+        : "";
 
-      bars.forEach(b => {
-        b.style.display = "block";
-        b.innerHTML = html;
+      const html = `<div style="display:flex; flex-direction:column; gap:8px;">${headerMultiHtml}${rowsHtml}</div>`;
+      bars.forEach(b => { b.style.display = "block"; b.innerHTML = html; });
+    }
+
+
+    function _buildDraftScenesFromSelectedTemplate(proj, curTpl, genMode) {
+      if (!curTpl) return [];
+      const bpList = Array.isArray(curTpl.scenes_blueprint) && curTpl.scenes_blueprint.length
+        ? curTpl.scenes_blueprint
+        : [
+            { scene_index: 1, start_sec: 0, end_sec: 8, duration: 8, transition_timestamps_sec: ["3.20s", "6.80s"], transition_timestamps: ["00:03", "00:07"] },
+            { scene_index: 2, start_sec: 8, end_sec: 16, duration: 8, transition_timestamps_sec: ["3.10s", "6.70s"], transition_timestamps: ["00:03", "00:07"] },
+          ];
+      const enabledOutfits = (STATE.fashionOutfits || []).filter(o => o && o.enabled !== false);
+      const charPath = (document.getElementById("inpFashionBaseChar")?.value || proj?.base_char_2k?.path || "").trim();
+      const charFn = charPath ? charPath.split(/[\\/]/).pop() : "Ảnh_nhân_vật_của_bạn.png";
+      let globalOutfitCursor = 0;
+
+      return bpList.map((bp, idx) => {
+        const scNum = Number(bp.scene_index || (idx + 1));
+        const tsSecArr = (Array.isArray(bp.transition_timestamps_sec) && bp.transition_timestamps_sec.length)
+          ? bp.transition_timestamps_sec
+          : ((bp.transition_timestamps || []).map(x => String(x)));
+        const tsColArr = Array.isArray(bp.transition_timestamps) ? bp.transition_timestamps : tsSecArr;
+        const trCount = Math.max(1, tsSecArr.length || 2);
+        const transitions = [];
+        for (let t = 0; t < trCount; t++) {
+          const outfObj = enabledOutfits.length
+            ? enabledOutfits[globalOutfitCursor % enabledOutfits.length]
+            : {
+                id: `outfit_${globalOutfitCursor + 1}`,
+                name: `Bộ trang phục #${globalOutfitCursor + 1} (Chưa chọn SP)`,
+                filename: `San_Pham_Bo_${globalOutfitCursor + 1}.png`,
+                path: "",
+              };
+          const tsVal = tsSecArr[t] || tsColArr[t] || `${(t + 1) * 3.2}s`;
+          transitions.push({
+            cut_index: globalOutfitCursor + 1,
+            timestamp_sec: tsVal,
+            timestamp_colon: tsColArr[t] || tsVal,
+            outfit: outfObj,
+          });
+          globalOutfitCursor++;
+        }
+
+        let rawPrompt = (genMode !== "video_ref" ? (bp.prompt_chained_i2v || bp.prompt_template) : (bp.prompt_template || bp.prompt_chained_i2v)) || "";
+        rawPrompt = rawPrompt
+          .replace(/07_Nhan_Vat_Basic_Phong_Ngu_2K\.png/g, charFn)
+          .replace(/02_Character_Sheet_Basic_Poses_2K\.png/g, charFn);
+        const stdOutfitFns = [
+          ["03_Product_Sheet_Quan_Xanh_2K.png", "04_Product_Sheet_Vay_Vang_2K.png"],
+          ["05_Product_Sheet_Quan_Sooc_Trang_2K.png", "06_Product_Sheet_Chan_Vay_Den_2K.png", "06_Product_Sheet_Quan_Be_2K.png"],
+        ][idx] || ["03_Product_Sheet_Quan_Xanh_2K.png", "04_Product_Sheet_Vay_Vang_2K.png"];
+        transitions.forEach((tr, tIdx) => {
+          const targetFn = stdOutfitFns[tIdx];
+          if (targetFn && tr.outfit?.filename) {
+            rawPrompt = rawPrompt.split(targetFn).join(tr.outfit.filename);
+          }
+        });
+
+        return {
+          id: `s${scNum}`,
+          scene_index: scNum,
+          start_sec: bp.start_sec ?? (idx * 8),
+          end_sec: bp.end_sec ?? ((idx + 1) * 8),
+          duration: bp.duration || 8,
+          status: "blueprint_preview",
+          is_blueprint_preview: true,
+          action_detail: bp.action_detail || curTpl.action_description || "",
+          background_setting: curTpl.background_setting || "",
+          ref_clip_path: curTpl.video_path || "",
+          strip_path: curTpl.strip_path || "",
+          transitions,
+          prompt: rawPrompt,
+          prompt_chained_i2v: rawPrompt,
+          prompt_google_vids: rawPrompt,
+          prompt_timeline_pro: bp.prompt_template || rawPrompt,
+        };
       });
     }
 
@@ -4570,245 +5295,195 @@
       const box = document.getElementById("fashionScenesTimelineContainer");
       const proj = STATE.fashionProject;
       if (!box || !proj) return;
-      const scenes = proj.scenes || [];
-      const genMode = proj.generation_mode || document.getElementById("selFashionGenerationMode")?.value || "chained_i2v";
-      const styleVal = document.getElementById("selFashionPromptStyle")?.value || proj.prompt_style || (genMode === "chained_i2v" ? "chained_i2v" : "timeline_pro");
+
+      const allTpls = (STATE.fashionVideoTemplatesCatalog && STATE.fashionVideoTemplatesCatalog.templates) || [];
+      const curCode = STATE.selectedFashionTemplateCode || proj.source_template_code || allTpls[0]?.code || "FVT_001";
+      const curTpl = allTpls.find(x => x.code === curCode) || allTpls[0] || null;
+      const genMode = _normFashionModeUI(proj.generation_mode || document.getElementById("selFashionGenerationMode")?.value || "chained_i2v");
+      const styleVal = document.getElementById("selFashionPromptStyle")?.value || proj.prompt_style || (genMode === "google_vids" ? "google_vids" : (genMode === "chained_i2v" ? "chained_i2v" : "timeline_pro"));
       const cacheBust = Date.now();
+
+      const actualScenes = Array.isArray(proj.scenes) && proj.scenes.length ? proj.scenes : [];
+      const scenes = actualScenes.length ? actualScenes : _buildDraftScenesFromSelectedTemplate(proj, curTpl, genMode);
+
+      const subBadge = document.getElementById("fashionSceneAnalysisSubBadge");
+      if (subBadge) {
+        const charVal = (document.getElementById("inpFashionBaseChar")?.value || proj.base_char_2k?.path || "").trim();
+        const outCnt = (STATE.fashionOutfits || []).filter(o => o && o.enabled !== false).length;
+        subBadge.innerHTML = actualScenes.length
+          ? `🎬 Dự án đã cắt <b>${actualScenes.length} cảnh</b> · Mẫu <b>${_escFashionHtml(curCode)}</b>`
+          : `📋 Phân tích trực tiếp Mẫu <b>${_escFashionHtml(curCode)}</b> (${scenes.length} cảnh · ${charVal ? "Đã gắn Nhân vật" : "Chưa chọn Nhân vật"} · ${outCnt} bộ đồ)`;
+      }
+
+      if (!scenes.length) {
+        box.innerHTML = `
+          <div style="grid-column:1/-1; padding:18px; background:#060a13; border:1px dashed rgba(6,182,212,0.35); border-radius:9px; text-align:center; color:#94a3b8; font-size:11.5px;">
+            Hãy chọn 1 mẫu video ở Bước 1 để xem phân tích chi tiết từng phân cảnh, dải frame và mốc giây biến hình.
+          </div>
+        `;
+        return;
+      }
 
       box.innerHTML = scenes.map((sc, scIdx) => {
         const scNum = Number(sc.scene_index || (scIdx + 1));
-        const clipEnc = encodeURIComponent(sc.ref_clip_path || '');
-        const clipUrl = `/api/media?path=${clipEnc}&t=${cacheBust}#t=0.5`;
+        const startSec = Number(sc.start_sec ?? (scIdx * 8));
+        const endSec = Number(sc.end_sec ?? ((scIdx + 1) * 8));
+        const sFrame = Math.round(startSec * 30) + 1;
+        const eFrame = Math.round(endSec * 30);
+        const isBlueprint = !!sc.is_blueprint_preview;
+
+        const clipEnc = encodeURIComponent(sc.ref_clip_path || curTpl?.video_path || "");
+        const clipTimeFrag = isBlueprint ? `#t=${startSec},${endSec}` : `#t=0.2`;
+        const clipUrl = `/api/media?path=${clipEnc}&t=${cacheBust}${clipTimeFrag}`;
         const outVidPath = sc.output_video_path || "";
         const outVidEnc = outVidPath ? encodeURIComponent(outVidPath) : "";
-        const outVidUrl = outVidEnc ? `/api/media?path=${outVidEnc}&t=${cacheBust}#t=0.5` : "";
-        const kfSheetPath = sc.keyframe_sheet_path || "";
+        const outVidUrl = outVidEnc ? `/api/media?path=${outVidEnc}&t=${cacheBust}#t=0.2` : "";
+
+        const kfSheetPath = sc.keyframe_sheet_path || sc.strip_path || curTpl?.strip_path || "";
         const kfSheetEnc = kfSheetPath ? encodeURIComponent(kfSheetPath) : "";
         const kfSheetUrl = kfSheetEnc ? `/api/media?path=${kfSheetEnc}&t=${cacheBust}` : "";
 
-        const stRef = sc.start_char_ref || {};
-        const stImgPath = stRef.is_continuity_generated && !stRef.exists_on_disk
-          ? (proj.base_char_2k?.path || "")
-          : (stRef.path || proj.base_char_2k?.path || "");
-        const stImgEnc = encodeURIComponent(stImgPath);
-        const stImgUrl = `/api/media?path=${stImgEnc}`;
-        const activePrompt = (genMode === "chained_i2v" || styleVal === "chained_i2v")
-          ? (sc.prompt_chained_i2v || sc.prompt)
-          : ((styleVal === "concise_flow") ? (sc.prompt_concise_flow || sc.prompt_timeline_pro || sc.prompt) : (sc.prompt_timeline_pro || sc.prompt));
+        const activePrompt = (genMode === "google_vids" || styleVal === "google_vids")
+          ? (sc.prompt_google_vids || sc.prompt_chained_i2v || sc.prompt)
+          : ((genMode === "chained_i2v" || styleVal === "chained_i2v")
+            ? (sc.prompt_chained_i2v || sc.prompt)
+            : ((styleVal === "concise_flow") ? (sc.prompt_concise_flow || sc.prompt_timeline_pro || sc.prompt) : (sc.prompt_timeline_pro || sc.prompt)));
         const transitions = sc.transitions || [];
 
-        const bgImgPath = proj.char_sheet_2k?.path || "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/07_Nhan_Vat_Basic_Phong_Ngu_2K.png";
+        const bgImgPath = (document.getElementById("inpFashionBaseChar")?.value || proj.char_sheet_2k?.path || proj.base_char_2k?.path || "").trim();
         const bgImgEnc = encodeURIComponent(bgImgPath);
-        const bgImgUrl = `/api/media?path=${bgImgEnc}`;
-        const bgImgFn = proj.char_sheet_2k?.filename || "07_Nhan_Vat_Basic_Phong_Ngu_2K.png";
-        const ovImgPath = "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/01_Character_Sheet_4_Outfits_2K.png";
-        const ovImgEnc = encodeURIComponent(ovImgPath);
-        const overallSheetUrl = `/api/media?path=${ovImgEnc}`;
+        const bgImgUrl = bgImgPath ? `/api/media?path=${bgImgEnc}` : "";
+        const bgImgFn = bgImgPath ? bgImgPath.split(/[\\/]/).pop() : "Chưa chọn ảnh nhân vật";
 
-        // Nếu là Phân cảnh 2+ (scNum >= 2), ảnh mở đầu là Frame cuối của Phân cảnh 1 (`scene_s1_last_frame_2k.png`)!
         const prevLfObj = sc.prev_scene_last_frame_ref || {};
         const prevLfFn = prevLfObj.filename || `scene_s${scNum - 1}_last_frame_2k.png`;
-        const prevLfPath = prevLfObj.path || `${proj.project_dir || ('flow_final_pipeline/fashion_motion_studio/projects/' + proj.project_id)}/assets_2k/${prevLfFn}`;
-        const prevLfEnc = encodeURIComponent(prevLfPath);
-        const prevLfUrl = `/api/media?path=${prevLfEnc}&t=${cacheBust}`;
+        const prevLfPath = prevLfObj.path || `${proj.project_dir || ("flow_final_pipeline/fashion_motion_studio/projects/" + proj.project_id)}/assets_2k/${prevLfFn}`;
+        const prevLfUrl = `/api/media?path=${encodeURIComponent(prevLfPath)}&t=${cacheBust}`;
 
         const clipVidDomId = `fClipRefVid_${sc.id || scIdx}`;
         const clipBtnDomId = `btnClipRefPlay_${sc.id || scIdx}`;
-        const clipMuteDomId = `btnClipRefMute_${sc.id || scIdx}`;
         const outVidDomId = `fSceneOutVid_${sc.id || scIdx}`;
         const outBtnDomId = `btnSceneOutPlay_${sc.id || scIdx}`;
-        const outMuteDomId = `btnSceneOutMute_${sc.id || scIdx}`;
 
         const openFrameChipHtml = scNum >= 2
-          ? `<span onclick="openLightbox('${prevLfUrl}', 'Frame Cuối Cảnh ${scNum - 1} Nối Tiếp Sang Cảnh ${scNum}: ${prevLfFn}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(16,185,129,0.24); color:#34d399; border:1px solid rgba(16,185,129,0.65); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:800;" title="Ảnh Frame cuối của Phân cảnh ${scNum - 1} dùng để mở đầu nối tiếp Phân cảnh ${scNum}">
-               🎞️ Frame cuối Cảnh ${scNum - 1}: ${prevLfFn}
-             </span>`
-          : `<span onclick="openLightbox('${bgImgUrl}', '${bgImgFn}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid rgba(59,130,246,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-               🏠 Mở đầu: ${bgImgFn}
-             </span>`;
+          ? `<span onclick="${isBlueprint ? "" : `openLightbox('${prevLfUrl}', '${_escFashionHtml(prevLfFn)}')`}" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(16,185,129,0.22); color:#34d399; border:1px solid rgba(16,185,129,0.55); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:800;">🎞️ Nối Frame cuối Cảnh ${scNum - 1}: ${_escFashionHtml(prevLfFn)}</span>`
+          : `<span onclick="${bgImgUrl ? `openLightbox('${bgImgUrl}', '${_escFashionHtml(bgImgFn)}')` : `startFashionCharacterUpload()`}" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(59,130,246,0.18); color:#93c5fd; border:1px solid rgba(59,130,246,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">👤 Mở đầu: ${_escFashionHtml(bgImgFn)}</span>`;
 
-        const ingredientsChipsHtml = genMode === "chained_i2v"
-          ? `
-            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap; background:#050811; padding:6px 8px; border-radius:7px; border:1px solid rgba(16,185,129,0.4);">
-              <span style="font-size:10px; font-weight:900; color:#34d399;">✨ 2 Ảnh Ref I2V + Timeline 0.1s Cảnh ${sc.scene_index} (Không dùng Video Ref):</span>
-              ${openFrameChipHtml}
-              <span onclick="openLightbox('${overallSheetUrl}', '01_Character_Sheet_4_Outfits_2K.png')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(168,85,247,0.18); color:#e9d5ff; border:1px solid rgba(168,85,247,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-                📋 01_Character_Sheet_4_Outfits_2K.png
-              </span>
-              ${transitions.map((tr, tIdx) => {
-                const oUrl = `/api/media?path=${encodeURIComponent(tr.outfit?.path || '')}`;
-                return `
-                  <span onclick="openLightbox('${oUrl}', '${tr.outfit?.name || ''}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); color:#fde68a; border:1px solid rgba(245,158,11,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-                    🎵 Beat @${Number(tr.timestamp_sec || 0).toFixed(2)}s: Look ${(scNum === 1 ? 0 : 2) + tIdx + 1} (${tr.outfit?.filename || ''})
-                  </span>
-                `;
-              }).join("")}
-            </div>
-          `
-          : `
-            <div style="display:flex; gap:5px; align-items:center; flex-wrap:wrap; background:#050811; padding:6px 8px; border-radius:7px; border:1px solid rgba(255,255,255,0.1);">
-              <span style="font-size:10px; font-weight:800; color:#94a3b8;">📎 5 Ảnh Ref + 1 Video Cảnh ${sc.scene_index}:</span>
-              <span onclick="openLightbox('${stImgUrl}', '${stRef.filename || ''}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(236,72,153,0.18); color:#f9a8d4; border:1px solid rgba(236,72,153,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-                👤 ${stRef.filename || '02_Character_Sheet_Basic_Poses_2K.png'}
-              </span>
-              <span onclick="openLightbox('${overallSheetUrl}', '01_Character_Sheet_4_Outfits_2K.png')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(168,85,247,0.18); color:#e9d5ff; border:1px solid rgba(168,85,247,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-                📋 01_Character_Sheet_4_Outfits_2K.png
-              </span>
-              ${openFrameChipHtml}
-              ${transitions.slice(0, 2).map(tr => {
-                const oUrl = `/api/media?path=${encodeURIComponent(tr.outfit?.path || '')}`;
-                return `
-                  <span onclick="openLightbox('${oUrl}', '${tr.outfit?.name || ''}')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); color:#fde68a; border:1px solid rgba(245,158,11,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">
-                    👗 @${tr.timestamp_colon}s: ${tr.outfit?.filename || ''}
-                  </span>
-                `;
-              }).join("")}
-              <span onclick="openVerticalVideoModal('${clipEnc}', '${bgImgEnc}', '${ovImgEnc}', 'Clip Tham Chiếu Cảnh ${sc.scene_index} (${sc.duration}s)', '', '')" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(6,182,212,0.18); color:#67e8f9; border:1px solid rgba(6,182,212,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;" title="Bấm để mở xem phóng to Clip Tham Chiếu 9:16">
-                🎞️ ${sc.ref_clip_filename} (${sc.duration}s)
-              </span>
+        const transitionsEditorHtml = transitions.map((tr, trIdx) => {
+          const tsRaw = String(tr.timestamp_sec || tr.timestamp_colon || "3.2s");
+          const secNum = parseFloat(tsRaw.replace(/[^0-9.]/g, "")) || ((trIdx + 1) * 3.2);
+          const relFrame = Math.round(secNum * 30);
+          const absFrame = sFrame + relFrame - 1;
+          return `
+            <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; background:rgba(245,158,11,0.09); border:1px solid rgba(245,158,11,0.32); padding:4px 8px; border-radius:6px; font-size:10.5px; flex-wrap:wrap;">
+              <div style="display:flex; align-items:center; gap:6px;">
+                <span style="color:#fde68a; font-weight:800;">🎵 Đổi đồ #${tr.cut_index || (trIdx + 1)} tại giây:</span>
+                <input id="inpCutTs_${sc.id}_${trIdx}" value="${_escFashionHtml(tr.timestamp_sec || tr.timestamp_colon || "")}" style="width:62px; font-weight:800; color:#67e8f9; text-align:center; padding:2px 5px; font-size:10.5px;" />
+                <span style="font-size:9.5px; color:#a5f3fc; background:rgba(6,182,212,0.15); padding:1px 6px; border-radius:4px;">Frame #${absFrame}</span>
+              </div>
+              <span style="color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">➔ <b style="color:#fcd34d;">${_escFashionHtml(tr.outfit?.name || tr.outfit?.filename || "")}</b></span>
             </div>
           `;
-
-        const transitionsEditorHtml = transitions.map((tr, trIdx) => `
-          <div style="display:flex; align-items:center; gap:8px; background:rgba(245,158,11,0.08); border:1px solid rgba(245,158,11,0.3); padding:5px 8px; border-radius:6px; font-size:11px;">
-            <span style="color:#fde68a; font-weight:800;">🎵 Đổi đồ #${trIdx + 1} tại giây:</span>
-            <input id="inpCutTs_${sc.id}_${trIdx}" value="${tr.timestamp_colon}" style="width:64px; font-weight:800; color:#67e8f9; text-align:center; padding:2px 5px; font-size:11px;" />
-            <span style="color:#e2e8f0; overflow:hidden; text-overflow:ellipsis; white-space:nowrap;">➔ Mặc <b>${tr.outfit?.name || tr.outfit?.filename}</b></span>
-          </div>
-        `).join("");
+        }).join("");
 
         const stStr = String(sc.status || "");
         const isSceneFailed = stStr.startsWith("failed");
         const isSceneRetrying = stStr.startsWith("retrying");
+        const actionAnalysisText = sc.action_detail || curTpl?.action_description || "Người mẫu nhún nhảy và biến hình thay trang phục khớp chính xác từng nhịp beat.";
+        const bgSettingText = sc.background_setting || curTpl?.background_setting || "Phòng studio thời trang";
 
         return `
-          <div style="background:#080c16; border:1px solid ${isSceneFailed ? '#ef4444' : (isSceneRetrying ? '#f59e0b' : 'rgba(236,72,153,0.42)')}; border-radius:10px; padding:12px; display:flex; flex-direction:column; gap:10px;">
-            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:1px solid var(--border); padding-bottom:7px;">
+          <div style="background:#070b14; border:1px solid ${isSceneFailed ? "#ef4444" : (isSceneRetrying ? "#f59e0b" : "rgba(6,182,212,0.38)")}; border-radius:10px; padding:11px; display:flex; flex-direction:column; gap:9px;">
+            <div style="display:flex; justify-content:space-between; align-items:center; gap:8px; flex-wrap:wrap; border-bottom:1px solid rgba(255,255,255,0.07); padding-bottom:6px;">
               <div style="display:flex; align-items:center; gap:6px; flex-wrap:wrap;">
-                <span class="badge" style="background:linear-gradient(135deg,#ec4899,#6366f1); color:#fff; font-weight:900;">✂️ PHÂN CẢNH ${sc.scene_index} (${sc.start_sec}s – ${sc.end_sec}s)</span>
-                <span class="badge" style="background:rgba(139,92,246,0.2); color:#c4b5fd; border:1px solid rgba(139,92,246,0.45);">🤖 ${sc.ai_model_used || 'AI Vision Analyzer'}</span>
-                ${_getFashionSceneStatusBadgeHtml(sc, outVidUrl)}
+                <span class="badge" style="background:linear-gradient(135deg,#ec4899,#6366f1); color:#fff; font-weight:900;">✂️ CẢNH ${scNum} (${startSec}s–${endSec}s • Frame ${sFrame}–${eFrame})</span>
+                ${isBlueprint
+                  ? `<span class="badge" style="background:rgba(6,182,212,0.16); color:#67e8f9; border:1px solid rgba(6,182,212,0.4);">📋 Kịch bản Mẫu ${_escFashionHtml(curCode)}</span>`
+                  : _getFashionSceneStatusBadgeHtml(sc, outVidUrl)
+                }
               </div>
               <div style="display:flex; gap:5px; flex-wrap:wrap;">
+                ${kfSheetUrl ? `
+                  <button class="btn btn-xs btn-outline" style="color:#fde68a; border-color:rgba(245,158,11,0.45);" onclick="openLightbox('${kfSheetUrl}', 'Bảng Phân Tích Frame Cảnh ${scNum} (${startSec}s–${endSec}s)')">🎞️ Xem Bảng Frame</button>
+                ` : ""}
                 ${outVidEnc ? `
-                  <button class="btn btn-xs btn-primary" onclick="openVerticalVideoModal('${outVidEnc}', '${bgImgEnc}', '${ovImgEnc}', 'Video Phân Cảnh ${sc.scene_index} (${sc.duration}s)', '', '')" title="Mở xem phóng to dọc 9:16 cho Video Phân Cảnh ${sc.scene_index}">
-                    📱 Xem Cảnh ${sc.scene_index} (9:16)
-                  </button>
-                  <button class="btn btn-xs btn-outline" onclick="openFolderEncoded('${outVidEnc}')" title="Mở file Video Phân Cảnh ${sc.scene_index} trong Explorer">
-                    📂 Mở File
-                  </button>
-                ` : ''}
-                <button class="btn btn-xs btn-amber" onclick="runSingleFashionScene('${sc.id}')" title="Chạy lại / Retry ngay Phân Cảnh ${sc.scene_index}">
-                  🔁 Retry Cảnh ${sc.scene_index}
-                </button>
-                <button class="btn btn-xs btn-success" onclick="runSingleFashionScene('${sc.id}')" title="Render Video AI Phân Cảnh ${sc.scene_index} trên Google Flow (Tác nhân · Omni 1.1 Flash · abra_edit)">
-                  🎬 Render Cảnh ${sc.scene_index} (Flow)
-                </button>
+                  <button class="btn btn-xs btn-primary" onclick="openVerticalVideoModal('${outVidEnc}', '${bgImgEnc}', '', 'Cảnh ${scNum} (${sc.duration || 8}s)', '', '')">📱 9:16</button>
+                  <button class="btn btn-xs btn-outline" onclick="openFolderEncoded('${outVidEnc}')">📂 File</button>
+                ` : ""}
+                ${isBlueprint ? `
+                  <button class="btn btn-xs btn-outline" style="color:#67e8f9;" onclick="previewOrRebuildFashionScenes()">✂️ Cắt Clip &amp; Frame 0.5s</button>
+                ` : `
+                  <button class="btn btn-xs btn-success" onclick="runSingleFashionScene('${sc.id}')">🎬 Tạo Riêng Cảnh ${scNum}</button>
+                `}
               </div>
             </div>
 
-            ${sc.status_detail ? `
-              <div style="background:${isSceneFailed ? 'rgba(239,68,68,0.14)' : (isSceneRetrying ? 'rgba(245,158,11,0.16)' : 'rgba(59,130,246,0.12)')}; border:1px solid ${isSceneFailed ? 'rgba(239,68,68,0.45)' : (isSceneRetrying ? 'rgba(245,158,11,0.5)' : 'rgba(59,130,246,0.35)')}; padding:5px 9px; border-radius:6px; font-size:11px; font-weight:700; color:${isSceneFailed ? '#fca5a5' : (isSceneRetrying ? '#fde68a' : '#93c5fd')};">
-                ${sc.status_detail}
-              </div>
-            ` : ''}
-
-            <!-- AI Phân Tích Chuyển Động Của Phân Cảnh -->
-            ${sc.ai_motion_summary_vn ? `
-              <div style="background:rgba(6,182,212,0.09); border-left:3px solid #06b6d4; padding:6px 10px; border-radius:5px; font-size:11px; color:#cbd5e1; line-height:1.45;">
-                <b style="color:#67e8f9;">👁️ AI Phân Tích Chuyển Động Cảnh ${sc.scene_index}:</b> ${sc.ai_motion_summary_vn}
-              </div>
-            ` : ''}
-
-            <div style="display:grid; grid-template-columns: 296px 1fr; gap:12px; align-items:start;">
-              <!-- Cột Trái: 2 Video Song Song (Clip Gốc Đã Cắt vs Video Phân Cảnh Mới 2K) + Bộ Nút Đầy Đủ Dưới Mỗi Video -->
-              <div style="display:flex; flex-direction:column; gap:6px;">
-                <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
-                  <!-- Khung Clip Gốc -->
-                  <div style="background:#04060c; border:1px solid rgba(6,182,212,0.45); border-radius:7px; padding:4px; display:flex; flex-direction:column; gap:4px;">
-                    <div style="font-size:9px; font-weight:800; color:#67e8f9; text-align:center;">🎬 CLIP GỐC #${sc.scene_index} (${sc.duration}S)</div>
-                    <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:5px; overflow:hidden; cursor:pointer; position:relative;"
-                         onclick="toggleFashionInlineVideo('${clipVidDomId}', '${clipBtnDomId}')"
-                         title="Bấm trực tiếp vào video để Phát / Dừng có tiếng">
-                      <video id="${clipVidDomId}" class="fashion-clean-video" preload="metadata"
-                             onloadedmetadata="if(this.currentTime===0){try{this.currentTime=0.5;}catch(e){}}"
-                             onplay="const b=document.getElementById('${clipBtnDomId}'); if(b) b.innerHTML='⏸️ Dừng';"
-                             onpause="const b=document.getElementById('${clipBtnDomId}'); if(b) b.innerHTML='▶️ Phát';"
-                             style="width:100%; height:100%; object-fit:cover;" src="${clipUrl}"></video>
-                    </div>
-                    <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
-                      <button id="${clipBtnDomId}" class="btn btn-xs btn-success" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                              onclick="toggleFashionInlineVideo('${clipVidDomId}', '${clipBtnDomId}')">▶️ Phát</button>
-                      <button id="${clipMuteDomId}" class="btn btn-xs btn-amber" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                              onclick="toggleFashionInlineMute('${clipVidDomId}', '${clipMuteDomId}')">🔊 Tiếng</button>
-                      <button class="btn btn-xs btn-primary" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                              onclick="openVerticalVideoModal('${clipEnc}', '${bgImgEnc}', '${ovImgEnc}', 'Clip Tham Chiếu Cảnh ${sc.scene_index} (${sc.duration}s)', '', '')">📱 9:16</button>
-                      <button class="btn btn-xs btn-outline" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                              onclick="openFolderEncoded('${clipEnc}')">📂 File</button>
-                    </div>
+            <!-- Thanh Phân Tích Dải Frame & Bối Cảnh Của Phân Cảnh -->
+            <div style="display:grid; grid-template-columns: ${kfSheetUrl ? "175px 1fr" : "1fr"}; gap:8px; background:rgba(15,23,42,0.65); border:1px solid rgba(255,255,255,0.08); border-radius:8px; padding:7px 9px; align-items:center;">
+              ${kfSheetUrl ? `
+                <div onclick="openLightbox('${kfSheetUrl}', 'Bảng Phân Tích Frame Cảnh ${scNum} (${startSec}s–${endSec}s)')"
+                     style="cursor:pointer; background:#03060c; border:1px solid rgba(6,182,212,0.4); border-radius:6px; padding:3px;"
+                     title="Bấm để phóng to bảng khung hình của Cảnh ${scNum}">
+                  <div style="display:flex; justify-content:space-between; font-size:8.5px; color:#67e8f9; font-weight:800; margin-bottom:2px;">
+                    <span>🎞️ DẢI FRAME CẢNH ${scNum}</span>
+                    <span style="color:#fde68a;">🔍 Phóng to</span>
                   </div>
-
-                  <!-- Khung Video Phân Cảnh AI 2K -->
-                  <div style="background:#04060c; border:1px solid rgba(16,185,129,0.55); border-radius:7px; padding:4px; display:flex; flex-direction:column; gap:4px;">
-                    <div style="font-size:9px; font-weight:800; color:#34d399; text-align:center;">✨ VIDEO CẢNH #${sc.scene_index} (2K)</div>
-                    <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:5px; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer; position:relative;"
-                         onclick="${outVidUrl ? `toggleFashionInlineVideo('${outVidDomId}', '${outBtnDomId}')` : `runSingleFashionScene('${sc.id}')`}"
-                         title="${outVidUrl ? 'Bấm trực tiếp vào video để Phát / Dừng có tiếng' : 'Bấm để Render Video Phân Cảnh này'}">
-                      ${outVidUrl
-                        ? `<video id="${outVidDomId}" class="fashion-clean-video" preload="metadata"
-                                  onloadedmetadata="if(this.currentTime===0){try{this.currentTime=0.5;}catch(e){}}"
-                                  onplay="const b=document.getElementById('${outBtnDomId}'); if(b) b.innerHTML='⏸️ Dừng';"
-                                  onpause="const b=document.getElementById('${outBtnDomId}'); if(b) b.innerHTML='▶️ Phát';"
-                                  style="width:100%; height:100%; object-fit:cover;" src="${outVidUrl}"></video>`
-                        : `<div style="font-size:10px; color:#94a3b8; text-align:center; padding:8px;">Bấm <b>🎬 Render Cảnh ${sc.scene_index}</b></div>`
-                      }
-                    </div>
-                    ${outVidUrl ? `
-                      <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
-                        <button id="${outBtnDomId}" class="btn btn-xs btn-success" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="toggleFashionInlineVideo('${outVidDomId}', '${outBtnDomId}')">▶️ Phát</button>
-                        <button id="${outMuteDomId}" class="btn btn-xs btn-amber" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="toggleFashionInlineMute('${outVidDomId}', '${outMuteDomId}')">🔊 Tiếng</button>
-                        <button class="btn btn-xs btn-primary" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="openVerticalVideoModal('${outVidEnc}', '${bgImgEnc}', '${ovImgEnc}', 'Video Phân Cảnh ${sc.scene_index} (${sc.duration}s)', '', '')">📱 9:16</button>
-                        <button class="btn btn-xs btn-outline" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="openFileEncoded('${outVidEnc}')">🖥️ Player</button>
-                        <button class="btn btn-xs btn-outline" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="openFolderEncoded('${outVidEnc}')">📂 File</button>
-                        <button class="btn btn-xs btn-outline" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                onclick="downloadFashionMedia('${outVidEnc}')">⬇️ Tải</button>
-                      </div>
-                    ` : `
-                      <button class="btn btn-xs btn-success" style="width:100%; justify-content:center; font-size:9px; padding:4px;" onclick="runSingleFashionScene('${sc.id}')">
-                        🎬 Render Cảnh ${sc.scene_index}
-                      </button>
-                    `}
-                  </div>
+                  <img src="${kfSheetUrl}" style="width:100%; height:54px; object-fit:cover; border-radius:4px;" />
                 </div>
-                ${kfSheetUrl ? `
-                  <div onclick="openLightbox('${kfSheetUrl}', 'Bảng Keyframe 0.5s Phân Cảnh ${sc.scene_index} (${sc.start_sec}s - ${sc.end_sec}s)')"
-                       style="cursor:pointer; background:#050811; border:1px solid rgba(245,158,11,0.4); border-radius:6px; padding:4px 8px; display:flex; align-items:center; justify-content:space-between; font-size:10px; color:#fde68a; font-weight:700;">
-                    <span>🎞️ Xem Bảng Keyframe 0.5s (AI Vision)</span>
-                    <span style="color:#93c5fd;">🔍 Phóng to</span>
+              ` : ""}
+              <div style="font-size:10.5px; color:#cbd5e1; line-height:1.45; min-width:0;">
+                <div><b style="color:#f9a8d4;">🏠 Bối cảnh:</b> ${_escFashionHtml(bgSettingText)}</div>
+                <div style="margin-top:2px;"><b style="color:#67e8f9;">💃 Phân tích chuyển động &amp; frame:</b> ${_escFashionHtml(actionAnalysisText)}</div>
+              </div>
+            </div>
+
+            <div style="display:grid; grid-template-columns: 248px 1fr; gap:10px; align-items:start;">
+              <div style="display:grid; grid-template-columns: 1fr 1fr; gap:6px;">
+                <div style="background:#04060c; border:1px solid rgba(6,182,212,0.4); border-radius:7px; padding:4px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="font-size:9px; font-weight:800; color:#67e8f9; text-align:center;">CLIP MẪU #${scNum} (${startSec}s–${endSec}s)</div>
+                  <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:5px; overflow:hidden; cursor:pointer;"
+                       onclick="toggleFashionInlineVideo('${clipVidDomId}', '${clipBtnDomId}')">
+                    <video id="${clipVidDomId}" class="fashion-clean-video" preload="metadata" style="width:100%; height:100%; object-fit:cover;" src="${clipUrl}"></video>
                   </div>
-                ` : ''}
+                  <button id="${clipBtnDomId}" class="btn btn-xs btn-outline" style="width:100%; justify-content:center; font-size:8.5px; padding:2px;" onclick="toggleFashionInlineVideo('${clipVidDomId}', '${clipBtnDomId}')">▶️ Xem mẫu Cảnh ${scNum}</button>
+                </div>
+
+                <div style="background:#04060c; border:1px solid rgba(16,185,129,0.5); border-radius:7px; padding:4px; display:flex; flex-direction:column; gap:4px;">
+                  <div style="font-size:9px; font-weight:800; color:#34d399; text-align:center;">VIDEO AI #${scNum}</div>
+                  <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:5px; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer;"
+                       onclick="${outVidUrl ? `toggleFashionInlineVideo('${outVidDomId}', '${outBtnDomId}')` : (isBlueprint ? `runFashionProjectOnFlow()` : `runSingleFashionScene('${sc.id}')`)}">
+                    ${outVidUrl
+                      ? `<video id="${outVidDomId}" class="fashion-clean-video" preload="metadata" style="width:100%; height:100%; object-fit:cover;" src="${outVidUrl}"></video>`
+                      : `<div style="font-size:9.5px; color:#94a3b8; text-align:center; padding:6px; line-height:1.4;">Chưa tạo<br><span style="color:#6ee7b7; font-size:8.5px;">(Sẵn sàng chạy đa luồng)</span></div>`
+                    }
+                  </div>
+                  ${outVidUrl
+                    ? `<button id="${outBtnDomId}" class="btn btn-xs btn-success" style="width:100%; justify-content:center; font-size:8.5px; padding:2px;" onclick="toggleFashionInlineVideo('${outVidDomId}', '${outBtnDomId}')">▶️ Phát</button>`
+                    : `<button class="btn btn-xs btn-outline" style="width:100%; justify-content:center; font-size:8.5px; padding:2px;" onclick="${isBlueprint ? `runFashionProjectOnFlow()` : `runSingleFashionScene('${sc.id}')`}">🚀 Tạo Video</button>`
+                  }
+                </div>
               </div>
 
-              <!-- Cột Phải: Ingredients + Mốc Giây Đổi Đồ Theo Beat + Timeline Prompt Có Chip Ảnh -->
-              <div style="display:flex; flex-direction:column; gap:8px;">
-                ${ingredientsChipsHtml}
-                <div style="display:flex; flex-direction:column; gap:5px;">
-                  ${transitionsEditorHtml}
+              <div style="display:flex; flex-direction:column; gap:6px; min-width:0;">
+                <div style="display:flex; gap:5px; flex-wrap:wrap; align-items:center;">
+                  ${openFrameChipHtml}
+                  ${transitions.map((tr, tIdx) => {
+                    const oPath = tr.outfit?.path || "";
+                    const oUrl = oPath ? `/api/media?path=${encodeURIComponent(oPath)}` : "";
+                    const lookNum = tr.cut_index || (tIdx + 1);
+                    return `<span onclick="${oUrl ? `openLightbox('${oUrl}', '${_escFashionHtml(tr.outfit?.name || "").replace(/'/g, "")}')` : `startFashionProductUpload()`}" style="cursor:pointer; display:inline-flex; align-items:center; gap:4px; background:rgba(245,158,11,0.18); color:#fde68a; border:1px solid rgba(245,158,11,0.45); padding:2px 7px; border-radius:5px; font-size:10px; font-weight:700;">👗 Look ${lookNum}: ${_escFashionHtml(tr.outfit?.filename || "Chưa chọn SP")}</span>`;
+                  }).join("")}
                 </div>
-                <div style="background:#050811; border:1px solid rgba(59,130,246,0.4); border-radius:8px; padding:9px;">
-                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:5px; flex-wrap:wrap; gap:6px;">
-                    <span style="font-size:10.5px; font-weight:800; color:#93c5fd;">💬 PROMPT PHÂN CẢNH ${sc.scene_index} (GẮN CHIP ẢNH INLINE CHUẨN GOOGLE FLOW):</span>
-                    <button class="btn btn-xs btn-primary" style="padding:2px 8px; font-size:10px;"
-                            onclick="navigator.clipboard.writeText(STATE.fashionProject.scenes[${scIdx}].prompt); showFashionBanner('📋 Đã copy Prompt Phân Cảnh ${sc.scene_index}!');">
-                      📋 Copy Prompt Cảnh ${sc.scene_index}
+                ${transitionsEditorHtml}
+                <div style="background:#050811; border:1px solid rgba(59,130,246,0.35); border-radius:7px; padding:7px 9px;">
+                  <div style="display:flex; justify-content:space-between; align-items:center; margin-bottom:4px;">
+                    <span style="font-size:10px; font-weight:800; color:#93c5fd;">💬 Prompt Kịch Bản Cảnh ${scNum} (Đã gắn Nhân vật &amp; Sản phẩm):</span>
+                    <button class="btn btn-xs btn-outline" style="padding:1px 7px; font-size:9.5px;"
+                            onclick="navigator.clipboard.writeText(${JSON.stringify(activePrompt || "").replace(/"/g, "&quot;")}); showFashionBanner('📋 Đã copy Prompt Cảnh ${scNum}!');">
+                      📋 Copy
                     </button>
                   </div>
-                  <div style="font-size:11px; color:#f1f5f9; line-height:1.5; background:#090e1a; padding:8px 10px; border-radius:6px; border:1px solid rgba(255,255,255,0.08); max-height:155px; overflow-y:auto;">
+                  <div style="font-size:10.5px; color:#f1f5f9; line-height:1.45; max-height:130px; overflow-y:auto;">
                     ${formatPromptWithInlineChipsHtml(activePrompt)}
                   </div>
                 </div>
@@ -4820,146 +5495,58 @@
     }
 
     function renderFashionFinalPostProdCard() {
+      const cardWrap = document.getElementById("cardFashionPostProdFinal");
       const box = document.getElementById("fashionFinalVideoPreviewBox");
       const topFinalsBar = document.getElementById("fashionCompletedFinalsTopBar");
+      const doneBadge = document.getElementById("badgeFashionDoneVideosCount");
       const proj = STATE.fashionProject;
-      if (!box || !proj) return;
       const cacheBust = Date.now();
-      const finalPath = proj.final_video_path || "";
-      const finalEnc = encodeURIComponent(finalPath);
-      const hasFinal = !!proj.final_video_ready && !!finalPath;
-      const finalUrl = hasFinal ? `/api/media?path=${finalEnc}&t=${cacheBust}#t=0.5` : "";
-      const scCount = (proj.scenes || []).length;
-      const outCount = (proj.outfits || []).length;
-      const totalDur = proj.reference_video?.duration || (scCount * 8);
-      const curRefImgEnc = encodeURIComponent(proj.char_sheet_2k?.path || "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/07_Nhan_Vat_Basic_Phong_Ngu_2K.png");
-      const curOvImgEnc = encodeURIComponent("ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/01_Character_Sheet_4_Outfits_2K.png");
 
-      // Danh sách tất cả các Dự Án Thời Trang đã có Video Final để hiển thị Tổng Hợp ngay trên đầu Tab & Bước 4
       const allCompletedFinals = (STATE.fashionProjectsList || []).filter(p => !!p.final_video_ready && !!p.final_video_path);
+      if (doneBadge) doneBadge.textContent = String(allCompletedFinals.length);
 
       if (topFinalsBar) {
         if (allCompletedFinals.length > 0) {
-          topFinalsBar.style.display = "block";
           topFinalsBar.innerHTML = `
-            <div style="background:linear-gradient(135deg, rgba(6,38,31,0.94), rgba(11,18,34,0.97)); border:1.5px solid rgba(16,185,129,0.65); border-radius:10px; padding:10px 14px; box-shadow:0 8px 24px rgba(0,0,0,0.45);">
-              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:9px;">
+            <div style="background:linear-gradient(135deg, rgba(6,38,31,0.94), rgba(11,18,34,0.97)); border:1.5px solid rgba(16,185,129,0.6); border-radius:11px; padding:11px 14px;">
+              <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:10px;">
                 <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                  <span class="badge" style="background:linear-gradient(135deg,#10b981,#06b6d4); color:#022c22; font-weight:900; font-size:11px; padding:3px 10px;">🏆 KHO VIDEO FINAL THỜI TRANG ĐÃ HOÀN TẤT (${allCompletedFinals.length} VIDEO • 1080P 60FPS)</span>
-                  <span style="font-size:11.5px; color:#d1fae5; font-weight:700;">Bấm thẳng vào video hoặc nút <b>▶️ Phát Có Tiếng</b>, <b>📱 Phóng To 9:16</b>, <b>⬇️ Tải MP4</b> (Không bị che bởi menu 3 chấm)!</span>
+                  <span class="badge" style="background:linear-gradient(135deg,#10b981,#06b6d4); color:#022c22; font-weight:900; font-size:11px; padding:3px 10px;">🏆 VIDEO THỜI TRANG ĐÃ TẠO (${allCompletedFinals.length})</span>
+                  <span style="font-size:11px; color:#cbd5e1;">Bấm vào video để phát có tiếng hoặc tải file MP4 1080p</span>
                 </div>
                 <div style="display:flex; gap:6px; flex-wrap:wrap;">
-                  <button class="btn btn-xs btn-primary" style="font-weight:800;" onclick="switchTab('dashboard', document.getElementById('navBtn-dashboard')); if(STATE.fashionProject?.project_id) loadProjectDetail(STATE.fashionProject.project_id, false);">📊 Xem Trong Tổng Hợp (Studio Dự Án)</button>
-                  <button class="btn btn-xs btn-amber" style="font-weight:800;" onclick="switchTab('matrix', document.getElementById('navBtn-matrix'));">🌐 Mở Bảng Matrix Video Final</button>
-                  <button class="btn btn-xs btn-success" style="font-weight:800;" onclick="openFolder('final_videos')">📂 Mở Folder final_videos</button>
+                  <button class="btn btn-xs btn-success" onclick="openFolder('final_videos')">📂 Mở Folder final_videos</button>
+                  <button class="btn btn-xs btn-outline" onclick="toggleFashionCompletedGallery(false)">✕ Thu gọn</button>
                 </div>
               </div>
-              <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(410px, 1fr)); gap:12px;">
+              <div style="display:grid; grid-template-columns: repeat(auto-fill, minmax(360px, 1fr)); gap:10px; max-height:360px; overflow-y:auto; padding-right:4px;">
                 ${allCompletedFinals.map((fp, fIdx) => {
-                  const isCur = fp.project_id === proj.project_id;
-                  const fEnc = encodeURIComponent(fp.final_video_path || '');
+                  const isCur = proj && fp.project_id === proj.project_id;
+                  const fEnc = encodeURIComponent(fp.final_video_path || "");
                   const fUrl = `/api/media?path=${fEnc}&t=${cacheBust}#t=0.5`;
-                  const refImgEnc = encodeURIComponent(fp.char_sheet_2k?.path || "ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/07_Nhan_Vat_Basic_Phong_Ngu_2K.png");
-                  const ovImgEnc = encodeURIComponent("ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/01_Character_Sheet_4_Outfits_2K.png");
+                  const refImgEnc = encodeURIComponent(fp.char_sheet_2k?.path || fp.base_char_2k?.path || "");
                   const tplBadge = fp.source_template_code || "#004";
                   const vidDomId = `fTopFinalVid_${fIdx}`;
                   const playBtnId = `btnTopFinalPlay_${fIdx}`;
-                  const muteBtnId = `btnTopFinalMute_${fIdx}`;
-                  const safeTitle = (fp.title || fp.project_id).replace(/'/g, "");
-                  const fnShort = fp.final_video_path.split(/[\\\\/]/).pop();
+                  const safeTitle = _escFashionHtml(fp.title || fp.project_id);
                   return `
-                    <div style="background:#050914; border:1.5px solid ${isCur ? '#10b981' : 'rgba(255,255,255,0.16)'}; border-radius:10px; padding:9px; display:grid; grid-template-columns: 112px 1fr; gap:11px; align-items:start; box-shadow:${isCur ? '0 0 18px rgba(16,185,129,0.22)' : 'none'};">
-                      <!-- Cột Trái: Khung Video Dọc 9:16 (Bấm trực tiếp để Phát/Dừng có tiếng, không hiện menu 3 chấm trắng) -->
-                      <div style="display:flex; flex-direction:column; gap:4px;">
-                        <div style="width:112px; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; border:1.5px solid ${isCur ? '#10b981' : 'rgba(16,185,129,0.5)'}; cursor:pointer; position:relative;"
-                             onclick="toggleFashionInlineVideo('${vidDomId}', '${playBtnId}')"
-                             title="Bấm trực tiếp vào khung hình để Phát / Dừng video có tiếng">
-                          <video id="${vidDomId}" class="fashion-clean-video" preload="metadata"
-                                 onloadedmetadata="if(this.currentTime===0){try{this.currentTime=0.5;}catch(e){}}"
-                                 onplay="const b=document.getElementById('${playBtnId}'); if(b) b.innerHTML='⏸️ Dừng'; const b2=document.getElementById('${playBtnId}_main'); if(b2) b2.innerHTML='⏸️ Dừng Video';"
-                                 onpause="const b=document.getElementById('${playBtnId}'); if(b) b.innerHTML='▶️ Phát'; const b2=document.getElementById('${playBtnId}_main'); if(b2) b2.innerHTML='▶️ Phát Có Tiếng';"
-                                 style="width:100%; height:100%; object-fit:cover;" src="${fUrl}"></video>
-                          <span style="position:absolute; bottom:4px; left:4px; right:4px; background:rgba(4,9,20,0.82); color:#6ee7b7; font-size:8.5px; font-weight:800; text-align:center; padding:1.5px 4px; border-radius:4px; border:1px solid rgba(16,185,129,0.4);">
-                            🔊 Bấm để phát
-                          </span>
-                        </div>
-                        <div style="display:grid; grid-template-columns: 1fr 1fr; gap:3px;">
-                          <button id="${playBtnId}" class="btn btn-xs btn-success" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                  onclick="toggleFashionInlineVideo('${vidDomId}', '${playBtnId}')">▶️ Phát</button>
-                          <button id="${muteBtnId}" class="btn btn-xs btn-amber" style="padding:2px 3px; font-size:8.5px; font-weight:800; justify-content:center;"
-                                  onclick="toggleFashionInlineMute('${vidDomId}', '${muteBtnId}')">🔊 Tiếng</button>
-                        </div>
+                    <div style="background:#060a14; border:1.5px solid ${isCur ? "#10b981" : "rgba(255,255,255,0.12)"}; border-radius:10px; padding:8px; display:grid; grid-template-columns: 92px 1fr; gap:10px; align-items:center;">
+                      <div style="width:92px; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; border:1px solid rgba(16,185,129,0.5); cursor:pointer;"
+                           onclick="toggleFashionInlineVideo('${vidDomId}', '${playBtnId}')">
+                        <video id="${vidDomId}" class="fashion-clean-video" preload="metadata" style="width:100%; height:100%; object-fit:cover;" src="${fUrl}"></video>
                       </div>
-
-                      <!-- Cột Phải: Thông Tin Video Final + Đầy Đủ Các Nút Điều Khiển -->
                       <div style="display:flex; flex-direction:column; gap:5px; min-width:0;">
-                        <div style="display:flex; align-items:center; justify-content:space-between; gap:5px; flex-wrap:wrap;">
-                          <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
-                            <span class="badge" style="background:linear-gradient(135deg,#ec4899,#8b5cf6); color:#fff; font-weight:900; font-size:9.5px;">${tplBadge}</span>
-                            <span class="badge badge-done" style="font-size:9.5px;">✅ 1080p • 24FPS</span>
-                            ${isCur ? `<span class="badge" style="background:rgba(16,185,129,0.22); color:#34d399; border:1px solid #10b981; font-size:9px; font-weight:900;">● Đang mở</span>` : ''}
-                          </div>
-                          ${fp.final_rendered_at ? `<span style="font-size:9px; color:#94a3b8;">🕒 ${fp.final_rendered_at}</span>` : ''}
+                        <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
+                          <span class="badge" style="background:rgba(236,72,153,0.22); color:#f9a8d4; font-size:9.5px;">${_escFashionHtml(tplBadge)}</span>
+                          <span class="badge badge-done" style="font-size:9.5px;">1080p</span>
                         </div>
-
-                        <div style="font-size:12px; font-weight:800; color:#f8fafc; line-height:1.3; overflow:hidden; text-overflow:ellipsis; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical;" title="${(fp.title || fp.project_id).replace(/"/g, '&quot;')}">
-                          ${fp.title || fp.project_id}
-                        </div>
-                        <div style="font-size:10px; color:#fde68a; overflow:hidden; text-overflow:ellipsis; white-space:nowrap; font-family:Consolas,monospace;" title="${fp.final_video_path}">
-                          📄 ${fnShort}
-                        </div>
-
-                        <!-- Hàng Nút 1: Phát Có Tiếng, Phóng To 9:16, Mở Player Máy, Mở File, Tải MP4, Copy Path -->
-                        <div style="display:flex; gap:4px; flex-wrap:wrap; margin-top:2px;">
-                          <button id="${playBtnId}_main" class="btn btn-xs btn-success" style="padding:4px 8px; font-size:10px; font-weight:900;"
-                                  onclick="toggleFashionInlineVideo('${vidDomId}', '${playBtnId}')">
-                            ▶️ Phát Có Tiếng
-                          </button>
-                          <button class="btn btn-xs btn-primary" style="padding:4px 8px; font-size:10px; font-weight:800;"
-                                  onclick="openVerticalVideoModal('${fEnc}', '${refImgEnc}', '${ovImgEnc}', '${safeTitle} — VIDEO FINAL 16S', '${fp.project_id}', 'v1')">
-                            📱 Phóng To 9:16
-                          </button>
-                          <button class="btn btn-xs btn-amber" style="padding:4px 7px; font-size:10px; font-weight:800;"
-                                  onclick="openFileEncoded('${fEnc}')" title="Mở bằng trình phát video của Windows">
-                            🖥️ Mở Player
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:4px 7px; font-size:10px; font-weight:800; color:#6ee7b7; border-color:rgba(16,185,129,0.5);"
-                                  onclick="openFolderEncoded('${fEnc}')" title="Mở thư mục và chọn đúng file MP4 này">
-                            📂 Mở File
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:4px 7px; font-size:10px; font-weight:800; color:#93c5fd; border-color:rgba(59,130,246,0.5);"
-                                  onclick="downloadFashionMedia('${fEnc}')" title="Tải trực tiếp file MP4 về máy">
-                            ⬇️ Tải MP4
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:4px 7px; font-size:10px; font-weight:800;"
-                                  onclick="copyFashionPath('${fEnc}')" title="Copy đường dẫn file MP4 vào Clipboard">
-                            📋 Copy Path
-                          </button>
-                        </div>
-
-                        <!-- Hàng Nút 2: Xem Cảnh 1, Xem Cảnh 2, Nạp Kịch Bản, Ghép Lại Final, Render Lại AI -->
-                        <div style="display:flex; gap:4px; flex-wrap:wrap; padding-top:4px; border-top:1px dashed rgba(255,255,255,0.1);">
-                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#67e8f9; border-color:rgba(6,182,212,0.45);"
-                                  onclick="openFashionSceneVideoModal('${fp.project_id}', 0)" title="Xem riêng Video Phân Cảnh 1 (0s-8s) ở chế độ dọc 9:16">
-                            🎬 Xem Cảnh 1
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#67e8f9; border-color:rgba(6,182,212,0.45);"
-                                  onclick="openFashionSceneVideoModal('${fp.project_id}', 1)" title="Xem riêng Video Phân Cảnh 2 (8s-16s) ở chế độ dọc 9:16">
-                            🎬 Xem Cảnh 2
-                          </button>
-                          <button class="btn btn-xs ${isCur ? 'btn-outline' : 'btn-amber'}" style="padding:3px 7px; font-size:9.5px; font-weight:800;"
-                                  onclick="onSelectFashionProjectSlug('${fp.project_id}'); document.getElementById('fashionScenesTimelineContainer')?.scrollIntoView({behavior:'smooth'});"
-                                  title="Nạp kịch bản dự án này xuống Bước 1–4 bên dưới để xem/chỉnh sửa">
-                            👁️ Xem Kịch Bản Cảnh 1 & 2
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#f9a8d4; border-color:rgba(236,72,153,0.45);"
-                                  onclick="renderFashionFinalForProject('${fp.project_id}')" title="Chạy ghép hậu kỳ lại Video Final 24FPS cho dự án này">
-                            🎞️ Ghép Lại
-                          </button>
-                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px; font-weight:800; color:#fde68a; border-color:rgba(245,158,11,0.45);"
-                                  onclick="runFashionFlowForProject('${fp.project_id}')" title="Chạy Render lại Video AI trên Google Flow cho dự án này">
-                            🚀 Render Lại AI
-                          </button>
+                        <div style="font-size:11.5px; font-weight:800; color:#f8fafc; display:-webkit-box; -webkit-line-clamp:2; -webkit-box-orient:vertical; overflow:hidden;" title="${safeTitle}">${safeTitle}</div>
+                        <div style="display:flex; gap:4px; flex-wrap:wrap;">
+                          <button id="${playBtnId}" class="btn btn-xs btn-success" style="padding:3px 7px; font-size:9.5px;" onclick="toggleFashionInlineVideo('${vidDomId}', '${playBtnId}')">▶️ Phát</button>
+                          <button class="btn btn-xs btn-primary" style="padding:3px 7px; font-size:9.5px;" onclick="openVerticalVideoModal('${fEnc}', '${refImgEnc}', '', '${safeTitle.replace(/'/g, "")}', '${fp.project_id}', 'v1')">📱 9:16</button>
+                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px;" onclick="downloadFashionMedia('${fEnc}')">⬇️ Tải</button>
+                          <button class="btn btn-xs btn-outline" style="padding:3px 7px; font-size:9.5px;" onclick="openFolderEncoded('${fEnc}')">📂 File</button>
+                          <button class="btn btn-xs btn-amber" style="padding:3px 7px; font-size:9.5px;" onclick="onSelectFashionProjectSlug('${_escFashionHtml(fp.project_id)}')">👁️ Mở</button>
                         </div>
                       </div>
                     </div>
@@ -4969,106 +5556,113 @@
             </div>
           `;
         } else {
-          topFinalsBar.style.display = "none";
-          topFinalsBar.innerHTML = "";
+          topFinalsBar.innerHTML = `<div style="padding:14px; background:#080d19; border:1px solid rgba(255,255,255,0.1); border-radius:9px; color:#94a3b8; font-size:12px;">Chưa có video thời trang nào hoàn tất.</div>`;
         }
       }
 
+      if (!cardWrap || !box || !proj) return;
+
+      const finalPath = proj.final_video_path || "";
+      const hasFinal = !!proj.final_video_ready && !!finalPath && proj.status !== "draft";
+      const scenes = proj.scenes || [];
+      const allScenesHaveOutput = scenes.length > 0 && scenes.every(s => !!s.output_video_path);
+
+      if (!hasFinal && !allScenesHaveOutput) {
+        cardWrap.style.display = "none";
+        box.innerHTML = "";
+        return;
+      }
+
+      cardWrap.style.display = "block";
+      const finalEnc = encodeURIComponent(finalPath);
+      const finalUrl = hasFinal ? `/api/media?path=${finalEnc}&t=${cacheBust}#t=0.5` : "";
+      const curRefImgEnc = encodeURIComponent(proj.char_sheet_2k?.path || proj.base_char_2k?.path || "");
+      const safeProjTitle = _escFashionHtml(proj.title || proj.project_id);
+
       box.innerHTML = `
-        <div style="display:grid; grid-template-columns: 215px 1fr; gap:16px; align-items:center;">
-          <!-- Cột Trái: Trình Phát Video Final 9:16 Hoàn Chỉnh (1080p 24FPS) + Đầy Đủ Nút Dưới Video -->
-          <div style="background:#04070e; border:2px solid ${hasFinal ? '#10b981' : 'rgba(148,163,184,0.35)'}; border-radius:10px; padding:6px; display:flex; flex-direction:column; gap:5px; box-shadow:0 8px 24px rgba(0,0,0,0.5);">
-            <div style="font-size:10px; font-weight:900; color:#34d399; text-align:center;">🏆 VIDEO FINAL HOÀN CHỈNH (1080P • 24FPS)</div>
-            <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:7px; overflow:hidden; display:flex; align-items:center; justify-content:center; cursor:pointer;"
+        <div style="display:grid; grid-template-columns: 165px 1fr; gap:16px; align-items:center; background:#050b14; border:1.5px solid rgba(16,185,129,0.5); border-radius:11px; padding:12px;">
+          <div style="display:flex; flex-direction:column; gap:5px;">
+            <div style="width:100%; aspect-ratio:9/16; background:#000; border-radius:8px; overflow:hidden; border:1.5px solid #10b981; display:flex; align-items:center; justify-content:center; cursor:pointer;"
                  onclick="${hasFinal ? `toggleFashionInlineVideo('fBottomStep4FinalVid', 'btnBottomStep4Play')` : `renderFashionFinalPostProd()`}">
               ${hasFinal
                 ? `<video id="fBottomStep4FinalVid" class="fashion-clean-video" controls controlslist="nodownload noplaybackrate" disablepictureinpicture preload="metadata"
-                          onloadedmetadata="if(this.currentTime===0){try{this.currentTime=0.5;}catch(e){}}"
                           onplay="const b=document.getElementById('btnBottomStep4Play'); if(b) b.innerHTML='⏸️ Dừng';"
-                          onpause="const b=document.getElementById('btnBottomStep4Play'); if(b) b.innerHTML='▶️ Phát';"
+                          onpause="const b=document.getElementById('btnBottomStep4Play'); if(b) b.innerHTML='▶️ Phát Có Tiếng';"
                           style="width:100%; height:100%; object-fit:cover;" src="${finalUrl}"></video>`
-                : `<div style="font-size:11px; color:#94a3b8; text-align:center; padding:12px;">Chưa ghép hậu kỳ.<br/>Bấm nút <b>Render Hậu Kỳ Video Final</b> bên phải!</div>`
+                : `<div style="font-size:11px; color:#fde68a; text-align:center; padding:10px;">Các cảnh đã xong!<br/>Bấm <b>Ghép Thành Video Final</b></div>`
               }
             </div>
-            ${hasFinal ? `
-              <div style="display:grid; grid-template-columns: repeat(3, 1fr); gap:3px;">
-                <button id="btnBottomStep4Play" class="btn btn-xs btn-success" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="toggleFashionInlineVideo('fBottomStep4FinalVid', 'btnBottomStep4Play')">▶️ Phát</button>
-                <button id="btnBottomStep4Mute" class="btn btn-xs btn-amber" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="toggleFashionInlineMute('fBottomStep4FinalVid', 'btnBottomStep4Mute')">🔊 Tiếng</button>
-                <button class="btn btn-xs btn-primary" style="padding:3px 2px; font-size:9px; font-weight:800; justify-content:center;"
-                        onclick="openVerticalVideoModal('${finalEnc}', '${curRefImgEnc}', '${curOvImgEnc}', '${(proj.title || proj.project_id).replace(/'/g, '')} — VIDEO FINAL 16S', '${proj.project_id}', 'v1')">📱 9:16</button>
-              </div>
-            ` : ''}
           </div>
 
-          <!-- Cột Phải: Thông Tin Hậu Kỳ Ghép Phân Cảnh + Nhạc Gốc & Các Nút Xuất Bản -->
-          <div style="display:flex; flex-direction:column; gap:10px;">
-            <div>
-              <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
-                <span class="badge" style="background:linear-gradient(135deg,#10b981,#059669); color:#022c22; font-weight:900; font-size:11px; padding:3px 10px;">🎬 BƯỚC 4: RENDER HẬU KỲ VIDEO FINAL</span>
-                <span style="font-size:15px; font-weight:900; color:#ecfdf5;">${proj.title || proj.project_id}</span>
-                ${hasFinal ? `<span class="badge badge-done">✅ Sẵn sàng Upload TikTok / Reels / Shorts</span>` : `<span class="badge badge-wait">⏳ Chờ Render Hậu Kỳ</span>`}
-              </div>
-              <div style="font-size:11.5px; color:#cbd5e1; margin-top:6px; line-height:1.5;">
-                • <b>Ghép nối mượt mà:</b> Tự động nối <b>${scCount} Video Phân Cảnh</b> + đồng bộ <b>Nhạc Gốc AAC 192kbps</b> của Video Tham Chiếu (<code>${proj.reference_video?.filename || ''}</code> — ${totalDur}s) ở chuẩn khung hình gốc <b>1080×1920 • 24 FPS</b> mượt mà.<br/>
-                • <b>Số lượng trang phục đã phối:</b> <b>${outCount} Bộ Đồ 2K</b> biến hình khớp chính xác từng điểm cắt hình ảnh & nhịp bass nhạc nền.<br/>
-                • <b>Đường dẫn xuất file Final:</b> <code style="color:#fde68a;">${finalPath || 'final_videos/' + proj.project_id + '_final.mp4'}</code>
-              </div>
+          <div style="display:flex; flex-direction:column; gap:9px; min-width:0;">
+            <div style="display:flex; align-items:center; gap:8px; flex-wrap:wrap;">
+              <span class="badge badge-done" style="font-size:11px; padding:3px 10px;">🎉 KẾT QUẢ VIDEO HOÀN TẤT (9:16 • 1080p)</span>
+              <span style="font-size:14px; font-weight:900; color:#ecfdf5;">${safeProjTitle}</span>
             </div>
-
+            ${finalPath ? `<div style="font-size:11px; color:#94a3b8;">📄 File xuất: <code style="color:#fde68a;">${_escFashionHtml(finalPath)}</code></div>` : ""}
             <div style="display:flex; gap:7px; flex-wrap:wrap;">
-              <button class="btn btn-success" style="padding:8px 15px; font-weight:900; font-size:12px;" onclick="renderFashionFinalPostProd()">
-                🎞️ Render Hậu Kỳ Ghép ${scCount} Phân Cảnh + Nhạc Gốc Thành Video Final (1080p 24FPS)
-              </button>
-              <button class="btn btn-primary" style="padding:8px 14px; font-weight:800;" onclick="runFashionProjectOnFlow()">
-                🚀 Chạy Tạo Video Phân Cảnh Qua Google Flow (Omni Flash)
-              </button>
               ${hasFinal ? `
-                <button class="btn btn-primary" style="padding:8px 12px; font-weight:800; background:#2563eb;" onclick="openVerticalVideoModal('${finalEnc}', '${curRefImgEnc}', '${curOvImgEnc}', '${(proj.title || proj.project_id).replace(/'/g, '')} — VIDEO FINAL 16S', '${proj.project_id}', 'v1')">
-                  📱 Xem Phóng To Dọc 9:16
+                <button id="btnBottomStep4Play" class="btn btn-success" style="padding:7px 14px; font-weight:900;" onclick="toggleFashionInlineVideo('fBottomStep4FinalVid', 'btnBottomStep4Play')">
+                  ▶️ Phát Có Tiếng
                 </button>
-                <button class="btn btn-amber" style="padding:8px 12px; font-weight:800;" onclick="openFileEncoded('${finalEnc}')">
-                  🖥️ Mở Xem Bằng Trình Phát Máy Tính
+                <button class="btn btn-primary" style="padding:7px 13px; font-weight:800;" onclick="openVerticalVideoModal('${finalEnc}', '${curRefImgEnc}', '', '${safeProjTitle.replace(/'/g, "")}', '${proj.project_id}', 'v1')">
+                  📱 Xem Phóng To 9:16
                 </button>
-                <button class="btn btn-outline" style="padding:8px 12px; font-weight:800; color:#6ee7b7; border-color:rgba(16,185,129,0.5);" onclick="openFolderEncoded('${finalEnc}')">
-                  📂 Chọn File Trong Explorer
-                </button>
-                <button class="btn btn-outline" style="padding:8px 12px; font-weight:800; color:#93c5fd; border-color:rgba(59,130,246,0.5);" onclick="downloadFashionMedia('${finalEnc}')">
+                <button class="btn btn-outline" style="padding:7px 12px; font-weight:800; color:#93c5fd; border-color:rgba(59,130,246,0.5);" onclick="downloadFashionMedia('${finalEnc}')">
                   ⬇️ Tải Video MP4
                 </button>
-                <button class="btn btn-outline" style="padding:8px 12px; font-weight:800;" onclick="copyFashionPath('${finalEnc}')">
-                  📋 Copy Đường Dẫn File
+                <button class="btn btn-outline" style="padding:7px 12px; font-weight:800; color:#6ee7b7; border-color:rgba(16,185,129,0.5);" onclick="openFolderEncoded('${finalEnc}')">
+                  📂 Mở Trong Explorer
                 </button>
-              ` : ''}
-              <button class="btn btn-outline" style="padding:8px 12px;" onclick="openFolder('final_videos')">
-                📂 Mở Thư Mục Video Final
-              </button>
-              <button class="btn btn-primary" style="padding:8px 12px; background:#6366f1; border-color:#818cf8;" onclick="switchTab('dashboard', document.getElementById('navBtn-dashboard')); if(STATE.fashionProject?.project_id) loadProjectDetail(STATE.fashionProject.project_id, false);">
-                📊 Xem Trong Tab Studio Dự Án (Tổng Hợp)
-              </button>
+                <button class="btn btn-amber" style="padding:7px 12px; font-weight:800;" onclick="startFreshFashionDraft(true)">
+                  ➕ Làm Video Mới Khác
+                </button>
+              ` : `
+                <button class="btn btn-success" style="padding:8px 15px; font-weight:900;" onclick="renderFashionFinalPostProd()">
+                  🎞️ Ghép Các Cảnh + Nhạc Gốc Thành Video Final 1080p
+                </button>
+              `}
             </div>
           </div>
         </div>
       `;
     }
 
+    async function renderFashionFinalForProject(projectId) {
+      const slug = projectId || STATE.fashionProject?.project_id;
+      if (!slug) return;
+      showFashionBanner(`⏳ Đang ghép nối các phân cảnh + nhạc gốc thành Video Final 1080p cho <b>${_escFashionHtml(slug)}</b>...`);
+      const res = await apiPost("/api/fashion_motion/render_final", { project_id: slug });
+      if (res && res.ok) {
+        await loadFashionMotionStudio(false, slug);
+        showFashionBanner(`🎉 ${res.message || "Đã xuất xong Video Final 1080p!"}`);
+      } else {
+        showFashionBanner(`❌ Lỗi ghép hậu kỳ: ${(res && res.error) || "Không xác định"}`, true);
+      }
+    }
+
+    async function runFashionFlowForProject(projectId) {
+      if (projectId && STATE.fashionProject?.project_id !== projectId) {
+        await loadFashionMotionStudio(false, projectId);
+      }
+      await runFashionProjectOnFlow(true);
+    }
+
     function startFashionLiveStatusMonitor(targetSlug = "") {
-      const slug = targetSlug || STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      if (STATE._fashionFlowPollTimer) {
-        clearInterval(STATE._fashionFlowPollTimer);
-        STATE._fashionFlowPollTimer = null;
-      }
-      if (STATE._fashionElapsedTicker) {
-        clearInterval(STATE._fashionElapsedTicker);
-        STATE._fashionElapsedTicker = null;
-      }
+      if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+      const slug = targetSlug || STATE.fashionProject?.project_id || "";
+      if (slug) STATE.runningFashionSlugs.add(slug);
+      if (!STATE.runningFashionSlugs.size) return;
+
+      stopFashionUiMonitor();
       if (!STATE._fashionWatchdogRetries) STATE._fashionWatchdogRetries = {};
       if (!STATE._fashionRunStartTs) STATE._fashionRunStartTs = Date.now();
 
       renderFashionLiveMonitorBar();
+      updateFashionSimpleSummary();
+
       STATE._fashionElapsedTicker = setInterval(() => {
-        if (STATE.fashionProject && STATE.fashionProject.status === "running_flow") {
+        if (STATE.runningFashionSlugs && STATE.runningFashionSlugs.size > 0) {
           renderFashionLiveMonitorBar();
         }
       }, 1000);
@@ -5076,142 +5670,222 @@
       let ticks = 0;
       STATE._fashionFlowPollTimer = setInterval(async () => {
         ticks++;
-        const r = await apiGet(`/api/fashion_motion/projects?project_id=${encodeURIComponent(slug)}`);
-        const nextProj = r && (r.active_project || r.current_project);
-        if (!r || !r.ok || !nextProj) return;
+        const activeSlugs = Array.from(STATE.runningFashionSlugs || []);
+        const querySlug = activeSlugs[0] || slug || "";
+        const r = await apiGet(`/api/fashion_motion/projects?project_id=${encodeURIComponent(querySlug)}`);
+        if (!r || !r.ok) return;
 
-        if (Array.isArray(r.projects)) STATE.fashionProjectsList = r.projects;
-        STATE.fashionProject = nextProj;
+        if (Array.isArray(r.projects)) {
+          STATE.fashionProjectsList = r.projects;
+        }
+
+        // Nếu dự án hiện tại trên màn hình trùng với một dự án trên server (và không phải nháp mới đang chỉnh), cập nhật trực tiếp
+        if (STATE.fashionProject && STATE.fashionProject.status !== "draft") {
+          const updatedCur = (STATE.fashionProjectsList || []).find(p => p.project_id === STATE.fashionProject.project_id)
+            || (r.active_project && r.active_project.project_id === STATE.fashionProject.project_id ? r.active_project : null);
+          if (updatedCur) {
+            STATE.fashionProject = updatedCur;
+          }
+        }
+
         populateFashionProjectDropdown();
-        renderFashionCompletedVideosShelf();
         renderFashionLiveMonitorBar();
-        renderFashionScenesTimeline();
+        if (STATE.fashionProject && STATE.fashionProject.status !== "draft") {
+          renderFashionScenesTimeline();
+        }
         renderFashionFinalPostProdCard();
+        updateFashionSimpleSummary();
 
-        if (nextProj.status_message) {
-          const isErr = String(nextProj.status || "").startsWith("failed");
-          showFashionBanner(nextProj.status_message, isErr);
+        let anyStillRunning = false;
+        for (const sSlug of activeSlugs) {
+          const pObj = (STATE.fashionProjectsList || []).find(p => p.project_id === sSlug)
+            || (r.active_project && r.active_project.project_id === sSlug ? r.active_project : null);
+          if (!pObj) continue;
+
+          const isRunningNow = pObj.status === "running_flow" || (pObj.scenes || []).some(s => {
+            const st = String(s.status || "");
+            return st === "preparing" || st === "uploading_video" || st === "submitting" || st === "submitted_720p" || st === "upsampling_1080p" || st.startsWith("rendering") || st.startsWith("retrying");
+          });
+
+          if (isRunningNow) {
+            anyStillRunning = true;
+          } else {
+            const failedList = (pObj.scenes || []).filter(s => String(s.status || "").startsWith("failed"));
+            const autoWatchdogOn = document.getElementById("chkFashionAutoRetryWatchdog")?.checked === true;
+            const wdCount = STATE._fashionWatchdogRetries[sSlug] || 0;
+
+            if (failedList.length > 0 && autoWatchdogOn && wdCount < 2) {
+              STATE._fashionWatchdogRetries[sSlug] = wdCount + 1;
+              showFashionBanner(`🔁 Tự động chạy lại ${failedList.length} phân cảnh lỗi của <b>${_escFashionHtml(pObj.title || sSlug)}</b> (Lần ${wdCount + 1}/2)...`);
+              await retryAllFailedFashionScenes(true, sSlug);
+              anyStillRunning = true;
+              continue;
+            }
+
+            STATE.runningFashionSlugs.delete(sSlug);
+            if (pObj.final_video_ready) {
+              showFashionBanner(`🎉 Dự án <b>${_escFashionHtml(pObj.title || sSlug)}</b> đã tạo xong toàn bộ phân cảnh và xuất Video Final 1080p! <button class="btn btn-xs btn-primary" style="margin-left:6px;" onclick="openProjectInStudio('${_escFashionHtml(sSlug)}')">📊 Xem Tại Studio Dự Án</button>`);
+              if (typeof refreshAll === "function") refreshAll(true);
+            } else if (failedList.length > 0 && pObj.status_message) {
+              showFashionBanner(pObj.status_message, true);
+            }
+          }
         }
 
-        const isStillRunning = nextProj.status === "running_flow" || (nextProj.scenes || []).some(s => {
-          const st = String(s.status || "");
-          return st === "preparing" || st === "uploading_video" || st === "submitting" || st === "submitted_720p" || st === "upsampling_1080p" || st.startsWith("rendering") || st.startsWith("retrying");
-        });
-
-        if (!isStillRunning) {
-          const failedList = (nextProj.scenes || []).filter(s => String(s.status || "").startsWith("failed"));
-          const autoWatchdogOn = document.getElementById("chkFashionAutoRetryWatchdog")?.checked !== false;
-          const wdCount = STATE._fashionWatchdogRetries[slug] || 0;
-
-          if (failedList.length > 0 && autoWatchdogOn && wdCount < 2) {
-            STATE._fashionWatchdogRetries[slug] = wdCount + 1;
-            showFashionBanner(`🔁 [Watchdog Tự Động Retry Lần ${wdCount + 1}/2] Phát hiện ${failedList.length} phân cảnh lỗi (${failedList.map(x => x.id.toUpperCase()).join(", ")}) -> Đang tự động kích hoạt Retry ngay lập tức!`);
-            await retryAllFailedFashionScenes(true);
-            return;
-          }
-
-          clearInterval(STATE._fashionFlowPollTimer);
-          STATE._fashionFlowPollTimer = null;
-          if (STATE._fashionElapsedTicker) {
-            clearInterval(STATE._fashionElapsedTicker);
-            STATE._fashionElapsedTicker = null;
-          }
+        if (!anyStillRunning || ticks > 600) {
+          stopFashionUiMonitor();
           STATE._fashionRunStartTs = 0;
-          if (nextProj.final_video_ready) {
-            showFashionBanner(`🎉 Đã tạo xong toàn bộ phân cảnh và Render Hậu Kỳ hoàn tất Video Final 1080p 24FPS!`);
-            if (typeof refreshAll === "function") refreshAll(true);
-          }
-        } else if (ticks > 360) {
-          clearInterval(STATE._fashionFlowPollTimer);
-          STATE._fashionFlowPollTimer = null;
-          if (STATE._fashionElapsedTicker) {
-            clearInterval(STATE._fashionElapsedTicker);
-            STATE._fashionElapsedTicker = null;
-          }
+          renderFashionLiveMonitorBar();
+          updateFashionSimpleSummary();
         }
-      }, 2000);
+      }, 2200);
     }
 
-    async function retryAllFailedFashionScenes(isAutoWatchdog = false) {
-      const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
+    async function retryAllFailedFashionScenes(isAutoWatchdog = false, overrideSlug = "") {
+      const slug = overrideSlug || STATE.fashionProject?.project_id;
+      if (!slug) {
+        showFashionBanner("⚠️ Chưa có phân cảnh lỗi cần chạy lại.", true);
+        return;
+      }
       if (!isAutoWatchdog) {
         STATE._fashionWatchdogRetries = STATE._fashionWatchdogRetries || {};
         STATE._fashionWatchdogRetries[slug] = 0;
       }
       STATE._fashionRunStartTs = Date.now();
-      showFashionBanner(`🔁 Đang kích hoạt Retry ngay lập tức cho các phân cảnh lỗi của dự án <b>${slug}</b> trên Google Flow...`);
+      showFashionBanner(`🔁 Đang chạy lại các phân cảnh lỗi của dự án <b>${_escFashionHtml(slug)}</b>...`);
       const res = await apiPost("/api/fashion_motion/retry_failed", {
         project_id: slug,
+        profile_name: _getSelectedFashionAccountProfile(),
       });
       if (res && res.ok) {
-        showFashionBanner(`🚀 ${res.message || 'Đang chạy Retry tự động trên Google Flow...'}`);
+        showFashionBanner(`🚀 ${res.message || "Đang chạy lại các cảnh lỗi..."}`);
         startFashionLiveStatusMonitor(slug);
+        if (typeof refreshAll === "function") refreshAll(true);
       } else {
-        showFashionBanner(`❌ Lỗi kích hoạt Retry: ${(res && res.error) || 'Không xác định'}`, true);
+        showFashionBanner(`❌ Lỗi khi chạy lại: ${(res && res.error) || "Không xác định"}`, true);
+      }
+    }
+
+    async function _ensureFashionProjectSyncedWithUI() {
+      const proj = STATE.fashionProject;
+      if (!proj) return;
+      if (proj.source_template_code) {
+        await prepareFashionTemplateInputs();
+        return;
+      }
+      const inpChar = (document.getElementById("inpFashionBaseChar")?.value || "").trim();
+      const inpSheet = (document.getElementById("inpFashionCharSheet")?.value || "").trim();
+      const curCharFn = inpChar.split(/[\\/]/).pop();
+      const projCharFn = (proj.base_char_2k?.filename || (proj.base_char_2k?.path || "").split(/[\\/]/).pop() || "");
+      const curSheetFn = inpSheet.split(/[\\/]/).pop();
+      const projSheetFn = (proj.char_sheet_2k?.filename || (proj.char_sheet_2k?.path || "").split(/[\\/]/).pop() || "");
+      const enabledFns = (STATE.fashionOutfits || []).filter(o => o.enabled !== false).map(o => o.filename).join("|");
+      const projOutFns = (proj.outfits || []).map(o => o.filename).join("|");
+
+      if (!proj.scenes?.length || (curCharFn && curCharFn !== projCharFn) || (curSheetFn && curSheetFn !== projSheetFn) || (enabledFns && enabledFns !== projOutFns)) {
+        await analyzeAndBuildFashionProject();
       }
     }
 
     async function runSingleFashionScene(sceneId) {
-      const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
+      await _ensureFashionProjectSyncedWithUI();
+      const slug = STATE.fashionProject?.project_id;
+      if (!slug || STATE.fashionProject?.status === "draft") return;
+
       const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
       const modeLbl = _fashionModeLabelUI(generation_mode);
-      const isVids = generation_mode === "google_vids";
+      const profile_name = _getSelectedFashionAccountProfile();
       STATE._fashionRunStartTs = Date.now();
+
       if (STATE.fashionProject) {
         STATE.fashionProject.generation_mode = generation_mode;
         STATE.fashionProject.status = "running_flow";
-        STATE.fashionProject.status_message = isVids
-          ? `🌐 Đang gửi Phân Cảnh ${sceneId.toUpperCase()} lên Google Vids Web (${modeLbl})...`
-          : `🚀 Đang gửi Phân Cảnh ${sceneId.toUpperCase()} lên Google Flow (${modeLbl})...`;
+        STATE.fashionProject.status_message = `Đang gửi Cảnh ${sceneId.toUpperCase()} (${modeLbl})...`;
         (STATE.fashionProject.scenes || []).forEach(s => {
           if (s.id === sceneId) {
             s.status = "preparing";
             s.attempt = 1;
-            s.max_attempts = isVids ? 3 : 4;
-            s.status_detail = isVids
-              ? "🌐 Đang kết nối Google Vids Web & tải ảnh 2K qua Scotty..."
-              : "🚀 Đang kết nối Google Flow & tải ảnh tham chiếu 2K...";
+            s.status_detail = "Đang kết nối & tải ảnh tham chiếu...";
           }
         });
         renderFashionLiveMonitorBar();
         renderFashionScenesTimeline();
       }
-      showFashionBanner(`⏳ Đang gửi Phân Cảnh <b>${sceneId.toUpperCase()}</b> (${modeLbl})...`);
+
       const res = await apiPost("/api/fashion_motion/run_scene", {
         project_id: slug,
         scene_id: sceneId,
         generation_mode,
+        profile_name,
         async: true,
       });
       if (res && res.ok) {
         if (res.project) STATE.fashionProject = res.project;
-        showFashionBanner(res.message || `🚀 Đang tạo Video Phân Cảnh ${sceneId.toUpperCase()} (${modeLbl})!`);
+        showFashionBanner(res.message || `🚀 Đang tạo Video Cảnh ${sceneId.toUpperCase()}!`);
         startFashionLiveStatusMonitor(slug);
       } else {
-        showFashionBanner(`❌ Lỗi tạo phân cảnh ${sceneId}: ${(res && res.error) || 'Không xác định'}`, true);
+        if (STATE.fashionProject) STATE.fashionProject.status = "ready";
+        updateFashionSimpleSummary();
+        showFashionBanner(`❌ Lỗi tạo cảnh ${sceneId}: ${(res && res.error) || "Không xác định"}`, true);
       }
     }
 
     async function renderFashionFinalPostProd() {
-      const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      showFashionBanner(`⏳ Đang Render Hậu Kỳ ghép các Video Phân Cảnh + Nhạc Gốc thành Video Final 1080×1920 mượt mà cho dự án <b>${slug}</b>...`);
-      const res = await apiPost("/api/fashion_motion/render_final", {
-        project_id: slug,
-      });
+      const slug = STATE.fashionProject?.project_id;
+      if (!slug || STATE.fashionProject?.status === "draft") {
+        showFashionBanner("⚠️ Dự án chưa tạo video phân cảnh để ghép hậu kỳ.", true);
+        return;
+      }
+      showFashionBanner(`⏳ Đang ghép nối các phân cảnh + nhạc gốc thành Video Final 1080p...`);
+      const res = await apiPost("/api/fashion_motion/render_final", { project_id: slug });
       if (res && res.ok && res.project) {
         STATE.fashionProject = res.project;
         renderFashionMotionStudio();
-        showFashionBanner(`🎉 ${res.message || 'Đã Render Hậu Kỳ xong Video Final 1080p mượt mà!'}`);
-        document.getElementById("cardFashionPostProdFinal")?.scrollIntoView({ behavior: "smooth" });
+        showFashionBanner(`🎉 ${res.message || "Đã ghép xong Video Final 1080p!"}`);
+        document.getElementById("cardFashionPostProdFinal")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
       } else {
-        showFashionBanner(`❌ Lỗi Render Hậu Kỳ: ${(res && res.error) || 'Không xác định'}`, true);
+        showFashionBanner(`❌ Lỗi ghép hậu kỳ: ${(res && res.error) || "Không xác định"}`, true);
       }
     }
 
+    async function previewOrRebuildFashionScenes() {
+      if (STATE.fashionProject?.source_template_code) {
+        STATE.fashionPreparedSignature = "";
+        const ok = await prepareFashionTemplateInputs();
+        if (ok) {
+          renderFashionScenesTimeline();
+          document.getElementById("fashionScenesTimelineContainer")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+        return ok;
+      }
+      await analyzeAndBuildFashionProject();
+      document.getElementById("fashionScenesTimelineContainer")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+    }
+
     async function analyzeAndBuildFashionProject(overrideSlug = "", overrideTitle = "") {
-      const base_char_path = document.getElementById("inpFashionBaseChar")?.value || "";
-      const char_sheet_path = document.getElementById("inpFashionCharSheet")?.value || "";
-      const ref_video_path = document.getElementById("inpFashionRefVideo")?.value || "";
+      if (!overrideSlug && STATE.fashionProject?.source_template_code) {
+        STATE.fashionInputsDirty = true;
+        STATE.fashionPreparedSignature = "";
+        return prepareFashionTemplateInputs();
+      }
+
+      const base_char_path = (document.getElementById("inpFashionBaseChar")?.value || "").trim();
+      const char_sheet_path = (document.getElementById("inpFashionCharSheet")?.value || base_char_path).trim();
+      const ref_video_path = (document.getElementById("inpFashionRefVideo")?.value || "").trim();
+      if (!ref_video_path) {
+        showFashionBanner("⚠️ Vui lòng chọn một Mẫu Video ở Bước 1 hoặc chọn file .MP4 tham chiếu riêng.", true);
+        return false;
+      }
+      if (!base_char_path) {
+        showFashionBanner("⚠️ Vui lòng chọn hoặc tải lên Ảnh Nhân Vật ở Bước 2 trước.", true);
+        return false;
+      }
+      const enabledOutfits = (STATE.fashionOutfits || []).filter(o => o.enabled !== false);
+      if (!enabledOutfits.length) {
+        showFashionBanner("⚠️ Vui lòng thêm ít nhất 1 ảnh sản phẩm quần áo ở Bước 3 trước.", true);
+        return false;
+      }
+
       const preferred_chunk_sec = document.getElementById("selFashionChunkSec")?.value || "auto";
       const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
       const defaultPStyle = generation_mode === "google_vids" ? "google_vids" : (generation_mode === "chained_i2v" ? "chained_i2v" : "timeline_pro");
@@ -5219,11 +5893,10 @@
       const ai_provider = document.getElementById("selFashionAiProvider")?.value || "auto";
       const ai_model = document.getElementById("selFashionAiModel")?.value || "gemini-2.5-flash";
 
-      const enabledOutfits = (STATE.fashionOutfits || []).filter(o => o.enabled !== false);
       const custom_scene_cuts = {};
       if (!overrideSlug && STATE.fashionProject && Array.isArray(STATE.fashionProject.scenes)) {
         const prevRef = STATE.fashionProject.reference_video?.path || "";
-        if (prevRef && ref_video_path && prevRef === ref_video_path && enabledOutfits.length === (STATE.fashionProject.outfits || []).length) {
+        if (prevRef && prevRef === ref_video_path && enabledOutfits.length === (STATE.fashionProject.outfits || []).length) {
           STATE.fashionProject.scenes.forEach(sc => {
             const cuts = [];
             (sc.transitions || []).forEach((tr, trIdx) => {
@@ -5235,10 +5908,10 @@
         }
       }
 
-      const targetSlug = overrideSlug || STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      const targetTitle = overrideTitle || STATE.fashionProject?.title || `Lookbook Thời Trang AI 2K (${enabledOutfits.length} Bộ Đồ)`;
+      const targetSlug = overrideSlug || STATE.fashionProject?.project_id || `fashion_custom_${Date.now()}`;
+      const targetTitle = overrideTitle || STATE.fashionProject?.title || `Lookbook Thời Trang AI (${enabledOutfits.length} Bộ Đồ)`;
 
-      showFashionBanner(`⏳ Đang phân tích Video Tham Chiếu chuẩn từng 0.1s theo nhạc (Chế độ: <b>${_fashionModeLabelUI(generation_mode)}</b>) và gán ${enabledOutfits.length} Bộ Đồ 2K...`);
+      showFashionBanner(`⏳ Đang phân tích nhịp cắt chuyển động & gán ${enabledOutfits.length} sản phẩm vào kịch bản...`);
       const res = await apiPost("/api/fashion_motion/analyze_and_create", {
         project_id: targetSlug,
         title: targetTitle,
@@ -5256,63 +5929,269 @@
       });
       if (res && res.ok) {
         STATE.fashionProject = res;
-        if (Array.isArray(res.projects)) {
-          STATE.fashionProjectsList = res.projects;
-        }
-        STATE.fashionOutfits = syncFashionOutfitsWithDefaults(res.outfits || [], STATE.fashionDefaultOutfits);
+        if (Array.isArray(res.projects)) STATE.fashionProjectsList = res.projects;
+        STATE.fashionOutfits = syncFashionOutfitsWithDefaults(res.outfits || []);
         populateFashionProjectDropdown();
         renderFashionMotionStudio();
-        showFashionBanner(`✅ Đã phân tích Video Gốc (${res.reference_video?.duration}s), căn nhịp 0.1s theo nhạc cho <b>${(res.scenes || []).length} Phân Cảnh × ${res.split_plan?.scene_duration}s</b> (Cảnh 2 tự động nối tiếp Frame cuối Cảnh 1)!`);
+        showFashionBanner(`✅ Đã dựng xong kịch bản <b>${(res.scenes || []).length} phân cảnh</b>!`);
+        return true;
       } else {
-        showFashionBanner(`❌ Lỗi phân tích: ${(res && res.error) || 'Không xác định'}`, true);
+        showFashionBanner(`❌ Lỗi phân tích video: ${(res && res.error) || "Không xác định"}`, true);
+        return false;
       }
     }
 
-    async function runFashionProjectOnFlow() {
-      const clickedTpl = STATE.lastUserClickedTemplateCode || "";
-      const curProjTpl = STATE.fashionProject?.source_template_code || "";
-      if (clickedTpl && curProjTpl !== clickedTpl && STATE.fashionProject?.project_id !== `fashion_tpl_${clickedTpl.toLowerCase()}`) {
-        return await applySelectedFashionTemplate(true);
+    async function _prepareFashionTemplateInputsOnce() {
+      const proj = STATE.fashionProject;
+      if (!proj?.source_template_code) return false;
+
+      const character = (document.getElementById("inpFashionBaseChar")?.value || proj.base_char_2k?.path || "").trim();
+      const background = (document.getElementById("inpFashionCharSheet")?.value || proj.char_sheet_2k?.path || character).trim();
+      const outfits = (STATE.fashionOutfits || []).filter(o => o.enabled !== false);
+      if (!character || !outfits.length) {
+        showFashionBanner(!character ? "⚠️ Vui lòng chọn Nhân vật ở Bước 2 trước." : "⚠️ Vui lòng thêm ít nhất 1 Sản phẩm ở Bước 3 trước.", true);
+        updateFashionSimpleSummary();
+        return false;
       }
 
-      const slug = STATE.fashionProject?.project_id || "fashion_lookbook_chan_vay_6e19";
-      const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
-      const modeLbl = _fashionModeLabelUI(generation_mode);
-      const isVids = generation_mode === "google_vids";
-      STATE._fashionWatchdogRetries = STATE._fashionWatchdogRetries || {};
-      STATE._fashionWatchdogRetries[slug] = 0;
-      STATE._fashionRunStartTs = Date.now();
+      const mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || proj.generation_mode || "chained_i2v");
+      const autoPrepare2K = !!document.getElementById("chkFashionAutoPrepare2K")?.checked && mode !== "google_vids";
+      const profile_name = _getSelectedFashionAccountProfile();
 
-      if (STATE.fashionProject) {
-        STATE.fashionProject.generation_mode = generation_mode;
-        STATE.fashionProject.status = "running_flow";
-        STATE.fashionProject.status_message = isVids
-          ? `🌐 Đang kết nối Google Vids Web (${modeLbl}) cho dự án ${slug}...`
-          : `🚀 Đang khởi động trình duyệt Google Flow (${modeLbl}) cho dự án ${slug}...`;
-        (STATE.fashionProject.scenes || []).forEach(s => {
-          s.status = "preparing";
-          s.attempt = 1;
-          s.max_attempts = isVids ? 3 : 4;
-          s.status_detail = isVids
-            ? "🌐 Đang kết nối Google Vids Web & chuẩn bị 3 ảnh 2K..."
-            : "🚀 Đang kết nối Google Flow & tải nguyên liệu 2K...";
-        });
-        renderFashionLiveMonitorBar();
-        renderFashionScenesTimeline();
-        document.getElementById("fashionLiveMonitorBarTop")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+      const signature = JSON.stringify([
+        proj.project_id,
+        proj.source_template_code,
+        character,
+        background,
+        outfits.map(o => [o.id, o.path, o.short_desc, o.en_desc]),
+        mode,
+        autoPrepare2K,
+        profile_name,
+      ]);
+      if (proj.status === "running_flow") return false;
+      if (STATE.fashionPreparedSignature === signature && Array.isArray(proj.scenes) && proj.scenes.length > 0 && proj.status !== "draft") {
+        return true;
       }
 
-      showFashionBanner(`🚀 Đang gửi dự án <b>${slug}</b> (Chế độ: <b>${modeLbl}</b> • Cảnh 2 nối tiếp Frame cuối Cảnh 1)...`);
-      const res = await apiPost("/api/fashion_motion/run_flow", {
-        project_id: slug,
-        generation_mode,
+      const requestId = proj.project_id || `fashion_${proj.source_template_code.toLowerCase()}_${Date.now()}`;
+      showFashionBanner(`⏳ Đang chuẩn bị kịch bản mẫu <b>${_escFashionHtml(proj.source_template_code)}</b> với nhân vật & ${outfits.length} sản phẩm của bạn...`);
+
+      const res = await apiPost("/api/fashion_motion/apply_template", {
+        template_code: proj.source_template_code,
+        project_id: requestId,
+        project_id_slug: requestId,
+        base_char_path: character,
+        char_sheet_path: background,
+        outfit_items: outfits,
+        require_inputs: autoPrepare2K,
+        profile_name,
+        generation_mode: mode,
+        auto_run_flow: false,
       });
-      if (res && res.ok) {
-        if (res.project) STATE.fashionProject = res.project;
-        showFashionBanner(`✅ ${res.message}`);
-        startFashionLiveStatusMonitor(slug);
-      } else {
-        showFashionBanner(`❌ Lỗi: ${(res && res.error) || 'Không thể khởi chạy'}`, true);
+      if (STATE.fashionProject && STATE.fashionProject.project_id !== requestId) return false;
+      if (!res?.ok) {
+        showFashionBanner(`❌ ${res?.error || "Không chuẩn bị được dữ liệu mẫu. Hãy thử lại."}`, true);
+        return false;
+      }
+
+      STATE.fashionProject = res;
+      STATE.fashionOutfits = syncFashionOutfitsWithDefaults(res.outfits || outfits);
+      STATE.fashionPreparedSignature = signature;
+      STATE.fashionInputsDirty = false;
+      if (Array.isArray(res.projects)) STATE.fashionProjectsList = res.projects;
+
+      populateFashionProjectDropdown();
+      renderFashionMotionStudio();
+      updateFashionSimpleSummary();
+      showFashionBanner(`✅ Kịch bản sẵn sàng: <b>${_escFashionHtml(proj.source_template_code)}</b> · <b>${(res.scenes || []).length} phân cảnh</b> · <b>${outfits.length} bộ đồ</b>.`);
+      return true;
+    }
+
+    async function prepareFashionTemplateInputs() {
+      while (STATE.fashionPreparePromise) await STATE.fashionPreparePromise;
+      STATE.fashionPreparePromise = _prepareFashionTemplateInputsOnce();
+      try {
+        return await STATE.fashionPreparePromise;
+      } finally {
+        STATE.fashionPreparePromise = null;
+        updateFashionSimpleSummary();
+      }
+    }
+
+    function updateFashionSimpleSummary() {
+      const el = document.getElementById("fashionSimpleSummary");
+      const runBtn = document.getElementById("btnFashionSimpleRun");
+      if (!el) return;
+
+      const p = STATE.fashionProject;
+      const tplCode = p?.source_template_code || STATE.selectedFashionTemplateCode || "";
+      const allTpls = STATE.fashionVideoTemplatesCatalog?.templates || [];
+      const tplObj = allTpls.find(x => x.code === tplCode);
+      const hasRefVid = !!(tplCode || p?.reference_video?.path || document.getElementById("inpFashionRefVideo")?.value?.trim());
+
+      const charPath = (document.getElementById("inpFashionBaseChar")?.value || p?.base_char_2k?.path || "").trim();
+      const hasChar = !!charPath;
+      const mergedChars = _getMergedFashionCharacters();
+      const charFn = charPath ? charPath.split(/[\\/]/).pop().toLowerCase() : "";
+      const matchedChar = charFn ? mergedChars.find(c => (c.char_path || "").split(/[\\/]/).pop().toLowerCase() === charFn) : null;
+      const charShortName = hasChar
+        ? (matchedChar ? matchedChar.name : charPath.split(/[\\/]/).pop().replace(/\.[^.]+$/, "")).slice(0, 26)
+        : "";
+
+      const outfitCount = (STATE.fashionOutfits || []).filter(o => o.enabled !== false).length;
+      const isSubmitting = !!STATE.fashionSubmitting;
+      const runningCount = STATE.runningFashionSlugs ? STATE.runningFashionSlugs.size : 0;
+
+      const pill1 = hasRefVid
+        ? `<span class="f-step-pill ready">🎬 Mẫu: ${_escFashionHtml(tplCode || "MP4 riêng")}${tplObj ? ` (${tplObj.duration}s)` : ""}</span>`
+        : `<span class="f-step-pill missing">🎬 Bước 1: Chọn mẫu video</span>`;
+
+      const pill2 = hasChar
+        ? `<span class="f-step-pill ready">👤 ${_escFashionHtml(charShortName)}</span>`
+        : `<span class="f-step-pill missing">👤 Bước 2: Chưa chọn nhân vật</span>`;
+
+      const pill3 = outfitCount > 0
+        ? `<span class="f-step-pill ready">👗 ${outfitCount} sản phẩm</span>`
+        : `<span class="f-step-pill missing">👗 Bước 3: Chưa thêm sản phẩm</span>`;
+
+      const pillRunning = runningCount > 0
+        ? `<span class="f-step-pill ready" style="cursor:pointer; border-color:#38bdf8; color:#7dd3fc;" onclick="openProjectInStudio('${_escFashionHtml(Array.from(STATE.runningFashionSlugs)[0])}')">⚡ Đang chạy ngầm ${runningCount} video · Bấm xem tại Studio Dự Án</span>`
+        : "";
+
+      el.innerHTML = `${pill1}${pill2}${pill3}${pillRunning}`;
+
+      if (runBtn) {
+        const canRun = hasRefVid && hasChar && outfitCount > 0 && !isSubmitting;
+        runBtn.disabled = !canRun;
+        if (isSubmitting) {
+          runBtn.innerHTML = "⏳ Đang Khởi Tạo Tác Vụ...";
+        } else if (runningCount > 0 || p?.status === "running_flow") {
+          runBtn.innerHTML = "🚀 Tạo Thêm Video Thời Trang Mới";
+        } else if (p?.final_video_ready) {
+          runBtn.innerHTML = "🚀 Tạo Bản Video Mới";
+        } else {
+          runBtn.innerHTML = "🚀 Tạo Video Thời Trang Ngay";
+        }
+      }
+    }
+
+    async function startFashionCharacterUpload() {
+      if (ensureFashionEditableDraft({ preserveInputs: true })) {
+        await promptAddNewFashionCharacter();
+      }
+    }
+
+    async function startFashionProductUpload() {
+      if (ensureFashionEditableDraft({ preserveInputs: true })) {
+        await addCustomFashionOutfitFromDisk();
+      }
+    }
+
+    async function runFashionProjectOnFlow(reuseExistingSlug = false) {
+      if (STATE.fashionSubmitting) {
+        showFashionBanner("⏳ Đang gửi tác vụ lên hệ thống, vui lòng đợi 1-2 giây...");
+        return;
+      }
+
+      const charPath = (document.getElementById("inpFashionBaseChar")?.value || STATE.fashionProject?.base_char_2k?.path || "").trim();
+      const enabledOutfits = (STATE.fashionOutfits || []).filter(o => o.enabled !== false);
+      if (!charPath) {
+        showFashionBanner("⚠️ Bạn chưa chọn Nhân vật ở <b>Bước 2</b>. Hãy chọn 1 người mẫu hoặc tải ảnh người mẫu lên trước!", true);
+        return;
+      }
+      if (!enabledOutfits.length) {
+        showFashionBanner("⚠️ Bạn chưa thêm Sản phẩm quần áo ở <b>Bước 3</b>. Hãy tải ảnh quần áo hoặc chọn từ Kho SP trước!", true);
+        return;
+      }
+
+      // Nếu dự án hiện tại đang chạy hoặc đã hoàn tất, tự động tách sang mã dự án mới để chạy đa tác vụ song song
+      if (!reuseExistingSlug && (STATE.fashionProject?.final_video_ready || STATE.fashionProject?.status === "running_flow" || STATE.fashionProject?.status === "done")) {
+        ensureFashionEditableDraft({
+          preserveInputs: true,
+          targetTemplateCode: STATE.fashionProject.source_template_code || STATE.selectedFashionTemplateCode || "FVT_001",
+        });
+      }
+
+      STATE.fashionSubmitting = true;
+      updateFashionSimpleSummary();
+
+      try {
+        if (STATE.fashionProject?.source_template_code) {
+          const ok = await prepareFashionTemplateInputs();
+          if (!ok) return;
+        } else {
+          await _ensureFashionProjectSyncedWithUI();
+          if (!STATE.fashionProject?.scenes?.length) return;
+        }
+
+        const slug = STATE.fashionProject?.project_id;
+        if (!slug) return;
+
+        const generation_mode = _normFashionModeUI(document.getElementById("selFashionGenerationMode")?.value || STATE.fashionProject?.generation_mode || "chained_i2v");
+        const modeLbl = _fashionModeLabelUI(generation_mode);
+        const profile_name = _getSelectedFashionAccountProfile();
+        const isVids = generation_mode === "google_vids";
+
+        STATE._fashionWatchdogRetries = STATE._fashionWatchdogRetries || {};
+        STATE._fashionWatchdogRetries[slug] = 0;
+        STATE._fashionRunStartTs = Date.now();
+
+        if (STATE.fashionProject) {
+          STATE.fashionProject.generation_mode = generation_mode;
+          STATE.fashionProject.status = "running_flow";
+          STATE.fashionProject.status_message = isVids
+            ? `Đang kết nối Google Vids Web 1080p (${profile_name || "Tự động đa tài khoản"})...`
+            : `Đang khởi chạy Google Flow (${profile_name || "Tự động đa tài khoản"})...`;
+          (STATE.fashionProject.scenes || []).forEach(s => {
+            s.status = "preparing";
+            s.attempt = 1;
+            s.max_attempts = STATE.fashionProject.max_scene_attempts || 1;
+            s.status_detail = isVids
+              ? "Đang tải ảnh tham chiếu lên Google Vids..."
+              : "Đang chuẩn bị nguyên liệu trên Google Flow...";
+          });
+          if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+          STATE.runningFashionSlugs.add(slug);
+          renderFashionLiveMonitorBar();
+          renderFashionScenesTimeline();
+          document.getElementById("fashionLiveMonitorBarTop")?.scrollIntoView({ behavior: "smooth", block: "nearest" });
+        }
+
+        showFashionBanner(`🚀 Đang đẩy tác vụ <b>${_escFashionHtml(STATE.fashionProject?.title || slug)}</b> qua <b>${_escFashionHtml(modeLbl)}</b>...`);
+        const res = await apiPost("/api/fashion_motion/run_flow", {
+          project_id: slug,
+          generation_mode,
+          profile_name,
+        });
+
+        if (res && res.ok) {
+          const launchedProj = res.project || STATE.fashionProject;
+          if (launchedProj) {
+            STATE.fashionProject = launchedProj;
+            if (!Array.isArray(STATE.fashionProjectsList)) STATE.fashionProjectsList = [];
+            const exIdx = STATE.fashionProjectsList.findIndex(x => x && x.project_id === slug);
+            if (exIdx >= 0) STATE.fashionProjectsList[exIdx] = launchedProj;
+            else STATE.fashionProjectsList.unshift(launchedProj);
+          }
+          if (!STATE.runningFashionSlugs) STATE.runningFashionSlugs = new Set();
+          STATE.runningFashionSlugs.add(slug);
+
+          showFashionBanner(
+            `✅ Đã đẩy tác vụ <b>${_escFashionHtml(launchedProj?.title || slug)}</b> sang chạy ngầm đa luồng! ` +
+            `<button class="btn btn-xs btn-primary" style="margin-left:6px; font-weight:800;" onclick="openProjectInStudio('${_escFashionHtml(slug)}')">📊 Xem Tiến Trình Tại Studio Dự Án</button> ` +
+            `<span style="color:#fde68a; margin-left:6px;">👉 Bạn có thể chọn mẫu/nhân vật/sản phẩm khác để tạo tiếp video mới ngay lập tức!</span>`
+          );
+          startFashionLiveStatusMonitor(slug);
+          if (typeof refreshAll === "function") refreshAll(false);
+        } else {
+          if (STATE.runningFashionSlugs) STATE.runningFashionSlugs.delete(slug);
+          if (STATE.fashionProject) STATE.fashionProject.status = "ready";
+          renderFashionLiveMonitorBar();
+          showFashionBanner(`❌ Không thể khởi chạy: ${(res && res.error) || "Lỗi không xác định"}`, true);
+        }
+      } finally {
+        STATE.fashionSubmitting = false;
+        updateFashionSimpleSummary();
       }
     }
 
@@ -5607,8 +6486,8 @@
               }
               sel.appendChild(og);
             }
-            // Auto-select Profile 13 (leviettung04)
-            const auto = _cdpProfileList.find(p => p.email && p.email.includes("leviettung04"));
+            // Tự chọn profile đã có session (hoặc profile đầu tiên)
+            const auto = _cdpProfileList.find(p => p.has_session) || _cdpProfileList[0];
             if (auto) sel.value = auto.id;
           }
         }
@@ -5687,18 +6566,22 @@ async function checkTokenManagerStatus() {
   const statusEl = document.getElementById("tokenMgrStatusText");
   if (statusEl) statusEl.textContent = "Đang kiểm tra...";
   try {
-    const r2 = await fetch("/api/flow/token_manager_status");
+    const r2 = await fetch("/api/flow/token_manager_status", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: "{}",
+    });
     const res = await r2.json();
     if (!res) return;
     const enabled = res.enabled ? "✅ Bật" : "⬜ Tắt";
-    const profiles = res.profiles ? res.profiles.join(", ") : "Tất cả";
+    const profiles = (Array.isArray(res.profiles) && res.profiles.length) ? res.profiles.join(", ") : "Tất cả";
     const lastRefresh = res.last_refresh || "Chưa";
     const statusText = `${enabled} | Profiles: ${profiles} | Làm mới lần cuối: ${lastRefresh}`;
     if (statusEl) statusEl.textContent = statusText;
     // Sync checkbox
     const chk = document.getElementById("chkAutoRefreshToken");
     if (chk) chk.checked = !!res.enabled;
-    if (typeof toast === "function") toast(`Token Manager: ${enabledTxt}`, "ok");
+    if (typeof toast === "function") toast(`Token Manager: ${enabled}`, "ok");
   } catch(e) {
     if (statusEl) statusEl.textContent = "Lỗi kết nối";
     if (typeof toast === "function") toast("Lỗi kiểm tra token manager: " + e, "err");
@@ -5729,10 +6612,11 @@ async function checkTokenManagerStatus() {
       loadCharacterLibrary();
       setInterval(async () => {
         refreshAll(true);
-        const isFashionTab = document.getElementById("tab-fashion-motion")?.classList.contains("active");
+        const isFashionTab = document.getElementById("tab-fashion")?.classList.contains("active");
         if (isFashionTab && !STATE._fashionFlowPollTimer) {
           try {
             const curSlug = STATE.fashionProject?.project_id || "";
+            if (!curSlug || STATE.fashionProject?.status === "draft") return;
             const r = await apiGet(`/api/fashion_motion/projects?project_id=${encodeURIComponent(curSlug)}`);
             if (r && r.ok) {
               const nextProj = r.active_project || r.current_project;
@@ -5740,14 +6624,14 @@ async function checkTokenManagerStatus() {
               const nextDoneCnt = (r.projects || []).filter(p => p.final_video_ready).length;
               const prevUpd = STATE.fashionProject?.updated_at || "";
               const nextUpd = nextProj?.updated_at || "";
-              if (nextProj && (nextDoneCnt !== prevDoneCnt || nextUpd !== prevUpd || nextProj.status === "running_flow")) {
+              if (nextProj && nextProj.project_id === curSlug && (nextDoneCnt !== prevDoneCnt || nextUpd !== prevUpd || nextProj.status === "running_flow")) {
                 STATE.fashionProjectsList = r.projects || [];
                 STATE.fashionProject = nextProj;
                 populateFashionProjectDropdown();
-                renderFashionCompletedVideosShelf();
                 renderFashionLiveMonitorBar();
                 renderFashionScenesTimeline();
                 renderFashionFinalPostProdCard();
+                updateFashionSimpleSummary();
                 if (nextProj.status === "running_flow") {
                   startFashionLiveStatusMonitor(nextProj.project_id);
                 }
@@ -5757,4 +6641,3 @@ async function checkTokenManagerStatus() {
         }
       }, 5000);
     })();
-  

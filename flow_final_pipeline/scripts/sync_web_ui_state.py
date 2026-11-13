@@ -339,6 +339,55 @@ def sync_web_ui(force: bool = True):
             except Exception:
                 pass
 
+        proj_json_path = os.path.join(pdir, "project.json")
+        existing_proj_data = {}
+        if os.path.isfile(proj_json_path):
+            try:
+                existing_proj_data = json.load(open(proj_json_path, encoding="utf-8"))
+            except Exception:
+                existing_proj_data = {}
+
+        if str(pid).startswith("proj_") and isinstance(existing_proj_data, dict) and existing_proj_data.get("id") and not prompts_data:
+            c_prods = existing_proj_data.get("products") or []
+            c_done = sum(1 for pr in c_prods if isinstance(pr, dict) and pr.get("status") == "done")
+            c_run = sum(1 for pr in c_prods if isinstance(pr, dict) and pr.get("status") in ("scripting", "img_gen", "vid_gen", "assembling"))
+            c_fail = sum(1 for pr in c_prods if isinstance(pr, dict) and pr.get("status") == "failed")
+            c_prim = next((str(pr.get("product_image_path") or "") for pr in c_prods if isinstance(pr, dict) and pr.get("product_image_path")), "")
+            c_sort = -1 if c_run > 0 else (0 if c_done > 0 else 1)
+            raw_index_items.append((
+                c_sort,
+                order_idx,
+                {
+                    "id": pid,
+                    "name": existing_proj_data.get("name") or pid,
+                    "primary_product_image_path": c_prim,
+                    "final_videos_dir": FINAL_VIDEOS_DIR,
+                    "project_dir": pdir,
+                    "role_skill_file": existing_proj_data.get("role_skill_file") or "DoAnVat.MD",
+                    "created_at": existing_proj_data.get("created_at") or now_str,
+                    "updated_at": existing_proj_data.get("updated_at") or now_str,
+                    "total_products": len(c_prods),
+                    "done_products": c_done,
+                    "running_products": c_run,
+                    "failed_products": c_fail,
+                    "thumbnails_count": 0,
+                    "deleted_finals_count": 0,
+                    "has_rendered_cache": c_done > 0,
+                    "rendered_files_count": c_done,
+                    "rendered_size_mb": 0,
+                    "is_clean_new": len(c_prods) == 0,
+                    "is_running": c_run > 0,
+                    "progress_pct": int(round((c_done / max(1, len(c_prods))) * 100)) if c_prods else 0,
+                    "current_step_text": "",
+                    "template_code": "",
+                    "template_name": existing_proj_data.get("role_skill_file") or "Custom Studio",
+                    "videos_per_character": 1,
+                    "is_custom_project": True,
+                    "settings": existing_proj_data.get("settings") or {},
+                },
+            ))
+            continue
+
         if not prompts_data and not info_data and not os.path.isdir(prod_img_dir):
             continue
 
@@ -611,6 +660,19 @@ def sync_web_ui(force: bool = True):
             },
             "products": products_entries,
         }
+
+        # Chỉ hiển thị trong Studio Dự Án những project thực sự đã khởi tạo kịch bản/video/cache hoặc đang chạy.
+        # Sản phẩm thô mới crawl (chưa có prompts.json, chưa có video/cache) chỉ nằm ở tab Sản Phẩm.
+        is_created_studio_project = bool(
+            has_prompts
+            or has_rendered_cache
+            or done_cnt > 0
+            or deleted_finals_count > 0
+            or is_pipeline_running
+        )
+        if not is_created_studio_project:
+            continue
+
         with open(os.path.join(pdir, "project.json"), "w", encoding="utf-8") as f:
             json.dump(proj_obj, f, ensure_ascii=False, indent=2)
 
@@ -664,7 +726,14 @@ def sync_web_ui(force: bool = True):
                 continue
             fdir = os.path.dirname(fjson_path)
             f_status = str(fproj.get("status") or "")
-            is_f_running = (f_status == "running_flow")
+            f_scenes = fproj.get("scenes") or []
+            active_sc_states = ("preparing", "submitting", "submitted_720p", "upsampling_1080p", "rendering_720p", "rendering_1080p", "retrying_auto", "running")
+            is_f_running = (f_status in ("running_flow", "preparing", "retrying_auto")) or any(
+                str(sc.get("status") or "") in active_sc_states for sc in f_scenes
+            )
+            any_sc_failed = (f_status in ("failed_scenes", "failed_auth", "failed_upload", "failed_input_preparation")) or any(
+                str(sc.get("status") or "").startswith("failed") for sc in f_scenes
+            )
             final_vid_path = fproj.get("final_video_path") or os.path.join(FINAL_VIDEOS_DIR, f"{fpid}_final.mp4")
             if not os.path.exists(final_vid_path):
                 alt_final = os.path.join(FINAL_VIDEOS_DIR, f"{fpid}_final_1080p_60fps.mp4")
@@ -672,13 +741,12 @@ def sync_web_ui(force: bool = True):
                     final_vid_path = alt_final
             final_exists = os.path.exists(final_vid_path) and os.path.getsize(final_vid_path) > 50000
 
-            f_scenes = fproj.get("scenes") or []
             any_sc_done = any(
                 os.path.exists(sc.get("output_video_path") or "") and os.path.getsize(sc.get("output_video_path") or "") > 50000
                 for sc in f_scenes
             )
-            # Chỉ đưa vào Tổng Hợp những dự án Thời Trang đang chạy, đã có cảnh render hoặc đã có Video Final
-            if not (final_exists or any_sc_done or is_f_running):
+            # Đưa vào Studio Dự Án tất cả dự án Thời Trang đang chạy, đang xử lý dở, lỗi cảnh hoặc đã có Video Final
+            if not (final_exists or any_sc_done or is_f_running or any_sc_failed):
                 continue
 
             base_char_abs = (fproj.get("base_char_2k") or {}).get("path") or ""
@@ -688,6 +756,13 @@ def sync_web_ui(force: bool = True):
                 o.get("path") for o in (fproj.get("outfits") or [])
                 if o.get("path") and os.path.exists(o.get("path"))
             ]
+            use_custom_assets = bool(fproj.get("disable_overall_sheet") or outfit_paths)
+            primary_prod_f = (outfit_paths[0] if (use_custom_assets and outfit_paths) else (base_char_abs or overall_abs))
+            all_prod_f = (
+                [p for p in ([base_char_abs] + outfit_paths) if p][:8]
+                if use_custom_assets
+                else [p for p in ([overall_abs, room_char_abs] + outfit_paths) if p][:8]
+            )
             raw_fvt_code = str(fproj.get("source_template_code") or "").strip()
             tpl_code_f = "004"
             tpl_name_f = "Motion Control Video Fashion"
@@ -695,27 +770,43 @@ def sync_web_ui(force: bool = True):
             proj_title_f = f"👗 {ftitle}" if not ftitle.startswith("👗") else ftitle
 
             scenes_ui_f = []
+            sc_weight_sum = 0.0
+            f_logs = []
+            if fproj.get("status_message"):
+                f_logs.append(f"[{fproj.get('updated_at') or now_str}] {fproj.get('status_message')}")
             for sc_i, sc in enumerate(f_scenes, start=1):
                 sc_vid = sc.get("output_video_path") or os.path.join(fdir, sc.get("output_video_file") or f"fashion_scene_s{sc_i}_1080p.mp4")
                 sc_done = os.path.exists(sc_vid) and os.path.getsize(sc_vid) > 50000
-                sc_thumb = sc.get("keyframe_sheet_path") or sc.get("ref_clip_thumb") or room_char_abs
+                sc_st_raw = str(sc.get("status") or "")
+                if sc_done or sc_st_raw == "completed_1080p":
+                    sc_weight_sum += 1.0
+                elif sc_st_raw in ("submitted_720p", "upsampling_1080p", "rendering_1080p"):
+                    sc_weight_sum += 0.72
+                elif sc_st_raw in ("submitting", "rendering_720p", "retrying_auto"):
+                    sc_weight_sum += 0.45
+                elif sc_st_raw in ("preparing", "running"):
+                    sc_weight_sum += 0.22
+                sc_thumb = sc.get("start_frame_path") or sc.get("keyframe_sheet_path") or sc.get("ref_clip_thumb") or room_char_abs
                 start_s = float(sc.get("start_sec", (sc_i - 1) * 8) or 0)
                 end_s = float(sc.get("end_sec", sc_i * 8) or (sc_i * 8))
                 dur_s = round(max(1.0, end_s - start_s), 1)
                 summary_vn = sc.get("ai_motion_summary_vn") or f"Phân cảnh {sc_i} ({start_s:g}s–{end_s:g}s): Chuyển động & biến hình trang phục theo nhạc"
+                sc_detail = sc.get("status_detail") or sc.get("last_error") or ""
+                if sc_detail:
+                    f_logs.append(f"• Cảnh {sc_i} ({sc_st_raw or 'pending'}): {sc_detail}")
                 scenes_ui_f.append({
                     "scene_number": sc_i,
                     "scene_title": f"Phân cảnh {sc_i} ({start_s:g}s – {end_s:g}s)",
-                    "scene_description": summary_vn,
-                    "dialogue_vn": summary_vn,
+                    "scene_description": f"{ f'[{sc_detail}] ' if (sc_detail and not sc_done) else '' }{summary_vn}",
+                    "dialogue_vn": f"{ f'[{sc_detail}] ' if (sc_detail and not sc_done) else '' }{summary_vn}",
                     "duration_sec": int(dur_s) if dur_s.is_integer() else dur_s,
                     "image_prompt": "2K Character Sheet + Outfit Product Sheets + Room Reference 2K",
                     "video_prompt": sc.get("prompt") or sc.get("prompt_timeline_pro") or "",
                     "image_path": sc_thumb if (sc_thumb and os.path.exists(sc_thumb)) else room_char_abs,
                     "video_path": sc_vid if sc_done else "",
-                    "primary_product_image_path": overall_abs,
+                    "primary_product_image_path": primary_prod_f,
                     "character_sheet_path": base_char_abs,
-                    "status": "done" if sc_done else ("running" if is_f_running else "pending"),
+                    "status": "done" if sc_done else ("failed" if sc_st_raw.startswith("failed") else ("running" if (is_f_running or sc_st_raw in active_sc_states) else "pending")),
                     "error_msg": sc.get("last_error") or "",
                 })
 
@@ -762,9 +853,9 @@ def sync_web_ui(force: bool = True):
                 "product_image_path": room_char_abs,
                 "thumbnail_path": use_final_thumb,
                 "has_thumbnail": has_thumb_f,
-                "primary_product_image_path": overall_abs,
+                "primary_product_image_path": primary_prod_f,
                 "slide_overlay_image_paths": outfit_paths[:5],
-                "all_product_image_paths": [p for p in ([overall_abs, room_char_abs] + outfit_paths) if p][:8],
+                "all_product_image_paths": all_prod_f,
                 "character_sheet_path": base_char_abs,
                 "role_skill_file": "FlowFinalPipeline.MD",
                 "img_model": "Nano Banana 2.1 (2K)",
@@ -778,8 +869,8 @@ def sync_web_ui(force: bool = True):
                 "flow_project_id": fproj.get("flow_project_id") or "",
                 "output_dir": FINAL_VIDEOS_DIR,
                 "project_dir": fdir,
-                "status": "done" if final_exists else ("vid_gen" if (is_f_running or any_sc_done) else "queued"),
-                "error_msg": "",
+                "status": "done" if final_exists else ("failed" if any_sc_failed else ("vid_gen" if (is_f_running or any_sc_done) else "queued")),
+                "error_msg": fproj.get("status_message") if any_sc_failed else "",
                 "final_video_path": final_vid_path if final_exists else "",
                 "final_video_mtime": int(os.path.getmtime(final_vid_path)) if final_exists else 0,
                 "scenes": scenes_ui_f,
@@ -793,9 +884,12 @@ def sync_web_ui(force: bool = True):
             f_done_thumbs = int(has_thumb_f)
             f_total_steps = max(1, 1 + len(scenes_ui_f) + 1)
             f_pct = 100 if final_exists else (
-                min(95, int(round(((f_done_refs + f_done_scenes) / f_total_steps) * 100)))
-                if (any_sc_done or f_done_refs)
-                else (20 if is_f_running else 0)
+                max(
+                    12 if is_f_running else 0,
+                    min(96, int(round(((f_done_refs + max(float(f_done_scenes), sc_weight_sum)) / f_total_steps) * 100))),
+                )
+                if (any_sc_done or sc_weight_sum > 0 or f_done_refs)
+                else (15 if is_f_running else 0)
             )
 
             f_inter_files = []
@@ -814,16 +908,16 @@ def sync_web_ui(force: bool = True):
                 "shop": "Video Thời Trang (#004)",
                 "final_videos_dir": FINAL_VIDEOS_DIR,
                 "project_dir": fdir,
-                "primary_product_image_path": overall_abs,
+                "primary_product_image_path": primary_prod_f,
                 "slide_overlay_image_paths": outfit_paths[:5],
-                "all_product_image_paths": [p for p in ([overall_abs, room_char_abs] + outfit_paths) if p][:8],
+                "all_product_image_paths": all_prod_f,
                 "role_skill_file": "FlowFinalPipeline.MD",
                 "created_at": fproj.get("created_at") or now_str,
                 "updated_at": fproj.get("updated_at") or now_str,
                 "total_products": len(f_products),
                 "done_products": f_done_cnt,
                 "running_products": f_run_cnt,
-                "failed_products": 0,
+                "failed_products": 1 if any_sc_failed else 0,
                 "thumbnails_count": f_done_thumbs,
                 "deleted_finals_count": 0,
                 "has_rendered_cache": bool(len(f_inter_files) > 0),
@@ -844,7 +938,7 @@ def sync_web_ui(force: bool = True):
                     "current_step": f_step_msg,
                     "current_step_text": f_step_msg,
                 },
-                "logs": [f_step_msg] if f_step_msg else [],
+                "logs": f_logs if f_logs else ([f_step_msg] if f_step_msg else []),
                 "template_code": tpl_code_f,
                 "template_name": tpl_name_f,
                 "videos_per_character": 1,
@@ -873,7 +967,7 @@ def sync_web_ui(force: bool = True):
                     "id": fpid,
                     "name": proj_title_f,
                     "price": f_proj_obj["price"],
-                    "primary_product_image_path": overall_abs,
+                    "primary_product_image_path": primary_prod_f,
                     "final_videos_dir": FINAL_VIDEOS_DIR,
                     "project_dir": fdir,
                     "role_skill_file": "FlowFinalPipeline.MD",
@@ -882,7 +976,7 @@ def sync_web_ui(force: bool = True):
                     "total_products": len(f_products),
                     "done_products": f_done_cnt,
                     "running_products": f_run_cnt,
-                    "failed_products": 0,
+                    "failed_products": 1 if any_sc_failed else 0,
                     "thumbnails_count": f_done_thumbs,
                     "deleted_finals_count": 0,
                     "has_rendered_cache": f_proj_obj["has_rendered_cache"],
@@ -902,7 +996,8 @@ def sync_web_ui(force: bool = True):
 
     from cooking_studio_projection import sync_projects as sync_cooking_projects
     for cooking_idx, cooking_item in enumerate(sync_cooking_projects(PROJECTS_DIR)):
-        raw_index_items.append((-1 if cooking_item['done_products'] else 1, -100 + cooking_idx, cooking_item))
+        c_sort_group = -2 if cooking_item.get("is_running") else (-1 if cooking_item.get("done_products") else 1)
+        raw_index_items.append((c_sort_group, -100 + cooking_idx, cooking_item))
 
     # Products with Final Videos (>0) stay at the TOP; products with 0 Final Videos move to the BOTTOM!
     raw_index_items.sort(key=lambda x: (x[0], x[1]))

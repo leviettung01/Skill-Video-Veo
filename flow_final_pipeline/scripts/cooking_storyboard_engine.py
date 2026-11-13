@@ -30,7 +30,7 @@ for _p in (str(ROOT), str(SCRIPTS_DIR)):
         sys.path.insert(0, _p)
 
 _LAUNCH_LOCK = threading.Lock()
-DEFAULT_FLOW_PROJECT_UUID = '932bc2a1-07ea-4199-b147-80ab0018d41c'
+DEFAULT_FLOW_PROJECT_UUID = os.environ.get("FLOW_DEFAULT_PROJECT_ID", "").strip()
 DEFAULT_VOICE_ID = '29f2a669-6ea7-4486-939e-5cef9db7f211'
 
 
@@ -171,7 +171,7 @@ def list_cooking_voices():
             'region_label': str(v.get('region_label') or 'Miền Bắc'),
             'tone_style': tone_style,
             'tone_label': str(v.get('tone_label') or ''),
-            'owner_profile': str(v.get('owner_profile') or 'leviettung04'),
+            'owner_profile': str(v.get('owner_profile') or ''),
             'account_voice_ids': dict(v.get('account_voice_ids') or {}),
             'sample_vn_abs': str(v.get('sample_vn_abs') or ''),
             'sample_url': str(v.get('sample_url') or ''),
@@ -237,7 +237,7 @@ def resolve_cooking_voice(voice_id_or_key, profile=''):
             'name': matched['name'],
             'gender': matched['gender'],
             'region': matched['region'],
-            'owner_profile': matched.get('owner_profile') or 'leviettung04',
+            'owner_profile': matched.get('owner_profile') or '',
             'delivery_en': delivery_en,
         }
 
@@ -431,9 +431,6 @@ def list_cooking_flow_accounts():
     except Exception:
         pass
 
-    if not order:
-        _upsert('leviettung04', name='Google_leviettung04', project_id=DEFAULT_FLOW_PROJECT_UUID)
-
     results = []
     for prof in order:
         item = by_prof[prof]
@@ -462,7 +459,7 @@ def resolve_cooking_account(profile='', explicit_project_uuid='', manifest=None)
     prof = str(profile or '').strip()
     if not prof:
         ready = next((a for a in accounts if a.get('has_cookies')), None)
-        prof = (ready or accounts[0])['profile_name'] if accounts else 'leviettung04'
+        prof = (ready or accounts[0])['profile_name'] if accounts else ''
 
     acc = next((a for a in accounts if a['profile_name'].lower() == prof.lower()), None)
     if acc:
@@ -483,7 +480,14 @@ def resolve_cooking_account(profile='', explicit_project_uuid='', manifest=None)
 
     if acc and _is_valid_uuid(acc.get('project_id')):
         return prof, acc['project_id']
-    return prof, DEFAULT_FLOW_PROJECT_UUID
+    try:
+        from engine_settings_manager import get_default_flow_project_id
+        dyn_pid = get_default_flow_project_id(prof) or get_default_flow_project_id('')
+        if _is_valid_uuid(dyn_pid):
+            return prof, dyn_pid
+    except Exception:
+        pass
+    return prof, (exp_uuid if _is_valid_uuid(exp_uuid) else '')
 
 
 # ---------------------------------------------------------------------------
@@ -791,7 +795,7 @@ def _resolve_cooking_video_provider(explicit_provider: str = '', manifest: dict 
     return 'google_flow'
 
 
-def launch_stage(project_id, stage, profile='leviettung04', project_uuid=DEFAULT_FLOW_PROJECT_UUID, reviewed=False, video_provider=''):
+def launch_stage(project_id, stage, profile='', project_uuid='', reviewed=False, video_provider=''):
     if stage not in ('storyboards', 'video', 'auto'):
         raise ValueError('Chỉ hỗ trợ bước storyboards, video hoặc auto.')
     with _LAUNCH_LOCK:
@@ -816,9 +820,12 @@ def launch_stage(project_id, stage, profile='leviettung04', project_uuid=DEFAULT
             write_json(project_folder(project_id) / 'cooking_manifest.json', manifest)
 
         resolved_profile, resolved_uuid = resolve_cooking_account(profile, project_uuid, manifest=manifest)
+        if not resolved_profile:
+            raise ValueError('Chưa có tài khoản Google Flow nào được cấu hình. Hãy mở tab Tài Khoản & Flow để thêm tài khoản trước!')
         if not has_cooking_cookies(resolved_profile):
             raise ValueError(f'Tài khoản Flow "{resolved_profile}" chưa có phiên đăng nhập (Cookie) đã lưu.')
-        uuid.UUID(resolved_uuid)
+        if not _is_valid_uuid(resolved_uuid):
+            raise ValueError(f'Tài khoản Flow "{resolved_profile}" chưa có Google Flow Project ID hợp lệ.')
 
         folder = project_folder(project_id)
         prov_badge = 'Google Vids Omni 1080p' if eff_provider == 'google_vids' else 'Google Flow'
@@ -1060,7 +1067,7 @@ def build_cooking_final_video(project_id, folder, manifest, save_cb=None):
 # Main Runner (`storyboards` | `video` | `auto`)
 # ---------------------------------------------------------------------------
 
-def run(project_id, stage='storyboards', profile='leviettung04', project_uuid=DEFAULT_FLOW_PROJECT_UUID, video_provider=''):
+def run(project_id, stage='storyboards', profile='', project_uuid='', video_provider=''):
     import run_all_7_videos_mt as mt
     from playwright.sync_api import sync_playwright
 
@@ -1329,7 +1336,7 @@ if __name__ == '__main__':
     parser = argparse.ArgumentParser(description=__doc__)
     parser.add_argument('project_id', nargs='?', default='', help='Project ID (auto-generated if omitted with --dish)')
     parser.add_argument('--stage', choices=['prepare', 'storyboards', 'video', 'auto'], default='prepare')
-    parser.add_argument('--profile', default='leviettung04')
+    parser.add_argument('--profile', default='')
     parser.add_argument('--flow-project', default='auto')
     parser.add_argument('--video-provider', choices=['auto', 'google_flow', 'google_vids'], default='auto')
     parser.add_argument('--recipe', help='Recipe JSON with dish, dish_en and clips (six actions per clip)')

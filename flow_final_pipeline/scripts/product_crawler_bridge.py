@@ -723,6 +723,82 @@ def prepare_and_optionally_run_product(
     }
 
 
+def batch_prepare_and_optionally_run_products(
+    raw_inputs: list,
+    template_name: str = "Nhà Xưởng",
+    crawl_method: str = "auto",
+    videos_per_character=None,
+    force_regenerate_prompts: bool = True,
+    auto_run_pipeline: bool = True,
+) -> dict:
+    """
+    Chuẩn bị kịch bản cho nhiều sản phẩm cùng lúc và đẩy toàn bộ vào MỘT tiến trình
+    run_all_7_videos_mt.py dùng chung (tối ưu đa luồng, đa tài khoản, không mở nhiều Chrome trùng).
+    """
+    items = [str(x or "").strip() for x in (raw_inputs or []) if str(x or "").strip()]
+    if not items:
+        return {"ok": False, "error": "Danh sách sản phẩm trống.", "results": [], "pids": []}
+
+    results = []
+    prepared_pids = []
+    for raw_in in items:
+        res = prepare_and_optionally_run_product(
+            raw_id_or_url=raw_in,
+            template_name=template_name,
+            crawl_method=crawl_method,
+            videos_per_character=videos_per_character,
+            force_regenerate_prompts=force_regenerate_prompts,
+            auto_run_pipeline=False,
+        )
+        results.append(res)
+        if res.get("ok") and res.get("pid"):
+            pid_val = str(res["pid"])
+            if pid_val not in prepared_pids:
+                prepared_pids.append(pid_val)
+
+    proc_pid = None
+    if auto_run_pipeline and prepared_pids:
+        runner_script = os.path.join(SCRIPTS_DIR, "run_all_7_videos_mt.py")
+        first_pid = prepared_pids[0]
+        log_path = os.path.join(PROJECTS_DIR, first_pid, "pipeline_mt.log")
+        with open(log_path, "a", encoding="utf-8") as lf:
+            lf.write(
+                f"\n=== BATCH MULTI-THREADED START ({time.strftime('%Y-%m-%d %H:%M:%S')}) "
+                f"| {len(prepared_pids)} SP | Template: {template_name} ===\n"
+            )
+            lf.flush()
+            p = subprocess.Popen(
+                [sys.executable, "-u", runner_script, *prepared_pids],
+                cwd=WS_DIR,
+                stdout=lf,
+                stderr=subprocess.STDOUT,
+            )
+        proc_pid = p.pid
+        for pid_val in prepared_pids:
+            try:
+                st_init = {
+                    "pid": pid_val,
+                    "pid_os": proc_pid,
+                    "is_running": True,
+                    "current_step_text": f"⏳ Đang xếp lịch Đa Luồng ({len(prepared_pids)} SP • Template: {template_name})...",
+                    "updated_at": time.strftime("%H:%M:%S"),
+                }
+                with open(os.path.join(PROJECTS_DIR, pid_val, "pipeline_status.json"), "w", encoding="utf-8") as f_st:
+                    json.dump(st_init, f_st, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+        sync_web_ui(force=True)
+
+    return {
+        "ok": len(prepared_pids) > 0,
+        "pids": prepared_pids,
+        "results": results,
+        "count": len(prepared_pids),
+        "pipeline_started": bool(auto_run_pipeline and prepared_pids),
+        "pipeline_pid": proc_pid,
+    }
+
+
 def main():
     parser = argparse.ArgumentParser(description="Crawl sản phẩm TikTok & Tạo dự án Video theo Mã Template (001, 002, 003...)")
     parser.add_argument("input", help="Link sản phẩm TikTok hoặc ID sản phẩm")

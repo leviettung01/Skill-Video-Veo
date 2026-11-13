@@ -356,7 +356,12 @@
     const videoBtn = document.getElementById("cookingVideo");
     const badgeEl = document.getElementById("cookingActiveProjectBadge");
 
-    if (autoBtn) autoBtn.disabled = running;
+    if (autoBtn) {
+      autoBtn.disabled = false;
+      autoBtn.innerHTML = running
+        ? "🚀 Tạo Thêm Món Mới (Đa Tác Vụ)"
+        : "🚀 Tạo Video Final Luôn (Tự Động 100%)";
+    }
     if (stopBtn) stopBtn.style.display = running ? "inline-flex" : "none";
     if (boardsBtn) boardsBtn.disabled = running;
     if (videoBtn) {
@@ -370,9 +375,18 @@
       const modeLbl = project.recipe?.audio_mode === "voice"
         ? `🎙️ ${project.recipe?.voice_name || "Có Voice"}`
         : "🎧 ASMR";
-      badgeEl.innerHTML = `📁 Dự án đang mở: <code>${esc(project.project_id)}</code> · <b>${esc(project.dish)}</b> · ${esc(modeLbl)} ${
-        project.profile ? `· TK: <code>${esc(project.profile)}</code>` : ""
-      }`;
+      badgeEl.innerHTML = `
+        <div style="display:flex; align-items:center; justify-content:space-between; gap:8px; flex-wrap:wrap;">
+          <span>📁 Dự án đang mở: <code>${esc(project.project_id)}</code> · <b>${esc(project.dish)}</b> · ${esc(modeLbl)} ${
+            project.profile ? `· TK: <code>${esc(project.profile)}</code>` : ""
+          }</span>
+          <div style="display:flex; gap:6px; flex-wrap:wrap;">
+            <button type="button" class="btn btn-xs btn-primary" style="font-weight:800; padding:3px 9px;" onclick="if(typeof window.openProjectInStudio==='function') window.openProjectInStudio('${esc(project.project_id)}');">
+              📊 Xem Tiến Trình Tại Studio Dự Án
+            </button>
+          </div>
+        </div>
+      `;
       badgeEl.style.display = "block";
     }
 
@@ -501,13 +515,17 @@
 
       projectId = res.project_id;
       mediaSignature = "";
+      if (autoBtn) autoBtn.disabled = false;
       if (res.manifest?.recipe) {
         populateEditorFromRecipe(res.manifest.recipe);
       }
       if (res.manifest) {
         renderProject(res.manifest);
       }
-      if (typeof refreshAll === "function") refreshAll(true);
+      show(
+        `✅ Đã đẩy món "${dish}" sang chạy ngầm đa tác vụ! Bạn có thể bấm "📊 Xem Tiến Trình Tại Studio Dự Án" hoặc nhập tên món ăn khác để tạo tiếp ngay!`
+      );
+      if (typeof refreshAll === "function") refreshAll(false);
     } catch (error) {
       const autoBtn = document.getElementById("cookingAutoFinalBtn");
       if (autoBtn) autoBtn.disabled = false;

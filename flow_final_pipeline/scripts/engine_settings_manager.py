@@ -226,6 +226,144 @@ def _has_saved_cookie_file(prof: str) -> bool:
     return False
 
 
+_CLIPROXY_MODELS_CACHE = {"ts": 0.0, "models": []}
+_DEFAULT_CLIPROXY_CHAT_PRIORITY = (
+    "gemini-3.5-flash-lite",
+    "gemini-3-flash",
+    "gemini-3.8-flash-high",
+    "gemini-3.1-flash-lite",
+    "gemini-3.8-flash-tiered",
+    "gpt-5.6-luna",
+    "gpt-6-luna",
+    "gpt-5.6-terra",
+    "claude-sonnet-4-6",
+    "gemini-2.5-flash",
+    "gpt-4o-mini",
+    "gpt-4o",
+)
+_CLIPROXY_NON_CHAT_HINTS = ("image", "codex-auto-review", "-sol", "-astra", "chat-thinking", "tts", "whisper")
+
+
+def get_cliproxy_config() -> dict:
+    """Trả về cấu hình CLIProxy cục bộ (`url`, `api_key`) từ accounts.json hoặc env."""
+    base_url = os.environ.get("CLIPROXY_BASE_URL", "http://127.0.0.1:8317").strip().rstrip("/")
+    api_key = os.environ.get("CLIPROXY_API_KEY", "").strip()
+    if not api_key:
+        for acc_path in (
+            os.path.join(WS_DIR, "data", "google_flow_grok", "accounts.json"),
+            os.path.join(WS_DIR, "accounts.json"),
+        ):
+            if not os.path.isfile(acc_path):
+                continue
+            try:
+                rows = json.load(open(acc_path, "r", encoding="utf-8"))
+                if isinstance(rows, list):
+                    for r in rows:
+                        if isinstance(r, dict) and "8317" in str(r.get("proxy_url") or "") and r.get("api_key"):
+                            api_key = str(r["api_key"]).strip()
+                            break
+                if api_key:
+                    break
+            except Exception:
+                pass
+    if not api_key:
+        api_key = os.environ.get("OPENAI_API_KEY", "").strip() or "grok-video-key-001"
+    return {"url": base_url, "api_key": api_key}
+
+
+def resolve_cliproxy_chat_models(preferred=(), timeout: float = 1.5, force_refresh: bool = False) -> list:
+    """Lấy danh sách model chat/vision hợp lệ trên CLIProxy (:8317/v1/models), ưu tiên model chạy ổn định."""
+    cfg = get_cliproxy_config()
+    now = time.time()
+    cached = _CLIPROXY_MODELS_CACHE.get("models") or []
+    if cached and not force_refresh and (now - float(_CLIPROXY_MODELS_CACHE.get("ts") or 0)) < 120.0:
+        avail = list(cached)
+    else:
+        avail = []
+        try:
+            import urllib.request as _ur
+            req = _ur.Request(
+                f"{cfg['url']}/v1/models",
+                headers={"Authorization": f"Bearer {cfg['api_key']}"},
+            )
+            with _ur.urlopen(req, timeout=timeout) as resp:
+                data = json.loads(resp.read().decode("utf-8", errors="replace"))
+            avail = [str(m.get("id") or "").strip() for m in (data.get("data") or []) if isinstance(m, dict) and m.get("id")]
+            if avail:
+                _CLIPROXY_MODELS_CACHE["ts"] = now
+                _CLIPROXY_MODELS_CACHE["models"] = list(avail)
+        except Exception:
+            avail = list(cached)
+
+    pref_list = [str(m).strip() for m in (preferred or ()) if str(m or "").strip() and str(m).strip().lower() != "auto"]
+    ordered = []
+    seen = set()
+
+    def _add(m_id: str):
+        if m_id and m_id not in seen:
+            seen.add(m_id)
+            ordered.append(m_id)
+
+    if avail:
+        avail_set = set(avail)
+        for m in pref_list:
+            if m in avail_set:
+                _add(m)
+        for m in _DEFAULT_CLIPROXY_CHAT_PRIORITY:
+            if m in avail_set:
+                _add(m)
+        for m in avail:
+            ml = m.lower()
+            if not any(h in ml for h in _CLIPROXY_NON_CHAT_HINTS):
+                _add(m)
+    for m in pref_list or ("gemini-3.5-flash-lite", "gemini-2.5-flash", "gpt-4o-mini"):
+        _add(m)
+    return ordered
+
+
+def get_default_flow_project_id(profile_name: str = "") -> str:
+    """Tìm Google Flow Project UUID đang cấu hình cho profile hoặc từ account sẵn có (không hardcode tài khoản dev)."""
+    prof_target = str(profile_name or "").split("@")[0].strip().lower()
+    for acc_path in (
+        os.path.join(WS_DIR, "data", "google_flow_grok", "accounts.json"),
+        os.path.join(WS_DIR, "accounts.json"),
+        os.path.join(WS_DIR, "data", "google_flow_grok", "Flow_nhieu_worker_accounts.json"),
+    ):
+        if not os.path.isfile(acc_path):
+            continue
+        try:
+            items = json.load(open(acc_path, "r", encoding="utf-8"))
+            if not isinstance(items, list):
+                continue
+            fallback_pid = ""
+            for it in items:
+                if not isinstance(it, dict):
+                    continue
+                pid = str(it.get("project_id") or "").strip()
+                if not pid:
+                    purl = str(it.get("proxy_url") or "").strip()
+                    if re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F-]{20,}$", purl):
+                        pid = purl
+                if not pid:
+                    continue
+                p_name = str(it.get("profile_name") or os.path.basename(str(it.get("profile_dir") or "").rstrip("\\/")) or "").split("@")[0].strip().lower()
+                if prof_target and p_name == prof_target:
+                    return pid
+                if not fallback_pid:
+                    fallback_pid = pid
+            if not prof_target and fallback_pid:
+                return fallback_pid
+        except Exception:
+            pass
+    try:
+        raw_env = os.environ.get("FLOW_DEFAULT_PROJECT_ID", "").strip()
+        if raw_env:
+            return raw_env
+    except Exception:
+        pass
+    return ""
+
+
 def list_available_flow_accounts() -> list:
     """Liệt kê toàn bộ tài khoản / profile Google Flow sẵn sàng để chạy đa tài khoản (chỉ bật xoay vòng cho profile đã có Cookie hợp lệ)."""
     accounts = []
@@ -256,7 +394,7 @@ def list_available_flow_accounts() -> list:
                         accounts.append({
                             "name": name or f"Google_{prof}",
                             "profile_name": prof,
-                            "project_id": str(it.get("proxy_url") or "932bc2a1-07ea-4199-b147-80ab0018d41c"),
+                            "project_id": str(it.get("proxy_url") or it.get("project_id") or get_default_flow_project_id(prof)),
                             "active": bool(it.get("active", True)) and has_ck,
                             "has_cookies": has_ck,
                         })
@@ -276,19 +414,11 @@ def list_available_flow_accounts() -> list:
                     accounts.append({
                         "name": f"Google_{prof}",
                         "profile_name": prof,
-                        "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+                        "project_id": get_default_flow_project_id(prof),
                         "active": True,
                         "has_cookies": True,
                     })
 
-    if not accounts:
-        accounts.append({
-            "name": "Google_leviettung04",
-            "profile_name": "leviettung04",
-            "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
-            "active": True,
-            "has_cookies": True,
-        })
     return accounts
 
 
@@ -557,9 +687,155 @@ def is_os_pid_running(pid_os: int) -> bool:
             return False
 
 
+FASHION_STUDIO_PROJECTS_DIR = os.path.join(PIPELINE_DIR, "fashion_motion_projects")
+
+
+def _get_fashion_project_live_progress(pid: str, fjson_path: str) -> dict:
+    try:
+        with open(fjson_path, "r", encoding="utf-8") as f:
+            fproj = json.load(f)
+    except Exception:
+        return {"pid": pid, "is_running": False, "logs": []}
+    fdir = os.path.dirname(fjson_path)
+    f_status = str(fproj.get("status") or "")
+    f_scenes = fproj.get("scenes") or []
+    active_sc_states = ("preparing", "submitting", "submitted_720p", "upsampling_1080p", "rendering_720p", "rendering_1080p", "retrying_auto", "running")
+    is_running = (f_status in ("running_flow", "preparing", "retrying_auto")) or any(
+        str(sc.get("status") or "") in active_sc_states for sc in f_scenes
+    )
+    final_vid_path = fproj.get("final_video_path") or os.path.join(FINAL_VIDEOS_DIR, f"{pid}_final.mp4")
+    if not os.path.exists(final_vid_path):
+        alt_final = os.path.join(FINAL_VIDEOS_DIR, f"{pid}_final_1080p_60fps.mp4")
+        if os.path.exists(alt_final):
+            final_vid_path = alt_final
+    final_done = os.path.isfile(final_vid_path) and os.path.getsize(final_vid_path) > 50000
+
+    room_char_abs = (fproj.get("char_sheet_2k") or {}).get("path") or (fproj.get("base_char_2k") or {}).get("path") or ""
+    done_refs = int(bool(room_char_abs and os.path.isfile(room_char_abs)))
+    total_scenes = len(f_scenes)
+    done_scenes = 0
+    sc_720_cnt = 0
+    sc_weight_sum = 0.0
+    logs = []
+    if fproj.get("status_message"):
+        logs.append(f"[{fproj.get('updated_at') or ''}] {fproj.get('status_message')}")
+    for idx, sc in enumerate(f_scenes, start=1):
+        sc_vid = sc.get("output_video_path") or os.path.join(fdir, sc.get("output_video_file") or f"fashion_scene_s{idx}_1080p.mp4")
+        sc_ok = os.path.isfile(sc_vid) and os.path.getsize(sc_vid) > 50000
+        sc_st = str(sc.get("status") or "")
+        if sc_ok or sc_st == "completed_1080p":
+            done_scenes += 1
+            sc_weight_sum += 1.0
+        elif sc_st in ("submitted_720p", "upsampling_1080p", "rendering_1080p"):
+            sc_720_cnt += 1
+            sc_weight_sum += 0.72
+        elif sc_st in ("submitting", "rendering_720p", "retrying_auto"):
+            sc_weight_sum += 0.45
+        elif sc_st in ("preparing", "running"):
+            sc_weight_sum += 0.22
+        det = sc.get("status_detail") or sc.get("last_error") or ""
+        if det:
+            logs.append(f"• Cảnh {idx} ({sc_st or 'pending'}): {det}")
+
+    total_steps = max(1, 1 + total_scenes + 1)
+    if final_done:
+        pct = 100
+    elif done_scenes > 0 or sc_weight_sum > 0 or done_refs > 0:
+        pct = max(12 if is_running else 0, min(96, int(round(((done_refs + max(float(done_scenes), sc_weight_sum)) / total_steps) * 100))))
+    else:
+        pct = 15 if is_running else 0
+
+    thumb_p = get_variant_thumbnail_path(pid, "nv1_v1") or os.path.join(fdir, "final_video_thumb.jpg")
+    has_thumb = bool(thumb_p and os.path.isfile(thumb_p) and os.path.getsize(thumb_p) > 3000)
+    step_text = fproj.get("status_message") or (logs[-1] if logs else f"Thời trang #004: {done_scenes}/{total_scenes} cảnh 1080p")
+    title = str(fproj.get("title") or pid).strip()
+    return {
+        "pid": pid,
+        "product_name": f"👗 {title}" if not title.startswith("👗") else title,
+        "pipeline_kind": "fashion_motion",
+        "is_running": is_running,
+        "pid_os": 0,
+        "recent_activity": is_running,
+        "progress_pct": pct,
+        "total_variants": 1,
+        "done_refs": done_refs,
+        "total_scenes": total_scenes,
+        "done_scenes": done_scenes,
+        "done_thumbs": int(has_thumb),
+        "done_finals": int(final_done),
+        "inflight_count": 1 if is_running else 0,
+        "queued_count": max(0, total_scenes - done_scenes) if is_running else 0,
+        "active_tasks": [step_text] if is_running else [],
+        "accounts_active": [fproj.get("preferred_profile_name")] if fproj.get("preferred_profile_name") else [],
+        "current_step_text": step_text,
+        "last_log_line": logs[-1] if logs else step_text,
+        "logs": logs,
+        "variant_progress": {
+            "v1": {
+                "char_v": "nv1_v1",
+                "ref_done": bool(done_refs),
+                "scenes_done": done_scenes,
+                "scenes_720p": sc_720_cnt,
+                "scenes_total": total_scenes,
+                "has_thumbnail": has_thumb,
+                "thumbnail_path": thumb_p if has_thumb else "",
+                "final_done": final_done,
+                "stage": "done" if final_done else ("vid_gen" if is_running else "queued"),
+                "label": step_text,
+            }
+        },
+        "updated_at": fproj.get("updated_at") or "",
+    }
+
+
+def _get_cooking_project_live_progress(pid: str, pdir: str) -> dict:
+    try:
+        from cooking_studio_projection import build_project
+        proj = build_project(pdir)
+        if not proj:
+            return {"pid": pid, "is_running": False, "logs": []}
+        live = proj.get("live_status") or {}
+        is_running = bool(proj.get("is_running"))
+        step_text = live.get("current_step_text") or live.get("current_step") or ""
+        logs = proj.get("logs") or ([step_text] if step_text else [])
+        return {
+            "pid": pid,
+            "product_name": proj.get("name") or proj.get("dish") or pid,
+            "pipeline_kind": "cooking_storyboard",
+            "is_running": is_running,
+            "pid_os": 0,
+            "recent_activity": is_running,
+            "progress_pct": int(proj.get("progress_pct") or 0),
+            "total_variants": 1,
+            "done_refs": int(live.get("done_refs") or 0),
+            "total_scenes": int(live.get("total_scenes") or 3),
+            "done_scenes": int(live.get("done_scenes") or 0),
+            "done_thumbs": int(live.get("done_thumbnails") or 0),
+            "done_finals": int(proj.get("done_products") or 0),
+            "inflight_count": 1 if is_running else 0,
+            "queued_count": 0,
+            "active_tasks": [step_text] if is_running else [],
+            "accounts_active": [proj.get("profile")] if proj.get("profile") else [],
+            "current_step_text": step_text,
+            "last_log_line": step_text,
+            "logs": logs,
+            "variant_progress": {},
+            "updated_at": time.strftime("%H:%M:%S"),
+        }
+    except Exception:
+        return {"pid": pid, "is_running": False, "logs": []}
+
+
 def get_project_live_progress(pid: str) -> dict:
-    """Đọc trạng thái tiến trình đang chạy thực tế + nhật ký trực tiếp của 1 sản phẩm."""
+    """Đọc trạng thái tiến trình đang chạy thực tế + nhật ký trực tiếp của 1 sản phẩm (hỗ trợ Basic #001-#003, Fashion #004, Cooking #005)."""
+    fjson_cand = os.path.join(FASHION_STUDIO_PROJECTS_DIR, pid, "fashion_project.json")
+    if os.path.isfile(fjson_cand):
+        return _get_fashion_project_live_progress(pid, fjson_cand)
+
     pdir = os.path.join(PROJECTS_DIR, pid)
+    if os.path.isfile(os.path.join(pdir, "cooking_manifest.json")):
+        return _get_cooking_project_live_progress(pid, pdir)
+
     if not os.path.isdir(pdir):
         return {"is_running": False, "logs": []}
 
@@ -709,43 +985,89 @@ def get_project_live_progress(pid: str) -> dict:
 
 
 def list_all_running_pipelines() -> list:
-    """Trả về danh sách tất cả các dự án đang chạy ngầm hoặc đang dở dang tiến trình."""
+    """Trả về danh sách tất cả các dự án đang chạy ngầm hoặc đang dở dang tiến trình (Basic, Thời trang #004, Nấu ăn #005)."""
     running = []
-    if not os.path.isdir(PROJECTS_DIR):
-        return running
-    for entry in os.listdir(PROJECTS_DIR):
-        pdir = os.path.join(PROJECTS_DIR, entry)
-        if not os.path.isdir(pdir):
-            continue
-        has_log = os.path.isfile(os.path.join(pdir, "pipeline_run.log"))
-        has_status = os.path.isfile(os.path.join(pdir, "pipeline_status.json"))
-        if not has_status and not has_log:
-            continue
-        st = get_project_live_progress(entry)
-        is_incomplete_with_log = (
-            has_log
-            and st.get("total_variants", 0) > 0
-            and st.get("done_finals", 0) < st.get("total_variants", 0)
-            and (st.get("done_refs", 0) > 0 or st.get("done_scenes", 0) > 0)
-        )
-        if st.get("is_running") or st.get("recent_activity") or is_incomplete_with_log:
-            # Attach product name for UI display
-            p_json = os.path.join(pdir, "prompts.json")
-            pname = entry
-            if os.path.isfile(p_json):
-                try:
-                    pname = json.load(open(p_json, "r", encoding="utf-8")).get("product_name") or entry
-                except Exception:
-                    pass
-            st["product_name"] = pname
-            running.append(st)
+    seen_pids = set()
+
+    if os.path.isdir(FASHION_STUDIO_PROJECTS_DIR):
+        for entry in os.listdir(FASHION_STUDIO_PROJECTS_DIR):
+            fjson_p = os.path.join(FASHION_STUDIO_PROJECTS_DIR, entry, "fashion_project.json")
+            if not os.path.isfile(fjson_p):
+                continue
+            st_f = _get_fashion_project_live_progress(entry, fjson_p)
+            if st_f.get("is_running"):
+                running.append(st_f)
+                seen_pids.add(entry)
+
+    if os.path.isdir(PROJECTS_DIR):
+        for entry in os.listdir(PROJECTS_DIR):
+            if entry in seen_pids:
+                continue
+            pdir = os.path.join(PROJECTS_DIR, entry)
+            if not os.path.isdir(pdir):
+                continue
+            if os.path.isfile(os.path.join(pdir, "cooking_manifest.json")):
+                st_c = _get_cooking_project_live_progress(entry, pdir)
+                if st_c.get("is_running"):
+                    running.append(st_c)
+                    seen_pids.add(entry)
+                continue
+            has_log = os.path.isfile(os.path.join(pdir, "pipeline_run.log"))
+            has_status = os.path.isfile(os.path.join(pdir, "pipeline_status.json"))
+            if not has_status and not has_log:
+                continue
+            st = get_project_live_progress(entry)
+            is_incomplete_with_log = (
+                has_log
+                and st.get("total_variants", 0) > 0
+                and st.get("done_finals", 0) < st.get("total_variants", 0)
+                and (st.get("done_refs", 0) > 0 or st.get("done_scenes", 0) > 0)
+            )
+            if st.get("is_running") or st.get("recent_activity") or is_incomplete_with_log:
+                p_json = os.path.join(pdir, "prompts.json")
+                pname = entry
+                if os.path.isfile(p_json):
+                    try:
+                        pname = json.load(open(p_json, "r", encoding="utf-8")).get("product_name") or entry
+                    except Exception:
+                        pass
+                st["product_name"] = pname
+                running.append(st)
+                seen_pids.add(entry)
+
     running.sort(key=lambda x: (0 if x.get("is_running") else 1, -x.get("progress_pct", 0)))
     return running
 
 
 def stop_running_pipeline(pid: str) -> dict:
-    """Dừng tiến trình đang chạy của 1 sản phẩm."""
+    """Dừng tiến trình đang chạy của 1 sản phẩm (hỗ trợ Basic, Thời trang #004, Nấu ăn #005)."""
+    fjson_cand = os.path.join(FASHION_STUDIO_PROJECTS_DIR, pid, "fashion_project.json")
+    if os.path.isfile(fjson_cand):
+        try:
+            with open(fjson_cand, "r", encoding="utf-8") as f:
+                fproj = json.load(f)
+            fproj["status"] = "stopped"
+            fproj["status_message"] = "⏹️ Đã tạm dừng tiến trình tạo video thời trang theo yêu cầu người dùng."
+            fproj["updated_at"] = time.strftime("%H:%M:%S")
+            for sc in fproj.get("scenes") or []:
+                if sc.get("status") not in ("completed_1080p", "done"):
+                    sc["status"] = "stopped"
+                    sc["status_detail"] = "⏹️ Đã tạm dừng"
+            with open(fjson_cand, "w", encoding="utf-8") as f:
+                json.dump(fproj, f, ensure_ascii=False, indent=2)
+            return {"ok": True, "pid": pid, "pid_os": 0, "stopped": True}
+        except Exception as exc:
+            return {"ok": False, "pid": pid, "error": str(exc)}
+
     pdir = os.path.join(PROJECTS_DIR, pid)
+    if os.path.isfile(os.path.join(pdir, "cooking_manifest.json")):
+        try:
+            import cooking_storyboard_engine as cooking
+            cooking.stop_stage(pid)
+            return {"ok": True, "pid": pid, "pid_os": 0, "stopped": True}
+        except Exception as exc:
+            return {"ok": False, "pid": pid, "error": str(exc)}
+
     status_path = os.path.join(pdir, "pipeline_status.json")
     killed = False
     pid_os = 0
@@ -1050,7 +1372,7 @@ def build_thumbnail_prompt_for_variant(
         "layout_type": resolved_tpl.get("layout_type", "grid_3_bottom"),
         "detected_category": detected_cat,
         "prompt": final_prompt,
-        "flow_project_id": vcfg.get("project_id") or prod_obj.get("flow_project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c",
+        "flow_project_id": vcfg.get("project_id") or prod_obj.get("flow_project_id") or get_default_flow_project_id(),
     }
 
 
@@ -1453,7 +1775,11 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
 
     # Lấy tài khoản Google Flow đang hoạt động và đọc Cookie từ file đã đồng bộ (không khoá Chrome đang mở)
     flow_accs = [a for a in list_available_flow_accounts() if a.get("active", True)]
-    prof_name = flow_accs[0]["profile_name"] if flow_accs else "leviettung04"
+    if not flow_accs:
+        for it in items:
+            outcomes[it["meta"]["vkey"]] = (False, "", "Chưa có tài khoản Google Flow nào đang hoạt động. Vui lòng đăng nhập tài khoản trong tab Tài Khoản!")
+        return outcomes
+    prof_name = flow_accs[0]["profile_name"]
     shared_dir = mt.gvt._resolve_flow_shared_dir(prof_name)
     raw_cookies = []
     try:
@@ -1486,14 +1812,16 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
             pass
 
     try:
+        _headless_thumb = os.environ.get("FLOW_SHOW_BROWSER", "").strip() != "1"
+        _launch_args = ["--disable-blink-features=AutomationControlled", "--window-size=1280,800", "--mute-audio"]
         with sync_playwright() as pw:
             if not raw_cookies:
                 pdir_prof, _ = gfa.profile_paths(shared_dir, prof_name)
                 p_ctx = pw.chromium.launch_persistent_context(
                     str(pdir_prof),
                     channel="chrome",
-                    headless=False,
-                    args=["--disable-blink-features=AutomationControlled", "--window-position=-2000,-2000", "--window-size=1280,800"],
+                    headless=_headless_thumb,
+                    args=_launch_args,
                 )
                 raw_cookies = p_ctx.cookies(["https://flow.google.com", "https://google.com", "https://www.google.com", "https://accounts.google.com"])
                 p_ctx.close()
@@ -1509,8 +1837,8 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
 
             browser = pw.chromium.launch(
                 channel="chrome",
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--window-position=-2000,-2000", "--window-size=1280,800"],
+                headless=_headless_thumb,
+                args=_launch_args,
             )
             ctx = browser.new_context()
             ctx.add_init_script(mt.gvt._FLOW_HIJACK_BYPASS_JS)
@@ -1526,7 +1854,10 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
                 meta = it["meta"]
                 vk = meta["vkey"]
                 out_thumb_proj = it["out_thumb_proj"]
-                project_id = meta.get("flow_project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
+                project_id = meta.get("flow_project_id") or get_default_flow_project_id(prof_name)
+                if not project_id:
+                    outcomes[vk] = (False, "", f"Tài khoản '{prof_name}' chưa có Google Flow Project ID. Vui lòng thiết lập Project ID trong tab Tài Khoản!")
+                    continue
 
                 try:
                     if cur_proj_id != project_id or wz is None:
@@ -1571,7 +1902,7 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
                         "pid": meta["pid"],
                         "v_key": f"{vk}_thumb",
                         "project_id": project_id,
-                        "char_id": meta.get("char_uuid") or "208606a7-a345-48b2-af32-9fd3c37d0c9a",
+                        "char_id": meta.get("char_uuid") or "",
                         "prod_uuids": ref_uuids,
                         "allow_multi_refs": True,
                         "prompt_str": meta["prompt"],

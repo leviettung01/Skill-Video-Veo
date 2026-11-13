@@ -256,21 +256,26 @@ def main():
             only_pids = ALL_PIDS
 
     with sync_playwright() as pw:
-        print("Launching persistent Chrome context for Google Flow...", flush=True)
+        print("Launching Chrome context for Google Flow...", flush=True)
+        _headless_mode = os.environ.get("FLOW_SHOW_BROWSER", "").strip() != "1"
+        _p_args = ["--disable-blink-features=AutomationControlled", "--window-size=1280,800", "--mute-audio"]
         context = pw.chromium.launch_persistent_context(
             str(profile_dir),
             channel="chrome",
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--window-position=-2000,-2000",
-                "--window-size=1280,800",
-            ],
+            headless=_headless_mode,
+            args=_p_args,
         )
         context.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
         page = context.pages[0] if context.pages else context.new_page()
-        first_proj = "932bc2a1-07ea-4199-b147-80ab0018d41c"
-        page.goto(f"https://flow.google.com/project/{first_proj}", wait_until="domcontentloaded", timeout=45000)
+        first_proj = ""
+        try:
+            import engine_settings_manager as _esm_g
+            first_proj = _esm_g.get_default_flow_project_id(PROF_NAME)
+        except Exception:
+            first_proj = ""
+        first_proj = first_proj or getattr(gvt, "DEFAULT_PROJECT_ID", "") or ""
+        target_flow_u = f"https://flow.google.com/project/{first_proj}" if first_proj else "https://flow.google.com/"
+        page.goto(target_flow_u, wait_until="domcontentloaded", timeout=45000)
         page.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
         page.wait_for_function(
             "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",

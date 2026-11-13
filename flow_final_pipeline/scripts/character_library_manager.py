@@ -28,6 +28,25 @@ SHEET_TEMPLATES_JSON = os.path.join(SHEET_TEMPLATES_DIR, "templates.json")
 PROJECTS_DIR = os.path.join(WS_DIR, "projects")
 
 
+def _default_owner_profile() -> str:
+    try:
+        import engine_settings_manager as _esm
+        accs = _esm.list_available_flow_accounts()
+        if accs:
+            return str(accs[0].get("profile_name") or "").strip()
+    except Exception:
+        pass
+    return ""
+
+
+def _default_flow_project_id(profile_name: str = "") -> str:
+    try:
+        import engine_settings_manager as _esm
+        return _esm.get_default_flow_project_id(profile_name) or ""
+    except Exception:
+        return ""
+
+
 def _save_audio_bytes_as_mp3(raw_bytes: bytes, out_mp3_path: str) -> None:
     """Lưu dữ liệu âm thanh Google Flow thành file MP3 chuẩn (tự chuyển đổi nếu nguồn là WAV/PCM)."""
     os.makedirs(os.path.dirname(out_mp3_path), exist_ok=True)
@@ -271,7 +290,7 @@ def get_character_library_state() -> dict:
         v_item["sample_vn_abs"] = abs_vn
         v_item["has_flow_vn_audio"] = bool(abs_vn)
         v_item["flow_synced"] = bool(v_item.get("flow_synced") or abs_vn)
-        owner_prof = str(v_item.get("owner_profile") or "leviettung04").strip() or "leviettung04"
+        owner_prof = str(v_item.get("owner_profile") or _default_owner_profile()).strip()
         v_item["owner_profile"] = owner_prof
         acc_vids = dict(v_item.get("account_voice_ids") or {})
         vid_cur = str(v_item.get("voice_id") or "").strip()
@@ -571,7 +590,7 @@ def save_voice_profile(payload: dict) -> dict:
         else:
             sample_dialogue_vn = COMMON_VN_DIALOGUE_PRESETS[0]["text"]
 
-    owner_prof = str(payload.get("owner_profile") or existing_v.get("owner_profile") or "leviettung04").strip() or "leviettung04"
+    owner_prof = str(payload.get("owner_profile") or existing_v.get("owner_profile") or _default_owner_profile()).strip()
     acc_vids = dict(existing_v.get("account_voice_ids") or {})
     if isinstance(payload.get("account_voice_ids"), dict):
         acc_vids.update(payload["account_voice_ids"])
@@ -624,9 +643,9 @@ def save_voice_profile(payload: dict) -> dict:
             "gender": v.get("gender", "female"),
             "region": v.get("region", "north"),
             "flow_slug": v.get("flow_slug", ""),
-            "owner_profile": v.get("owner_profile", "leviettung04"),
+            "owner_profile": v.get("owner_profile", ""),
             "account_voice_ids": v.get("account_voice_ids", {}),
-            "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+            "project_id": _default_flow_project_id(v.get("owner_profile", "")),
             "description": v.get("description", ""),
         }
         for k, v in cfg.get("voices", {}).items()
@@ -680,7 +699,7 @@ def resolve_voice_id_for_account(voice_id_or_key: str, profile_name: str = "") -
                 acc_map = v.get("account_voice_ids") or {}
                 if prof and prof in acc_map and acc_map[prof]:
                     return str(acc_map[prof]).strip()
-                owner = str(v.get("owner_profile") or "leviettung04").strip()
+                owner = str(v.get("owner_profile") or _default_owner_profile()).strip()
                 if not prof or prof.lower() == owner.lower():
                     return vid or raw
                 # Nếu tài khoản phụ chưa nhân bản UUID riêng, kiểm tra bất kỳ UUID nào đã map hoặc trả về vid
@@ -699,7 +718,7 @@ def _list_flow_accounts_with_cookies(target_profile: str = "") -> list:
     seen = set()
 
     acc_grok_json = os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "accounts.json")
-    default_proj = "932bc2a1-07ea-4199-b147-80ab0018d41c"
+    default_proj = _default_flow_project_id(target_profile)
     if os.path.isfile(acc_grok_json):
         try:
             rows = json.loads(open(acc_grok_json, "r", encoding="utf-8").read())
@@ -728,17 +747,18 @@ def _list_flow_accounts_with_cookies(target_profile: str = "") -> list:
             pass
 
     if not results:
-        fallback_prof = str(target_profile or "leviettung04").strip()
+        fallback_prof = str(target_profile or _default_owner_profile()).strip()
         if fallback_prof.lower() == "all":
-            fallback_prof = "leviettung04"
-        ck = _load_clean_flow_cookies(fallback_prof)
-        if ck:
-            results.append({
-                "profile_name": fallback_prof,
-                "name": f"Google_{fallback_prof}",
-                "project_id": default_proj,
-                "cookies": ck,
-            })
+            fallback_prof = _default_owner_profile()
+        if fallback_prof:
+            ck = _load_clean_flow_cookies(fallback_prof)
+            if ck:
+                results.append({
+                    "profile_name": fallback_prof,
+                    "name": f"Google_{fallback_prof}",
+                    "project_id": default_proj or _default_flow_project_id(fallback_prof),
+                    "cookies": ck,
+                })
     return results
 
 
@@ -1097,9 +1117,9 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                         "gender": v.get("gender", "female"),
                         "region": v.get("region", "north"),
                         "flow_slug": v.get("flow_slug", ""),
-                        "owner_profile": v.get("owner_profile", "leviettung04"),
+                        "owner_profile": v.get("owner_profile", ""),
                         "account_voice_ids": v.get("account_voice_ids", {}),
-                        "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
+                        "project_id": _default_flow_project_id(v.get("owner_profile", "")),
                         "description": v.get("description", ""),
                     }
                     for k, v in voices_map.items()
@@ -1275,12 +1295,16 @@ def _load_clean_flow_cookies(profile_name: str = "") -> list:
                 cookie_candidates.append(cand_p)
 
     if not prof_clean:
-        for def_p in (
-            os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "cookies", "leviettung04.json"),
-            os.path.join(WORKSPACE_DIR, "cookies", "leviettung04.json"),
+        for ck_dir in (
+            os.path.join(WORKSPACE_DIR, "data", "google_flow_grok", "cookies"),
+            os.path.join(WORKSPACE_DIR, "cookies"),
         ):
-            if os.path.isfile(def_p) and def_p not in cookie_candidates:
-                cookie_candidates.append(def_p)
+            if os.path.isdir(ck_dir):
+                for fn in sorted(os.listdir(ck_dir)):
+                    if fn.endswith(".json"):
+                        def_p = os.path.join(ck_dir, fn)
+                        if os.path.isfile(def_p) and def_p not in cookie_candidates:
+                            cookie_candidates.append(def_p)
         try:
             import run_all_7_videos_mt as mt
             if getattr(mt, "cookie_file", None) and os.path.isfile(str(mt.cookie_file)):
@@ -1433,7 +1457,7 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
 
     sample_vn = (payload.get("sample_dialogue_vn") or v_obj.get("sample_dialogue_vn") or COMMON_VN_DIALOGUE_PRESETS[0]["text"]).strip()
     sample_vn_118 = sample_vn[:118]
-    project_id = payload.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
+    project_id = payload.get("project_id") or _default_flow_project_id()
 
     try:
         scripts_dir = os.path.join(PIPELINE_DIR, "scripts")
@@ -1850,8 +1874,10 @@ def generate_character_or_product_image(payload: dict) -> dict:
 
     # 1. Nếu chọn model ChatGPT (`chatgpt`), thử gọi CLIProxy (:8317) hoặc OpenAI Images API trước
     if model_choice == "chatgpt":
-        api_url = os.environ.get("OPENAI_IMAGE_API_URL", "http://127.0.0.1:8317/v1/images/generations")
-        api_key = os.environ.get("OPENAI_API_KEY", "sk-cliproxy-local")
+        import engine_settings_manager as _esm_clm
+        _cp_cfg = _esm_clm.get_cliproxy_config()
+        api_url = os.environ.get("OPENAI_IMAGE_API_URL", f"{_cp_cfg['url']}/v1/images/generations")
+        api_key = os.environ.get("OPENAI_API_KEY") or _cp_cfg["api_key"]
         req_body = json.dumps({
             "model": "gpt-image-1",
             "prompt": final_prompt,
@@ -1895,7 +1921,7 @@ def generate_character_or_product_image(payload: dict) -> dict:
 
         state_cfg = get_character_library_state()
         char_entry = next((c for c in state_cfg["characters"] if c["key"] == char_key), None)
-        project_id = (char_entry or {}).get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
+        project_id = (char_entry or {}).get("project_id") or _default_flow_project_id()
         char_uuid = (char_entry or {}).get("character_id") or ""
 
         clean_cookies = _load_clean_flow_cookies()

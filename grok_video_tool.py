@@ -125,7 +125,33 @@ def _get_project_submit_lock(project_id: str):
         return lock
 
 
-FLOW_DEFAULT_PROJECT_ID = "bf4979d1-548a-44bd-a265-3927bba76dc1"
+def _resolve_initial_flow_project_id() -> str:
+    env_pid = os.environ.get("FLOW_DEFAULT_PROJECT_ID", "").strip()
+    if env_pid:
+        return env_pid
+    base = Path(__file__).resolve().parent / "data" / "google_flow_grok"
+    for fname in ("accounts.json", "Flow_nhieu_worker_accounts.json"):
+        fp = base / fname
+        if fp.is_file():
+            try:
+                rows = json.loads(fp.read_text(encoding="utf-8", errors="ignore"))
+                if isinstance(rows, list):
+                    for r in rows:
+                        if not isinstance(r, dict):
+                            continue
+                        pid = str(r.get("project_id") or "").strip()
+                        if not pid:
+                            purl = str(r.get("proxy_url") or "").strip()
+                            if re.match(r"^[0-9a-fA-F]{8}-[0-9a-fA-F-]{20,}$", purl):
+                                pid = purl
+                        if pid:
+                            return pid
+            except Exception:
+                pass
+    return ""
+
+
+FLOW_DEFAULT_PROJECT_ID = _resolve_initial_flow_project_id()
 
 
 def _flow_session_values(payload):
@@ -1238,7 +1264,7 @@ POLL_INTERVAL      = 10
 MAX_WAIT           = 900
 DEFAULT_THREADS    = 3
 COOLDOWN_DELAY     = 6.0  # Giãn cách 6s giữa các request trên cùng tài khoản
-DEFAULT_PROJECT_ID = "bf4979d1-548a-44bd-a265-3927bba76dc1"  # Project ID mặc định cho Google Flow
+DEFAULT_PROJECT_ID = FLOW_DEFAULT_PROJECT_ID  # Project ID mặc định cho Google Flow (đọc động từ config người dùng)
 
 # ── Helper: Nhận dạng model Google/Veo (không phải Grok) ──
 VEO_MODEL_KEYWORDS = (
@@ -4052,7 +4078,7 @@ def _sync_extension_flow_cookies(
         if not prof and email and "@" in email:
             prof = _resolve_google_profile_name(email) or re.sub(r"[^a-zA-Z0-9._@-]+", "_", email.split("@")[0]).strip("_")
         if not prof:
-            prof = _default_google_profile_name() or "leviettung04"
+            prof = _default_google_profile_name() or "flow_acc_1"
 
         effective_email = email or (prof if "@" in prof else f"{prof.replace('Google_', '')}@gmail.com")
         effective_tok = access_token if access_token.startswith("ya29.") else (flow_tok or access_token)
@@ -7381,7 +7407,7 @@ class LoginWorker(QThread):
         chrome_paths = [
             Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Google\\Chrome\\Application\\chrome.exe",
             Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Google\\Chrome\\Application\\chrome.exe",
-            Path(os.environ.get("LocalAppData", "C:\\Users\\ADMIN\\AppData\\Local")) / "Google\\Chrome\\Application\\chrome.exe",
+            Path(os.environ.get("LocalAppData") or str(Path.home() / "AppData" / "Local")) / "Google\\Chrome\\Application\\chrome.exe",
         ]
         for p in chrome_paths:
             if p.exists():
@@ -12993,7 +13019,7 @@ class AccountManagerDialog(QDialog):
         chrome_paths = [
             Path(os.environ.get("ProgramFiles", "C:\\Program Files")) / "Google\\Chrome\\Application\\chrome.exe",
             Path(os.environ.get("ProgramFiles(x86)", "C:\\Program Files (x86)")) / "Google\\Chrome\\Application\\chrome.exe",
-            Path(os.environ.get("LocalAppData", "C:\\Users\\ADMIN\\AppData\\Local")) / "Google\\Chrome\\Application\\chrome.exe",
+            Path(os.environ.get("LocalAppData") or str(Path.home() / "AppData" / "Local")) / "Google\\Chrome\\Application\\chrome.exe",
         ]
         for p in chrome_paths:
             if p.exists():

@@ -44,6 +44,7 @@ import shutil
 import base64
 import random
 import subprocess
+import threading
 import concurrent.futures
 from pathlib import Path
 from PIL import Image, ImageFilter
@@ -450,6 +451,114 @@ def analyze_and_split_reference_video(
     clips_dir = os.path.join(work_dir, "ref_clips")
     os.makedirs(clips_dir, exist_ok=True)
 
+    import hashlib as _hl
+    import fashion_ai_video_analyzer as fava
+
+    outfits_list = list(outfits or DEFAULT_FASHION_DEMO_OUTFITS[:4])
+    ref_cache_dir = ""
+    cache_meta_path = ""
+    try:
+        st_ref = os.stat(ref_video_path)
+        key_src = json.dumps(
+            {
+                "path": os.path.abspath(ref_video_path),
+                "size": st_ref.st_size,
+                "mtime": int(st_ref.st_mtime),
+                "chunk_sec": str(preferred_chunk_sec),
+                "mode": str(generation_mode or "chained_i2v"),
+                "cuts": custom_scene_cuts or {},
+            },
+            sort_keys=True,
+        )
+        cache_hash = _hl.sha1(key_src.encode("utf-8")).hexdigest()[:16]
+        ref_cache_dir = os.path.join(FASHION_STUDIO_DIR, "_ref_cache", cache_hash)
+        cache_meta_path = os.path.join(ref_cache_dir, "meta.json")
+    except Exception:
+        ref_cache_dir = ""
+        cache_meta_path = ""
+
+    if cache_meta_path and os.path.isfile(cache_meta_path):
+        try:
+            cached = json.load(open(cache_meta_path, "r", encoding="utf-8"))
+            c_probe = cached.get("video_probe") or {}
+            c_plan = cached.get("split_plan") or {}
+            c_gcuts = cached.get("global_cuts_info") or {}
+            c_scenes = cached.get("scenes_files") or []
+            c_aud_name = cached.get("master_audio_filename") or ""
+            files_valid = bool(c_scenes) and all(
+                os.path.isfile(os.path.join(ref_cache_dir, sf["clip"])) and os.path.getsize(os.path.join(ref_cache_dir, sf["clip"])) > 0
+                for sf in c_scenes
+            )
+            if c_aud_name and not os.path.isfile(os.path.join(ref_cache_dir, c_aud_name)):
+                files_valid = False
+            if files_valid:
+                master_audio_path = os.path.join(clips_dir, c_aud_name) if c_aud_name else ""
+                if c_aud_name:
+                    shutil.copy2(os.path.join(ref_cache_dir, c_aud_name), master_audio_path)
+                c_chunk_sec = int(c_plan.get("scene_duration") or 8)
+                c_num_scenes = int(c_plan.get("num_scenes") or len(c_scenes))
+                c_total_dur = float(c_probe.get("duration") or (c_chunk_sec * c_num_scenes))
+                scene_transitions_all = fava.map_outfits_to_scenes_smart(
+                    num_scenes=c_num_scenes,
+                    chunk_sec=c_chunk_sec,
+                    total_dur=c_total_dur,
+                    outfits_list=outfits_list,
+                    global_cuts_info=c_gcuts,
+                    clips_dir=clips_dir,
+                    custom_scene_cuts=custom_scene_cuts,
+                    detect_clip_fn=detect_clip_beat_and_visual_cuts,
+                    generation_mode=generation_mode,
+                )
+                _g_tr_idx = 0
+                for _sc_trs in scene_transitions_all:
+                    for _tr_item in _sc_trs:
+                        _g_tr_idx += 1
+                        _tr_item["transition_index"] = _g_tr_idx
+                scenes_data = []
+                for idx, sf in enumerate(c_scenes):
+                    sc_id = sf["id"]
+                    clip_fn = sf["clip"]
+                    clip_dst = os.path.join(clips_dir, clip_fn)
+                    shutil.copy2(os.path.join(ref_cache_dir, clip_fn), clip_dst)
+                    adult_dst = ""
+                    if sf.get("adult") and os.path.isfile(os.path.join(ref_cache_dir, sf["adult"])):
+                        adult_dst = os.path.join(clips_dir, sf["adult"])
+                        shutil.copy2(os.path.join(ref_cache_dir, sf["adult"]), adult_dst)
+                    thumb_dst = ""
+                    if sf.get("thumb") and os.path.isfile(os.path.join(ref_cache_dir, sf["thumb"])):
+                        thumb_dst = os.path.join(clips_dir, sf["thumb"])
+                        shutil.copy2(os.path.join(ref_cache_dir, sf["thumb"]), thumb_dst)
+                    kf_dst = ""
+                    if sf.get("kf") and os.path.isfile(os.path.join(ref_cache_dir, sf["kf"])):
+                        kf_dst = os.path.join(clips_dir, sf["kf"])
+                        shutil.copy2(os.path.join(ref_cache_dir, sf["kf"]), kf_dst)
+                    scenes_data.append({
+                        "id": sc_id,
+                        "scene_index": sf["scene_index"],
+                        "start_sec": sf["start_sec"],
+                        "end_sec": sf["end_sec"],
+                        "duration": c_chunk_sec,
+                        "fps": 30,
+                        "start_frame": 1,
+                        "end_frame": int(c_chunk_sec * 30) + 1,
+                        "ref_clip_filename": clip_fn,
+                        "ref_clip_path": clip_dst,
+                        "adult_safe_clip_path": adult_dst,
+                        "ref_clip_thumb": thumb_dst,
+                        "keyframe_sheet_path": kf_dst,
+                        "transitions": scene_transitions_all[idx] if idx < len(scene_transitions_all) else [],
+                    })
+                return {
+                    "ok": True,
+                    "video_probe": c_probe,
+                    "split_plan": c_plan,
+                    "global_cuts_info": c_gcuts,
+                    "master_audio_path": master_audio_path if (master_audio_path and os.path.exists(master_audio_path)) else "",
+                    "scenes": scenes_data,
+                }
+        except Exception:
+            pass
+
     probe = probe_video_info(ref_video_path)
     if not probe.get("ok"):
         return probe
@@ -482,10 +591,8 @@ def analyze_and_split_reference_video(
         ]
         subprocess.run(cmd_aud, capture_output=True, timeout=30)
 
-    outfits_list = list(outfits or DEFAULT_FASHION_DEMO_OUTFITS[:4])
     total_outfits = len(outfits_list)
 
-    import fashion_ai_video_analyzer as fava
     global_cuts_info = fava.detect_global_video_cuts_and_beats(ref_video_path, total_dur)
     scene_transitions_all = fava.map_outfits_to_scenes_smart(
         num_scenes=num_scenes,
@@ -657,6 +764,50 @@ def analyze_and_split_reference_video(
             }
         )
 
+    if cache_meta_path and ref_cache_dir and scenes_data and all(os.path.isfile(s["ref_clip_path"]) and os.path.getsize(s["ref_clip_path"]) > 0 for s in scenes_data):
+        try:
+            os.makedirs(ref_cache_dir, exist_ok=True)
+            aud_fn = ""
+            if os.path.isfile(master_audio_path) and os.path.getsize(master_audio_path) > 0:
+                aud_fn = os.path.basename(master_audio_path)
+                shutil.copy2(master_audio_path, os.path.join(ref_cache_dir, aud_fn))
+            sf_list = []
+            for s in scenes_data:
+                cf = os.path.basename(s["ref_clip_path"])
+                shutil.copy2(s["ref_clip_path"], os.path.join(ref_cache_dir, cf))
+                af = ""
+                if s.get("adult_safe_clip_path") and os.path.isfile(s["adult_safe_clip_path"]):
+                    af = os.path.basename(s["adult_safe_clip_path"])
+                    shutil.copy2(s["adult_safe_clip_path"], os.path.join(ref_cache_dir, af))
+                tf = ""
+                if s.get("ref_clip_thumb") and os.path.isfile(s["ref_clip_thumb"]):
+                    tf = os.path.basename(s["ref_clip_thumb"])
+                    shutil.copy2(s["ref_clip_thumb"], os.path.join(ref_cache_dir, tf))
+                kf = ""
+                if s.get("keyframe_sheet_path") and os.path.isfile(s["keyframe_sheet_path"]):
+                    kf = os.path.basename(s["keyframe_sheet_path"])
+                    shutil.copy2(s["keyframe_sheet_path"], os.path.join(ref_cache_dir, kf))
+                sf_list.append({
+                    "id": s["id"],
+                    "scene_index": s["scene_index"],
+                    "start_sec": s["start_sec"],
+                    "end_sec": s["end_sec"],
+                    "clip": cf,
+                    "adult": af,
+                    "thumb": tf,
+                    "kf": kf,
+                })
+            with open(cache_meta_path, "w", encoding="utf-8") as mf:
+                json.dump({
+                    "video_probe": probe,
+                    "split_plan": split_plan,
+                    "global_cuts_info": global_cuts_info,
+                    "master_audio_filename": aud_fn,
+                    "scenes_files": sf_list,
+                }, mf, ensure_ascii=False)
+        except Exception:
+            pass
+
     return {
         "ok": True,
         "video_probe": probe,
@@ -739,11 +890,24 @@ def build_scene_timeline_prompt(
     overall_title = "01_Character_Sheet_4_Outfits_2K.png"
     overall_key = "overall_sheet_2k"
 
-    bg_title = (char_sheet_ref or {}).get("filename") or "07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
-    bg_key = (char_sheet_ref or {}).get("asset_key") or "char_sheet_2k"
+    _default_nv5_files = (
+        "02_Character_Sheet_Basic_Poses_2K.png",
+        "07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "09_NV5_Phong_Tu_Go_Mo_Dau_2K.png",
+        overall_title,
+    )
+    is_custom_char = start_title not in _default_nv5_files
+
+    bg_title = (char_sheet_ref or {}).get("filename") or (start_title if is_custom_char else "07_Nhan_Vat_Basic_Phong_Ngu_2K.png")
+    bg_key = (char_sheet_ref or {}).get("asset_key") or ("base_char_2k" if is_custom_char else "char_sheet_2k")
     if bg_title == overall_title:
-        bg_title = "07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
-        bg_key = "char_sheet_2k"
+        bg_title = start_title if is_custom_char else "07_Nhan_Vat_Basic_Phong_Ngu_2K.png"
+        bg_key = start_key if is_custom_char else "char_sheet_2k"
+    elif is_custom_char and bg_title in _default_nv5_files:
+        # Khi người dùng đã chọn/upload Nhân Vật mới nhưng bg_title vẫn trỏ về ảnh mặc định của NV5,
+        # tự động dùng chính ảnh Nhân Vật mới làm ảnh mở đầu & giữ nhận diện khuôn mặt!
+        bg_title = start_title
+        bg_key = start_key
 
     prev_lf_obj = prev_scene_last_frame_ref or scene_info.get("prev_scene_last_frame_ref") or {}
     prev_outf_obj = prev_scene_last_outfit or scene_info.get("prev_scene_last_outfit") or {}
@@ -761,7 +925,7 @@ def build_scene_timeline_prompt(
     #   - Cảnh 1: [Ảnh phòng ngủ Basic 2K] + [Ảnh phẳng Bộ đồ 1 2K] + [Ảnh phẳng Bộ đồ 2 2K]
     #   - Cảnh 2+: [Frame cuối Cảnh 1 2K] + [Ảnh phẳng Bộ đồ 3 2K] + [Ảnh phẳng Bộ đồ 4 2K]
     # ==========================================================================
-    if prompt_style == "google_vids":
+    if prompt_style in ("google_vids", "chained_i2v"):
         import fashion_ai_video_analyzer as fava
 
         choreo = fava.analyze_scene_choreography_and_hooks_for_i2v(
@@ -787,7 +951,7 @@ def build_scene_timeline_prompt(
             out1_key = out1.get("id") or out1_title
             out2_title = out2.get("filename") or os.path.basename(out2.get("path") or overall_title)
             out2_key = out2.get("id") or out2_title
-            use_individual_sheets = 1 <= len(transitions) <= 2 and bool(out1.get("filename") or out1.get("path"))
+            use_individual_sheets = len(transitions) >= 1 and bool(out1.get("filename") or out1.get("path"))
             b1 = choreo.get("s1_blocks") or {}
 
             segments.append({"type": "text", "text": f"Create an {dur}-second photorealistic vertical 9:16 fashion transformation video.\n\nREFERENCES\nUse "})
@@ -803,10 +967,12 @@ def build_scene_timeline_prompt(
                     segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 2 ({out2_en}). Completely replace Look 1's accessories and never show the flatlay collage sheet itself in the video.\n\n"})
                 else:
                     segments.append({"type": "text", "text": "\n"})
-            else:
+            elif not is_custom_char:
                 segments.append({"type": "text", "text": "Use "})
                 segments.append({"type": "media", "asset_key": overall_key, "title": overall_title})
                 segments.append({"type": "text", "text": " strictly for the exact Look 1 and Look 2 outfits. Never show the reference sheet in the video.\n\n"})
+            else:
+                segments.append({"type": "text", "text": "\n"})
 
             segments.append({"type": "text", "text": "IDENTITY AND CAMERA\nPreserve the exact woman's face, natural skin texture, body proportions, and hairstyle from "})
             segments.append({"type": "media", "asset_key": bg_key, "title": bg_title})
@@ -879,91 +1045,133 @@ def build_scene_timeline_prompt(
             out3 = transitions[0]["outfit"] if len(transitions) >= 1 else {}
             out4 = transitions[1]["outfit"] if len(transitions) >= 2 else {}
             prev_en = prev_outf_obj.get("en_desc") or prev_outf_obj.get("short_desc") or "exact ending outfit from the previous clip"
+            prev_outf_title = prev_outf_obj.get("filename") or os.path.basename(prev_outf_obj.get("path") or "")
+            prev_outf_key = prev_outf_obj.get("id") or prev_outf_title
             out3_en = out3.get("en_desc") or out3.get("short_desc") or "exact Look 3 outfit and accessories"
             out4_en = out4.get("en_desc") or out4.get("short_desc") or "exact Look 4 outfit and accessories"
             out3_title = out3.get("filename") or os.path.basename(out3.get("path") or overall_title)
             out3_key = out3.get("id") or out3_title
             out4_title = out4.get("filename") or os.path.basename(out4.get("path") or overall_title)
             out4_key = out4.get("id") or out4_title
-            use_individual_sheets = 1 <= len(transitions) <= 2 and bool(out3.get("filename") or out3.get("path"))
-            b2 = choreo.get("s2_blocks") or {}
+            use_individual_sheets = len(transitions) >= 1 and bool(out3.get("filename") or out3.get("path"))
+            b2 = dict(choreo.get("s2_blocks") or {})
+            if len(transitions) == 3:
+                t5 = float(transitions[2]["timestamp_sec"])
+                b2["turn_range"] = f"6.15-{t5:.2f}"
+                b2["end_range"] = f"{t5:.2f}-{dur:.2f}"
+                b2["end_en"] = "Settle into a balanced final pose wearing EXACT LOOK 5, retaining all its accessories."
             open_pose_en = choreo.get("opening_pose_en") or f"Her hands and feet begin in the exact ending pose of Clip {sc_num-1}."
 
             segments.append({"type": "text", "text": f"Create an {dur}-second photorealistic vertical 9:16 continuation of the previous fashion video.\n\nREFERENCES AND CONTINUITY\nUse "})
             segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
             segments.append({"type": "text", "text": f" as the exact first frame, continuing the exact same woman, facial identity, hairstyle, room background, warm lighting, locked full-body 9:16 camera, and starting outfit ({prev_en}).\n"})
-            if use_individual_sheets:
-                segments.append({"type": "text", "text": "Use "})
-                segments.append({"type": "media", "asset_key": out3_key, "title": out3_title})
-                segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 3 ({out3_en}). Never show the flatlay collage sheet in the video.\n"})
-                if len(transitions) >= 2 and (out4.get("filename") or out4.get("path")):
+            if len(transitions) == 0:
+                if prev_outf_title:
                     segments.append({"type": "text", "text": "Use "})
-                    segments.append({"type": "media", "asset_key": out4_key, "title": out4_title})
-                    segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 4 ({out4_en}). Never show the flatlay collage sheet in the video.\n\n"})
+                    segments.append({"type": "media", "asset_key": prev_outf_key, "title": prev_outf_title})
+                    segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference to preserve every detail of the current outfit ({prev_en}) throughout this clip. Never show the flatlay collage sheet in the video.\n\n"})
                 else:
                     segments.append({"type": "text", "text": "\n"})
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f"{open_pose_en}\n{move_feel_en}\n\n"
+                        "TIMELINE (LOCAL CLIP TIME)\n"
+                        f"{b2.get('open_range', '0.00-1.50')}: Start seamlessly from "
+                    ),
+                })
+                segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f". {b2.get('open_en', f'Continue the gentle body sway from Clip {sc_num-1} without resetting.')}\n"
+                        f"1.50-4.50: {b2.get('build3_en', 'She places her right hand gently on her hip and gestures gracefully to the beat while showcasing the outfit.')}\n"
+                        f"4.50-7.20: {b2.get('turn_en', 'She angles her body slightly to showcase the silhouette and fabric drape while keeping her gaze on the camera.')}\n"
+                        f"7.20-{dur:.2f}: {b2.get('end_en', 'Settle into a balanced, confident final fashion lookbook pose.')}\n\n"
+                        "AUDIO AND NEGATIVE CONSTRAINTS\n"
+                        "Silent visual clip only: no speech, singing, voiceover, music, or lip-syncing. No camera movement, no face drift, no morphing clothes, no captions, and no visible reference-sheet panels."
+                    ),
+                })
             else:
-                segments.append({"type": "text", "text": "Use "})
-                segments.append({"type": "media", "asset_key": overall_key, "title": overall_title})
-                segments.append({"type": "text", "text": " strictly for the exact Look 3 and Look 4 outfits. Never show the reference sheet in the video.\n\n"})
+                if use_individual_sheets:
+                    segments.append({"type": "text", "text": "Use "})
+                    segments.append({"type": "media", "asset_key": out3_key, "title": out3_title})
+                    segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 3 ({out3_en}). Never show the flatlay collage sheet in the video.\n"})
+                    if len(transitions) >= 2 and (out4.get("filename") or out4.get("path")):
+                        segments.append({"type": "text", "text": "Use "})
+                        segments.append({"type": "media", "asset_key": out4_key, "title": out4_title})
+                        segments.append({"type": "text", "text": f" strictly as the flatlay wardrobe reference for EXACT LOOK 4 ({out4_en}). Never show the flatlay collage sheet in the video.\n\n"})
+                    else:
+                        segments.append({"type": "text", "text": "\n"})
+                elif not is_custom_char:
+                    segments.append({"type": "text", "text": "Use "})
+                    segments.append({"type": "media", "asset_key": overall_key, "title": overall_title})
+                    segments.append({"type": "text", "text": " strictly for the exact Look 3 and Look 4 outfits. Never show the reference sheet in the video.\n\n"})
+                else:
+                    segments.append({"type": "text", "text": "\n"})
 
-            segments.append({
-                "type": "text",
-                "text": (
-                    f"{open_pose_en}\n{move_feel_en}\n\n"
-                    "TIMELINE (LOCAL CLIP TIME)\n"
-                    f"{b2.get('open_range', '0.00-1.01')}: Start seamlessly from "
-                ),
-            })
-            segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
-            segments.append({
-                "type": "text",
-                "text": (
-                    f". {b2.get('open_en', f'Continue the gentle body sway from Clip {sc_num-1} without resetting.')}\n"
-                    f"{b2.get('build3_range', f'1.01-{max(1.20, t3-0.30):.2f}')}: {b2.get('build3_en', 'She places her right hand gently on her hip and gestures gracefully with her left forearm.')}\n"
-                    f"{b2.get('prep3_range', f'{max(1.20, t3-0.30):.2f}-{t3:.2f}')}: {b2.get('prep3_en', 'She prepares the transition gesture on the pre-beat without pausing.')}\n"
-                    f"AT {t3:.2f}: {b2.get('at3_trigger_en', 'Perform an instantaneous matched-pose wardrobe switch into EXACT LOOK 3')} from "
-                ),
-            })
-            segments.append({"type": "media", "asset_key": out3_key if use_individual_sheets else overall_key, "title": out3_title if use_individual_sheets else overall_title})
-            segments.append({
-                "type": "text",
-                "text": (
-                    f": {out3_en}. Switch the complete outfit, shoes, and accessories in a single clean frame while preserving her facial identity, moving arm trajectory, and locked room.\n"
-                ),
-            })
-            if len(transitions) >= 2:
                 segments.append({
                     "type": "text",
                     "text": (
-                        f"{b2.get('post3_range', f'{t3:.2f}-{min(t4-0.50, t3+1.30):.2f}')}: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3 and take one short graceful step in place.')}\n"
-                        f"{b2.get('build4_range', f'{min(t4-0.50, t3+1.30):.2f}-{max(t3+1.45, t4-0.30):.2f}')}: {b2.get('build4_en', 'She subtly angles her torso and brings her hand up toward her shoulder to prepare the next switch.')}\n"
-                        f"{b2.get('prep4_range', f'{max(t3+1.45, t4-0.30):.2f}-{t4:.2f}')}: {b2.get('prep4_en', 'She executes the pre-beat transition accent while keeping her face fully visible.')}\n"
-                        f"AT {t4:.2f}: {b2.get('at4_trigger_en', 'On the musical beat accent, switch instantaneously into EXACT LOOK 4')} from "
+                        f"{open_pose_en}\n{move_feel_en}\n\n"
+                        "TIMELINE (LOCAL CLIP TIME)\n"
+                        f"{b2.get('open_range', '0.00-1.01')}: Start seamlessly from "
                     ),
                 })
-                segments.append({"type": "media", "asset_key": out4_key if use_individual_sheets else overall_key, "title": out4_title if use_individual_sheets else overall_title})
+                segments.append({"type": "media", "asset_key": prev_lf_key, "title": prev_lf_title})
                 segments.append({
                     "type": "text",
                     "text": (
-                        f": {out4_en}. Remove the previous Look 3 accessories completely and switch coherently in the same visual instant.\n"
-                        f"{b2.get('post4_range', f'{t4:.2f}-6.15')}: {b2.get('post4_en', 'Continue the hand movement smoothly after the switch and settle into a composed posture.')}\n"
+                        f". {b2.get('open_en', f'Continue the gentle body sway from Clip {sc_num-1} without resetting.')}\n"
+                        f"{b2.get('build3_range', f'1.01-{max(1.20, t3-0.30):.2f}')}: {b2.get('build3_en', 'She places her right hand gently on her hip and gestures gracefully with her left forearm.')}\n"
+                        f"{b2.get('prep3_range', f'{max(1.20, t3-0.30):.2f}-{t3:.2f}')}: {b2.get('prep3_en', 'She prepares the transition gesture on the pre-beat without pausing.')}\n"
+                        f"AT {t3:.2f}: {b2.get('at3_trigger_en', 'Perform an instantaneous matched-pose wardrobe switch into EXACT LOOK 3')} from "
                     ),
                 })
-            else:
+                segments.append({"type": "media", "asset_key": out3_key if use_individual_sheets else overall_key, "title": out3_title if use_individual_sheets else overall_title})
                 segments.append({
                     "type": "text",
-                    "text": f"{t3:.2f}-6.15: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3.')}\n",
+                    "text": (
+                        f": {out3_en}. Switch the complete outfit, shoes, and accessories in a single clean frame while preserving her facial identity, moving arm trajectory, and locked room.\n"
+                    ),
                 })
-            segments.append({
-                "type": "text",
-                "text": (
-                    f"{b2.get('turn_range', '6.15-7.35')}: {b2.get('turn_en', 'She angles her body slightly to showcase the silhouette and accessories while keeping her gaze on the camera.')}\n"
-                    f"{b2.get('end_range', f'7.35-{dur:.2f}')}: {b2.get('end_en', 'Settle into a balanced, confident final fashion lookbook pose.')}\n\n"
-                    "AUDIO AND NEGATIVE CONSTRAINTS\n"
-                    "Silent visual clip only: no speech, singing, voiceover, music, or lip-syncing. No camera movement, no face drift, no leftover accessories from previous outfits, no morphing clothes, no captions, and no visible reference-sheet panels."
-                ),
-            })
+                if len(transitions) >= 2:
+                    segments.append({
+                        "type": "text",
+                        "text": (
+                            f"{b2.get('post3_range', f'{t3:.2f}-{min(t4-0.50, t3+1.30):.2f}')}: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3 and take one short graceful step in place.')}\n"
+                            f"{b2.get('build4_range', f'{min(t4-0.50, t3+1.30):.2f}-{max(t3+1.45, t4-0.30):.2f}')}: {b2.get('build4_en', 'She subtly angles her torso and brings her hand up toward her shoulder to prepare the next switch.')}\n"
+                            f"{b2.get('prep4_range', f'{max(t3+1.45, t4-0.30):.2f}-{t4:.2f}')}: {b2.get('prep4_en', 'She executes the pre-beat transition accent while keeping her face fully visible.')}\n"
+                            f"AT {t4:.2f}: {b2.get('at4_trigger_en', 'On the musical beat accent, switch instantaneously into EXACT LOOK 4')} from "
+                        ),
+                    })
+                    segments.append({"type": "media", "asset_key": out4_key if use_individual_sheets else overall_key, "title": out4_title if use_individual_sheets else overall_title})
+                    segments.append({
+                        "type": "text",
+                        "text": (
+                            f": {out4_en}. Remove the previous Look 3 accessories completely and switch coherently in the same visual instant.\n"
+                            f"{b2.get('post4_range', f'{t4:.2f}-6.15')}: {b2.get('post4_en', 'Continue the hand movement smoothly after the switch and settle into a composed posture.')}\n"
+                        ),
+                    })
+                else:
+                    segments.append({
+                        "type": "text",
+                        "text": f"{t3:.2f}-6.15: {b2.get('post3_en', 'Complete the hand movement naturally in Look 3.')}\n",
+                    })
+                if len(transitions) == 3:
+                    out5 = transitions[2]["outfit"]
+                    segments.append({"type": "text", "text": f"AT {t5:.2f}: On the beat, make one matched-pose wardrobe switch into EXACT LOOK 5 from "})
+                    segments.append({"type": "media", "asset_key": out5.get("id") or out5["filename"], "title": out5["filename"]})
+                    segments.append({"type": "text", "text": f": {out5.get('en_desc') or out5.get('short_desc')}. Replace the complete outfit, shoes and accessories at once, preserving face, room and gesture.\n"})
+                segments.append({
+                    "type": "text",
+                    "text": (
+                        f"{b2.get('turn_range', '6.15-7.35')}: {b2.get('turn_en', 'She angles her body slightly to showcase the silhouette and accessories while keeping her gaze on the camera.')}\n"
+                        f"{b2.get('end_range', f'7.35-{dur:.2f}')}: {b2.get('end_en', 'Settle into a balanced, confident final fashion lookbook pose.')}\n\n"
+                        "AUDIO AND NEGATIVE CONSTRAINTS\n"
+                        "Silent visual clip only: no speech, singing, voiceover, music, or lip-syncing. No camera movement, no face drift, no leftover accessories from previous outfits, no morphing clothes, no captions, and no visible reference-sheet panels."
+                    ),
+                })
 
     # ==========================================================================
     # CHẾ ĐỘ A: CHAINED IMAGE-TO-VIDEO + TIMELINE 0.1s CHUẨN NHẠC (`chained_i2v`)
@@ -1147,7 +1355,7 @@ def build_scene_timeline_prompt(
     # Phân cảnh 2+ BẮT BUỘC dùng ảnh Frame cuối của Phân cảnh 1 (`scene_s1_last_frame_2k.png`) làm ảnh mở đầu nối tiếp!
     # ==========================================================================
     else:
-        include_overall_sheet = len(transitions) <= 2
+        include_overall_sheet = (not is_custom_char) and (not scene_info.get("disable_overall_sheet")) and len(transitions) <= 2
         if sc_num == 1:
             segments.append({"type": "text", "text": "Tạo 1 video mới hoàn toàn, có nhân vật là "})
             segments.append({"type": "media", "asset_key": start_key, "title": start_title})
@@ -1201,6 +1409,26 @@ def build_scene_timeline_prompt(
         "display_prompt": display_prompt,
         "segments_spec": segments,
     }
+
+
+def resolve_fashion_prompt_image_refs(segments_spec, asset_uuid_map, limit=5):
+    """Every image mention must be an attached, resolved asset; never flatten to text."""
+    refs = []
+    for segment in segments_spec:
+        if segment.get("type") != "media":
+            continue
+        key = segment.get("asset_key") or ""
+        title = segment.get("title") or key
+        if key.startswith("ref_video_") or title.lower().endswith(".mp4"):
+            continue
+        uid = asset_uuid_map.get(key) or asset_uuid_map.get(title)
+        if not uid:
+            raise ValueError(f"Missing uploaded image for inline chip: {title}")
+        if uid not in refs:
+            refs.append(uid)
+    if len(refs) > limit:
+        raise ValueError(f"Scene needs {len(refs)} image refs; supported limit is {limit}")
+    return refs
 
 
 def encode_flow_structured_prompt_Nj(segments_spec: list, asset_uuid_map: dict, fallback_text: str = "", allowed_image_uuids: list = None) -> list:
@@ -1407,6 +1635,7 @@ def generate_fashion_2k_asset_on_flow(
     proj_dir = os.path.join(FASHION_STUDIO_DIR, project_id_slug or "fashion_motion_demo_7anh_2k")
     assets_dir = os.path.join(proj_dir, "assets_2k")
     os.makedirs(assets_dir, exist_ok=True)
+    manifest_path = os.path.join(proj_dir, "fashion_project.json")
 
     valid_refs = [p for p in (ref_image_paths or []) if p and os.path.exists(p)]
     if not output_filename:
@@ -1414,134 +1643,180 @@ def generate_fashion_2k_asset_on_flow(
         output_filename = f"{asset_type}_{ts_tag}_2K.jpg"
     out_file = os.path.join(assets_dir, output_filename)
 
-    prof = (profile_name or "").strip() or "leviettung04"
-    cookie_hdr = gvt._load_flow_cookie_header(prof)
-    if not cookie_hdr:
-        return {"ok": False, "error": f"Tài khoản Flow '{prof}' chưa có Cookie hợp lệ."}
-
-    flow_project_id = _resolve_account_flow_project_id(prof)
-    dl_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Referer": "https://flow.google.com/",
-        "Cookie": cookie_hdr,
-    }
-
-    with sync_playwright() as pw:
-        launch_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--window-position=-2000,-2000",
-            "--window-size=1280,800",
-            "--mute-audio",
-            "--no-first-run",
-            "--no-default-browser-check",
-        ]
-        browser = None
-        context = None
-        _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
+    def _update_manifest_switch_msg(msg_text: str):
+        if not os.path.exists(manifest_path):
+            return
         try:
-            browser = pw.chromium.launch(channel="chrome", headless=False, args=launch_args)
+            with open(manifest_path, "r", encoding="utf-8") as _mf:
+                _mdata = json.load(_mf)
+            _mdata["status_message"] = msg_text
+            _mdata["updated_at"] = time.strftime("%H:%M:%S")
+            with open(manifest_path, "w", encoding="utf-8") as _mf:
+                json.dump(_mdata, _mf, ensure_ascii=False, indent=2)
         except Exception:
-            browser = pw.chromium.launch(headless=False, args=launch_args)
+            pass
 
-        context = browser.new_context(viewport={"width": 1280, "height": 800})
-        if _bypass_js:
-            context.add_init_script(_bypass_js)
+    candidate_profiles = _get_ordered_flow_account_candidates(profile_name)
+    last_err = "Không có tài khoản Google Flow khả dụng."
+
+    for acc_idx, prof in enumerate(candidate_profiles):
+        cookie_hdr = gvt._load_flow_cookie_header(prof)
         pw_cookies = _build_playwright_cookies_from_header(cookie_hdr, prof)
-        if pw_cookies:
-            context.add_cookies(pw_cookies)
+        if not cookie_hdr and not pw_cookies:
+            last_err = f"Tài khoản Flow '{prof}' chưa có Cookie hợp lệ."
+            _mark_flow_profile_unhealthy(prof, last_err)
+            if acc_idx + 1 < len(candidate_profiles):
+                next_prof = candidate_profiles[acc_idx + 1]
+                _update_manifest_switch_msg(f"🔄 Tài khoản '{prof}' chưa có Cookie -> Tự động đổi sang tài khoản '{next_prof}'...")
+            continue
 
         try:
-            page = context.new_page()
+            flow_project_id = _resolve_account_flow_project_id(prof)
+        except Exception as _proj_exc:
+            last_err = str(_proj_exc)
+            _mark_flow_profile_unhealthy(prof, last_err)
+            continue
+
+        dl_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Referer": "https://flow.google.com/",
+            "Cookie": cookie_hdr or "",
+        }
+
+        with sync_playwright() as pw:
+            browser = _launch_flow_browser(pw)
+            context = None
+            _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
+
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
             if _bypass_js:
-                page.add_init_script(_bypass_js)
-            page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
-            if _bypass_js:
+                context.add_init_script(_bypass_js)
+            if pw_cookies:
                 try:
-                    page.evaluate(_bypass_js)
+                    context.add_cookies(pw_cookies)
                 except Exception:
                     pass
+
             try:
-                page.wait_for_function(
-                    "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise",
-                    timeout=35000,
+                page = context.new_page()
+                if _bypass_js:
+                    page.add_init_script(_bypass_js)
+                page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
+                if _bypass_js:
+                    try:
+                        page.evaluate(_bypass_js)
+                    except Exception:
+                        pass
+                try:
+                    page.wait_for_function(
+                        "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise",
+                        timeout=35000,
+                    )
+                except Exception:
+                    page.wait_for_timeout(4000)
+                page.wait_for_timeout(1200)
+
+                wiz = page.evaluate(
+                    """() => {
+                        const w = window.WIZ_global_data || {};
+                        return {
+                            at: w.SNlM0e || '',
+                            bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261104.10_p0',
+                            fsid: w.FdrFJe || '',
+                            ua: navigator.userAgent
+                        };
+                    }"""
                 )
-            except Exception:
-                page.wait_for_timeout(4000)
-            page.wait_for_timeout(1200)
+                if not wiz.get("at"):
+                    last_err = f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."
+                    _mark_flow_profile_unhealthy(prof, last_err)
+                    if acc_idx + 1 < len(candidate_profiles):
+                        next_prof = candidate_profiles[acc_idx + 1]
+                        _update_manifest_switch_msg(
+                            f"🔄 Tài khoản '{prof}' hết hạn phiên đăng nhập -> Tự động đổi sang tài khoản '{next_prof}' để tạo ảnh 2K..."
+                        )
+                    continue
 
-            wiz = page.evaluate(
-                """() => {
-                    const w = window.WIZ_global_data || {};
-                    return {
-                        at: w.SNlM0e || '',
-                        bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261104.10_p0',
-                        fsid: w.FdrFJe || '',
-                        ua: navigator.userAgent
-                    };
-                }"""
-            )
-            if not wiz.get("at"):
-                return {"ok": False, "error": f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."}
-
-            try:
-                live_c = context.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
-                c_map = {c["name"]: c["value"] for c in live_c if "GRECAPTCHA" not in c.get("name", "").upper()}
-                if c_map:
-                    cookie_hdr = "; ".join(f"{k}={v}" for k, v in c_map.items())
-                    dl_headers = {
-                        "Cookie": cookie_hdr,
-                        "Referer": "https://flow.google.com/",
-                        "User-Agent": wiz["ua"],
-                    }
-            except Exception:
-                pass
-
-            uploaded_uuids = []
-            for rp in valid_refs[:5]:
-                ok_u, u_id, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, rp, quality=98)
-                if ok_u and u_id:
-                    uploaded_uuids.append(u_id)
-
-            primary_uuid = uploaded_uuids[0] if uploaded_uuids else None
-            extra_uuids = uploaded_uuids[1:] if len(uploaded_uuids) > 1 else []
-
-            ref_task = {
-                "pid": project_id_slug,
-                "v_key": asset_type,
-                "project_id": flow_project_id,
-                "char_id": primary_uuid,
-                "prod_uuids": extra_uuids,
-                "allow_multi_refs": len(extra_uuids) > 0,
-                "prompt_str": prompt_str,
-                "out_file": out_file,
-            }
-            ok_gen, media_uuid_2k, err_gen = generate_variant_ref_image_in_page(
-                page, wiz, cookie_hdr, dl_headers, ref_task
-            )
-            if not ok_gen:
-                return {"ok": False, "error": f"Tạo ảnh 2K trên Google Flow thất bại: {err_gen}"}
-
-            info_2k = ensure_image_is_2k(out_file)
-            return {
-                "ok": True,
-                "asset_type": asset_type,
-                "filename": os.path.basename(out_file),
-                "path": out_file,
-                "media_uuid_2k": media_uuid_2k,
-                "width": info_2k.get("width", 1536),
-                "height": info_2k.get("height", 2752),
-                "is_2k": True,
-            }
-        finally:
-            try:
-                context.close()
-            except Exception:
-                pass
-            if browser:
                 try:
-                    browser.close()
+                    live_c = context.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
+                    c_map = {c["name"]: c["value"] for c in live_c if "GRECAPTCHA" not in c.get("name", "").upper()}
+                    if c_map:
+                        cookie_hdr = "; ".join(f"{k}={v}" for k, v in c_map.items())
+                        dl_headers = {
+                            "Cookie": cookie_hdr,
+                            "Referer": "https://flow.google.com/",
+                            "User-Agent": wiz["ua"],
+                        }
                 except Exception:
                     pass
+
+                uploaded_uuids = []
+                upload_err_detail = ""
+                for rp in valid_refs[:5]:
+                    ok_u, u_id, err_u = upload_single_product_ref_in_page(page, wiz, flow_project_id, rp, quality=98)
+                    if ok_u and u_id:
+                        uploaded_uuids.append(u_id)
+                    else:
+                        upload_err_detail = str(err_u or "upload_failed")
+
+                if valid_refs and len(uploaded_uuids) < len(valid_refs[:5]):
+                    last_err = f"Upload ảnh tham chiếu lên Google Flow ({prof}) thất bại: {upload_err_detail}"
+                    _mark_flow_profile_unhealthy(prof, last_err)
+                    if acc_idx + 1 < len(candidate_profiles):
+                        next_prof = candidate_profiles[acc_idx + 1]
+                        _update_manifest_switch_msg(
+                            f"🔄 Tài khoản '{prof}' lỗi upload ảnh tham chiếu -> Tự động đổi sang tài khoản '{next_prof}'..."
+                        )
+                    continue
+
+                ref_task = {
+                    "pid": project_id_slug,
+                    "v_key": asset_type,
+                    "project_id": flow_project_id,
+                    "char_id": "",
+                    "prod_uuids": uploaded_uuids,
+                    "allow_multi_refs": len(uploaded_uuids) > 1,
+                    "prompt_str": prompt_str,
+                    "out_file": out_file,
+                }
+                ok_gen, media_uuid_2k, err_gen = generate_variant_ref_image_in_page(
+                    page, wiz, cookie_hdr, dl_headers, ref_task
+                )
+                if not ok_gen:
+                    last_err = f"Tạo ảnh 2K trên Google Flow ({prof}) thất bại: {err_gen}"
+                    _mark_flow_profile_unhealthy(prof, last_err)
+                    if acc_idx + 1 < len(candidate_profiles):
+                        next_prof = candidate_profiles[acc_idx + 1]
+                        _update_manifest_switch_msg(
+                            f"🔄 Tài khoản '{prof}' lỗi tạo ảnh 2K ({str(err_gen)[:45]}) -> Tự động đổi sang tài khoản '{next_prof}'..."
+                        )
+                    continue
+
+                _mark_flow_profile_healthy(prof)
+                info_2k = ensure_image_is_2k(out_file)
+                return {
+                    "ok": True,
+                    "asset_type": asset_type,
+                    "filename": os.path.basename(out_file),
+                    "path": out_file,
+                    "media_uuid_2k": media_uuid_2k,
+                    "width": info_2k.get("width", 1536),
+                    "height": info_2k.get("height", 2752),
+                    "is_2k": True,
+                    "profile_used": prof,
+                }
+            finally:
+                try:
+                    context.close()
+                except Exception:
+                    pass
+                if browser:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+
+    return {"ok": False, "error": last_err, "tried_accounts": candidate_profiles}
 
 
 # ==============================================================================
@@ -2029,15 +2304,49 @@ def create_or_update_fashion_motion_project(
     assets_dir = os.path.join(proj_dir, "assets_2k")
     os.makedirs(assets_dir, exist_ok=True)
 
+    def _resolve_fashion_input_path(raw_p: str) -> str:
+        p = str(raw_p or "").strip().strip('"').strip("'")
+        if not p:
+            return ""
+        if os.path.exists(p):
+            return os.path.abspath(p)
+        for base_d in (WS_DIR, PIPELINE_DIR, DEMO_ASSETS_DIR, assets_dir):
+            cand = os.path.join(base_d, p.lstrip("/\\"))
+            if os.path.exists(cand):
+                return os.path.abspath(cand)
+            cand_bn = os.path.join(base_d, os.path.basename(p))
+            if os.path.exists(cand_bn):
+                return os.path.abspath(cand_bn)
+        return ""
+
+    base_char_path = _resolve_fashion_input_path(base_char_path)
+    char_sheet_path = _resolve_fashion_input_path(char_sheet_path)
+    ref_video_path = _resolve_fashion_input_path(ref_video_path) or ref_video_path
+
     # Mặc định lấy từ folder `ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K`:
     # - Ảnh Ref Nhân Vật Thời Trang gốc: `02_Character_Sheet_Basic_Poses_2K.png`
     # - Ảnh Bối Cảnh Phòng Tham Chiếu: `07_Nhan_Vat_Basic_Phong_Ngu_2K.png`
     if not base_char_path or not os.path.exists(base_char_path):
         base_char_path = os.path.join(DEMO_ASSETS_DIR, "02_Character_Sheet_Basic_Poses_2K.png")
-    if not char_sheet_path or not os.path.exists(char_sheet_path):
-        cand_cs = os.path.join(DEMO_ASSETS_DIR, "07_Nhan_Vat_Basic_Phong_Ngu_2K.png")
-        if os.path.exists(cand_cs):
-            char_sheet_path = cand_cs
+
+    _default_nv5_filenames = {
+        "02_Character_Sheet_Basic_Poses_2K.png",
+        "07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
+        "09_NV5_Phong_Tu_Go_Mo_Dau_2K.png",
+        "01_Character_Sheet_4_Outfits_2K.png",
+    }
+    is_custom_base_char = os.path.basename(base_char_path) not in _default_nv5_filenames
+
+    if is_custom_base_char:
+        # Nếu người dùng đã đổi sang Nhân Vật của họ mà ô Bối Cảnh Mở Đầu vẫn để trống hoặc còn dính ảnh mẫu NV5,
+        # tự động dùng chính ảnh Nhân Vật của người dùng làm ảnh mở đầu!
+        if not char_sheet_path or not os.path.exists(char_sheet_path) or os.path.basename(char_sheet_path) in _default_nv5_filenames:
+            char_sheet_path = base_char_path
+    else:
+        if not char_sheet_path or not os.path.exists(char_sheet_path):
+            cand_cs = os.path.join(DEMO_ASSETS_DIR, "07_Nhan_Vat_Basic_Phong_Ngu_2K.png")
+            if os.path.exists(cand_cs):
+                char_sheet_path = cand_cs
 
     # Copy & đảm bảo chuẩn 2K cho ảnh nhân vật gốc
     char_filename = os.path.basename(base_char_path)
@@ -2062,7 +2371,7 @@ def create_or_update_fashion_motion_project(
         shutil.copy2(overall_sheet_src, local_overall_2k)
         ensure_image_is_2k(local_overall_2k)
 
-    # Chuẩn bị danh sách 4–5 Outfit 2K
+    # Chuẩn bị danh sách Outfit 2K (Tôn trọng 1..N bộ đồ của người dùng; chỉ fallback sang 5 bộ mẫu nếu rỗng hoàn toàn)
     if not outfit_items:
         outfit_items = []
         for d_out in DEFAULT_FASHION_DEMO_OUTFITS[:5]:
@@ -2072,12 +2381,25 @@ def create_or_update_fashion_motion_project(
                 item_copy["path"] = src_p
                 outfit_items.append(item_copy)
 
+    default_outfit_filenames = {d["filename"] for d in DEFAULT_FASHION_DEMO_OUTFITS}
     normalized_outfits = []
+    seen_outfit_fns = set()
+    _generic_store_fns = {"prod_1.jpg", "prod_2.jpg", "prod_3.jpg", "prod_1.png", "prod_2.png", "image.png", "image.jpg", "media.png", "media.jpg", "clipboard.png"}
     for idx_o, item in enumerate(outfit_items):
-        src_p = item.get("path") or os.path.join(DEMO_ASSETS_DIR, item.get("filename") or "")
+        src_p = _resolve_fashion_input_path(item.get("path") or item.get("filename") or "")
         if not src_p or not os.path.exists(src_p):
             continue
         fn = os.path.basename(src_p)
+        if fn in seen_outfit_fns or fn.lower() in _generic_store_fns:
+            import hashlib as _hl
+            try:
+                with open(src_p, "rb") as _sf:
+                    _h6 = _hl.sha1(_sf.read()).hexdigest()[:6]
+            except Exception:
+                _h6 = f"s{idx_o+1}"
+            _st, _ex = os.path.splitext(fn)
+            fn = f"{_st}_{_h6}{_ex}"
+        seen_outfit_fns.add(fn)
         dst_p = os.path.join(assets_dir, fn)
         if os.path.abspath(src_p) != os.path.abspath(dst_p):
             shutil.copy2(src_p, dst_p)
@@ -2093,6 +2415,10 @@ def create_or_update_fashion_motion_project(
             "height": info_2k.get("height", 2752),
             "is_2k": True,
         }
+        if item.get("raw_product_path") and os.path.exists(item["raw_product_path"]):
+            out_entry["raw_product_path"] = item["raw_product_path"]
+        if item.get("needs_deconstruct_sheet"):
+            out_entry["needs_deconstruct_sheet"] = True
         lb_path = item.get("lookbook_model_path") or ""
         if not lb_path or not os.path.exists(lb_path):
             lb_fn = item.get("lookbook_model_filename") or ""
@@ -2109,8 +2435,21 @@ def create_or_update_fashion_motion_project(
             out_entry["lookbook_model_path"] = lb_path
         normalized_outfits.append(out_entry)
 
+    has_custom_outfits = any(o.get("filename") not in default_outfit_filenames for o in normalized_outfits)
+    disable_overall_sheet = bool(is_custom_base_char or has_custom_outfits)
+
     # Copy video tham chiếu vào project
     local_ref_video = os.path.join(proj_dir, "reference_motion_source.mp4")
+    if (not ref_video_path or not os.path.exists(ref_video_path)) and not os.path.exists(local_ref_video):
+        # Fallback về video tham chiếu mặc định hoặc FVT_001 để khi người dùng chỉ đổi Nhân vật / Sản phẩm trên dự án mới vẫn chạy ngay
+        for _cand_v in (
+            os.path.join(FASHION_STUDIO_DIR, "fashion_tpl_fvt_001", "reference_motion_source.mp4"),
+            os.path.join(FASHION_STUDIO_DIR, "fashion_lookbook_chan_vay_6e19", "reference_motion_source.mp4"),
+        ):
+            if _cand_v and os.path.exists(_cand_v):
+                ref_video_path = _cand_v
+                break
+
     orig_ref_filename = os.path.basename(ref_video_path) if (ref_video_path and os.path.exists(ref_video_path)) else "reference_motion_source.mp4"
     if ref_video_path and os.path.exists(ref_video_path):
         if os.path.abspath(ref_video_path) != os.path.abspath(local_ref_video):
@@ -2203,6 +2542,7 @@ def create_or_update_fashion_motion_project(
         sc["transition_actions_vn"] = ai_res.get("transition_actions_vn") or []
         sc["ref_video_path"] = orig_ref_filename or local_ref_video
         sc["template_meta"] = {"code": project_id_slug, "slug": orig_ref_filename}
+        sc["disable_overall_sheet"] = disable_overall_sheet
 
         sc["start_char_ref"] = start_char_ref
         p_vids = build_scene_timeline_prompt(
@@ -2277,9 +2617,17 @@ def create_or_update_fashion_motion_project(
         except Exception:
             prev_manifest = {}
 
+    def _is_cacheable_img_filename(k_str: str) -> bool:
+        kl = str(k_str or "").strip().lower()
+        if not kl.endswith((".png", ".jpg", ".jpeg", ".webp")):
+            return False
+        if kl.startswith(("prepared_", "scene_s", "ref_video_", "outfit_prod_")):
+            return False
+        return True
+
     prev_img_uuids = {
         k: v for k, v in (prev_manifest.get("asset_uuid_map") or {}).items()
-        if v and not str(k).startswith("ref_video_") and not str(k).lower().endswith(".mp4")
+        if v and _is_cacheable_img_filename(k)
     }
 
     final_vid_path = os.path.join(FINAL_VIDEOS_DIR, f"{project_id_slug}_final.mp4")
@@ -2295,6 +2643,7 @@ def create_or_update_fashion_motion_project(
         "ai_model": ai_model,
         "ai_agent_command": ai_agent_cmd,
         "generation_mode": gen_mode,
+        "disable_overall_sheet": disable_overall_sheet,
         "global_cuts_info": split_res.get("global_cuts_info") or {},
         "base_char_2k": {
             "filename": char_filename,
@@ -2360,8 +2709,134 @@ def list_fashion_motion_projects() -> list:
 # 7. CHẠY FULL PIPELINE MOTION CONTROL VIDEO FASHION TRÊN GOOGLE FLOW (2K + OMNI FLASH)
 # ==============================================================================
 
+_UNHEALTHY_FLOW_PROFILES = {}  # {prof_lower: (timestamp, reason)}
+_FLOW_ACCOUNT_RR_COUNTER = 0
+
+
+def _launch_flow_browser(pw):
+    """Khởi chạy trình duyệt Chrome sạch cho Google Flow (headless mặc định, trừ khi FLOW_SHOW_BROWSER=1)."""
+    headless_mode = os.environ.get("FLOW_SHOW_BROWSER", "").strip() != "1"
+    launch_args = [
+        "--disable-blink-features=AutomationControlled",
+        "--window-size=1280,800",
+        "--mute-audio",
+        "--no-first-run",
+        "--no-default-browser-check",
+    ]
+    try:
+        return pw.chromium.launch(channel="chrome", headless=headless_mode, args=launch_args)
+    except Exception:
+        return pw.chromium.launch(headless=headless_mode, args=launch_args)
+
+
+def _mark_flow_profile_unhealthy(prof: str, reason: str = "") -> None:
+    key = str(prof or "").strip().lower()
+    if not key:
+        return
+    _UNHEALTHY_FLOW_PROFILES[key] = (time.time(), str(reason or "error"))
+    print(
+        f"⚠️ [Auto-Switch Account] Tài khoản '{prof}' báo lỗi ({str(reason)[:95]}) -> Tự động chuyển sang tài khoản khác!",
+        flush=True,
+    )
+
+
+def _mark_flow_profile_healthy(prof: str) -> None:
+    key = str(prof or "").strip().lower()
+    if key:
+        _UNHEALTHY_FLOW_PROFILES.pop(key, None)
+
+
+def _is_flow_profile_unhealthy(prof: str, cooldown_sec: float = 300.0) -> bool:
+    key = str(prof or "").strip().lower()
+    if not key or key not in _UNHEALTHY_FLOW_PROFILES:
+        return False
+    ts, _ = _UNHEALTHY_FLOW_PROFILES[key]
+    if (time.time() - ts) > cooldown_sec:
+        _UNHEALTHY_FLOW_PROFILES.pop(key, None)
+        return False
+    return True
+
+
+def _get_ordered_flow_account_candidates(preferred_profile: str = "", rotate_round_robin: bool = False) -> list:
+    """
+    Trả về danh sách toàn bộ tài khoản Google Flow / Vids khả dụng theo thứ tự ưu tiên:
+      1. Các tài khoản khỏe mạnh (chưa bị lỗi phiên `SNlM0e` / Cookie trong 5 phút gần nhất).
+      2. Nếu người dùng chọn `preferred_profile` và tài khoản đó chưa bị đánh dấu lỗi, xếp đầu tiên;
+         nếu tài khoản đó lỗi, tự động xoay sang `flow_acc_2`, `leviettung04`, `capcutpro`, `Profile 13`, `Profile 15`, ...
+      3. Khi `rotate_round_robin=True` (đa luồng đa tài khoản), xoay vòng giữa các tài khoản khỏe mạnh có đủ Cookie.
+    """
+    global _FLOW_ACCOUNT_RR_COUNTER
+    pref_clean = str(preferred_profile or "").strip()
+    accounts_meta = []
+    seen_lower = set()
+
+    try:
+        from cooking_storyboard_engine import list_cooking_flow_accounts, load_cooking_cookies
+        for acc in list_cooking_flow_accounts():
+            p_name = str(acc.get("profile_name") or "").strip()
+            if not p_name or p_name.lower() in seen_lower:
+                continue
+            if not acc.get("active", True):
+                continue
+            ck_list = load_cooking_cookies(p_name)
+            has_ck = bool(acc.get("has_cookies") or ck_list)
+            if not has_ck:
+                continue
+            seen_lower.add(p_name.lower())
+            tag_str = str(acc.get("tag") or "").lower()
+            tier_rank = 0 if ("ultra" in tag_str or "pro" in tag_str) else 1
+            rich_rank = 0 if len(ck_list) >= 15 else 1
+            accounts_meta.append({
+                "profile_name": p_name,
+                "rich_rank": rich_rank,
+                "tier_rank": tier_rank,
+                "cookie_count": len(ck_list),
+            })
+    except Exception:
+        pass
+
+    if pref_clean and pref_clean.lower() not in seen_lower:
+        accounts_meta.insert(0, {
+            "profile_name": pref_clean,
+            "rich_rank": 0,
+            "tier_rank": 0,
+            "cookie_count": 50,
+        })
+        seen_lower.add(pref_clean.lower())
+
+    if not accounts_meta:
+        return [pref_clean] if pref_clean else []
+
+    healthy = [m for m in accounts_meta if not _is_flow_profile_unhealthy(m["profile_name"])]
+    unhealthy = [m for m in accounts_meta if _is_flow_profile_unhealthy(m["profile_name"])]
+
+    healthy.sort(key=lambda m: (m["rich_rank"], m["tier_rank"], -m["cookie_count"]))
+
+    if rotate_round_robin and len(healthy) > 1:
+        rich_healthy = [m for m in healthy if m["rich_rank"] == 0] or healthy
+        shift = _FLOW_ACCOUNT_RR_COUNTER % len(rich_healthy)
+        _FLOW_ACCOUNT_RR_COUNTER += 1
+        rotated_rich = rich_healthy[shift:] + rich_healthy[:shift]
+        rest_healthy = [m for m in healthy if m not in rich_healthy]
+        healthy = rotated_rich + rest_healthy
+
+    if pref_clean:
+        pref_match = next((m for m in healthy if m["profile_name"].lower() == pref_clean.lower()), None)
+        if pref_match:
+            healthy = [pref_match] + [m for m in healthy if m["profile_name"].lower() != pref_clean.lower()]
+
+    ordered = [m["profile_name"] for m in healthy] + [m["profile_name"] for m in unhealthy]
+    return ordered or ([pref_clean] if pref_clean else [])
+
+
 def _resolve_account_flow_project_id(prof: str) -> str:
     """Lấy đúng Google Flow Project ID của tài khoản đang chọn từ Flow_nhieu_worker_accounts.json."""
+    from cooking_storyboard_engine import list_cooking_flow_accounts, DEFAULT_FLOW_PROJECT_UUID
+    for account in list_cooking_flow_accounts():
+        if str(account.get("profile_name", "")).lower() == prof.lower():
+            project_id = str(account.get("project_id") or "").strip()
+            if project_id:
+                return project_id
     acc_file = os.path.join(WS_DIR, "data", "google_flow_grok", "Flow_nhieu_worker_accounts.json")
     if os.path.exists(acc_file):
         try:
@@ -2371,20 +2846,33 @@ def _resolve_account_flow_project_id(prof: str) -> str:
                 em = str(a.get("email") or "").lower()
                 if prof.lower() in em and a.get("project_id"):
                     return str(a["project_id"]).strip()
-            for a in accs:
-                if a.get("project_id"):
-                    return str(a["project_id"]).strip()
         except Exception:
             pass
-    return "29316b9f-db3d-4e54-9a25-5994b3a2695a"
+    return DEFAULT_FLOW_PROJECT_UUID
 
 
 def _build_playwright_cookies_from_header(cookie_hdr: str, prof: str) -> list:
-    """Tạo danh sách cookie chuẩn Playwright từ file cookies JSON + chuỗi Cookie header."""
+    """Tạo danh sách cookie chuẩn Playwright từ file cookies JSON đầy đủ (giữ nguyên __Host-1PLSID/3PLSID/GAPS) + chuỗi Cookie header."""
     pw_cookies = []
     seen = set()
+    try:
+        from cooking_storyboard_engine import load_cooking_cookies
+        raw_list = load_cooking_cookies(prof)
+        for c in raw_list or []:
+            if not isinstance(c, dict):
+                continue
+            name = str(c.get("name") or "").strip()
+            val = c.get("value")
+            if not name or val is None or "GRECAPTCHA" in name.upper():
+                continue
+            dom = str(c.get("domain") or ".google.com").strip()
+            pw_cookies.append(c)
+            seen.add((name, dom))
+    except Exception:
+        pass
+
     cookies_json = os.path.join(WS_DIR, "data", "google_flow_grok", "cookies", f"{prof}.json")
-    if os.path.exists(cookies_json):
+    if not pw_cookies and os.path.exists(cookies_json):
         try:
             with open(cookies_json, "r", encoding="utf-8") as f:
                 cdata = json.load(f)
@@ -2392,10 +2880,10 @@ def _build_playwright_cookies_from_header(cookie_hdr: str, prof: str) -> list:
                 name = str(c.get("name") or "").strip()
                 val = c.get("value")
                 dom = str(c.get("domain") or ".google.com").strip()
-                if not name or val is None or name.startswith("__Host-") or "GRECAPTCHA" in name.upper():
+                if not name or val is None or "GRECAPTCHA" in name.upper():
                     continue
-                if "google.com" in dom:
-                    is_sec = bool(c.get("secure", True)) or name.startswith("__Secure-")
+                if "google.com" in dom or "youtube.com" in dom:
+                    is_sec = bool(c.get("secure", True)) or name.startswith(("__Secure-", "__Host-"))
                     pw_cookies.append(
                         {
                             "name": name,
@@ -2653,13 +3141,13 @@ def _run_fashion_motion_project_on_google_vids(
 
     vids_model = str(cfg.get("google_vids_model") or "omni").strip().lower()
     multi_acc = bool(cfg.get("multi_account_enabled", True))
-    detected_accs = [
-        a["profile_name"]
-        for a in (cfg.get("detected_flow_accounts") or [])
-        if a.get("active", True) and a.get("profile_name")
-    ]
-    prof = (profile_name or "").strip() or (detected_accs[0] if detected_accs else "leviettung04")
-    fallback_profs = [p for p in detected_accs if p != prof] if multi_acc else []
+    candidate_profiles = _get_ordered_flow_account_candidates(
+        profile_name or manifest.get("preferred_profile_name") or ""
+    )
+    prof = candidate_profiles[0] if candidate_profiles else (profile_name or "").strip()
+    if not prof:
+        return {"ok": False, "error": "Chưa có tài khoản Google Vids / Google Flow nào được đăng nhập. Vui lòng đăng nhập ở tab Tài Khoản!"}
+    fallback_profs = [p for p in candidate_profiles if p != prof] if multi_acc else []
 
     manifest["generation_mode"] = "google_vids"
     manifest["prompt_style"] = "google_vids"
@@ -2667,6 +3155,8 @@ def _run_fashion_motion_project_on_google_vids(
     scenes_to_run = [s for s in all_scenes if not target_scene_id or s.get("id") == target_scene_id]
     if not scenes_to_run:
         return {"ok": False, "error": f"Không tìm thấy phân cảnh '{target_scene_id}' trong dự án '{project_id_slug}'."}
+
+    _last_sync_ts = [0.0]
 
     def _save_live(st_code: str = None, st_msg: str = None):
         if st_code:
@@ -2676,6 +3166,14 @@ def _run_fashion_motion_project_on_google_vids(
         manifest["updated_at"] = time.strftime("%H:%M:%S")
         with open(manifest_path, "w", encoding="utf-8") as mf:
             json.dump(manifest, mf, ensure_ascii=False, indent=2)
+        now_t = time.monotonic()
+        if st_code in ("completed_final", "failed_scenes", "failed_auth", "failed_upload") or (now_t - _last_sync_ts[0] >= 2.5):
+            _last_sync_ts[0] = now_t
+            try:
+                import sync_web_ui_state as _sws
+                threading.Thread(target=lambda: _sws.sync_web_ui(force=True), daemon=True).start()
+            except Exception:
+                pass
 
     start_char_ref = {
         "asset_key": "base_char_2k",
@@ -2793,6 +3291,11 @@ def _run_fashion_motion_project_on_google_vids(
         if res_gen.get("ok") and os.path.isfile(out_mp4) and os.path.getsize(out_mp4) > 50000:
             mb_size = round(res_gen["bytes"] / 1048576, 2)
             used_prof = res_gen.get("profile") or prof
+            if used_prof != prof:
+                _mark_flow_profile_unhealthy(prof, f"Google Vids tự động chuyển sang '{used_prof}'")
+                prof = used_prof
+                fallback_profs = [p for p in candidate_profiles if p != prof] if multi_acc else []
+            _mark_flow_profile_healthy(used_prof)
             q_rem = (res_gen.get("quota") or {}).get("remaining")
             q_str = f" • Quota còn: {q_rem}" if q_rem is not None else ""
             sc["output_video_path"] = out_mp4
@@ -2882,6 +3385,18 @@ def run_fashion_motion_project_on_flow(
     with open(manifest_path, "r", encoding="utf-8") as f:
         manifest = json.load(f)
 
+    if manifest.get('input_flow') == 'simple' and not manifest.get('input_assets_prepared'):
+        prepared = prepare_simple_fashion_inputs(project_id_slug, manifest, profile_name)
+        if not prepared.get('ok'):
+            manifest['status'] = 'failed_input_preparation'
+            manifest['status_message'] = prepared.get('error','Không chuẩn bị được ảnh đầu vào.')
+            for scene in manifest.get('scenes',[]):
+                scene.update(status='failed:input_preparation',status_detail=manifest['status_message'])
+            with open(manifest_path,'w',encoding='utf-8') as f:
+                json.dump(manifest,f,ensure_ascii=False,indent=2)
+            return prepared
+        manifest = prepared['project']
+
     gen_mode_norm = normalize_fashion_generation_mode(
         generation_mode or manifest.get("generation_mode") or "chained_i2v"
     )
@@ -2907,91 +3422,7 @@ def run_fashion_motion_project_on_flow(
         submit_upsample_1080p_in_page,
     )
 
-    prof = (profile_name or "").strip() or "leviettung04"
-    cookie_hdr = gvt._load_flow_cookie_header(prof)
-    if not cookie_hdr:
-        return {"ok": False, "error": f"Tài khoản Flow '{prof}' chưa có Cookie hợp lệ."}
-
-    account_project_id = _resolve_account_flow_project_id(prof)
-    flow_project_id = account_project_id or manifest.get("flow_project_id")
-
-    # ── GLOBAL ASSET UUID CACHE (Dùng chung UUID ảnh 2K cho mọi Template FVT_001..FVT_173 trên cùng flow_project_id) ──
-    global_cache_path = os.path.join(FASHION_STUDIO_DIR, "_global_flow_asset_cache.json")
-    global_proj_cache = {}
-    try:
-        if os.path.exists(global_cache_path):
-            with open(global_cache_path, "r", encoding="utf-8") as _gcf:
-                _all_gc = json.load(_gcf)
-                if isinstance(_all_gc, dict):
-                    global_proj_cache = dict(_all_gc.get(flow_project_id) or {})
-    except Exception:
-        global_proj_cache = {}
-
-    if not global_proj_cache:
-        # Tự động thu hoạch UUID ảnh 2K đã upload từ các project cùng flow_project_id (VD fashion_tpl_fvt_001, fashion_lookbook_chan_vay_6e19)
-        for _seed_slug in ("fashion_tpl_fvt_001", "fashion_lookbook_chan_vay_6e19"):
-            _seed_p = os.path.join(FASHION_STUDIO_DIR, _seed_slug, "fashion_project.json")
-            if os.path.exists(_seed_p):
-                try:
-                    _sd = json.load(open(_seed_p, "r", encoding="utf-8"))
-                    if _sd.get("flow_project_id") == flow_project_id and isinstance(_sd.get("asset_uuid_map"), dict):
-                        for _k, _v in _sd["asset_uuid_map"].items():
-                            if _v and not str(_k).startswith("ref_video_") and not str(_k).endswith(".mp4"):
-                                global_proj_cache[_k] = _v
-                except Exception:
-                    pass
-
-    def _save_global_asset_cache():
-        try:
-            _all_gc = {}
-            if os.path.exists(global_cache_path):
-                try:
-                    _all_gc = json.load(open(global_cache_path, "r", encoding="utf-8"))
-                except Exception:
-                    _all_gc = {}
-            _all_gc[flow_project_id] = {
-                k: v for k, v in asset_uuid_map.items()
-                if v and not str(k).startswith("ref_video_") and not str(k).endswith(".mp4")
-            }
-            with open(global_cache_path, "w", encoding="utf-8") as _gcf:
-                json.dump(_all_gc, _gcf, ensure_ascii=False, indent=2)
-        except Exception:
-            pass
-
-    # Nếu project_id thay đổi hoặc asset_uuid_map chưa gắn với đúng flow_project_id hiện tại,
-    # xóa cache UUID cũ của project khác và nạp ngay Global Cache của flow_project_id hiện tại!
-    if manifest.get("asset_uuid_project_id") != flow_project_id or manifest.get("flow_project_id") != flow_project_id:
-        print(
-            f"🔄 [Google Flow] Đồng bộ asset_uuid_map sang đúng Project {flow_project_id} của tài khoản '{prof}'...",
-            flush=True,
-        )
-        asset_uuid_map = dict(global_proj_cache)
-        for _sc in manifest.get("scenes") or []:
-            _sc["ref_video_uuid"] = None
-    else:
-        asset_uuid_map = dict(global_proj_cache)
-        asset_uuid_map.update(manifest.get("asset_uuid_map") or {})
-
-    manifest["flow_project_id"] = flow_project_id
-    manifest["asset_uuid_project_id"] = flow_project_id
-
-    http_sess = cffi_requests.Session(impersonate="chrome131")
-    dl_headers = {
-        "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
-        "Referer": "https://flow.google.com/",
-        "Cookie": cookie_hdr,
-    }
-
-    target_sc_norm = str(target_scene_id or "").strip().lower()
-    scenes_to_run = [
-        sc
-        for sc in (manifest.get("scenes") or [])
-        if (not target_sc_norm) or str(sc.get("id") or "").lower() == target_sc_norm
-    ]
-    if not scenes_to_run:
-        return {"ok": False, "error": f"Không tìm thấy phân cảnh '{target_scene_id}' trong project {project_id_slug}"}
-
-    MAX_SCENE_ATTEMPTS = 4  # 1 lần chạy gốc + tối đa 3 lần tự động Retry ngay khi lỗi
+    _last_flow_sync_ts = [0.0]
 
     def _save_manifest_live(proj_status: str = None, status_msg: str = None):
         if proj_status:
@@ -3004,6 +3435,14 @@ def run_fashion_motion_project_on_flow(
                 json.dump(manifest, _mf, ensure_ascii=False, indent=2)
         except Exception:
             pass
+        now_t = time.monotonic()
+        if proj_status in ("completed_final", "failed_scenes", "failed_auth", "failed_upload") or (now_t - _last_flow_sync_ts[0] >= 2.5):
+            _last_flow_sync_ts[0] = now_t
+            try:
+                import sync_web_ui_state as _sws
+                threading.Thread(target=lambda: _sws.sync_web_ui(force=True), daemon=True).start()
+            except Exception:
+                pass
 
     def _refresh_wiz_tokens_in_page(pw_page, fallback_wiz: dict) -> dict:
         try:
@@ -3024,731 +3463,911 @@ def run_fashion_motion_project_on_flow(
             pass
         return fallback_wiz
 
-    for _sc_init in scenes_to_run:
-        _sc_init["status"] = "preparing"
-        _sc_init["attempt"] = 1
-        _sc_init["max_attempts"] = MAX_SCENE_ATTEMPTS
-        _sc_init["status_detail"] = f"🚀 Đang kết nối Google Flow & chuẩn bị nguyên liệu 2K cho Phân Cảnh {_sc_init.get('scene_index', _sc_init['id'])}..."
-        if target_sc_norm:
-            # Nếu user chủ động bấm Render/Retry lại 1 cảnh cụ thể thì xóa job cũ để tạo mới hoàn toàn
-            _sc_init["job_uuid_720p"] = None
-            _sc_init["job_uuid_1080p"] = None
-    _save_manifest_live("running_flow", f"🚀 Đang khởi chạy tạo video trên Google Flow ({len(scenes_to_run)} phân cảnh)...")
+    target_sc_norm = str(target_scene_id or "").strip().lower()
+    all_target_scenes = [
+        sc
+        for sc in (manifest.get("scenes") or [])
+        if (not target_sc_norm) or str(sc.get("id") or "").lower() == target_sc_norm
+    ]
+    if not all_target_scenes:
+        return {"ok": False, "error": f"Không tìm thấy phân cảnh '{target_scene_id}' trong project {project_id_slug}"}
 
-    with sync_playwright() as pw:
-        launch_args = [
-            "--disable-blink-features=AutomationControlled",
-            "--window-position=-2000,-2000",
-            "--window-size=1280,800",
-            "--mute-audio",
-            "--no-first-run",
-            "--no-default-browser-check",
-        ]
-        browser = None
-        context = None
-        _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
-        try:
-            browser = pw.chromium.launch(
-                channel="chrome",
-                headless=False,
-                args=launch_args,
-            )
-        except Exception as _launch_err:
-            print(f"[WARN] Chrome channel launch error: {_launch_err}. Thử Playwright Chromium...", flush=True)
-            browser = pw.chromium.launch(headless=False, args=launch_args)
+    MAX_SCENE_ATTEMPTS = max(1, int(manifest.get("max_scene_attempts", 4)))
+    if target_sc_norm:
+        for _sc_t in all_target_scenes:
+            _sc_t["status"] = "preparing"
+            _sc_t["job_uuid_720p"] = None
+            _sc_t["job_uuid_1080p"] = None
 
-        context = browser.new_context(viewport={"width": 1280, "height": 800})
-        if _bypass_js:
-            context.add_init_script(_bypass_js)
+    candidate_profiles = _get_ordered_flow_account_candidates(
+        profile_name or manifest.get("preferred_profile_name") or ""
+    )
+    last_account_error = ""
 
-        pw_cookies = _build_playwright_cookies_from_header(cookie_hdr, prof)
-        if pw_cookies:
-            context.add_cookies(pw_cookies)
-
-        try:
-            page = context.new_page()
-            if _bypass_js:
-                page.add_init_script(_bypass_js)
-            page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
-            if _bypass_js:
-                try:
-                    page.evaluate(_bypass_js)
-                except Exception:
-                    pass
-            try:
-                page.wait_for_function(
-                    "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
-                    timeout=40000,
+    for acc_idx, prof in enumerate(candidate_profiles):
+        scenes_to_run = [
+            sc
+            for sc in all_target_scenes
+            if (target_sc_norm and acc_idx == 0)
+            or (
+                sc.get("status") != "done"
+                and not (
+                    sc.get("output_video_path")
+                    and os.path.exists(sc.get("output_video_path", ""))
+                    and os.path.getsize(sc.get("output_video_path", "")) > 50000
                 )
-            except Exception:
-                page.wait_for_timeout(5000)
-            page.wait_for_timeout(1500)
+            )
+        ]
+        if not scenes_to_run:
+            break
 
-            wiz = _refresh_wiz_tokens_in_page(page, {})
-            if not wiz.get("at"):
-                err_msg = f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e tại {page.url})."
-                _save_manifest_live("failed_auth", err_msg)
-                return {"ok": False, "error": err_msg}
+        cookie_hdr = gvt._load_flow_cookie_header(prof)
+        if not cookie_hdr:
+            last_account_error = f"Tài khoản Flow '{prof}' chưa có Cookie hợp lệ."
+            _mark_flow_profile_unhealthy(prof, last_account_error)
+            if acc_idx + 1 < len(candidate_profiles):
+                next_prof = candidate_profiles[acc_idx + 1]
+                _save_manifest_live(
+                    "running_flow",
+                    f"⚠️ {last_account_error} -> Đang tự động đổi sang tài khoản '{next_prof}' ({acc_idx + 2}/{len(candidate_profiles)})...",
+                )
+                continue
+            return {"ok": False, "error": last_account_error}
 
+        account_project_id = _resolve_account_flow_project_id(prof)
+        flow_project_id = account_project_id or manifest.get("flow_project_id")
+
+        # ── GLOBAL ASSET UUID CACHE (Chỉ lưu theo đúng tên file ảnh gốc .png/.jpg, tuyệt đối không lưu key chung như base_char_2k hay outfit_*) ──
+        def _is_valid_global_img_key(k_str: str) -> bool:
+            kl = str(k_str or "").strip().lower()
+            if not kl.endswith((".png", ".jpg", ".jpeg", ".webp")):
+                return False
+            if kl.startswith(("prepared_", "scene_s", "ref_video_", "outfit_prod_")):
+                return False
+            return True
+
+        global_cache_path = os.path.join(FASHION_STUDIO_DIR, "_global_flow_asset_cache.json")
+        global_proj_cache = {}
+        try:
+            if os.path.exists(global_cache_path):
+                with open(global_cache_path, "r", encoding="utf-8") as _gcf:
+                    _all_gc = json.load(_gcf)
+                    if isinstance(_all_gc, dict):
+                        raw_gc = dict(_all_gc.get(flow_project_id) or {})
+                        global_proj_cache = {
+                            k: v for k, v in raw_gc.items()
+                            if v and _is_valid_global_img_key(k)
+                        }
+        except Exception:
+            global_proj_cache = {}
+
+        if not global_proj_cache:
+            for _seed_slug in ("fashion_tpl_fvt_001", "fashion_lookbook_chan_vay_6e19"):
+                _seed_p = os.path.join(FASHION_STUDIO_DIR, _seed_slug, "fashion_project.json")
+                if os.path.exists(_seed_p):
+                    try:
+                        _sd = json.load(open(_seed_p, "r", encoding="utf-8"))
+                        if _sd.get("flow_project_id") == flow_project_id and isinstance(_sd.get("asset_uuid_map"), dict):
+                            for _k, _v in _sd["asset_uuid_map"].items():
+                                if _v and _is_valid_global_img_key(_k):
+                                    global_proj_cache[_k] = _v
+                    except Exception:
+                        pass
+
+        def _save_global_asset_cache():
             try:
-                live_c = context.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
-                c_map = {c["name"]: c["value"] for c in live_c if "GRECAPTCHA" not in c.get("name", "").upper()}
-                if c_map:
-                    cookie_hdr = "; ".join(f"{k}={v}" for k, v in c_map.items())
-                    dl_headers = {
-                        "Cookie": cookie_hdr,
-                        "Referer": "https://flow.google.com/",
-                        "User-Agent": wiz["ua"],
-                    }
+                _all_gc = {}
+                if os.path.exists(global_cache_path):
+                    try:
+                        _all_gc = json.load(open(global_cache_path, "r", encoding="utf-8"))
+                    except Exception:
+                        _all_gc = {}
+                _all_gc[flow_project_id] = {
+                    k: v for k, v in asset_uuid_map.items()
+                    if v and _is_valid_global_img_key(k)
+                }
+                with open(global_cache_path, "w", encoding="utf-8") as _gcf:
+                    json.dump(_all_gc, _gcf, ensure_ascii=False, indent=2)
             except Exception:
                 pass
 
-            print(f"✅ [Google Flow] Đã kết nối Project {flow_project_id} (bl={wiz['bl']})", flush=True)
-
-            def _upload_img_with_401_recovery(img_p: str, q_val: int = 98):
-                nonlocal wiz
-                ok_x, uid_x, err_x = upload_single_product_ref_in_page(page, wiz, flow_project_id, img_p, quality=q_val)
-                if not ok_x:
-                    if "401" in str(err_x):
-                        try:
-                            page.reload(wait_until="domcontentloaded", timeout=45000)
-                            page.wait_for_timeout(2500)
-                        except Exception:
-                            time.sleep(2.5)
-                    else:
-                        time.sleep(2.0)
-                    wiz = _refresh_wiz_tokens_in_page(page, wiz)
-                    ok_x, uid_x, err_x = upload_single_product_ref_in_page(page, wiz, flow_project_id, img_p, quality=q_val)
-                return ok_x, uid_x, err_x
-
-            did_any_upload_in_session = False
-
-            # 1. Upload Ảnh Nhân Vật Gốc 2K (Ưu tiên tra cứu theo filename trong Global Cache -> 0.0s!)
-            base_char = manifest["base_char_2k"]
-            bc_fn = base_char.get("filename") or ""
-            cached_bc_uid = (
-                asset_uuid_map.get(bc_fn)
-                or (manifest.get("asset_uuid_map") or {}).get("base_char_2k")
-                or asset_uuid_map.get("base_char_2k")
+        if manifest.get("asset_uuid_project_id") != flow_project_id or manifest.get("flow_project_id") != flow_project_id:
+            print(
+                f"🔄 [Google Flow] Đồng bộ asset_uuid_map sang đúng Project {flow_project_id} của tài khoản '{prof}'...",
+                flush=True,
             )
-            if not cached_bc_uid:
-                _save_manifest_live("running_flow", f"📸 Đang upload Ảnh Nhân Vật 2K ({bc_fn})...")
-                ok_u, u_id, err_u = _upload_img_with_401_recovery(base_char["path"], 98)
-                if not ok_u:
-                    err_msg = f"Upload Ảnh Nhân Vật 2K thất bại: {err_u}"
-                    _save_manifest_live("failed_upload", err_msg)
-                    return {"ok": False, "error": err_msg}
-                did_any_upload_in_session = True
-                asset_uuid_map["base_char_2k"] = u_id
-                asset_uuid_map[bc_fn] = u_id
-                manifest["asset_uuid_map"] = asset_uuid_map
-                _save_manifest_live()
-                _save_global_asset_cache()
-                print(f"📸 Uploaded Base Char 2K ({bc_fn}) -> {u_id}", flush=True)
-            else:
-                asset_uuid_map["base_char_2k"] = cached_bc_uid
-                if bc_fn:
-                    asset_uuid_map[bc_fn] = cached_bc_uid
+            asset_uuid_map = dict(global_proj_cache)
+            for _sc in manifest.get("scenes") or []:
+                _sc["ref_video_uuid"] = None
+        else:
+            asset_uuid_map = dict(global_proj_cache)
+            for _mk, _mv in (manifest.get("asset_uuid_map") or {}).items():
+                if _mv and (_is_valid_global_img_key(_mk) or str(_mk).startswith(("scene_s", "ref_video_"))):
+                    asset_uuid_map[_mk] = _mv
 
-            # 2. Upload (hoặc Tách nền Flat-Lay 2K nếu ảnh sản phẩm thô chưa tách) toàn bộ Ảnh Bộ Đồ 2K (Product Sheets)
-            for outf in manifest.get("outfits") or []:
-                o_key = outf["id"]
-                o_fn = outf.get("filename") or ""
-                cached_o_uid = (
-                    asset_uuid_map.get(o_fn)
-                    or (manifest.get("asset_uuid_map") or {}).get(o_key)
-                    or asset_uuid_map.get(o_key)
-                )
-                if not cached_o_uid or outf.get("needs_deconstruct_sheet"):
-                    _save_manifest_live("running_flow", f"👗 Đang upload Ảnh Sản Phẩm 2K ({o_fn})...")
-                    if outf.get("needs_deconstruct_sheet") and outf.get("raw_product_path") and os.path.exists(outf["raw_product_path"]):
-                        ok_raw, raw_u_id, _ = _upload_img_with_401_recovery(outf["raw_product_path"], 96)
-                        if ok_raw and raw_u_id:
-                            did_any_upload_in_session = True
-                            flatlay_prompt = STANDARD_FASHION_PROMPTS["deconstructed_outfit_flatlay_2k"]["prompt_en"]
-                            if outf.get("en_desc"):
-                                flatlay_prompt += f" Product details: {outf['en_desc']}."
-                            ok_fl, fl_uuid_2k, _ = generate_variant_ref_image_in_page(
-                                page,
-                                wiz,
-                                cookie_hdr,
-                                dl_headers,
-                                {
-                                    "pid": project_id_slug,
-                                    "v_key": f"flatlay_{o_key}",
-                                    "project_id": flow_project_id,
-                                    "char_id": raw_u_id,
-                                    "prod_uuids": [],
-                                    "allow_multi_refs": False,
-                                    "prompt_str": flatlay_prompt,
-                                    "out_file": outf["path"],
-                                },
-                            )
-                            if ok_fl and fl_uuid_2k:
-                                cached_o_uid = fl_uuid_2k
-                                asset_uuid_map[o_key] = fl_uuid_2k
-                                asset_uuid_map[o_fn] = fl_uuid_2k
-                                outf["needs_deconstruct_sheet"] = False
-                                manifest["asset_uuid_map"] = asset_uuid_map
-                                _save_manifest_live()
-                                _save_global_asset_cache()
-                                print(f"✨ Tách nền Product Sheet 2K ({o_fn}) -> {fl_uuid_2k}", flush=True)
-                    if not cached_o_uid:
-                        ok_o, o_id, err_o = _upload_img_with_401_recovery(outf["path"], 98)
-                        if not ok_o:
-                            err_msg = f"Upload Ảnh Outfit '{o_fn}' thất bại: {err_o}"
-                            _save_manifest_live("failed_upload", err_msg)
-                            return {"ok": False, "error": err_msg}
-                        did_any_upload_in_session = True
-                        asset_uuid_map[o_key] = o_id
-                        asset_uuid_map[o_fn] = o_id
-                        manifest["asset_uuid_map"] = asset_uuid_map
-                        _save_manifest_live()
-                        _save_global_asset_cache()
-                        print(f"👗 Uploaded Outfit Product Sheet 2K ({o_fn}) -> {o_id}", flush=True)
+        manifest["flow_project_id"] = flow_project_id
+        manifest["asset_uuid_project_id"] = flow_project_id
+        manifest["active_profile_name"] = prof
+
+        http_sess = cffi_requests.Session(impersonate="chrome131")
+        dl_headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36",
+            "Referer": "https://flow.google.com/",
+            "Cookie": cookie_hdr,
+        }
+
+        for _sc_init in scenes_to_run:
+            _sc_init["status"] = "preparing"
+            _sc_init["attempt"] = 1
+            _sc_init["_retries"] = 0
+            _sc_init["max_attempts"] = MAX_SCENE_ATTEMPTS
+            _sc_init["job_uuid_720p"] = None
+            _sc_init["job_uuid_1080p"] = None
+            _sc_init["status_detail"] = (
+                f"🚀 Đang kết nối Google Flow ({prof}) & chuẩn bị nguyên liệu 2K cho Phân Cảnh {_sc_init.get('scene_index', _sc_init['id'])}..."
+            )
+        _save_manifest_live(
+            "running_flow",
+            f"🚀 Đang khởi chạy tạo video trên Google Flow bằng tài khoản '{prof}' ({len(scenes_to_run)} phân cảnh)...",
+        )
+
+        with sync_playwright() as pw:
+            browser = _launch_flow_browser(pw)
+            context = None
+            _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
+
+            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            if _bypass_js:
+                context.add_init_script(_bypass_js)
+
+            pw_cookies = _build_playwright_cookies_from_header(cookie_hdr, prof)
+            if pw_cookies:
+                context.add_cookies(pw_cookies)
+
+            try:
+                page = context.new_page()
+                if _bypass_js:
+                    page.add_init_script(_bypass_js)
+                page.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
+                if _bypass_js:
+                    try:
+                        page.evaluate(_bypass_js)
+                    except Exception:
+                        pass
+                try:
+                    page.wait_for_function(
+                        "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
+                        timeout=40000,
+                    )
+                except Exception:
+                    page.wait_for_timeout(5000)
+                page.wait_for_timeout(1500)
+
+                wiz = _refresh_wiz_tokens_in_page(page, {})
+                if not wiz.get("at"):
+                    err_msg = f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e tại {page.url})."
+                    raise RuntimeError(err_msg)
+
+                try:
+                    live_c = context.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
+                    c_map = {c["name"]: c["value"] for c in live_c if "GRECAPTCHA" not in c.get("name", "").upper()}
+                    if c_map:
+                        cookie_hdr = "; ".join(f"{k}={v}" for k, v in c_map.items())
+                        dl_headers = {
+                            "Cookie": cookie_hdr,
+                            "Referer": "https://flow.google.com/",
+                            "User-Agent": wiz["ua"],
+                        }
+                except Exception:
+                    pass
+
+                print(f"✅ [Google Flow] Đã kết nối Project {flow_project_id} (bl={wiz['bl']})", flush=True)
+
+                def _upload_img_with_401_recovery(img_p: str, q_val: int = 98):
+                    nonlocal wiz
+                    ok_x, uid_x, err_x = upload_single_product_ref_in_page(page, wiz, flow_project_id, img_p, quality=q_val)
+                    if not ok_x:
+                        if "401" in str(err_x):
+                            try:
+                                page.reload(wait_until="domcontentloaded", timeout=45000)
+                                page.wait_for_timeout(2500)
+                            except Exception:
+                                time.sleep(2.5)
+                        else:
+                            time.sleep(2.0)
+                        wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                        ok_x, uid_x, err_x = upload_single_product_ref_in_page(page, wiz, flow_project_id, img_p, quality=q_val)
+                    return ok_x, uid_x, err_x
+
+                did_any_upload_in_session = False
+
+                # 1. Upload Ảnh Nhân Vật Gốc 2K (Tra cứu theo đúng filename để khi đổi nhân vật sẽ upload ảnh mới ngay!)
+                base_char = manifest["base_char_2k"]
+                bc_fn = base_char.get("filename") or ""
+                cached_bc_uid = asset_uuid_map.get(bc_fn) if bc_fn else asset_uuid_map.get("base_char_2k")
+                if not cached_bc_uid:
+                    _save_manifest_live("running_flow", f"📸 Đang upload Ảnh Nhân Vật 2K ({bc_fn})...")
+                    ok_u, u_id, err_u = _upload_img_with_401_recovery(base_char["path"], 98)
+                    if not ok_u:
+                        err_msg = f"Upload Ảnh Nhân Vật 2K thất bại ({prof}): {err_u}"
+                        raise RuntimeError(err_msg)
+                    did_any_upload_in_session = True
+                    asset_uuid_map["base_char_2k"] = u_id
+                    asset_uuid_map[bc_fn] = u_id
+                    manifest["asset_uuid_map"] = asset_uuid_map
+                    _save_manifest_live()
+                    _save_global_asset_cache()
+                    print(f"📸 Uploaded Base Char 2K ({bc_fn}) -> {u_id}", flush=True)
                 else:
-                    asset_uuid_map[o_key] = cached_o_uid
-                    if o_fn:
-                        asset_uuid_map[o_fn] = cached_o_uid
+                    asset_uuid_map["base_char_2k"] = cached_bc_uid
+                    if bc_fn:
+                        asset_uuid_map[bc_fn] = cached_bc_uid
 
-            # 3A. Upload Ảnh Bối Cảnh Căn Phòng & Bộ Đồ Basic Mở Đầu 2K (`07_Nhan_Vat_Basic_Phong_Ngu_2K.png`)
-            cs_obj = manifest.get("char_sheet_2k")
-            if cs_obj:
-                cs_fn = cs_obj.get("filename") or ""
-                cached_cs_uid = (
-                    asset_uuid_map.get(cs_fn)
-                    or (manifest.get("asset_uuid_map") or {}).get("char_sheet_2k")
-                    or asset_uuid_map.get("char_sheet_2k")
-                )
-                if not cached_cs_uid:
-                    if cs_obj.get("path") and os.path.exists(cs_obj["path"]) and not cs_obj.get("needs_auto_generate"):
-                        ok_cs, cs_id, _ = _upload_img_with_401_recovery(cs_obj["path"], 96)
-                        if ok_cs and cs_id:
+                # 2. Upload (hoặc Tách nền Flat-Lay 2K nếu ảnh sản phẩm thô chưa tách) toàn bộ Ảnh Bộ Đồ 2K (Product Sheets)
+                for outf in manifest.get("outfits") or []:
+                    o_key = outf["id"]
+                    o_fn = outf.get("filename") or ""
+                    cached_o_uid = asset_uuid_map.get(o_fn) if o_fn else asset_uuid_map.get(o_key)
+                    if not cached_o_uid or outf.get("needs_deconstruct_sheet"):
+                        _save_manifest_live("running_flow", f"👗 Đang upload Ảnh Sản Phẩm 2K ({o_fn})...")
+                        if outf.get("needs_deconstruct_sheet") and outf.get("raw_product_path") and os.path.exists(outf["raw_product_path"]):
+                            ok_raw, raw_u_id, _ = _upload_img_with_401_recovery(outf["raw_product_path"], 96)
+                            if ok_raw and raw_u_id:
+                                did_any_upload_in_session = True
+                                flatlay_prompt = STANDARD_FASHION_PROMPTS["deconstructed_outfit_flatlay_2k"]["prompt_en"]
+                                if outf.get("en_desc"):
+                                    flatlay_prompt += f" Product details: {outf['en_desc']}."
+                                ok_fl, fl_uuid_2k, _ = generate_variant_ref_image_in_page(
+                                    page,
+                                    wiz,
+                                    cookie_hdr,
+                                    dl_headers,
+                                    {
+                                        "pid": project_id_slug,
+                                        "v_key": f"flatlay_{o_key}",
+                                        "project_id": flow_project_id,
+                                        "char_id": "",
+                                        "prod_uuids": [raw_u_id],
+                                        "allow_multi_refs": False,
+                                        "prompt_str": flatlay_prompt,
+                                        "out_file": outf["path"],
+                                    },
+                                )
+                                if ok_fl and fl_uuid_2k:
+                                    cached_o_uid = fl_uuid_2k
+                                    asset_uuid_map[o_key] = fl_uuid_2k
+                                    asset_uuid_map[o_fn] = fl_uuid_2k
+                                    outf["needs_deconstruct_sheet"] = False
+                                    manifest["asset_uuid_map"] = asset_uuid_map
+                                    _save_manifest_live()
+                                    _save_global_asset_cache()
+                                    print(f"✨ Tách nền Product Sheet 2K ({o_fn}) -> {fl_uuid_2k}", flush=True)
+                        if not cached_o_uid:
+                            ok_o, o_id, err_o = _upload_img_with_401_recovery(outf["path"], 98)
+                            if not ok_o:
+                                err_msg = f"Upload Ảnh Outfit '{o_fn}' thất bại ({prof}): {err_o}"
+                                raise RuntimeError(err_msg)
                             did_any_upload_in_session = True
-                            asset_uuid_map["char_sheet_2k"] = cs_id
-                            asset_uuid_map[cs_fn] = cs_id
+                            asset_uuid_map[o_key] = o_id
+                            asset_uuid_map[o_fn] = o_id
                             manifest["asset_uuid_map"] = asset_uuid_map
                             _save_manifest_live()
                             _save_global_asset_cache()
-                            print(f"📸 Uploaded Room Background & Basic Ref 2K ({cs_fn}) -> {cs_id}", flush=True)
-                else:
-                    asset_uuid_map["char_sheet_2k"] = cached_cs_uid
-                    if cs_fn:
-                        asset_uuid_map[cs_fn] = cached_cs_uid
-
-            # 3B. Upload Bảng Tham Chiếu Tổng Thể Các Bộ Đồ 2K (`01_Character_Sheet_4_Outfits_2K.png`)
-            overall_sheet_fn = "01_Character_Sheet_4_Outfits_2K.png"
-            overall_sheet_p = os.path.join(proj_dir, "assets_2k", overall_sheet_fn)
-            if not os.path.exists(overall_sheet_p):
-                cand_ov = os.path.join(DEMO_ASSETS_DIR, overall_sheet_fn)
-                if os.path.exists(cand_ov):
-                    shutil.copy2(cand_ov, overall_sheet_p)
-            cached_ov_uid = asset_uuid_map.get(overall_sheet_fn) or asset_uuid_map.get("overall_sheet_2k")
-            if not cached_ov_uid:
-                if os.path.exists(overall_sheet_p):
-                    ok_ov, ov_id, _ = _upload_img_with_401_recovery(overall_sheet_p, 96)
-                    if ok_ov and ov_id:
-                        did_any_upload_in_session = True
-                        asset_uuid_map["overall_sheet_2k"] = ov_id
-                        asset_uuid_map[overall_sheet_fn] = ov_id
-                        manifest["asset_uuid_map"] = asset_uuid_map
-                        _save_manifest_live()
-                        _save_global_asset_cache()
-                        print(f"📸 Uploaded Overall 4-Outfits Sheet 2K ({overall_sheet_fn}) -> {ov_id}", flush=True)
-            else:
-                asset_uuid_map["overall_sheet_2k"] = cached_ov_uid
-                asset_uuid_map[overall_sheet_fn] = cached_ov_uid
-
-            _save_global_asset_cache()
-
-            # 4A. NẾU CHẾ ĐỘ LÀ `video_ref`: UPLOAD ĐA LUỒNG SONG SONG (`Promise.all`) TẤT CẢ CLIP VIDEO THAM CHIẾU 30 FPS (`ref_clip_s1_8s.mp4`, `ref_clip_s2_8s.mp4`)
-            # (Nếu chế độ là `chained_i2v`, KHÔNG upload Video Tham Chiếu vì tạo hoàn toàn từ Img2Video + Timeline 0.1s!)
-            if gen_mode_norm == "video_ref":
-                vids_to_upload = []
-                for sc in scenes_to_run:
-                    sc_id = sc["id"]
-                    vid_key = f"ref_video_{sc_id}"
-                    if not asset_uuid_map.get(vid_key):
-                        sc["status"] = "uploading_video"
-                        sc["status_detail"] = f"🎬 Đang upload song song Video Tham Chiếu {sc['ref_clip_filename']} (30 FPS)..."
-                        vids_to_upload.append({"key": vid_key, "sc": sc, "path": sc["ref_clip_path"]})
-
-                if vids_to_upload:
-                    _save_manifest_live(
-                        "running_flow",
-                        f"⚡ Đang upload song song {len(vids_to_upload)} clip Video Tham Chiếu 30FPS ({', '.join(v['sc']['ref_clip_filename'] for v in vids_to_upload)})...",
-                    )
-                    par_res = upload_multiple_reference_videos_parallel_in_page(
-                        page, wiz, flow_project_id, [{"key": v["key"], "path": v["path"]} for v in vids_to_upload]
-                    )
-                    for v_it in vids_to_upload:
-                        vk = v_it["key"]
-                        sc_v = v_it["sc"]
-                        r_v = par_res.get(vk) or {}
-                        if r_v.get("ok") and r_v.get("uuid"):
-                            did_any_upload_in_session = True
-                            asset_uuid_map[vk] = r_v["uuid"]
-                            print(f"🎬 [Parallel Upload] {sc_v['ref_clip_filename']} -> {r_v['uuid']}", flush=True)
-                        else:
-                            wiz = _refresh_wiz_tokens_in_page(page, wiz)
-                            ok_v, v_uuid, _, err_v = upload_reference_video_in_page(page, wiz, flow_project_id, v_it["path"])
-                            if not ok_v:
-                                err_msg = f"Upload Video Tham Chiếu '{sc_v['ref_clip_filename']}' thất bại: {err_v}"
-                                sc_v["status"] = "failed:upload_video"
-                                sc_v["status_detail"] = f"❌ {err_msg}"
-                                _save_manifest_live("failed_upload", err_msg)
-                                return {"ok": False, "error": err_msg}
-                            did_any_upload_in_session = True
-                            asset_uuid_map[vk] = v_uuid
-                            print(f"🎬 Uploaded Reference Video 30fps ({sc_v['ref_clip_filename']}) -> {v_uuid}", flush=True)
-
-            # Nếu toàn bộ Ảnh 2K và Video Ref đều đã lấy từ Cache (0 lượt upload trong phiên mở trang này),
-            # thực hiện 1 lượt warmup maseQ nhanh (~1s) để kích hoạt phiên reCAPTCHA Enterprise, tránh lỗi PUBLIC_ERROR_UNUSUAL_ACTIVITY ngay từ Try 1!
-            if not did_any_upload_in_session and base_char.get("path") and os.path.exists(base_char["path"]):
-                try:
-                    ok_w0, w0_uid, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, base_char["path"], quality=95)
-                    if ok_w0 and w0_uid:
-                        asset_uuid_map["base_char_2k"] = w0_uid
-                        if bc_fn:
-                            asset_uuid_map[bc_fn] = w0_uid
-                        _save_global_asset_cache()
-                except Exception:
-                    pass
-
-            def _extract_and_upload_prev_scene_last_frame(prev_sc_id: str, prev_video_path: str) -> str:
-                """Cắt Frame cuối của phân cảnh trước (`prev_sc_id`) chuẩn 2K (`1536x2752`) và upload lên Google Flow qua `maseQ`."""
-                lf_key = f"scene_{prev_sc_id}_last_frame_2k"
-                lf_fn = f"{lf_key}.png"
-                lf_path = os.path.join(proj_dir, "assets_2k", lf_fn)
-                if prev_video_path and os.path.exists(prev_video_path) and os.path.getsize(prev_video_path) > 50000:
-                    extract_scene_last_frame_2k(prev_video_path, lf_path)
-                if os.path.exists(lf_path):
-                    ok_lf, lf_uid, err_lf = _upload_img_with_401_recovery(lf_path, 98)
-                    if ok_lf and lf_uid:
-                        asset_uuid_map[lf_key] = lf_uid
-                        asset_uuid_map[lf_fn] = lf_uid
-                        manifest["asset_uuid_map"] = asset_uuid_map
-                        _save_manifest_live()
-                        print(f"🎞️ [Last-Frame Continuity] Cắt & Upload Frame cuối {lf_fn} -> {lf_uid}", flush=True)
-                        return lf_uid
-                    print(f"⚠️ [Last-Frame Upload Warn] {lf_fn}: {err_lf}", flush=True)
-                return asset_uuid_map.get(lf_key) or asset_uuid_map.get("char_sheet_2k") or ""
-
-            def _prepare_and_submit_scene(sc: dict, is_retry: bool = False, retry_idx: int = 0) -> bool:
-                """Chuẩn bị danh sách ảnh tham chiếu + prompt (theo `gen_mode_norm`) và gửi đúng 1 job duy nhất cho phân cảnh `sc`."""
-                nonlocal wiz
-                sc_id = sc["id"]
-                sc_num = int(sc.get("scene_index") or 1)
-                sc_idx_label = sc.get("scene_index", sc_id)
-                clip_path = sc.get("ref_clip_path") or ""
-                vid_key = f"ref_video_{sc_id}"
-                if gen_mode_norm == "video_ref" and asset_uuid_map.get(vid_key):
-                    sc["ref_video_uuid"] = asset_uuid_map[vid_key]
-                    asset_uuid_map[sc["ref_clip_filename"]] = sc["ref_video_uuid"]
-
-                # Nếu đây là Phân cảnh 2+ (sc_num >= 2), đảm bảo Frame cuối của Phân cảnh trước đã được cắt & upload
-                prev_sc_id = f"s{sc_num - 1}"
-                lf_key = f"scene_{prev_sc_id}_last_frame_2k"
-                lf_fn = f"{lf_key}.png"
-                lf_path = os.path.join(proj_dir, "assets_2k", lf_fn)
-                if sc_num >= 2:
-                    if not asset_uuid_map.get(lf_key):
-                        prev_mp4 = os.path.join(proj_dir, f"fashion_scene_{prev_sc_id}_1080p.mp4")
-                        _extract_and_upload_prev_scene_last_frame(prev_sc_id, prev_mp4)
-                    sc["prev_scene_last_frame_ref"] = {
-                        "asset_key": lf_key,
-                        "filename": lf_fn,
-                        "path": lf_path,
-                    }
-
-                # Xây dựng lại prompt theo đúng chế độ (`chained_i2v` hoặc `timeline_pro`)
-                sc["start_char_ref"] = {
-                    "asset_key": "base_char_2k",
-                    "filename": manifest["base_char_2k"]["filename"],
-                    "path": manifest["base_char_2k"]["path"],
-                    "is_continuity_generated": False,
-                }
-                char_sheet_ref_obj = manifest.get("char_sheet_2k")
-                target_p_style = "chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro"
-                rebuilt_p = build_scene_timeline_prompt(
-                    sc,
-                    sc["start_char_ref"],
-                    char_sheet_ref_obj,
-                    prompt_style=target_p_style,
-                    bpm_info=(manifest.get("split_plan") or {}).get("bpm_info"),
-                )
-                sc["generation_mode"] = gen_mode_norm
-                sc["active_prompt_style"] = target_p_style
-                if gen_mode_norm == "chained_i2v":
-                    sc["prompt_chained_i2v"] = rebuilt_p["display_prompt"]
-                    sc["segments_chained_i2v"] = rebuilt_p["segments_spec"]
-                else:
-                    sc["prompt_timeline_pro"] = rebuilt_p["display_prompt"]
-                    sc["segments_timeline_pro"] = rebuilt_p["segments_spec"]
-                    sc["prompt_concise_flow"] = rebuilt_p["display_prompt"]
-                    sc["segments_concise_flow"] = rebuilt_p["segments_spec"]
-                if not sc.get("user_edited_prompt"):
-                    sc["prompt"] = rebuilt_p["display_prompt"]
-                    sc["segments_spec"] = rebuilt_p["segments_spec"]
-
-                # Tập hợp danh sách ảnh tham chiếu chuẩn xác cho từng chế độ:
-                sc_transitions = sc.get("transitions") or []
-                sc_img_uuids = []
-                if gen_mode_norm == "chained_i2v":
-                    # Chế độ Chained I2V (`MZZa6b` / `macaron_cookie_r2v_8s`):
-                    # - Cảnh 1: [Ảnh phòng ngủ Basic 07 + Character Sheet 01]
-                    # - Cảnh 2+: [Ảnh Frame cuối Cảnh 1 (`scene_s1_last_frame_2k.png`) + Character Sheet 01]
-                    open_uid = (
-                        (asset_uuid_map.get(lf_key) or asset_uuid_map.get("char_sheet_2k"))
-                        if sc_num >= 2
-                        else asset_uuid_map.get("char_sheet_2k")
-                    )
-                    if open_uid:
-                        sc_img_uuids.append(open_uid)
-                    if asset_uuid_map.get("overall_sheet_2k") and asset_uuid_map["overall_sheet_2k"] not in sc_img_uuids:
-                        sc_img_uuids.append(asset_uuid_map["overall_sheet_2k"])
-                    use_model_key = "abra_r2v_8s" if (is_retry and retry_idx >= 2) else "macaron_cookie_r2v_8s"
-                else:
-                    # Chế độ Motion Control Video Ref (`jIps6` / `abra_edit`):
-                    # - Cảnh 1: Mở đầu từ `char_sheet_2k` (`07_Nhan_Vat_Basic_Phong_Ngu_2K.png`)
-                    # - Cảnh 2+: Mở đầu nối tiếp từ `scene_s1_last_frame_2k` (`scene_s1_last_frame_2k.png`)!
-                    open_bg_uid = (
-                        (asset_uuid_map.get(lf_key) or asset_uuid_map.get("char_sheet_2k"))
-                        if sc_num >= 2
-                        else asset_uuid_map.get("char_sheet_2k")
-                    )
-                    if asset_uuid_map.get("base_char_2k"):
-                        sc_img_uuids.append(asset_uuid_map["base_char_2k"])
-                    if len(sc_transitions) <= 2 and asset_uuid_map.get("overall_sheet_2k") and asset_uuid_map["overall_sheet_2k"] not in sc_img_uuids:
-                        sc_img_uuids.append(asset_uuid_map["overall_sheet_2k"])
-                    if open_bg_uid and open_bg_uid not in sc_img_uuids:
-                        sc_img_uuids.append(open_bg_uid)
-                    for tr in sc_transitions[:3]:
-                        o_u = asset_uuid_map.get(tr["outfit"].get("filename") or "") or asset_uuid_map.get(tr["outfit"]["id"])
-                        if o_u and o_u not in sc_img_uuids and len(sc_img_uuids) < 5:
-                            sc_img_uuids.append(o_u)
-                    if len(sc_img_uuids) < 5 and asset_uuid_map.get("overall_sheet_2k") and asset_uuid_map["overall_sheet_2k"] not in sc_img_uuids:
-                        sc_img_uuids.append(asset_uuid_map["overall_sheet_2k"])
-                    sc_img_uuids = sc_img_uuids[:5]
-                    use_model_key = sc.get("model_key") or (manifest.get("split_plan") or {}).get("model_key_edit") or "abra_edit"
-                    if is_retry and retry_idx >= 3:
-                        use_model_key = "macaron_cookie_edit"
-
-                sc["_sc_img_uuids"] = sc_img_uuids
-
-                ok_sub, job_uuid, err_sub = False, None, ""
-                for sub_try in range(1, 4):
-                    sc["status"] = "submitting" if sub_try == 1 else f"retrying_submit_{sub_try}"
-                    sc["status_detail"] = (
-                        f"🚀 Đang gửi lệnh tạo video Phân Cảnh {sc_idx_label} lên Google Flow ({use_model_key})..."
-                        if sub_try == 1
-                        else f"🔁 Lỗi gửi lệnh ({err_sub[:45]}) -> Đang tự động Retry gửi lại ngay (Lần {sub_try}/3)..."
-                    )
-                    _save_manifest_live("running_flow", sc["status_detail"])
-                    if sub_try > 1:
-                        time.sleep(2.0)
-                        if "UNUSUAL_ACTIVITY" in str(err_sub).upper():
-                            try:
-                                page.reload(wait_until="domcontentloaded", timeout=35000)
-                                page.wait_for_timeout(2000)
-                                page.mouse.move(400, 360, steps=10)
-                                page.mouse.wheel(0, 120)
-                                page.wait_for_timeout(500)
-                                wiz = _refresh_wiz_tokens_in_page(page, wiz)
-                                if base_char.get("path") and os.path.exists(base_char["path"]):
-                                    ok_w, w_uid, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, base_char["path"])
-                                    if ok_w and w_uid:
-                                        asset_uuid_map["base_char_2k"] = w_uid
-                                        if bc_fn:
-                                            asset_uuid_map[bc_fn] = w_uid
-                            except Exception:
-                                pass
-                        wiz = _refresh_wiz_tokens_in_page(page, wiz)
-                        if gen_mode_norm == "video_ref" and any(k in str(err_sub).upper() for k in ("INVALID", "NOT_FOUND", "[3]", "[5]")):
-                            re_clip = (sc.get("adult_safe_clip_path") if sub_try >= 2 and sc.get("adult_safe_clip_path") and os.path.exists(sc.get("adult_safe_clip_path")) else clip_path)
-                            ok_rv, rv_uid, _, _ = upload_reference_video_in_page(page, wiz, flow_project_id, re_clip)
-                            if ok_rv and rv_uid:
-                                sc["ref_video_uuid"] = rv_uid
-                                asset_uuid_map[vid_key] = rv_uid
-                                asset_uuid_map[sc["ref_clip_filename"]] = rv_uid
-
-                    if gen_mode_norm == "chained_i2v":
-                        ok_sub, job_uuid, err_sub = submit_fashion_chained_i2v_scene_in_page(
-                            page,
-                            wiz,
-                            {
-                                "project_id": flow_project_id,
-                                "image_ref_uuids": sc_img_uuids,
-                                "asset_uuid_map": asset_uuid_map,
-                                "segments_spec": sc.get("segments_spec") or rebuilt_p["segments_spec"],
-                                "display_prompt": sc.get("prompt") or rebuilt_p["display_prompt"],
-                                "model_key": use_model_key,
-                            },
-                        )
+                            print(f"👗 Uploaded Outfit Product Sheet 2K ({o_fn}) -> {o_id}", flush=True)
                     else:
-                        ok_sub, job_uuid, err_sub = submit_fashion_motion_scene_in_page(
-                            page,
-                            wiz,
-                            {
-                                "project_id": flow_project_id,
-                                "ref_video_uuid": sc.get("ref_video_uuid"),
-                                "duration": sc["duration"],
-                                "fps": 30,
-                                "start_frame": 1,
-                                "end_frame": round(int(sc.get("duration") or 8) * 30) + 1,
-                                "image_ref_uuids": sc_img_uuids,
-                                "asset_uuid_map": asset_uuid_map,
-                                "segments_spec": sc.get("segments_spec") or rebuilt_p["segments_spec"],
-                                "display_prompt": sc.get("prompt") or rebuilt_p["display_prompt"],
-                                "model_key": use_model_key,
-                            },
-                        )
-                    if ok_sub and job_uuid:
-                        break
-                    print(f"⚠️ [Submit {sc_id} Try {sub_try}/3 Failed] {err_sub}", flush=True)
+                        asset_uuid_map[o_key] = cached_o_uid
+                        if o_fn:
+                            asset_uuid_map[o_fn] = cached_o_uid
 
-                if not ok_sub or not job_uuid:
-                    sc["status"] = f"failed:submit_{str(err_sub)[:40]}"
-                    sc["last_error"] = str(err_sub)
-                    sc["status_detail"] = f"❌ Gửi lệnh tạo video Phân Cảnh {sc_id} thất bại sau 3 lần thử: {err_sub}"
-                    _save_manifest_live("running_flow", sc["status_detail"])
-                    return False
+                # 3A. Upload Ảnh Bối Cảnh Căn Phòng & Bộ Đồ Basic Mở Đầu 2K (`07_Nhan_Vat_Basic_Phong_Ngu_2K.png` hoặc Ảnh Nhân Vật Mới)
+                cs_obj = manifest.get("char_sheet_2k")
+                if cs_obj:
+                    cs_fn = cs_obj.get("filename") or ""
+                    cached_cs_uid = asset_uuid_map.get(cs_fn) if cs_fn else asset_uuid_map.get("char_sheet_2k")
+                    if not cached_cs_uid:
+                        if cs_obj.get("path") and os.path.exists(cs_obj["path"]) and not cs_obj.get("needs_auto_generate"):
+                            ok_cs, cs_id, _ = _upload_img_with_401_recovery(cs_obj["path"], 96)
+                            if ok_cs and cs_id:
+                                did_any_upload_in_session = True
+                                asset_uuid_map["char_sheet_2k"] = cs_id
+                                asset_uuid_map[cs_fn] = cs_id
+                                manifest["asset_uuid_map"] = asset_uuid_map
+                                _save_manifest_live()
+                                _save_global_asset_cache()
+                                print(f"📸 Uploaded Room Background & Basic Ref 2K ({cs_fn}) -> {cs_id}", flush=True)
+                    else:
+                        asset_uuid_map["char_sheet_2k"] = cached_cs_uid
+                        if cs_fn:
+                            asset_uuid_map[cs_fn] = cached_cs_uid
 
-                sc["job_uuid_720p"] = job_uuid
-                sc["job_uuid_1080p"] = None
-                if not is_retry:
-                    sc["_retries"] = 0
-                    sc["attempt"] = 1
-                sc["max_attempts"] = MAX_SCENE_ATTEMPTS
-                sc["_job_start_ts"] = time.time()
-                sc["_rpc_errs"] = 0
-                sc["last_error"] = ""
-                sc["status"] = "submitted_720p"
-                sc["status_detail"] = f"⏳ Đang tạo video Cảnh {sc_idx_label} trên Google Flow ({use_model_key} • Lần thử {sc.get('attempt', 1)}/{MAX_SCENE_ATTEMPTS})..."
-                print(f"🚀 [Google Flow {gen_mode_norm}/{use_model_key}] Đã gửi Phân Cảnh {sc_id} -> media_uuid={job_uuid}", flush=True)
-                return True
-
-            # 4B. KHỞI CHẠY PHÂN CẢNH 1 TRƯỚC, PHÂN CẢNH 2+ CHỜ CẮT FRAME CUỐI CỦA PHÂN CẢNH 1 ĐỂ NỐI TIẾP LIỀN MẠCH!
-            # (Nếu user chỉ bấm Render riêng Phân cảnh 2 khi Phân cảnh 1 đã xong từ trước, Phân cảnh 2 sẽ tự cắt Frame cuối Cảnh 1 và gửi ngay!)
-            waiting_chained_scenes = []
-            running_s1_in_batch = any(int(s.get("scene_index") or 1) == 1 for s in scenes_to_run)
-
-            for sc in scenes_to_run:
-                sc_num = int(sc.get("scene_index") or 1)
-                if sc_num >= 2 and running_s1_in_batch:
-                    sc["job_uuid_720p"] = None
-                    sc["job_uuid_1080p"] = None
-                    sc["status"] = "waiting_prev_scene_frame"
-                    sc["status_detail"] = f"⏳ Đang chờ Phân Cảnh {sc_num - 1} hoàn tất để cắt Frame cuối 2K (`scene_s{sc_num - 1}_last_frame_2k.png`) nối tiếp sang Phân Cảnh {sc_num}..."
-                    waiting_chained_scenes.append(sc)
+                # 3B. Upload Bảng Tham Chiếu Tổng Thể Các Bộ Đồ 2K (`01_Character_Sheet_4_Outfits_2K.png`)
+                overall_sheet_fn = "01_Character_Sheet_4_Outfits_2K.png"
+                overall_sheet_p = os.path.join(proj_dir, "assets_2k", overall_sheet_fn)
+                if not manifest.get("disable_overall_sheet") and not os.path.exists(overall_sheet_p):
+                    cand_ov = os.path.join(DEMO_ASSETS_DIR, overall_sheet_fn)
+                    if os.path.exists(cand_ov):
+                        shutil.copy2(cand_ov, overall_sheet_p)
+                if manifest.get("disable_overall_sheet"):
+                    asset_uuid_map.pop(overall_sheet_fn, None)
+                    asset_uuid_map.pop("overall_sheet_2k", None)
+                cached_ov_uid = asset_uuid_map.get(overall_sheet_fn) or asset_uuid_map.get("overall_sheet_2k")
+                if not cached_ov_uid:
+                    if not manifest.get("disable_overall_sheet") and os.path.exists(overall_sheet_p):
+                        ok_ov, ov_id, _ = _upload_img_with_401_recovery(overall_sheet_p, 96)
+                        if ok_ov and ov_id:
+                            did_any_upload_in_session = True
+                            asset_uuid_map["overall_sheet_2k"] = ov_id
+                            asset_uuid_map[overall_sheet_fn] = ov_id
+                            manifest["asset_uuid_map"] = asset_uuid_map
+                            _save_manifest_live()
+                            _save_global_asset_cache()
+                            print(f"📸 Uploaded Overall 4-Outfits Sheet 2K ({overall_sheet_fn}) -> {ov_id}", flush=True)
                 else:
-                    _prepare_and_submit_scene(sc, is_retry=False, retry_idx=0)
+                    asset_uuid_map["overall_sheet_2k"] = cached_ov_uid
+                    asset_uuid_map[overall_sheet_fn] = cached_ov_uid
 
-            manifest["asset_uuid_map"] = asset_uuid_map
-            _save_manifest_live(
-                "running_flow",
-                f"⚡ Đang chạy chế độ {'Chained Img2Video 0.1s' if gen_mode_norm == 'chained_i2v' else 'Motion Control Video Ref'} trên Google Flow...",
-            )
+                _save_global_asset_cache()
 
-            # 6. POLL ĐA LUỒNG SONG SONG (`ThreadPoolExecutor`) & TỰ ĐỘNG CẮT FRAME CUỐI CẢNH 1 ĐỂ GỬI CẢNH 2 NGAY LẬP TỨC!
-            pending = [sc for sc in scenes_to_run if sc.get("job_uuid_720p")]
-            start_wait = time.time()
-            while (pending or waiting_chained_scenes) and (time.time() - start_wait) < 900:
-                if not pending:
-                    break
-                time.sleep(3.0)
-                still_pending = []
+                # 4A. NẾU CHẾ ĐỘ LÀ `video_ref`: UPLOAD ĐA LUỒNG SONG SONG (`Promise.all`) TẤT CẢ CLIP VIDEO THAM CHIẾU 30 FPS (`ref_clip_s1_8s.mp4`, `ref_clip_s2_8s.mp4`)
+                # (Nếu chế độ là `chained_i2v`, KHÔNG upload Video Tham Chiếu vì tạo hoàn toàn từ Img2Video + Timeline 0.1s!)
+                if gen_mode_norm == "video_ref":
+                    vids_to_upload = []
+                    for sc in scenes_to_run:
+                        sc_id = sc["id"]
+                        vid_key = f"ref_video_{sc_id}"
+                        if not asset_uuid_map.get(vid_key):
+                            sc["status"] = "uploading_video"
+                            sc["status_detail"] = f"🎬 Đang upload song song Video Tham Chiếu {sc['ref_clip_filename']} (30 FPS)..."
+                            vids_to_upload.append({"key": vid_key, "sc": sc, "path": sc["ref_clip_path"]})
 
-                def _poll_worker(sc_item):
-                    _sid = sc_item["id"]
-                    _out_p = os.path.join(proj_dir, sc_item["output_video_file"])
-                    _stg = "upsample_1080p" if sc_item.get("job_uuid_1080p") else "base_720p"
-                    _p_uid = sc_item.get("job_uuid_1080p") or sc_item.get("job_uuid_720p")
-                    _t_sess = cffi_requests.Session(impersonate="chrome131")
-                    _st, _blen = _poll_flow_scene_video_cffi(
-                        _t_sess, cookie_hdr, wiz, dl_headers, flow_project_id, _p_uid, _out_p, stage=_stg, page=None
-                    )
-                    return _sid, _stg, _p_uid, _out_p, _st, _blen
+                    if vids_to_upload:
+                        _save_manifest_live(
+                            "running_flow",
+                            f"⚡ Đang upload song song {len(vids_to_upload)} clip Video Tham Chiếu 30FPS ({', '.join(v['sc']['ref_clip_filename'] for v in vids_to_upload)})...",
+                        )
+                        par_res = upload_multiple_reference_videos_parallel_in_page(
+                            page, wiz, flow_project_id, [{"key": v["key"], "path": v["path"]} for v in vids_to_upload]
+                        )
+                        for v_it in vids_to_upload:
+                            vk = v_it["key"]
+                            sc_v = v_it["sc"]
+                            r_v = par_res.get(vk) or {}
+                            if r_v.get("ok") and r_v.get("uuid"):
+                                did_any_upload_in_session = True
+                                asset_uuid_map[vk] = r_v["uuid"]
+                                print(f"🎬 [Parallel Upload] {sc_v['ref_clip_filename']} -> {r_v['uuid']}", flush=True)
+                            else:
+                                wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                                ok_v, v_uuid, _, err_v = upload_reference_video_in_page(page, wiz, flow_project_id, v_it["path"])
+                                if not ok_v:
+                                    err_msg = f"Upload Video Tham Chiếu '{sc_v['ref_clip_filename']}' thất bại ({prof}): {err_v}"
+                                    sc_v["status"] = "failed:upload_video"
+                                    sc_v["status_detail"] = f"❌ {err_msg}"
+                                    raise RuntimeError(err_msg)
+                                did_any_upload_in_session = True
+                                asset_uuid_map[vk] = v_uuid
+                                print(f"🎬 Uploaded Reference Video 30fps ({sc_v['ref_clip_filename']}) -> {v_uuid}", flush=True)
 
-                poll_map = {}
-                with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(pending))) as _pool:
-                    futs = {_pool.submit(_poll_worker, sc): sc for sc in pending}
-                    for fut in concurrent.futures.as_completed(futs):
-                        sc_ref = futs[fut]
-                        try:
-                            poll_map[sc_ref["id"]] = fut.result()
-                        except Exception as _pe:
-                            poll_map[sc_ref["id"]] = (
-                                sc_ref["id"],
-                                "upsample_1080p" if sc_ref.get("job_uuid_1080p") else "base_720p",
-                                sc_ref.get("job_uuid_1080p") or sc_ref.get("job_uuid_720p"),
-                                os.path.join(proj_dir, sc_ref["output_video_file"]),
-                                f"rpc_err:{_pe}",
-                                None,
-                            )
+                # Nếu toàn bộ Ảnh 2K và Video Ref đều đã lấy từ Cache (0 lượt upload trong phiên mở trang này),
+                # thực hiện 1 lượt warmup maseQ nhanh (~1s) để kích hoạt phiên reCAPTCHA Enterprise, tránh lỗi PUBLIC_ERROR_UNUSUAL_ACTIVITY ngay từ Try 1!
+                if not did_any_upload_in_session and base_char.get("path") and os.path.exists(base_char["path"]):
+                    try:
+                        ok_w0, w0_uid, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, base_char["path"], quality=95)
+                        if ok_w0 and w0_uid:
+                            asset_uuid_map["base_char_2k"] = w0_uid
+                            if bc_fn:
+                                asset_uuid_map[bc_fn] = w0_uid
+                            _save_global_asset_cache()
+                    except Exception:
+                        pass
 
-                for sc in pending:
+                def _extract_and_upload_prev_scene_last_frame(prev_sc_id: str, prev_video_path: str) -> str:
+                    """Cắt Frame cuối của phân cảnh trước (`prev_sc_id`) chuẩn 2K (`1536x2752`) và upload lên Google Flow qua `maseQ`."""
+                    lf_key = f"scene_{prev_sc_id}_last_frame_2k"
+                    lf_fn = f"{lf_key}.png"
+                    lf_path = os.path.join(proj_dir, "assets_2k", lf_fn)
+                    if prev_video_path and os.path.exists(prev_video_path) and os.path.getsize(prev_video_path) > 50000:
+                        extract_scene_last_frame_2k(prev_video_path, lf_path)
+                    if os.path.exists(lf_path):
+                        # Upload encoded JPEG with matching filename and MIME, preserving
+                        # the exact extracted frame rather than substituting the room.
+                        lf_jpg = os.path.splitext(lf_path)[0] + ".jpg"
+                        with Image.open(lf_path) as frame_image:
+                            frame_image.convert("RGB").save(lf_jpg, "JPEG", quality=95)
+                        ok_lf, lf_uid, err_lf = _upload_img_with_401_recovery(lf_jpg, 95)
+                        if ok_lf and lf_uid:
+                            asset_uuid_map[lf_key] = lf_uid
+                            asset_uuid_map[lf_fn] = lf_uid
+                            manifest["asset_uuid_map"] = asset_uuid_map
+                            _save_manifest_live()
+                            print(f"🎞️ [Last-Frame Continuity] Cắt & Upload Frame cuối {lf_fn} -> {lf_uid}", flush=True)
+                            return lf_uid
+                        print(f"⚠️ [Last-Frame Upload Warn] {lf_fn}: {err_lf}", flush=True)
+                    if asset_uuid_map.get(lf_key):
+                        return asset_uuid_map[lf_key]
+                    raise RuntimeError(f"Cannot upload continuity frame {lf_fn}; scene submission stopped")
+
+                def _prepare_and_submit_scene(sc: dict, is_retry: bool = False, retry_idx: int = 0) -> bool:
+                    """Chuẩn bị danh sách ảnh tham chiếu + prompt (theo `gen_mode_norm`) và gửi đúng 1 job duy nhất cho phân cảnh `sc`."""
+                    nonlocal wiz
                     sc_id = sc["id"]
                     sc_num = int(sc.get("scene_index") or 1)
                     sc_idx_label = sc.get("scene_index", sc_id)
-                    _, stage, poll_uid, out_mp4, st_res, byte_len = poll_map[sc_id]
-                    elapsed_s = int(time.time() - (sc.get("_job_start_ts") or start_wait))
-                    sc["elapsed_sec"] = elapsed_s
-                    cur_attempt = int(sc.get("attempt") or (int(sc.get("_retries") or 0) + 1))
+                    clip_path = sc.get("ref_clip_path") or ""
+                    vid_key = f"ref_video_{sc_id}"
+                    if gen_mode_norm == "video_ref" and asset_uuid_map.get(vid_key):
+                        sc["ref_video_uuid"] = asset_uuid_map[vid_key]
+                        asset_uuid_map[sc["ref_clip_filename"]] = sc["ref_video_uuid"]
 
-                    if str(st_res).startswith("rpc_err:") or str(st_res).startswith("dl_err:"):
-                        st_res, byte_len = _poll_flow_scene_video_cffi(
-                            http_sess, cookie_hdr, wiz, dl_headers, flow_project_id, poll_uid, out_mp4, stage=stage, page=page
-                        )
+                    # Nếu đây là Phân cảnh 2+ (sc_num >= 2), đảm bảo Frame cuối của Phân cảnh trước đã được cắt & upload
+                    prev_sc_id = f"s{sc_num - 1}"
+                    lf_key = f"scene_{prev_sc_id}_last_frame_2k"
+                    lf_fn = f"{lf_key}.png"
+                    lf_path = os.path.join(proj_dir, "assets_2k", lf_fn)
+                    if sc_num >= 2:
+                        if not asset_uuid_map.get(lf_key):
+                            prev_mp4 = os.path.join(proj_dir, f"fashion_scene_{prev_sc_id}_1080p.mp4")
+                            _extract_and_upload_prev_scene_last_frame(prev_sc_id, prev_mp4)
+                        sc["prev_scene_last_frame_ref"] = {
+                            "asset_key": lf_key,
+                            "filename": lf_fn,
+                            "path": lf_path,
+                        }
 
-                    print(
-                        f"⏳ [Poll {sc_id} | {gen_mode_norm} | {stage} | Try {cur_attempt}/{MAX_SCENE_ATTEMPTS} | {elapsed_s}s | {poll_uid[:8]}] -> {st_res} ({byte_len or 0} bytes)",
-                        flush=True,
+                    # Xây dựng lại prompt theo đúng chế độ (`chained_i2v` hoặc `timeline_pro`)
+                    sc["start_char_ref"] = {
+                        "asset_key": "base_char_2k",
+                        "filename": manifest["base_char_2k"]["filename"],
+                        "path": manifest["base_char_2k"]["path"],
+                        "is_continuity_generated": False,
+                    }
+                    char_sheet_ref_obj = manifest.get("char_sheet_2k")
+                    target_p_style = "chained_i2v" if gen_mode_norm == "chained_i2v" else "timeline_pro"
+                    rebuilt_p = build_scene_timeline_prompt(
+                        sc,
+                        sc["start_char_ref"],
+                        char_sheet_ref_obj,
+                        prompt_style=target_p_style,
+                        bpm_info=(manifest.get("split_plan") or {}).get("bpm_info"),
                     )
-
-                    if str(st_res).startswith("rpc_err:") or str(st_res).startswith("dl_err:"):
-                        sc["_rpc_errs"] = int(sc.get("_rpc_errs") or 0) + 1
-                        if sc["_rpc_errs"] >= 3:
-                            st_res = f"failed:{st_res}"
+                    sc["generation_mode"] = gen_mode_norm
+                    sc["active_prompt_style"] = target_p_style
+                    if gen_mode_norm == "chained_i2v":
+                        sc["prompt_chained_i2v"] = rebuilt_p["display_prompt"]
+                        sc["segments_chained_i2v"] = rebuilt_p["segments_spec"]
                     else:
-                        sc["_rpc_errs"] = 0
+                        sc["prompt_timeline_pro"] = rebuilt_p["display_prompt"]
+                        sc["segments_timeline_pro"] = rebuilt_p["segments_spec"]
+                        sc["prompt_concise_flow"] = rebuilt_p["display_prompt"]
+                        sc["segments_concise_flow"] = rebuilt_p["segments_spec"]
+                    if not sc.get("user_edited_prompt"):
+                        sc["prompt"] = rebuilt_p["display_prompt"]
+                        sc["segments_spec"] = rebuilt_p["segments_spec"]
 
-                    if stage == "base_720p" and str(st_res).startswith("rendering:") and elapsed_s > 185:
-                        print(f"⚠️ [Timeout Watchdog {sc_id}] Treo >185s ở trạng thái {st_res} -> Kích hoạt Retry ngay!", flush=True)
-                        st_res = "failed:timeout_185s"
-                    elif stage == "upsample_1080p" and str(st_res).startswith("rendering:") and elapsed_s > 60 and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 50000:
-                        print(f"⚡ [Fast-Path 1080p {sc_id}] Upsample Flow >60s -> Dùng ngay file AI đã tải để hậu kỳ!", flush=True)
-                        st_res = "done"
-                        byte_len = os.path.getsize(out_mp4)
-
-                    if st_res == "ready_for_1080p":
-                        sc["output_video_path"] = out_mp4
-                        sc["is_ai_generated"] = True
-                        sc["flow_job_id"] = sc["job_uuid_720p"]
-                        sc["last_error"] = ""
-                        sc["status_detail"] = f"✨ Đã tải xong bản 720p ({round((byte_len or 0)/1048576, 2)} MB) -> Đang nâng cấp lên 1080p & cắt Frame cuối nối Cảnh tiếp theo..."
-
-                        # ⚡ NGAY KHI CẢNH TRƯỚC (`s1`) TẢI XONG VIDEO: CẮT FRAME CUỐI 2K, UPLOAD LÊN FLOW VÀ GỬI CẢNH TIẾP THEO (`s2`) CHẠY SONG SONG!
-                        next_wait_list = [w for w in waiting_chained_scenes if int(w.get("scene_index") or 2) == sc_num + 1]
-                        if next_wait_list:
-                            _extract_and_upload_prev_scene_last_frame(sc_id, out_mp4)
-                            for w_sc in next_wait_list:
-                                waiting_chained_scenes.remove(w_sc)
-                                if _prepare_and_submit_scene(w_sc, is_retry=False, retry_idx=0):
-                                    still_pending.append(w_sc)
-
-                        ok_up, up_uid, _ = submit_upsample_1080p_in_page(
-                            page,
-                            wiz,
-                            {
-                                "pid": project_id_slug,
-                                "sc": {"id": sc_id},
-                                "project_id": flow_project_id,
-                                "base_video_uuid": sc["job_uuid_720p"],
-                            },
+                    # Tập hợp danh sách ảnh tham chiếu chuẩn xác cho từng chế độ:
+                    sc_transitions = sc.get("transitions") or []
+                    sc_img_uuids = []
+                    if gen_mode_norm == "chained_i2v":
+                        # Chế độ Chained I2V (`MZZa6b` / `macaron_cookie_r2v_8s`):
+                        # - Cảnh 1: [Ảnh phòng ngủ Basic 07 + Character Sheet 01]
+                        # - Cảnh 2+: [Ảnh Frame cuối Cảnh 1 (`scene_s1_last_frame_2k.png`) + Character Sheet 01]
+                        open_uid = (
+                            (asset_uuid_map.get(lf_key) or asset_uuid_map.get("char_sheet_2k"))
+                            if sc_num >= 2
+                            else asset_uuid_map.get("char_sheet_2k")
                         )
-                        if ok_up and up_uid:
-                            sc["job_uuid_1080p"] = up_uid
-                            sc["_job_start_ts"] = time.time()
-                            sc["status"] = "upsampling_1080p"
-                            still_pending.append(sc)
+                        if open_uid:
+                            sc_img_uuids.append(open_uid)
+                        sc_img_uuids = resolve_fashion_prompt_image_refs(
+                            sc.get("segments_spec") or rebuilt_p["segments_spec"], asset_uuid_map
+                        )
+                        use_model_key = "abra_r2v_8s" if (is_retry and retry_idx >= 2) else "macaron_cookie_r2v_8s"
+                    else:
+                        # Chế độ Motion Control Video Ref (`jIps6` / `abra_edit`):
+                        # - Cảnh 1: Mở đầu từ `char_sheet_2k` (`07_Nhan_Vat_Basic_Phong_Ngu_2K.png`)
+                        # - Cảnh 2+: Mở đầu nối tiếp từ `scene_s1_last_frame_2k` (`scene_s1_last_frame_2k.png`)!
+                        open_bg_uid = (
+                            (asset_uuid_map.get(lf_key) or asset_uuid_map.get("char_sheet_2k"))
+                            if sc_num >= 2
+                            else asset_uuid_map.get("char_sheet_2k")
+                        )
+                        if asset_uuid_map.get("base_char_2k"):
+                            sc_img_uuids.append(asset_uuid_map["base_char_2k"])
+                        if len(sc_transitions) <= 2 and asset_uuid_map.get("overall_sheet_2k") and asset_uuid_map["overall_sheet_2k"] not in sc_img_uuids:
+                            sc_img_uuids.append(asset_uuid_map["overall_sheet_2k"])
+                        if open_bg_uid and open_bg_uid not in sc_img_uuids:
+                            sc_img_uuids.append(open_bg_uid)
+                        for tr in sc_transitions[:3]:
+                            o_u = asset_uuid_map.get(tr["outfit"].get("filename") or "") or asset_uuid_map.get(tr["outfit"]["id"])
+                            if o_u and o_u not in sc_img_uuids and len(sc_img_uuids) < 5:
+                                sc_img_uuids.append(o_u)
+                        if len(sc_img_uuids) < 5 and asset_uuid_map.get("overall_sheet_2k") and asset_uuid_map["overall_sheet_2k"] not in sc_img_uuids:
+                            sc_img_uuids.append(asset_uuid_map["overall_sheet_2k"])
+                        sc_img_uuids = sc_img_uuids[:5]
+                        use_model_key = sc.get("model_key") or (manifest.get("split_plan") or {}).get("model_key_edit") or "abra_edit"
+                        if is_retry and retry_idx >= 3:
+                            use_model_key = "macaron_cookie_edit"
+
+                    sc["_sc_img_uuids"] = sc_img_uuids
+                    # Persist the actual prompt/chip bindings immediately before submission.
+                    if gen_mode_norm == "chained_i2v":
+                        audit_segments = sc.get("segments_spec") or rebuilt_p["segments_spec"]
+                        sc["submitted_prompt_audit"] = {
+                            "display_prompt": sc.get("prompt") or rebuilt_p["display_prompt"],
+                            "segments_spec": audit_segments,
+                            "image_ref_uuids": sc_img_uuids,
+                            "encoded_prompt": encode_flow_structured_prompt_Nj(
+                                audit_segments, asset_uuid_map, allowed_image_uuids=sc_img_uuids
+                            ),
+                        }
+
+                    ok_sub, job_uuid, err_sub = False, None, ""
+                    for sub_try in range(1, 4):
+                        sc["status"] = "submitting" if sub_try == 1 else f"retrying_submit_{sub_try}"
+                        sc["status_detail"] = (
+                            f"🚀 Đang gửi lệnh tạo video Phân Cảnh {sc_idx_label} lên Google Flow ({use_model_key})..."
+                            if sub_try == 1
+                            else f"🔁 Lỗi gửi lệnh ({err_sub[:45]}) -> Đang tự động Retry gửi lại ngay (Lần {sub_try}/3)..."
+                        )
+                        _save_manifest_live("running_flow", sc["status_detail"])
+                        if sub_try > 1:
+                            time.sleep(2.0)
+                            if "UNUSUAL_ACTIVITY" in str(err_sub).upper():
+                                try:
+                                    page.reload(wait_until="domcontentloaded", timeout=35000)
+                                    page.wait_for_timeout(2000)
+                                    page.mouse.move(400, 360, steps=10)
+                                    page.mouse.wheel(0, 120)
+                                    page.wait_for_timeout(500)
+                                    wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                                    if base_char.get("path") and os.path.exists(base_char["path"]):
+                                        ok_w, w_uid, _ = upload_single_product_ref_in_page(page, wiz, flow_project_id, base_char["path"])
+                                        if ok_w and w_uid:
+                                            asset_uuid_map["base_char_2k"] = w_uid
+                                            if bc_fn:
+                                                asset_uuid_map[bc_fn] = w_uid
+                                except Exception:
+                                    pass
+                            wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                            if gen_mode_norm == "video_ref" and any(k in str(err_sub).upper() for k in ("INVALID", "NOT_FOUND", "[3]", "[5]")):
+                                re_clip = (sc.get("adult_safe_clip_path") if sub_try >= 2 and sc.get("adult_safe_clip_path") and os.path.exists(sc.get("adult_safe_clip_path")) else clip_path)
+                                ok_rv, rv_uid, _, _ = upload_reference_video_in_page(page, wiz, flow_project_id, re_clip)
+                                if ok_rv and rv_uid:
+                                    sc["ref_video_uuid"] = rv_uid
+                                    asset_uuid_map[vid_key] = rv_uid
+                                    asset_uuid_map[sc["ref_clip_filename"]] = rv_uid
+
+                        if gen_mode_norm == "chained_i2v":
+                            ok_sub, job_uuid, err_sub = submit_fashion_chained_i2v_scene_in_page(
+                                page,
+                                wiz,
+                                {
+                                    "project_id": flow_project_id,
+                                    "image_ref_uuids": sc_img_uuids,
+                                    "asset_uuid_map": asset_uuid_map,
+                                    "segments_spec": sc.get("segments_spec") or rebuilt_p["segments_spec"],
+                                    "display_prompt": sc.get("prompt") or rebuilt_p["display_prompt"],
+                                    "model_key": use_model_key,
+                                },
+                            )
                         else:
-                            sc["status"] = "done"
-                            sc["status_detail"] = f"✅ Đã tạo xong Video Phân Cảnh {sc_idx_label} (Lần thử {cur_attempt}/{MAX_SCENE_ATTEMPTS})!"
-                    elif st_res == "done":
-                        sc["output_video_path"] = out_mp4
-                        sc["is_ai_generated"] = True
-                        sc["flow_job_id"] = sc.get("job_uuid_1080p") or sc.get("job_uuid_720p")
-                        sc["last_error"] = ""
-                        sc["status"] = "done"
-                        sc["status_detail"] = f"✅ Đã hoàn tất Video Phân Cảnh {sc_idx_label} 1080p ({round((byte_len or 0)/1048576, 2)} MB)!"
-                        # Cập nhật lại ảnh Frame cuối trên ổ đĩa từ bản 1080p sắc nét
-                        if sc_num == 1 and os.path.exists(out_mp4):
-                            extract_scene_last_frame_2k(out_mp4, os.path.join(proj_dir, "assets_2k", f"scene_{sc_id}_last_frame_2k.png"))
-                        next_wait_list = [w for w in waiting_chained_scenes if int(w.get("scene_index") or 2) == sc_num + 1]
-                        if next_wait_list:
-                            _extract_and_upload_prev_scene_last_frame(sc_id, out_mp4)
-                            for w_sc in next_wait_list:
-                                waiting_chained_scenes.remove(w_sc)
-                                if _prepare_and_submit_scene(w_sc, is_retry=False, retry_idx=0):
-                                    still_pending.append(w_sc)
-                    elif str(st_res).startswith("failed"):
-                        if stage == "upsample_1080p" and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 50000:
+                            ok_sub, job_uuid, err_sub = submit_fashion_motion_scene_in_page(
+                                page,
+                                wiz,
+                                {
+                                    "project_id": flow_project_id,
+                                    "ref_video_uuid": sc.get("ref_video_uuid"),
+                                    "duration": sc["duration"],
+                                    "fps": 30,
+                                    "start_frame": 1,
+                                    "end_frame": round(int(sc.get("duration") or 8) * 30) + 1,
+                                    "image_ref_uuids": sc_img_uuids,
+                                    "asset_uuid_map": asset_uuid_map,
+                                    "segments_spec": sc.get("segments_spec") or rebuilt_p["segments_spec"],
+                                    "display_prompt": sc.get("prompt") or rebuilt_p["display_prompt"],
+                                    "model_key": use_model_key,
+                                },
+                            )
+                        if ok_sub and job_uuid:
+                            break
+                        print(f"⚠️ [Submit {sc_id} Try {sub_try}/3 Failed] {err_sub}", flush=True)
+
+                    if not ok_sub or not job_uuid:
+                        sc["status"] = f"failed:submit_{str(err_sub)[:40]}"
+                        sc["last_error"] = str(err_sub)
+                        sc["status_detail"] = f"❌ Gửi lệnh tạo video Phân Cảnh {sc_id} thất bại sau 3 lần thử: {err_sub}"
+                        _save_manifest_live("running_flow", sc["status_detail"])
+                        return False
+
+                    sc["job_uuid_720p"] = job_uuid
+                    sc["job_uuid_1080p"] = None
+                    if not is_retry:
+                        sc["_retries"] = 0
+                        sc["attempt"] = 1
+                    sc["max_attempts"] = MAX_SCENE_ATTEMPTS
+                    sc["_job_start_ts"] = time.time()
+                    sc["_rpc_errs"] = 0
+                    sc["last_error"] = ""
+                    sc["status"] = "submitted_720p"
+                    sc["status_detail"] = f"⏳ Đang tạo video Cảnh {sc_idx_label} trên Google Flow ({use_model_key} • Lần thử {sc.get('attempt', 1)}/{MAX_SCENE_ATTEMPTS})..."
+                    print(f"🚀 [Google Flow {gen_mode_norm}/{use_model_key}] Đã gửi Phân Cảnh {sc_id} -> media_uuid={job_uuid}", flush=True)
+                    return True
+
+                # 4B. KHỞI CHẠY PHÂN CẢNH 1 TRƯỚC, PHÂN CẢNH 2+ CHỜ CẮT FRAME CUỐI CỦA PHÂN CẢNH 1 ĐỂ NỐI TIẾP LIỀN MẠCH!
+                # (Nếu user chỉ bấm Render riêng Phân cảnh 2 khi Phân cảnh 1 đã xong từ trước, Phân cảnh 2 sẽ tự cắt Frame cuối Cảnh 1 và gửi ngay!)
+                waiting_chained_scenes = []
+                running_s1_in_batch = any(int(s.get("scene_index") or 1) == 1 for s in scenes_to_run)
+
+                for sc in scenes_to_run:
+                    sc_num = int(sc.get("scene_index") or 1)
+                    if sc_num >= 2 and running_s1_in_batch:
+                        sc["job_uuid_720p"] = None
+                        sc["job_uuid_1080p"] = None
+                        sc["status"] = "waiting_prev_scene_frame"
+                        sc["status_detail"] = f"⏳ Đang chờ Phân Cảnh {sc_num - 1} hoàn tất để cắt Frame cuối 2K (`scene_s{sc_num - 1}_last_frame_2k.png`) nối tiếp sang Phân Cảnh {sc_num}..."
+                        waiting_chained_scenes.append(sc)
+                    else:
+                        _prepare_and_submit_scene(sc, is_retry=False, retry_idx=0)
+
+                manifest["asset_uuid_map"] = asset_uuid_map
+                _save_manifest_live(
+                    "running_flow",
+                    f"⚡ Đang chạy chế độ {'Chained Img2Video 0.1s' if gen_mode_norm == 'chained_i2v' else 'Motion Control Video Ref'} trên Google Flow...",
+                )
+
+                # 6. POLL ĐA LUỒNG SONG SONG (`ThreadPoolExecutor`) & TỰ ĐỘNG CẮT FRAME CUỐI CẢNH 1 ĐỂ GỬI CẢNH 2 NGAY LẬP TỨC!
+                pending = [sc for sc in scenes_to_run if sc.get("job_uuid_720p")]
+                start_wait = time.time()
+                while (pending or waiting_chained_scenes) and (time.time() - start_wait) < 900:
+                    if not pending:
+                        break
+                    time.sleep(3.0)
+                    still_pending = []
+
+                    def _poll_worker(sc_item):
+                        _sid = sc_item["id"]
+                        _out_p = os.path.join(proj_dir, sc_item["output_video_file"])
+                        _stg = "upsample_1080p" if sc_item.get("job_uuid_1080p") else "base_720p"
+                        _p_uid = sc_item.get("job_uuid_1080p") or sc_item.get("job_uuid_720p")
+                        _t_sess = cffi_requests.Session(impersonate="chrome131")
+                        _st, _blen = _poll_flow_scene_video_cffi(
+                            _t_sess, cookie_hdr, wiz, dl_headers, flow_project_id, _p_uid, _out_p, stage=_stg, page=None
+                        )
+                        return _sid, _stg, _p_uid, _out_p, _st, _blen
+
+                    poll_map = {}
+                    with concurrent.futures.ThreadPoolExecutor(max_workers=max(1, len(pending))) as _pool:
+                        futs = {_pool.submit(_poll_worker, sc): sc for sc in pending}
+                        for fut in concurrent.futures.as_completed(futs):
+                            sc_ref = futs[fut]
+                            try:
+                                poll_map[sc_ref["id"]] = fut.result()
+                            except Exception as _pe:
+                                poll_map[sc_ref["id"]] = (
+                                    sc_ref["id"],
+                                    "upsample_1080p" if sc_ref.get("job_uuid_1080p") else "base_720p",
+                                    sc_ref.get("job_uuid_1080p") or sc_ref.get("job_uuid_720p"),
+                                    os.path.join(proj_dir, sc_ref["output_video_file"]),
+                                    f"rpc_err:{_pe}",
+                                    None,
+                                )
+
+                    for sc in pending:
+                        sc_id = sc["id"]
+                        sc_num = int(sc.get("scene_index") or 1)
+                        sc_idx_label = sc.get("scene_index", sc_id)
+                        _, stage, poll_uid, out_mp4, st_res, byte_len = poll_map[sc_id]
+                        elapsed_s = int(time.time() - (sc.get("_job_start_ts") or start_wait))
+                        sc["elapsed_sec"] = elapsed_s
+                        cur_attempt = int(sc.get("attempt") or (int(sc.get("_retries") or 0) + 1))
+
+                        if str(st_res).startswith("rpc_err:") or str(st_res).startswith("dl_err:"):
+                            st_res, byte_len = _poll_flow_scene_video_cffi(
+                                http_sess, cookie_hdr, wiz, dl_headers, flow_project_id, poll_uid, out_mp4, stage=stage, page=page
+                            )
+
+                        print(
+                            f"⏳ [Poll {sc_id} | {gen_mode_norm} | {stage} | Try {cur_attempt}/{MAX_SCENE_ATTEMPTS} | {elapsed_s}s | {poll_uid[:8]}] -> {st_res} ({byte_len or 0} bytes)",
+                            flush=True,
+                        )
+
+                        if str(st_res).startswith("rpc_err:") or str(st_res).startswith("dl_err:"):
+                            sc["_rpc_errs"] = int(sc.get("_rpc_errs") or 0) + 1
+                            if sc["_rpc_errs"] >= 3:
+                                st_res = f"failed:{st_res}"
+                        else:
+                            sc["_rpc_errs"] = 0
+
+                        if stage == "base_720p" and str(st_res).startswith("rendering:") and elapsed_s > 185:
+                            print(f"⚠️ [Timeout Watchdog {sc_id}] Treo >185s ở trạng thái {st_res} -> Kích hoạt Retry ngay!", flush=True)
+                            st_res = "failed:timeout_185s"
+                        elif stage == "upsample_1080p" and str(st_res).startswith("rendering:") and elapsed_s > 60 and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 50000:
+                            print(f"⚡ [Fast-Path 1080p {sc_id}] Upsample Flow >60s -> Dùng ngay file AI đã tải để hậu kỳ!", flush=True)
+                            st_res = "done"
+                            byte_len = os.path.getsize(out_mp4)
+
+                        if st_res == "ready_for_1080p":
                             sc["output_video_path"] = out_mp4
                             sc["is_ai_generated"] = True
-                            sc["flow_job_id"] = sc.get("job_uuid_720p")
+                            sc["flow_job_id"] = sc["job_uuid_720p"]
+                            sc["last_error"] = ""
+                            sc["status_detail"] = f"✨ Đã tải xong bản 720p ({round((byte_len or 0)/1048576, 2)} MB) -> Đang nâng cấp lên 1080p & cắt Frame cuối nối Cảnh tiếp theo..."
+
+                            # ⚡ NGAY KHI CẢNH TRƯỚC (`s1`) TẢI XONG VIDEO: CẮT FRAME CUỐI 2K, UPLOAD LÊN FLOW VÀ GỬI CẢNH TIẾP THEO (`s2`) CHẠY SONG SONG!
+                            next_wait_list = [w for w in waiting_chained_scenes if int(w.get("scene_index") or 2) == sc_num + 1]
+                            if next_wait_list:
+                                _extract_and_upload_prev_scene_last_frame(sc_id, out_mp4)
+                                for w_sc in next_wait_list:
+                                    waiting_chained_scenes.remove(w_sc)
+                                    if _prepare_and_submit_scene(w_sc, is_retry=False, retry_idx=0):
+                                        still_pending.append(w_sc)
+
+                            ok_up, up_uid, _ = submit_upsample_1080p_in_page(
+                                page,
+                                wiz,
+                                {
+                                    "pid": project_id_slug,
+                                    "sc": {"id": sc_id},
+                                    "project_id": flow_project_id,
+                                    "base_video_uuid": sc["job_uuid_720p"],
+                                },
+                            )
+                            if ok_up and up_uid:
+                                sc["job_uuid_1080p"] = up_uid
+                                sc["_job_start_ts"] = time.time()
+                                sc["status"] = "upsampling_1080p"
+                                still_pending.append(sc)
+                            else:
+                                sc["status"] = "done"
+                                sc["status_detail"] = f"✅ Đã tạo xong Video Phân Cảnh {sc_idx_label} (Lần thử {cur_attempt}/{MAX_SCENE_ATTEMPTS})!"
+                        elif st_res == "done":
+                            sc["output_video_path"] = out_mp4
+                            sc["is_ai_generated"] = True
+                            sc["flow_job_id"] = sc.get("job_uuid_1080p") or sc.get("job_uuid_720p")
                             sc["last_error"] = ""
                             sc["status"] = "done"
-                            sc["status_detail"] = f"✅ Đã tạo xong Video Phân Cảnh {sc_idx_label} (Bản chuẩn AI)!"
-                        elif stage == "base_720p" and int(sc.get("_retries") or 0) < (MAX_SCENE_ATTEMPTS - 1):
-                            sc["_retries"] = int(sc.get("_retries") or 0) + 1
-                            retry_idx = sc["_retries"]
-                            sc["attempt"] = retry_idx + 1
-                            sc["last_error"] = st_res
-                            sc["status"] = f"retrying_{retry_idx}"
-                            sc["status_detail"] = (
-                                f"🔁 Phát hiện lỗi tạo video ({st_res}) ở Cảnh {sc_idx_label} -> "
-                                f"Đang tự động Retry ngay lập tức (Lần thử {sc['attempt']}/{MAX_SCENE_ATTEMPTS})..."
-                            )
-                            _save_manifest_live("running_flow", sc["status_detail"])
-                            print(f"⚡ [Auto-Retry Immediate {sc_id}] {sc['status_detail']}", flush=True)
+                            sc["status_detail"] = f"✅ Đã hoàn tất Video Phân Cảnh {sc_idx_label} 1080p ({round((byte_len or 0)/1048576, 2)} MB)!"
+                            # Cập nhật lại ảnh Frame cuối trên ổ đĩa từ bản 1080p sắc nét
+                            if sc_num == 1 and os.path.exists(out_mp4):
+                                extract_scene_last_frame_2k(out_mp4, os.path.join(proj_dir, "assets_2k", f"scene_{sc_id}_last_frame_2k.png"))
+                            next_wait_list = [w for w in waiting_chained_scenes if int(w.get("scene_index") or 2) == sc_num + 1]
+                            if next_wait_list:
+                                _extract_and_upload_prev_scene_last_frame(sc_id, out_mp4)
+                                for w_sc in next_wait_list:
+                                    waiting_chained_scenes.remove(w_sc)
+                                    if _prepare_and_submit_scene(w_sc, is_retry=False, retry_idx=0):
+                                        still_pending.append(w_sc)
+                        elif str(st_res).startswith("failed"):
+                            if stage == "upsample_1080p" and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 50000:
+                                sc["output_video_path"] = out_mp4
+                                sc["is_ai_generated"] = True
+                                sc["flow_job_id"] = sc.get("job_uuid_720p")
+                                sc["last_error"] = ""
+                                sc["status"] = "done"
+                                sc["status_detail"] = f"✅ Đã tạo xong Video Phân Cảnh {sc_idx_label} (Bản chuẩn AI)!"
+                            elif stage == "base_720p" and int(sc.get("_retries") or 0) < (MAX_SCENE_ATTEMPTS - 1):
+                                sc["_retries"] = int(sc.get("_retries") or 0) + 1
+                                retry_idx = sc["_retries"]
+                                sc["attempt"] = retry_idx + 1
+                                sc["last_error"] = st_res
+                                sc["status"] = f"retrying_{retry_idx}"
+                                sc["status_detail"] = (
+                                    f"🔁 Phát hiện lỗi tạo video ({st_res}) ở Cảnh {sc_idx_label} -> "
+                                    f"Đang tự động Retry ngay lập tức (Lần thử {sc['attempt']}/{MAX_SCENE_ATTEMPTS})..."
+                                )
+                                _save_manifest_live("running_flow", sc["status_detail"])
+                                print(f"⚡ [Auto-Retry Immediate {sc_id}] {sc['status_detail']}", flush=True)
 
-                            wiz = _refresh_wiz_tokens_in_page(page, wiz)
-                            if gen_mode_norm == "video_ref" and retry_idx in (1, 2):
-                                adult_clip = sc.get("adult_safe_clip_path") or ""
-                                re_clip_p = adult_clip if (adult_clip and os.path.exists(adult_clip)) else sc.get("ref_clip_path")
-                                if re_clip_p and os.path.exists(re_clip_p):
-                                    ok_rv2, rv2_uid, _, _ = upload_reference_video_in_page(page, wiz, flow_project_id, re_clip_p)
-                                    if ok_rv2 and rv2_uid:
-                                        sc["ref_video_uuid"] = rv2_uid
-                                        asset_uuid_map[f"ref_video_{sc_id}"] = rv2_uid
-                                        asset_uuid_map[sc["ref_clip_filename"]] = rv2_uid
+                                wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                                if gen_mode_norm == "video_ref" and retry_idx in (1, 2):
+                                    adult_clip = sc.get("adult_safe_clip_path") or ""
+                                    re_clip_p = adult_clip if (adult_clip and os.path.exists(adult_clip)) else sc.get("ref_clip_path")
+                                    if re_clip_p and os.path.exists(re_clip_p):
+                                        ok_rv2, rv2_uid, _, _ = upload_reference_video_in_page(page, wiz, flow_project_id, re_clip_p)
+                                        if ok_rv2 and rv2_uid:
+                                            sc["ref_video_uuid"] = rv2_uid
+                                            asset_uuid_map[f"ref_video_{sc_id}"] = rv2_uid
+                                            asset_uuid_map[sc["ref_clip_filename"]] = rv2_uid
 
-                            time.sleep(2)
-                            if _prepare_and_submit_scene(sc, is_retry=True, retry_idx=retry_idx):
-                                still_pending.append(sc)
+                                time.sleep(2)
+                                if _prepare_and_submit_scene(sc, is_retry=True, retry_idx=retry_idx):
+                                    still_pending.append(sc)
+                            else:
+                                sc["status"] = st_res
+                                sc["last_error"] = st_res
+                                sc["status_detail"] = f"❌ Tạo video Cảnh {sc_idx_label} không thành công sau {MAX_SCENE_ATTEMPTS} lần thử ({st_res}). Bấm Retry để chạy lại!"
                         else:
                             sc["status"] = st_res
-                            sc["last_error"] = st_res
-                            sc["status_detail"] = f"❌ Tạo video Cảnh {sc_idx_label} không thành công sau {MAX_SCENE_ATTEMPTS} lần thử ({st_res}). Bấm Retry để chạy lại!"
+                            sc["status_detail"] = (
+                                f"⏳ Đang tạo video Cảnh {sc_idx_label} trên Google Flow "
+                                f"(Lần thử {cur_attempt}/{MAX_SCENE_ATTEMPTS} • {elapsed_s}s)..."
+                            )
+                            still_pending.append(sc)
+                    pending = still_pending
+                    if pending:
+                        summary_parts = [
+                            f"Cảnh {s.get('scene_index', s['id'])}: Lần {s.get('attempt', 1)}/{MAX_SCENE_ATTEMPTS} ({s.get('elapsed_sec', 0)}s)"
+                            for s in pending
+                        ]
+                        if waiting_chained_scenes:
+                            summary_parts.append(f"Cảnh 2: Chờ nối Frame cuối Cảnh 1")
+                        _save_manifest_live("running_flow", "⏳ Đang theo dõi & tạo video: " + " | ".join(summary_parts))
                     else:
-                        sc["status"] = st_res
-                        sc["status_detail"] = (
-                            f"⏳ Đang tạo video Cảnh {sc_idx_label} trên Google Flow "
-                            f"(Lần thử {cur_attempt}/{MAX_SCENE_ATTEMPTS} • {elapsed_s}s)..."
-                        )
-                        still_pending.append(sc)
-                pending = still_pending
-                if pending:
-                    summary_parts = [
-                        f"Cảnh {s.get('scene_index', s['id'])}: Lần {s.get('attempt', 1)}/{MAX_SCENE_ATTEMPTS} ({s.get('elapsed_sec', 0)}s)"
-                        for s in pending
-                    ]
-                    if waiting_chained_scenes:
-                        summary_parts.append(f"Cảnh 2: Chờ nối Frame cuối Cảnh 1")
-                    _save_manifest_live("running_flow", "⏳ Đang theo dõi & tạo video: " + " | ".join(summary_parts))
-                else:
-                    _save_manifest_live("running_flow", "✅ Đã hoàn tất vòng theo dõi các phân cảnh!")
+                        _save_manifest_live("running_flow", "✅ Đã hoàn tất vòng theo dõi các phân cảnh!")
 
-            for _sc_clean in manifest.get("scenes") or []:
-                _sc_clean.pop("_sc_img_uuids", None)
-                _sc_clean.pop("_job_start_ts", None)
-                _sc_clean.pop("_rpc_errs", None)
-            _save_manifest_live()
-        finally:
-            try:
-                context.close()
-            except Exception:
-                pass
-            if browser:
+                for _sc_clean in manifest.get("scenes") or []:
+                    _sc_clean.pop("_sc_img_uuids", None)
+                    _sc_clean.pop("_job_start_ts", None)
+                    _sc_clean.pop("_rpc_errs", None)
+                _save_manifest_live()
+            except Exception as _acc_exc:
+                last_account_error = str(_acc_exc)
+                _mark_flow_profile_unhealthy(prof, last_account_error)
+                for _sc_f in scenes_to_run:
+                    if _sc_f.get("status") != "done":
+                        _sc_f["status"] = "failed:account_error"
+                        _sc_f["last_error"] = last_account_error
+                        _sc_f["status_detail"] = f"⚠️ {last_account_error}"
+                if acc_idx + 1 < len(candidate_profiles):
+                    next_prof = candidate_profiles[acc_idx + 1]
+                    _save_manifest_live(
+                        "running_flow",
+                        f"🔄 Tài khoản '{prof}' lỗi ({last_account_error[:70]}) -> Chủ động chuyển sang tài khoản '{next_prof}' ({acc_idx + 2}/{len(candidate_profiles)})...",
+                    )
+                else:
+                    _save_manifest_live("failed_auth", last_account_error)
+            finally:
                 try:
-                    browser.close()
+                    context.close()
                 except Exception:
                     pass
+                if browser:
+                    try:
+                        browser.close()
+                    except Exception:
+                        pass
+
+        remaining_unfinished = [
+            sc
+            for sc in all_target_scenes
+            if sc.get("status") != "done"
+            and not (
+                sc.get("output_video_path")
+                and os.path.exists(sc.get("output_video_path", ""))
+                and os.path.getsize(sc.get("output_video_path", "")) > 50000
+            )
+        ]
+        if not remaining_unfinished:
+            _mark_flow_profile_healthy(prof)
+            break
+
+        if not last_account_error:
+            last_account_error = (
+                remaining_unfinished[0].get("last_error")
+                or remaining_unfinished[0].get("status_detail")
+                or f"Tài khoản '{prof}' chưa hoàn tất phân cảnh"
+            )
+        _mark_flow_profile_unhealthy(prof, last_account_error)
+        if acc_idx + 1 < len(candidate_profiles):
+            next_prof = candidate_profiles[acc_idx + 1]
+            _save_manifest_live(
+                "running_flow",
+                f"🔄 Tài khoản '{prof}' chưa hoàn tất ({str(last_account_error)[:65]}) -> Chủ động chuyển sang tài khoản '{next_prof}' ({acc_idx + 2}/{len(candidate_profiles)}) để chạy tiếp...",
+            )
+            continue
 
     # 7. Render hậu kỳ ghép các phân cảnh AI hoàn chỉnh + Nhạc gốc ở chuẩn 24 FPS CFR mượt mà thành Video Final
     done_scenes = [s for s in (manifest.get("scenes") or []) if s.get("status") == "done" or (s.get("output_video_path") and os.path.exists(s.get("output_video_path", "")))]
-    failed_scenes = [s for s in scenes_to_run if str(s.get("status") or "").startswith("failed")]
+    failed_scenes = [
+        s
+        for s in all_target_scenes
+        if s.get("status") != "done"
+        and not (
+            s.get("output_video_path")
+            and os.path.exists(s.get("output_video_path", ""))
+            and os.path.getsize(s.get("output_video_path", "")) > 50000
+        )
+    ]
     try:
         if len(done_scenes) == len(manifest.get("scenes") or []):
             post_res = fava.render_fashion_postprod_final_video(
@@ -3823,6 +4442,14 @@ def retry_failed_fashion_scenes_on_flow(project_id_slug: str, profile_name: str 
             sc["job_uuid_1080p"] = None
             sc["_retries"] = 0
             sc["status"] = "retrying_auto"
+    prev_err_msg = str(manifest.get("status_message") or "")
+    for _cand_p in _get_ordered_flow_account_candidates(""):
+        if f"'{_cand_p}'" in prev_err_msg and ("hết hạn" in prev_err_msg or "SNlM0e" in prev_err_msg or "lỗi" in prev_err_msg.lower()):
+            _mark_flow_profile_unhealthy(_cand_p, prev_err_msg)
+    if not profile_name:
+        manifest["preferred_profile_name"] = ""
+    manifest["status"] = "running_flow"
+    manifest["status_message"] = "🔄 Đang tự động đổi sang tài khoản Google Flow khả dụng để chạy lại các phân cảnh lỗi..."
     with open(manifest_path, "w", encoding="utf-8") as f:
         json.dump(manifest, f, ensure_ascii=False, indent=2)
     if len(failed_ids) == 1:
@@ -3903,10 +4530,44 @@ def list_fashion_characters_and_outfits_library() -> dict:
             c_copy = dict(c_item)
             c_copy["char_path"] = c_p
             c_copy["pose_sheet_path"] = c_p
-            bg_p = c_copy.get("bg_path") or c_copy.get("bg_ref_path") or default_bg_p
+            bg_p = c_copy.get("bg_path") or c_copy.get("bg_ref_path") or c_p
+            # Nếu nhân vật tuỳ chỉnh trước đây bị gán nhầm bg_path = 07_Nhan_Vat_Basic_Phong_Ngu_2K.png của NV5,
+            # tự động dùng chính ảnh nhân vật tuỳ chỉnh làm ảnh mở đầu & nhận diện khuôn mặt!
+            if os.path.basename(bg_p) == "07_Nhan_Vat_Basic_Phong_Ngu_2K.png" and os.path.basename(c_p) != "02_Character_Sheet_Basic_Poses_2K.png":
+                bg_p = c_p
             c_copy["bg_path"] = bg_p
             c_copy["bg_ref_path"] = bg_p
+            c_copy["bg_filename"] = os.path.basename(bg_p)
             characters.append(c_copy)
+
+    # Tích hợp toàn bộ nhân vật từ Kho Nhân Vật chung (`voices_and_characters.json`: NV1, NV2, ...)
+    try:
+        import character_library_manager as _clm
+        clm_state = _clm.get_character_library_state()
+        seen_paths_clm = {os.path.abspath(c["char_path"]) for c in characters if c.get("char_path") and os.path.exists(c["char_path"])}
+        for ch_item in (clm_state.get("characters") or []):
+            ch_abs = ch_item.get("ref_image_abs") or ""
+            if not ch_abs and ch_item.get("ref_image"):
+                ch_abs = os.path.join(WS_DIR, str(ch_item["ref_image"]).lstrip("/\\"))
+            if ch_abs and os.path.exists(ch_abs) and os.path.abspath(ch_abs) not in seen_paths_clm:
+                ch_key = ch_item.get("key") or os.path.splitext(os.path.basename(ch_abs))[0]
+                ch_fn = os.path.basename(ch_abs)
+                seen_paths_clm.add(os.path.abspath(ch_abs))
+                characters.append({
+                    "id": f"char_store_{ch_key}",
+                    "key": f"char_store_{ch_key}",
+                    "name": f"👤 Kho Nhân Vật: {ch_item.get('name') or ch_key.upper()} ({ch_fn})",
+                    "char_filename": ch_fn,
+                    "char_path": os.path.abspath(ch_abs),
+                    "pose_sheet_path": os.path.abspath(ch_abs),
+                    "bg_filename": ch_fn,
+                    "bg_path": os.path.abspath(ch_abs),
+                    "bg_ref_path": os.path.abspath(ch_abs),
+                    "is_default": False,
+                    "badge": f"KHO NV ({ch_key.upper()})",
+                })
+    except Exception:
+        pass
 
     # Quét thêm từ thư mục `character_library` nếu có
     char_lib_dir = os.path.join(WS_DIR, "character_library")
@@ -3923,9 +4584,9 @@ def list_fashion_characters_and_outfits_library() -> dict:
                         "char_filename": fn,
                         "char_path": fp,
                         "pose_sheet_path": fp,
-                        "bg_filename": "07_Nhan_Vat_Basic_Phong_Ngu_2K.png",
-                        "bg_path": default_bg_p,
-                        "bg_ref_path": default_bg_p,
+                        "bg_filename": fn,
+                        "bg_path": fp,
+                        "bg_ref_path": fp,
                         "is_default": False,
                         "badge": "KHO NHÂN VẬT",
                     })
@@ -3964,14 +4625,13 @@ def add_custom_fashion_character(char_image_path: str, char_name: str = "", bg_i
     os.makedirs(DEMO_ASSETS_DIR, exist_ok=True)
     fn = os.path.basename(char_image_path)
     clean_fn = re.sub(r"[^a-zA-Z0-9_.-]+", "_", fn)
-    if not clean_fn.lower().endswith((".png", ".jpg", ".jpeg")):
+    if not clean_fn.lower().endswith((".png", ".jpg", ".jpeg", ".webp")):
         clean_fn += ".png"
     dst_char = os.path.join(DEMO_ASSETS_DIR, clean_fn)
     if os.path.abspath(char_image_path) != os.path.abspath(dst_char):
         shutil.copy2(char_image_path, dst_char)
     ensure_image_is_2k(dst_char)
 
-    default_bg_p = os.path.join(DEMO_ASSETS_DIR, "07_Nhan_Vat_Basic_Phong_Ngu_2K.png")
     if bg_image_path and os.path.exists(bg_image_path):
         bg_fn = re.sub(r"[^a-zA-Z0-9_.-]+", "_", os.path.basename(bg_image_path))
         dst_bg = os.path.join(DEMO_ASSETS_DIR, bg_fn)
@@ -3979,8 +4639,9 @@ def add_custom_fashion_character(char_image_path: str, char_name: str = "", bg_i
             shutil.copy2(bg_image_path, dst_bg)
         ensure_image_is_2k(dst_bg)
     else:
-        dst_bg = default_bg_p
-        bg_fn = os.path.basename(default_bg_p)
+        # Mặc định dùng chính ảnh nhân vật 2K của người dùng làm ảnh mở đầu & giữ nhận diện khuôn mặt (KHÔNG lấy ảnh phòng ngủ NV5!)
+        dst_bg = dst_char
+        bg_fn = clean_fn
 
     lib = _load_custom_fashion_library()
     c_id = f"char_custom_{int(time.time())}"
@@ -3997,9 +4658,176 @@ def add_custom_fashion_character(char_image_path: str, char_name: str = "", bg_i
         "is_default": False,
         "badge": "NHÂN VẬT MỚI 2K",
     }
-    lib.setdefault("characters", []).insert(0, new_char)
+    existing_chars = [c for c in (lib.get("characters") or []) if c.get("char_filename") != clean_fn]
+    existing_chars.insert(0, new_char)
+    lib["characters"] = existing_chars
     _save_custom_fashion_library(lib)
     return {"ok": True, "character": new_char, "library": list_fashion_characters_and_outfits_library()}
+
+
+def upload_custom_fashion_asset_base64(
+    filename: str,
+    data_base64: str,
+    kind: str = "outfit",
+    name: str = "",
+    short_desc: str = "",
+    en_desc: str = "",
+    project_id_slug: str = "",
+    auto_white_bg_local: bool = False,
+) -> dict:
+    """
+    Nhận file ảnh/video người dùng chọn trực tiếp từ trình duyệt (HTML5 File Input),
+    lưu xuống ổ đĩa, chuẩn hóa 2K và đăng ký vào Thư Viện Thời Trang / Dự Án hiện tại.
+    """
+    if not data_base64:
+        return {"ok": False, "error": "Dữ liệu file tải lên trống (thiếu data_base64)."}
+    b64_str = str(data_base64).strip()
+    if "," in b64_str and b64_str.lower().startswith("data:"):
+        b64_str = b64_str.split(",", 1)[1]
+    try:
+        raw_bytes = base64.b64decode(b64_str)
+    except Exception as e:
+        return {"ok": False, "error": f"Giải mã base64 thất bại: {e}"}
+
+    if len(raw_bytes) < 64:
+        return {"ok": False, "error": "File tải lên quá nhỏ hoặc không hợp lệ."}
+
+    kind_norm = str(kind or "outfit").strip().lower()
+    orig_bn = os.path.basename(str(filename or f"upload_{int(time.time())}.png"))
+    stem, ext = os.path.splitext(orig_bn)
+    clean_stem = re.sub(r"[^a-zA-Z0-9_-]+", "_", stem).strip("_")[:42] or f"Custom_{int(time.time())}"
+    if clean_stem.lower() in ("prod_1", "prod_2", "prod_3", "image", "media", "clipboard", "upload", "screenshot"):
+        import hashlib as _hl_u
+        clean_stem = f"{clean_stem}_{_hl_u.sha1(raw_bytes).hexdigest()[:6]}"
+    ext_low = ext.lower()
+
+    def _invalidate_global_asset_cache_filename(fn_to_clear: str):
+        if not fn_to_clear:
+            return
+        gc_p = os.path.join(FASHION_STUDIO_DIR, "_global_flow_asset_cache.json")
+        if not os.path.exists(gc_p):
+            return
+        try:
+            with open(gc_p, "r", encoding="utf-8") as _gf:
+                gc_data = json.load(_gf)
+            if isinstance(gc_data, dict):
+                changed = False
+                for _proj_u, _u_map in gc_data.items():
+                    if isinstance(_u_map, dict) and fn_to_clear in _u_map:
+                        _u_map.pop(fn_to_clear, None)
+                        changed = True
+                if changed:
+                    with open(gc_p, "w", encoding="utf-8") as _gf:
+                        json.dump(gc_data, _gf, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    if kind_norm == "video":
+        if ext_low not in (".mp4", ".mov", ".webm", ".mkv"):
+            ext_low = ".mp4"
+        up_dir = os.path.join(FASHION_STUDIO_DIR, "_custom_uploads")
+        os.makedirs(up_dir, exist_ok=True)
+        clean_fn = f"{clean_stem}{ext_low}"
+        dst_p = os.path.join(up_dir, clean_fn)
+        with open(dst_p, "wb") as f:
+            f.write(raw_bytes)
+        return {"ok": True, "kind": "video", "path": dst_p, "filename": clean_fn}
+
+    if ext_low not in (".png", ".jpg", ".jpeg", ".webp"):
+        ext_low = ".png"
+    os.makedirs(DEMO_ASSETS_DIR, exist_ok=True)
+
+    if kind_norm == "character":
+        clean_fn = f"Char_{clean_stem}_2K.png" if not clean_stem.endswith("_2K") else f"Char_{clean_stem}.png"
+        dst_p = os.path.join(DEMO_ASSETS_DIR, clean_fn)
+        with open(dst_p, "wb") as f:
+            f.write(raw_bytes)
+        _invalidate_global_asset_cache_filename(clean_fn)
+        res_c = add_custom_fashion_character(dst_p, char_name=name or stem)
+        if not res_c.get("ok"):
+            return res_c
+        ch_obj = res_c["character"]
+        _invalidate_global_asset_cache_filename(ch_obj.get("char_filename") or "")
+        return {
+            "ok": True,
+            "kind": "character",
+            "path": ch_obj["char_path"],
+            "filename": ch_obj["char_filename"],
+            "character": ch_obj,
+            "library": res_c.get("library"),
+        }
+
+    if kind_norm == "bg":
+        clean_fn = f"BG_{clean_stem}_2K.png" if not clean_stem.endswith("_2K") else f"BG_{clean_stem}.png"
+        dst_p = os.path.join(DEMO_ASSETS_DIR, clean_fn)
+        with open(dst_p, "wb") as f:
+            f.write(raw_bytes)
+        _invalidate_global_asset_cache_filename(clean_fn)
+        info_2k = ensure_image_is_2k(dst_p)
+        return {
+            "ok": True,
+            "kind": "bg",
+            "path": dst_p,
+            "filename": clean_fn,
+            "width": info_2k.get("width", 1536),
+            "height": info_2k.get("height", 2752),
+        }
+
+    # Mặc định: kind == "outfit" (Sản phẩm quần áo của người dùng)
+    clean_fn = f"Outfit_{clean_stem}_2K.png" if not clean_stem.endswith("_2K") else f"Outfit_{clean_stem}.png"
+    dst_p = os.path.join(DEMO_ASSETS_DIR, clean_fn)
+    raw_tmp_p = os.path.join(DEMO_ASSETS_DIR, f"_raw_{clean_fn}")
+    with open(raw_tmp_p, "wb") as f:
+        f.write(raw_bytes)
+    _invalidate_global_asset_cache_filename(clean_fn)
+
+    if auto_white_bg_local:
+        try:
+            _create_clean_white_bg_product_sheet_local_2k(raw_tmp_p, dst_p, outfit_name=name or stem)
+        except Exception:
+            shutil.copy2(raw_tmp_p, dst_p)
+    else:
+        shutil.copy2(raw_tmp_p, dst_p)
+
+    info_2k = ensure_image_is_2k(dst_p)
+    outfit_id = f"outfit_custom_{clean_stem.lower()}"
+    final_name = (name or "").strip() or f"SP Thời Trang: {stem}"
+    new_outfit_entry = {
+        "id": outfit_id,
+        "filename": clean_fn,
+        "path": dst_p,
+        "raw_product_path": raw_tmp_p if os.path.exists(raw_tmp_p) else dst_p,
+        "name": final_name,
+        "short_desc": (short_desc or "").strip() or f"trang phục thời trang theo đúng ảnh sản phẩm {clean_fn}",
+        "en_desc": (en_desc or "").strip() or f"exact fashion outfit matching product reference image {clean_fn}",
+        "width": info_2k.get("width", 1536),
+        "height": info_2k.get("height", 2752),
+        "is_2k": True,
+        "is_default": False,
+        "is_white_bg_sheet": bool(auto_white_bg_local),
+    }
+
+    lib = _load_custom_fashion_library()
+    existing_outfits = [o for o in (lib.get("outfits") or []) if o.get("filename") != clean_fn]
+    existing_outfits.insert(0, new_outfit_entry)
+    lib["outfits"] = existing_outfits
+    _save_custom_fashion_library(lib)
+
+    if project_id_slug:
+        proj_assets = os.path.join(FASHION_STUDIO_DIR, project_id_slug, "assets_2k")
+        os.makedirs(proj_assets, exist_ok=True)
+        proj_dst = os.path.join(proj_assets, clean_fn)
+        if os.path.abspath(dst_p) != os.path.abspath(proj_dst):
+            shutil.copy2(dst_p, proj_dst)
+
+    return {
+        "ok": True,
+        "kind": "outfit",
+        "path": dst_p,
+        "filename": clean_fn,
+        "outfit": new_outfit_entry,
+        "library": list_fashion_characters_and_outfits_library(),
+    }
 
 
 def _create_clean_white_bg_product_sheet_local_2k(source_image_path: str, out_file: str, outfit_name: str = "") -> dict:
@@ -4099,46 +4927,53 @@ def deconstruct_user_product_to_white_bg_sheet_2k(
     if "chatgpt" in provider_norm or "gpt" in provider_norm or "auto" in provider_norm:
         try:
             import urllib.request
+            import engine_settings_manager as _esm_fmc
+            _cp_cfg = _esm_fmc.get_cliproxy_config()
             raw_b = open(source_image_path, "rb").read()
             b64_img = base64.b64encode(raw_b).decode("ascii")
             mime = "image/png" if source_image_path.lower().endswith(".png") else "image/jpeg"
-            payload_chat = {
-                "model": "gpt-4o",
-                "messages": [
-                    {
-                        "role": "user",
-                        "content": [
+            for _m_vis in _esm_fmc.resolve_cliproxy_chat_models(("gpt-5.6-luna", "gpt-6-luna", "gemini-3.5-flash-lite", "gpt-4o"))[:3]:
+                try:
+                    payload_chat = {
+                        "model": _m_vis,
+                        "messages": [
                             {
-                                "type": "text",
-                                "text": (
-                                    "Analyze this clothing/fashion image and return ONLY a JSON object with 3 keys: "
-                                    "\"name_vn\" (short Vietnamese outfit title), "
-                                    "\"desc_vn\" (detailed Vietnamese description of top, bottom/skirt/dress, color, fabric, and matching accessories), "
-                                    "\"desc_en\" (detailed English description of the exact garments, cut, pleats, fabric texture, colors, and 4 matching accessories for an e-commerce flat-lay product sheet on pure white background)."
-                                ),
-                            },
-                            {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64_img}"}},
+                                "role": "user",
+                                "content": [
+                                    {
+                                        "type": "text",
+                                        "text": (
+                                            "Analyze this clothing/fashion image and return ONLY a JSON object with 3 keys: "
+                                            "\"name_vn\" (short Vietnamese outfit title), "
+                                            "\"desc_vn\" (detailed Vietnamese description of top, bottom/skirt/dress, color, fabric, and matching accessories), "
+                                            "\"desc_en\" (detailed English description of the exact garments, cut, pleats, fabric texture, colors, and 4 matching accessories for an e-commerce flat-lay product sheet on pure white background)."
+                                        ),
+                                    },
+                                    {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64_img}"}},
+                                ],
+                            }
                         ],
+                        "temperature": 0.2,
                     }
-                ],
-                "temperature": 0.2,
-            }
-            req = urllib.request.Request(
-                "http://127.0.0.1:8317/v1/chat/completions",
-                data=json.dumps(payload_chat).encode("utf-8"),
-                headers={"Content-Type": "application/json", "Authorization": "Bearer sk-cliproxy"},
-                method="POST",
-            )
-            with urllib.request.urlopen(req, timeout=25) as resp:
-                r_data = json.loads(resp.read().decode("utf-8", errors="replace"))
-                txt_c = (((r_data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
-                m_j = re.search(r"\{.*\}", txt_c, flags=re.DOTALL)
-                if m_j:
-                    parsed_j = json.loads(m_j.group(0))
-                    if not outfit_name and parsed_j.get("name_vn"):
-                        outfit_name = parsed_j["name_vn"]
-                    analyzed_vn_desc = parsed_j.get("desc_vn") or ""
-                    analyzed_en_desc = parsed_j.get("desc_en") or ""
+                    req = urllib.request.Request(
+                        f"{_cp_cfg['url']}/v1/chat/completions",
+                        data=json.dumps(payload_chat).encode("utf-8"),
+                        headers={"Content-Type": "application/json", "Authorization": f"Bearer {_cp_cfg['api_key']}"},
+                        method="POST",
+                    )
+                    with urllib.request.urlopen(req, timeout=25) as resp:
+                        r_data = json.loads(resp.read().decode("utf-8", errors="replace"))
+                        txt_c = (((r_data.get("choices") or [{}])[0].get("message") or {}).get("content") or "").strip()
+                        m_j = re.search(r"\{.*\}", txt_c, flags=re.DOTALL)
+                        if m_j:
+                            parsed_j = json.loads(m_j.group(0))
+                            if not outfit_name and parsed_j.get("name_vn"):
+                                outfit_name = parsed_j["name_vn"]
+                            analyzed_vn_desc = parsed_j.get("desc_vn") or ""
+                            analyzed_en_desc = parsed_j.get("desc_en") or ""
+                            break
+                except Exception:
+                    continue
         except Exception as _chat_err:
             print(f"[ChatGPT Vision Info] {_chat_err}", flush=True)
 
@@ -4414,6 +5249,14 @@ def apply_fashion_video_template_to_project(
     for sc in manifest.get("scenes") or []:
         sc_id = sc.get("id")
         bp = bp_map.get(sc_id) or {}
+        # Bind selected outfits to template beats; changing assets must not re-detect its timing.
+        template_times = bp.get('transition_timestamps_sec') or []
+        if len(template_times) >= len(sc.get('transitions') or []):
+            for tr, raw_time in zip(sc.get('transitions') or [], template_times):
+                seconds = float(str(raw_time).rstrip('sS'))
+                tr['timestamp_sec'] = seconds
+                tr['timestamp_colon'] = format_colon_timestamp(seconds)
+                tr['global_timestamp_sec'] = round(float(sc.get('start_sec') or 0) + seconds, 2)
         if use_adult_safe_s1 and sc_id == "s1" and sc.get("adult_safe_clip_path") and os.path.exists(sc["adult_safe_clip_path"]):
             sc["ref_clip_path"] = sc["adult_safe_clip_path"]
             sc["ref_clip_filename"] = os.path.basename(sc["adult_safe_clip_path"])
@@ -4461,9 +5304,8 @@ def apply_fashion_video_template_to_project(
 
 
 if __name__ == "__main__":
-    # Tự động khởi tạo Project Demo từ Trọn Bộ 7 Ảnh 2K + Video Tham Chiếu 16.28s
-    default_vid = r"C:\Users\ADMIN\.gemini\antigravity\brain\d671407a-7a92-4e69-88ae-fef70956018d\.user_uploaded\media_1793813877093_cc67864d.mp4"
-    if os.path.exists(default_vid) and os.path.exists(DEMO_ASSETS_DIR):
+    default_vid = os.environ.get("FASHION_DEMO_VIDEO", "").strip() or (sys.argv[1] if len(sys.argv) > 1 else "")
+    if default_vid and os.path.exists(default_vid) and os.path.exists(DEMO_ASSETS_DIR):
         res = create_or_update_fashion_motion_project(
             project_id_slug="fashion_motion_demo_7anh_2k",
             title="Lookbook Thời Trang Thay Đồ Theo Nhạc (Trọn Bộ 7 Ảnh 2K — 2 Phân Cảnh × 8s)",
@@ -4472,3 +5314,93 @@ if __name__ == "__main__":
             prompt_style="concise_flow",
         )
         print(json.dumps(res, ensure_ascii=False, indent=2))
+
+
+def prepare_simple_fashion_inputs(project_id, manifest, profile_name=''):
+    """Create a single opening shot and faithful garment-only refs; keep cached successes."""
+    import hashlib
+    folder = os.path.join(FASHION_STUDIO_DIR, project_id)
+    cache_path = os.path.join(folder, 'input_preparation.json')
+    cache_lock = threading.Lock()
+    try:
+        with open(cache_path,encoding='utf-8') as f: cache=json.load(f)
+    except (OSError,ValueError): cache={}
+    def generate(role, source, prompt, assigned_profile=None):
+        if not source or not os.path.isfile(source):
+            raise ValueError('Không tìm thấy ảnh '+role)
+        with open(source,'rb') as source_file:
+            digest=hashlib.sha256(source_file.read()).hexdigest()
+        key=role+'_'+digest
+        with cache_lock:
+            saved=cache.get(key,{})
+            if saved.get('path') and os.path.isfile(saved['path']): return saved['path']
+            manifest['status_message']='Đang chuẩn bị ảnh '+role+' từ ảnh bạn đã thêm...'
+            with open(os.path.join(folder,'fashion_project.json'),'w',encoding='utf-8') as f:
+                json.dump(manifest,f,ensure_ascii=False,indent=2)
+        use_prof = assigned_profile if assigned_profile is not None else profile_name
+        result=generate_fashion_2k_asset_on_flow(
+            asset_type='base_char_bedroom_2k' if role=='opening' else 'deconstructed_outfit_flatlay_2k',
+            prompt_str=prompt,ref_image_paths=[source],
+            output_filename='prepared_'+role+'_'+digest[:12]+'.png',
+            project_id_slug=project_id,profile_name=use_prof)
+        if not result.get('ok') or not os.path.isfile(result.get('path','')):
+            raise ValueError(result.get('error') or 'Không tạo được ảnh '+role)
+        with cache_lock:
+            cache[key]={'path':result['path'],'source':source,'source_hash':digest,'prompt':prompt}
+            with open(cache_path,'w',encoding='utf-8') as f:json.dump(cache,f,ensure_ascii=False,indent=2)
+        return result['path']
+    try:
+        source=manifest['base_char_2k']['path']
+        opening=generate('opening',source,
+            'Create ONE photorealistic vertical 9:16 full-body opening frame for a fashion video. '
+            'The supplied image defines the same adult character face, hair, skin tone and body identity only. '
+            'If it is a multi-view character sheet, reconstruct exactly ONE person, never show panels or text. '
+            'Neutral simple basic outfit, full head and both feet visible, relaxed standing pose, natural hands. '
+            'Use a tidy fashion room with soft daylight, fixed eye-level tripod camera. Setting: '
+            +str(manifest.get('source_template_background') or 'a clean bright dressing room')+
+            '. No product held in hands, no logos, labels, text, extra people or collage.')
+        raw_outfits = list(manifest.get('outfits') or [])
+        if not raw_outfits: raise ValueError('Chưa chọn sản phẩm.')
+        outfit_prompt = (
+            'Create one clean garment-only fashion reference on a seamless white background. '
+            'Extract ONLY the exact visible clothing from the supplied product photo. Preserve its actual '
+            'color, material, print, buttons, cut and hem. Remove the original wearer, face, hands, hair, '
+            'room and text. No invented accessories, jewelry, bags, shoes, outfit colors or extra garments. '
+            'If a feature is not visible, do not invent a distinctive design. One coherent flatlay, '
+            'soft contact shadows, crisp realistic fabric, no labels or watermark.'
+        )
+        outfits=[]
+        if len(raw_outfits) == 1:
+            item = raw_outfits[0]
+            raw = item.get('path') or ''
+            ref = generate('outfit1', raw, outfit_prompt)
+            outfits.append(dict(item, path=ref, filename=os.path.basename(ref)))
+        else:
+            cand_accs = _get_ordered_flow_account_candidates(profile_name, rotate_round_robin=True)
+            def _prep_one_outfit(idx_and_item):
+                idx, it = idx_and_item
+                raw_p = it.get('path') or ''
+                acc_p = cand_accs[(idx - 1) % len(cand_accs)] if cand_accs else profile_name
+                ref_p = generate('outfit'+str(idx), raw_p, outfit_prompt, assigned_profile=acc_p)
+                return idx, dict(it, path=ref_p, filename=os.path.basename(ref_p))
+            max_w = min(len(raw_outfits), max(1, len(cand_accs)), 3)
+            indexed_results = {}
+            with concurrent.futures.ThreadPoolExecutor(max_workers=max_w) as _opool:
+                futs = {_opool.submit(_prep_one_outfit, (i, it)): i for i, it in enumerate(raw_outfits, 1)}
+                for fut in concurrent.futures.as_completed(futs):
+                    r_idx, r_item = fut.result()
+                    indexed_results[r_idx] = r_item
+            for i in range(1, len(raw_outfits) + 1):
+                outfits.append(indexed_results[i])
+        result=apply_fashion_video_template_to_project(
+            template_code=manifest['source_template_code'],base_char_path=opening,char_sheet_path=opening,
+            outfit_items=outfits,project_id_slug=project_id,
+            generation_mode=manifest.get('generation_mode') or 'chained_i2v')
+        if not result.get('ok'): return result
+        result.update(input_flow='simple',input_assets_prepared=True,
+            original_character_path=source,original_outfit_paths=[o.get('path') for o in manifest.get('outfits',[])],
+            max_scene_attempts=manifest.get('max_scene_attempts',1),status='running_flow')
+        with open(os.path.join(folder,'fashion_project.json'),'w',encoding='utf-8') as f:json.dump(result,f,ensure_ascii=False,indent=2)
+        return {'ok':True,'project':result}
+    except Exception as error:
+        return {'ok':False,'error':str(error)}

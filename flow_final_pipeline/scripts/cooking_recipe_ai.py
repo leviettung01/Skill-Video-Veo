@@ -906,16 +906,10 @@ def _try_cliproxy_llm_recipe(dish: str, num_clips: int, region: str, custom_note
     except OSError:
         return None
 
-    api_key = "grok-video-key-001"
-    for acc_path in (ROOT / "data/google_flow_grok/accounts.json", ROOT / "accounts.json"):
-        if acc_path.is_file():
-            try:
-                for row in json.loads(acc_path.read_text(encoding="utf-8")):
-                    if "8317" in str(row.get("proxy_url") or "") and row.get("api_key"):
-                        api_key = str(row["api_key"]).strip()
-                        break
-            except Exception:
-                pass
+    import engine_settings_manager as _esm
+    _cp_cfg = _esm.get_cliproxy_config()
+    api_key = _cp_cfg["api_key"]
+    clip_url = f"{_cp_cfg['url']}/v1/chat/completions"
 
     dialect_hint = (
         "giọng miền Nam thân thiện tự nhiên (nha, nè)"
@@ -938,7 +932,7 @@ def _try_cliproxy_llm_recipe(dish: str, num_clips: int, region: str, custom_note
     )
     user_prompt = f"Món ăn: {dish.strip()}" + (f"\nGhi chú thêm: {custom_notes.strip()}" if custom_notes else "")
 
-    for model_name in ("gemini-2.5-flash", "gpt-4o-mini", "gpt-4o"):
+    for model_name in _esm.resolve_cliproxy_chat_models(("gemini-3.5-flash-lite", "gemini-3-flash", "gpt-5.6-luna", "gemini-2.5-flash", "gpt-4o-mini")):
         try:
             payload = {
                 "model": model_name,
@@ -950,7 +944,7 @@ def _try_cliproxy_llm_recipe(dish: str, num_clips: int, region: str, custom_note
                 "max_tokens": 2600,
             }
             req = urllib.request.Request(
-                "http://127.0.0.1:8317/v1/chat/completions",
+                clip_url,
                 data=json.dumps(payload).encode("utf-8"),
                 headers={"Content-Type": "application/json", "Authorization": f"Bearer {api_key}"},
                 method="POST",

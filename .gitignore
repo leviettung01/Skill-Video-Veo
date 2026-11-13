@@ -59,3 +59,10 @@ Thumbs.db
 *.log
 *.tmp
 *.zip
+
+# Local runtime fashion custom library, QA leftover images & scratch scripts
+data/fashion_templates_cache/custom_fashion_library.json
+prepare_fvt009_*.py
+ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/Char_*
+ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/Outfit_*
+ảnh mẫu thumbnail/Tron_Bo_7_Anh_2K/_raw_*

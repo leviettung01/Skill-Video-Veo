@@ -41,7 +41,7 @@ import google_flow_auth as gfa
 AUTH_ROOT = SKILL_DIR / "data" / "google_flow_grok"
 ACCOUNTS_FILE = AUTH_ROOT / "accounts.json"
 REGISTRY_FILE = AUTH_ROOT / "Flow_nhieu_worker_accounts.json"
-DEFAULT_PROJECT_ID = "bf4979d1-548a-44bd-a265-3927bba76dc1"
+DEFAULT_PROJECT_ID = os.environ.get("FLOW_DEFAULT_PROJECT_ID", "").strip()
 
 
 def _load_accounts() -> list[dict]:

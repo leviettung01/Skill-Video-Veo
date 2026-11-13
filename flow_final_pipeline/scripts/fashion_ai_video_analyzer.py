@@ -334,16 +334,25 @@ def map_outfits_to_scenes_smart(
         return round(local_t, 2)
 
     # Phân bổ số lần đổi đồ trên mỗi phân cảnh
-    is_chained_i2v_mode = str(generation_mode or "").lower() == "chained_i2v"
+    is_chained_i2v_mode = str(generation_mode or "").lower() in ("chained_i2v", "google_vids")
     per_scene_counts = [0] * num_scenes
     if total_outfits > 0:
-        if is_chained_i2v_mode and num_scenes == 2 and total_outfits >= 4:
-            # Chế độ Chained I2V với Character Sheet 4 Outfits: Cảnh 1 đổi 2 bộ (Basic -> Look 1 -> Look 2), Cảnh 2 nối tiếp từ Look 2 đổi 2 bộ (Look 2 -> Look 3 -> Look 4)
+        if total_outfits == 1:
+            # 1 bộ đồ: Cảnh 1 biến hình sang Bộ #1, Cảnh 2+ tiếp tục trình diễn Bộ #1
+            per_scene_counts[0] = 1
+        elif total_outfits == 2 and num_scenes == 2:
+            # 2 bộ đồ trên 2 phân cảnh: Cảnh 1 biến hình sang Bộ #1, Cảnh 2 biến hình sang Bộ #2
+            per_scene_counts = [1, 1]
+        elif is_chained_i2v_mode and num_scenes == 2 and total_outfits == 4:
+            # 4 bộ đồ trên 2 phân cảnh: Cảnh 1 đổi 2 bộ (Basic -> Look 1 -> Look 2), Cảnh 2 nối tiếp từ Look 2 đổi 2 bộ (Look 2 -> Look 3 -> Look 4)
             per_scene_counts = [2, 2]
+        elif is_chained_i2v_mode and num_scenes == 2 and total_outfits >= 5:
+            # 5 bộ đồ trên 2 phân cảnh: Cảnh 1 đổi 2 bộ, Cảnh 2 đổi 3 bộ
+            per_scene_counts = [2, min(3, total_outfits - 2)]
         else:
             for i in range(total_outfits):
                 if total_outfits == 3 and num_scenes == 2:
-                    target_sc_idx = 0 if i == 0 else 1
+                    target_sc_idx = 0 if i < 2 else 1
                 elif total_outfits == 4 and num_scenes == 2:
                     # 4 bộ đồ trên 2 phân cảnh: Cảnh 1 đổi 2 bộ (Look 1 & Look 2), Cảnh 2 nối tiếp từ Look 2 đổi sang Look 3 & Look 4!
                     target_sc_idx = 0 if i < 2 else 1
@@ -493,8 +502,10 @@ def call_cliproxy_vision_for_scene_analysis(
         f'}}'
     )
 
-    models_to_try = [ai_model] if ai_model and ai_model != "auto" else ["gemini-2.5-flash", "gemini-2.5-pro", "gpt-4o", "gpt-4o-mini"]
-    for m_name in models_to_try:
+    import engine_settings_manager as _esm
+    _cp_cfg = _esm.get_cliproxy_config()
+    models_to_try = _esm.resolve_cliproxy_chat_models([ai_model] if ai_model and ai_model != "auto" else ())
+    for m_name in models_to_try[:4]:
         try:
             payload = {
                 "model": m_name,
@@ -511,9 +522,9 @@ def call_cliproxy_vision_for_scene_analysis(
                 "max_tokens": 700,
             }
             req = urllib.request.Request(
-                "http://127.0.0.1:8317/v1/chat/completions",
+                f"{_cp_cfg['url']}/v1/chat/completions",
                 data=json.dumps(payload).encode("utf-8"),
-                headers={"Content-Type": "application/json", "Authorization": "Bearer sk-cliproxy-local"},
+                headers={"Content-Type": "application/json", "Authorization": f"Bearer {_cp_cfg['api_key']}"},
                 method="POST",
             )
             with urllib.request.urlopen(req, timeout=18) as resp:
@@ -1689,21 +1700,16 @@ def render_fashion_postprod_final_video(
     scene_video_paths = []
 
     for sc in scenes:
-        out_name = sc.get("output_video_file") or f"fashion_scene_{sc['id']}_1080p.mp4"
+        status = str(sc.get('status') or '')
+        if status.startswith('failed') or 'synthetic' in str(sc.get('output_provenance') or ''):
+            return {'ok': False, 'error': f"Cảnh {sc.get('id')} chưa có video AI hợp lệ. Hãy tạo lại cảnh lỗi trước khi ghép final."}
+        out_name = sc.get('output_video_file') or f"fashion_scene_{sc['id']}_1080p.mp4"
         sc_mp4 = os.path.join(proj_dir, out_name)
-        if not os.path.exists(sc_mp4) or os.path.getsize(sc_mp4) < 10000:
-            # Tự động tổng hợp video phân cảnh từ bộ khung hình 2K nếu phân cảnh này chưa có file MP4
-            synth_p = synthesize_fashion_scene_video_from_2k_frames(sc, proj_dir, base_char_path)
-            if synth_p and os.path.exists(synth_p):
-                sc_mp4 = synth_p
-                sc["status"] = "done"
-                sc["output_video_path"] = sc_mp4
-        else:
-            sc["status"] = "done"
-            sc["output_video_path"] = sc_mp4
-
-        if os.path.exists(sc_mp4):
-            scene_video_paths.append(sc_mp4)
+        if not os.path.isfile(sc_mp4) or os.path.getsize(sc_mp4) < 10000:
+            return {'ok': False, 'error': f"Thiếu video AI cảnh {sc.get('id')}. Không dùng ảnh tĩnh thay video AI."}
+        if status != 'done':
+            return {'ok': False, 'error': f"Cảnh {sc.get('id')} chưa hoàn tất; không thể ghép final."}
+        scene_video_paths.append(sc_mp4)
 
     if not scene_video_paths:
         return {"ok": False, "error": "Không tìm thấy hoặc không thể tạo file video cho các phân cảnh."}

@@ -1,6 +1,10 @@
 # 👗 ROLE SKILL — TEMPLATE #004: MOTION CONTROL VIDEO FASHION (OMNI FLASH THAY ĐỒ THEO NHẠC & VIDEO THAM CHIẾU)
 
 ## 1. Mục Tiêu Cốt Lõi
+
+### Bắt buộc giữ kịch bản template và chip ảnh từng bộ đồ
+
+Khi chạy một FVT đã có phân tích, giữ `i2v_choreography_precomputed` và các khối động tác của template; chỉ thay ảnh nhân vật, phòng, mô tả sản phẩm và gán bộ đồ tại các mốc. Không thay toàn bộ bằng prompt tự viết, không dùng bảng ghép để thay các product sheet gốc. Mỗi lệnh đổi bộ đồ phải có media segment trỏ đúng ảnh bộ đồ đó và UUID ấy phải có trong danh sách ảnh gửi kèm. Trước khi gửi job, kiểm tra `submitted_prompt_audit` chứa chip đã mã hóa đúng; thiếu UUID phải dừng, không biến chip thành tên file chữ thường. Cảnh nối tiếp bắt buộc upload được frame cuối của cảnh trước; không tự thay bằng ảnh phòng ban đầu khi upload lỗi. Bản render sửa phải giữ riêng để bảo toàn kết quả cũ.
 Template **#004 — Motion Control Video Fashion** được thiết kế chuyên biệt cho các video **Lookbook Thời Trang, OOTD Biến Hình Thay Đồ Theo Beat Nhạc** sử dụng khả năng **Tham Chiếu Video (Video Reference)** độc quyền của model **Omni 1.1 Flash (`abra_edit` / `6s`, `8s`, `10s`)** trên Google Flow:
 - **1 Ảnh Nhân Vật Gốc chuẩn 2K (`1536x2752` / `2048x3639`)**: Đặt nhân vật cố định trong một bối cảnh đẹp (phòng ngủ ấm cúng, studio thời trang, cửa hàng luxury...). Ảnh bắt buộc đạt chuẩn **2K** để gương mặt nhân vật trong video giữ được độ nét chân thực tuyệt đối.
 - **1 Bảng Nhân Vật / Character Sheet 2K (Tùy chọn)**: Giúp khóa chuẩn tỷ lệ cơ thể và form dáng khi mặc các bộ trang phục.

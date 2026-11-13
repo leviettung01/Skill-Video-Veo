@@ -349,20 +349,39 @@ def _refresh_and_commit_google_account(
                 "message": f"✅ Phiên Google Flow '{verified_email}' (Profile: {prof_clean}) đang còn hạn & sẵn sàng.",
             }
 
-    # Khi chạy tự động ngầm (force_refresh=False), không mở Playwright headless trên các Profile mới chưa từng đăng nhập lần đầu
-    # để tránh khóa SingletonLock của Profile khiến người dùng bấm Mở Chrome không hiện cửa sổ.
-    if not force_refresh and not cur_tok and not cfile.is_file():
-        meta_init = gfa.load_session_metadata(gvt.GROK_AUTH_ROOT, prof_clean)
-        if not meta_init.get("token"):
-            return {
-                "ok": False,
-                "profile_name": prof_clean,
-                "email": cur_email or prof_clean,
-                "refreshed": False,
-                "error": "Chưa đăng nhập lần đầu — bấm Mở Chrome Đăng Nhập 1 lần duy nhất.",
-            }
+    # Nếu chưa có cur_tok (hoặc hết hạn) nhưng đã có file cookie JSON -> thử kiểm tra HTTP nhẹ, KHÔNG mở Chrome khi idle
+    if not force_refresh:
+        if not cur_tok and cfile.is_file():
+            try:
+                snap = gfa.read_json(cfile, default=None)
+                c_list = snap.get("cookies", []) if isinstance(snap, dict) else (snap if isinstance(snap, list) else [])
+                flow_tok_from_file = gfa._cookies_list_to_flow_token(c_list)
+                if flow_tok_from_file:
+                    ok_ck2, ck_detail2 = gvt.GoogleTokenRefreshWorker._check_token(flow_tok_from_file)
+                    if ok_ck2:
+                        verified_email = ck_detail2 if "@" in str(ck_detail2 or "") else (cur_email or f"{prof_clean}@gmail.com")
+                        gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, verified_email, flow_tok_from_file, cur_proj)
+                        gvt._upsert_flow_profile_registry(verified_email, prof_clean, cur_proj, mark_login=True)
+                        _sync_cookie_file_to_skill_dirs(prof_clean)
+                        return {
+                            "ok": True,
+                            "profile_name": prof_clean,
+                            "email": verified_email,
+                            "project_id": cur_proj,
+                            "refreshed": False,
+                            "message": f"✅ Phiên Google Flow '{verified_email}' (Profile: {prof_clean}) đã xác thực từ Cookie lưu sẵn.",
+                        }
+            except Exception:
+                pass
+        return {
+            "ok": False,
+            "profile_name": prof_clean,
+            "email": cur_email or prof_clean,
+            "refreshed": False,
+            "error": "Phiên chưa sẵn sàng hoặc đã hết hạn (chỉ kiểm tra HTTP khi chạy ngầm, không tự bật Chrome).",
+        }
 
-    # Token/Cookie hết hạn hoặc yêu cầu làm mới -> Tự động lấy lại Cookie/Token mới từ Profile Chrome đã lưu
+    # Khi force_refresh=True -> Mở Chrome Profile để lấy lại Cookie/Token mới
     ok_ref, new_tok, new_proj, note = gvt._refresh_google_profile(prof_clean)
     if ok_ref and new_tok:
         verified_email = cur_email
@@ -406,8 +425,8 @@ def _refresh_and_commit_google_account(
             "message": f"🔄 Đã tự động lấy Cookie/Token mới từ Chrome Profile '{prof_clean}' ({verified_email})!",
         }
 
-    # Fallback: thu extract tu System Chrome profile qua Playwright
-    if not ok_ref:
+    # Chỉ chạy fallback mở Chrome Playwright khi người dùng chủ động yêu cầu (force_refresh=True)
+    if not ok_ref and force_refresh:
         try:
             import importlib.util as _ilu_ecs
             _spec_ecs = _ilu_ecs.spec_from_file_location("extract_chrome_session", str(Path(__file__).parent / "extract_chrome_session.py"))
@@ -512,6 +531,8 @@ def auto_refresh_all_google_accounts(
         ok_count = 0
         refreshed_count = 0
         for a in google_accs:
+            if not force_refresh and getattr(a, "auth_state", "") == "logging_in":
+                continue
             prof = gvt._google_profile_name_for_account(a, allow_unresolved=True)
             if not prof:
                 continue
@@ -709,19 +730,33 @@ def _is_port_open(port: int) -> bool:
         return False
 
 
+_TM_MOD_CACHE = None
+
+
+def _get_token_manager_module():
+    global _TM_MOD_CACHE
+    if _TM_MOD_CACHE is not None:
+        return _TM_MOD_CACHE
+    if "token_manager" in sys.modules:
+        _TM_MOD_CACHE = sys.modules["token_manager"]
+        return _TM_MOD_CACHE
+    import importlib.util as _ilu_tm
+    _spec_tm = _ilu_tm.spec_from_file_location("token_manager", str(Path(__file__).parent / "token_manager.py"))
+    _mod_tm = _ilu_tm.module_from_spec(_spec_tm)
+    sys.modules["token_manager"] = _mod_tm
+    _spec_tm.loader.exec_module(_mod_tm)
+    _TM_MOD_CACHE = _mod_tm
+    return _mod_tm
+
+
 def ensure_background_services():
     """Đảm bảo CaptchaBridge (:4000), CLIProxy (:8317) và Tự động làm mới Cookie Google Flow luôn sẵn sàng."""
     _RUNNER.ensure_captcha_bridge()
     _start_periodic_google_cookie_refresher()
-    # Khoi dong Token Manager tu dong lam moi session Chrome khi can
+    # Đăng ký guard patch cho gvt mà không bật luồng mở Chrome headless=False định kỳ mỗi 20 phút khi tool đang rảnh
     try:
-        import importlib.util as _ilu_tm
-        _spec_tm = _ilu_tm.spec_from_file_location("token_manager", str(Path(__file__).parent / "token_manager.py"))
-        _mod_tm = _ilu_tm.module_from_spec(_spec_tm)
-        _spec_tm.loader.exec_module(_mod_tm)
-        _mod_tm.TOKEN_MANAGER.enable(profiles=None, auto=True)
+        _mod_tm = _get_token_manager_module()
         _mod_tm.patch_gvt()
-        print("[TokenMgr] Token Manager da khoi dong - tu dong lam moi session Chrome.", flush=True)
     except Exception as _tm_e:
         print(f"[TokenMgr] Init warning: {_tm_e}", flush=True)
     if not _is_port_open(8317) and gvt.CLIPROXY_EXE.is_file():
@@ -759,6 +794,65 @@ def launch_microsoft_edge_app(url: str):
     import webbrowser
     webbrowser.open(url)
     return False
+
+
+_FASHION_RUN_GUARD = threading.Lock()
+_FASHION_RUNNING = set()
+_ALLOWED_MEDIA_EXTS = frozenset({
+    ".mp4", ".mov", ".webm", ".mkv", ".avi", ".m4v",
+    ".jpg", ".jpeg", ".png", ".webp", ".gif", ".bmp", ".svg",
+    ".mp3", ".wav", ".m4a", ".aac", ".ogg", ".flac",
+})
+
+
+def _resolve_allowed_media_path(fpath_str: str) -> tuple:
+    """Resolve media path safely inside SKILL_DIR or configured output directories; returns (Path|None, is_forbidden)."""
+    raw = str(fpath_str or "").strip()
+    if not raw or "\x00" in raw:
+        return None, False
+    norm = os.path.normpath(raw)
+    if norm in ("", "."):
+        return None, False
+
+    roots = [SKILL_DIR.resolve()]
+    extra_candidates = []
+    try:
+        if FINAL_VIDEOS_DIR:
+            extra_candidates.append(FINAL_VIDEOS_DIR)
+    except Exception:
+        pass
+    try:
+        cfg_dir = (_esm.load_engine_settings() or {}).get("final_videos_dir")
+        if cfg_dir:
+            extra_candidates.append(cfg_dir)
+    except Exception:
+        pass
+    for ed in extra_candidates:
+        try:
+            rp = Path(str(ed)).resolve()
+            if rp not in roots:
+                roots.append(rp)
+        except Exception:
+            pass
+
+    p_in = Path(norm)
+    candidates = [p_in] if p_in.is_absolute() else [SKILL_DIR / p_in]
+    saw_forbidden = False
+    for cand in candidates:
+        try:
+            res = cand.resolve()
+        except Exception:
+            continue
+        in_allowed_root = any(res == r or res.is_relative_to(r) for r in roots)
+        if not in_allowed_root:
+            saw_forbidden = True
+            continue
+        if res.suffix.lower() not in _ALLOWED_MEDIA_EXTS:
+            saw_forbidden = True
+            continue
+        if res.is_file():
+            return res, False
+    return None, saw_forbidden
 
 
 class SkillWebHandler(BaseHTTPRequestHandler):
@@ -824,7 +918,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path.startswith("/static/"):
             rel_name = path[len("/static/"):].strip("/\\")
             target_file = (STATIC_DIR / rel_name).resolve()
-            if str(target_file).startswith(str(STATIC_DIR.resolve())) and target_file.is_file():
+            static_root = STATIC_DIR.resolve()
+            if (target_file == static_root or target_file.is_relative_to(static_root)) and target_file.is_file():
                 raw = target_file.read_bytes()
                 ext = target_file.suffix.lower()
                 ctype = (
@@ -862,8 +957,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             secret_val = ""
             if bridge and hasattr(bridge, "get_secret"):
                 secret_val = bridge.get_secret()
-            prof_default = gvt._default_google_profile_name() or "leviettung04"
-            has_cookies = bool(gvt._load_flow_cookie_header(prof_default))
+            prof_default = gvt._default_google_profile_name() or ""
+            has_cookies = bool(prof_default and gvt._load_flow_cookie_header(prof_default))
             bridge_info = {
                 "running": running_4000,
                 "port": bridge_port,
@@ -928,7 +1023,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             from cooking_recipe_ai import SUGGESTED_DISHES
             voices = cooking.list_cooking_voices()
             accounts = cooking.list_cooking_flow_accounts()
-            default_acc = next((a["profile_name"] for a in accounts if a.get("has_cookies")), (accounts[0]["profile_name"] if accounts else "leviettung04"))
+            default_acc = next((a["profile_name"] for a in accounts if a.get("has_cookies")), (accounts[0]["profile_name"] if accounts else ""))
             default_voice = next((v["key"] for v in voices if v.get("recommended_for_cooking")), (voices[0]["key"] if voices else ""))
             default_vid_prov = (_esm.load_engine_settings() or {}).get("video_provider", "google_flow")
             self._send_json({
@@ -1082,6 +1177,15 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             if not proj:
                 self._send_json({"ok": False, "error": "Không tìm thấy dự án"}, 404)
                 return
+            try:
+                live_st = _esm.get_project_live_progress(pid)
+                if live_st and (live_st.get("is_running") or not proj.get("live_status")):
+                    proj["live_status"] = live_st
+                    if live_st.get("is_running"):
+                        proj["is_running"] = True
+                        proj["progress_pct"] = live_st.get("progress_pct", proj.get("progress_pct", 0))
+            except Exception:
+                pass
             self._send_json({"ok": True, "project": proj})
             return
 
@@ -1108,15 +1212,9 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/media":
             fpath_str = (qs.get("path") or [""])[0]
-            if fpath_str:
-                fpath_str = os.path.normpath(fpath_str.strip())
-            fpath = Path(fpath_str) if fpath_str else None
-            if fpath and not fpath.is_file():
-                cand = SKILL_DIR / fpath_str
-                if cand.is_file():
-                    fpath = cand
+            fpath, is_forbidden = _resolve_allowed_media_path(fpath_str)
             if not fpath or not fpath.is_file():
-                self.send_response(404)
+                self.send_response(403 if is_forbidden else 404)
                 self.send_header("Connection", "close")
                 self.end_headers()
                 return
@@ -1185,6 +1283,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path in ("/api/fashion_motion/projects", "/api/fashion_motion/project"):
             try:
                 import fashion_motion_control_engine as _fmce
+                importlib.reload(_fmce)
                 req_pid = (qs.get("project_id") or [""])[0].strip()
                 projs = _fmce.list_fashion_motion_projects()
                 if not projs:
@@ -1243,6 +1342,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     "video_templates_catalog": tpl_cat,
                     "standard_prompts": _fmce.get_standard_fashion_prompts(),
                     "characters": _clm.get_character_library_state().get("characters", []),
+                    "flow_accounts": (__import__("cooking_storyboard_engine").list_cooking_flow_accounts() if os.path.exists(str(PIPELINE_SCRIPTS_DIR / "cooking_storyboard_engine.py")) else []),
+                    "vids_accounts": (__import__("google_vids_client").list_available_vids_accounts() if os.path.exists(str(PIPELINE_SCRIPTS_DIR / "google_vids_client.py")) else []),
                 })
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -1272,6 +1373,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     "ok": True,
                     "workflows": wfs,
                     "characters": _clm.get_character_library_state().get("characters", []),
+                    "flow_accounts": (__import__("cooking_storyboard_engine").list_cooking_flow_accounts() if os.path.exists(str(PIPELINE_SCRIPTS_DIR / "cooking_storyboard_engine.py")) else []),
+                    "vids_accounts": (__import__("google_vids_client").list_available_vids_accounts() if os.path.exists(str(PIPELINE_SCRIPTS_DIR / "google_vids_client.py")) else []),
                 })
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -1320,7 +1423,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/studio/overview":
             char_st = _clm.get_character_library_state() if _clm else {"characters": [], "voices_list": []}
-            prods_st = _pcb.load_products_store() if _pcb else {"products": []}
+            prods_st = _pcb.list_all_products_store() if _pcb else {"products": []}
             tpls = _tm.list_video_templates() if _tm else []
             self._send_json({
                 "ok": True,
@@ -1426,6 +1529,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     stage=str(body.get("stage") or "auto").strip() or "auto",
                     video_provider=str(body.get("video_provider") or "").strip(),
                 )
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
                 self._send_json(result)
             except ValueError as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
@@ -1442,6 +1549,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     reviewed=body.get("storyboards_reviewed") is True,
                     video_provider=str(body.get("video_provider") or "").strip(),
                 )
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
                 self._send_json(result)
             except (ValueError, FileNotFoundError) as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
@@ -1451,6 +1562,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             import cooking_storyboard_engine as cooking
             try:
                 result = cooking.stop_stage(str(body.get("project_id") or "").strip())
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
                 self._send_json(result)
             except (ValueError, FileNotFoundError) as exc:
                 self._send_json({"ok": False, "error": str(exc)}, 400)
@@ -1602,7 +1717,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/analyze_and_create":
             try:
-                import importlib
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fava)
@@ -1648,7 +1762,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path in ("/api/fashion_motion/switch_mode", "/api/fashion_motion/switch_generation_mode"):
             try:
-                import importlib
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fava)
@@ -1664,7 +1777,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/run_scene":
             try:
-                import importlib
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
@@ -1711,6 +1823,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         except Exception as exc:
                             print(f"[FASHION-SCENE-FLOW ERR] {exc}", flush=True)
                     threading.Thread(target=_bg_scene_run, daemon=True).start()
+                    try:
+                        sync_web_ui(force=True)
+                    except Exception:
+                        pass
                     is_vids_s = "vids" in gen_mode.lower() or (cur_manifest or {}).get("generation_mode") == "google_vids"
                     self._send_json({
                         "ok": True,
@@ -1733,7 +1849,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/retry_failed":
             try:
-                import importlib
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
@@ -1746,6 +1861,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         print(f"[FASHION-RETRY-ERR] {exc}", flush=True)
 
                 threading.Thread(target=_bg_retry_failed, daemon=True).start()
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
                 self._send_json({
                     "ok": True,
                     "async": True,
@@ -1758,7 +1877,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/render_final":
             try:
-                import importlib
                 import fashion_motion_control_engine as _fmce
                 import fashion_ai_video_analyzer as _fava
                 importlib.reload(_fmce)
@@ -1781,7 +1899,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/run_flow":
             try:
-                import importlib
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_motion_demo_7anh_2k").strip()
@@ -1790,6 +1907,14 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
                 proj_dir = os.path.join(_fmce.FASHION_STUDIO_DIR, slug)
                 m_path = os.path.join(proj_dir, "fashion_project.json")
+                if not os.path.isfile(m_path):
+                    self._send_json({'ok':False,'error':'Dự án chưa được chuẩn bị. Thêm nhân vật và sản phẩm trước.'},400)
+                    return
+                with _FASHION_RUN_GUARD:
+                    if slug in _FASHION_RUNNING:
+                        self._send_json({'ok':False,'error':'Dự án đang chạy; không gửi thêm job trùng.'},409)
+                        return
+                    _FASHION_RUNNING.add(slug)
                 cur_manifest = None
                 if os.path.exists(m_path):
                     try:
@@ -1812,7 +1937,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         for sc_obj in cur_manifest.get("scenes") or []:
                             sc_obj["status"] = "preparing"
                             sc_obj["attempt"] = 1
-                            sc_obj["max_attempts"] = 3 if eff_m == "google_vids" else 4
+                            sc_obj["max_attempts"] = cur_manifest.get("max_scene_attempts", 3 if eff_m == "google_vids" else 4)
                             sc_obj["status_detail"] = (
                                 "🌐 Đang kết nối Google Vids Web & chuẩn bị 3 ảnh 2K..."
                                 if eff_m == "google_vids"
@@ -1828,8 +1953,14 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         _fmce.run_fashion_motion_project_on_flow(slug, profile_name=prof, generation_mode=gen_mode)
                     except Exception as exc:
                         print(f"[FASHION-FLOW ERR] {exc}", flush=True)
+                    finally:
+                        with _FASHION_RUN_GUARD: _FASHION_RUNNING.discard(slug)
 
                 threading.Thread(target=_bg_run, daemon=True).start()
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
                 is_vids_p = "vids" in gen_mode.lower() or (cur_manifest or {}).get("generation_mode") == "google_vids"
                 self._send_json({
                     "ok": True,
@@ -1842,6 +1973,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     ),
                 })
             except Exception as e:
+                if "slug" in locals():
+                    with _FASHION_RUN_GUARD: _FASHION_RUNNING.discard(slug)
                 self._send_json({"ok": False, "error": str(e)}, 500)
             return
 
@@ -1995,10 +2128,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/flow/token_manager_status":
             try:
-                import importlib.util as _ilu_tms
-                _spec_tms = _ilu_tms.spec_from_file_location("token_manager", str(SKILL_DIR / "token_manager.py"))
-                _mod_tms = _ilu_tms.module_from_spec(_spec_tms)
-                _spec_tms.loader.exec_module(_mod_tms)
+                _mod_tms = _get_token_manager_module()
                 self._send_json(_mod_tms.TOKEN_MANAGER.get_status())
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -2006,10 +2136,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/flow/token_manager_toggle":
             try:
-                import importlib.util as _ilu_tmt
-                _spec_tmt = _ilu_tmt.spec_from_file_location("token_manager", str(SKILL_DIR / "token_manager.py"))
-                _mod_tmt = _ilu_tmt.module_from_spec(_spec_tmt)
-                _spec_tmt.loader.exec_module(_mod_tmt)
+                _mod_tmt = _get_token_manager_module()
                 _enabled = body.get("enabled", True)
                 _profiles = body.get("profiles") or None
                 if _enabled:
@@ -2066,7 +2193,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/fashion_motion/apply_template":
             try:
-                import importlib
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
                 importlib.reload(_fava)
@@ -2076,6 +2202,9 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 char_sheet_path = (body.get("char_sheet_path") or "").strip().strip('"') or None
                 outfit_items = body.get("outfit_items") if isinstance(body.get("outfit_items"), list) else None
                 project_id_slug = (body.get("project_id") or "").strip() or None
+                if body.get('require_inputs') and (not base_char_path or not outfit_items):
+                    self._send_json({'ok':False,'error':'Thêm nhân vật và ít nhất một sản phẩm trước khi tạo video.'},400)
+                    return
                 use_adult_safe_s1 = bool(body.get("use_adult_safe_s1", False))
                 generation_mode = (body.get("generation_mode") or "chained_i2v").strip()
                 auto_run_flow = bool(body.get("auto_run_flow") or body.get("auto_render_flow"))
@@ -2094,6 +2223,18 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     self._send_json(manifest, 400)
                     return
 
+                if prof:
+                    manifest["preferred_profile_name"] = prof
+                if body.get('require_inputs'):
+                    manifest.update(input_flow='simple',max_scene_attempts=int(body.get('max_scene_attempts') or 3))
+                    with open(os.path.join(manifest['project_dir'],'fashion_project.json'),'w',encoding='utf-8') as f:
+                        json.dump(manifest,f,ensure_ascii=False,indent=2)
+                else:
+                    manifest.pop('input_flow', None)
+                    manifest.pop('input_assets_prepared', None)
+                    manifest['max_scene_attempts'] = int(body.get('max_scene_attempts') or 4)
+                    with open(os.path.join(manifest['project_dir'],'fashion_project.json'),'w',encoding='utf-8') as f:
+                        json.dump(manifest,f,ensure_ascii=False,indent=2)
                 target_slug = manifest.get("project_id")
                 if auto_run_flow and target_slug:
                     eff_m = manifest.get("generation_mode") or "chained_i2v"
@@ -2131,6 +2272,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                             print(f"[FASHION-TPL-FLOW ERR] {exc}", flush=True)
                     threading.Thread(target=_bg_tpl_run, daemon=True).start()
                     manifest["flow_started"] = True
+                    try:
+                        sync_web_ui(force=True)
+                    except Exception:
+                        pass
 
                 proj_copy = dict(manifest)
                 manifest["project"] = proj_copy
@@ -2143,6 +2288,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/fashion_motion/deconstruct_outfit_2k":
             try:
                 import fashion_motion_control_engine as _fmce
+                importlib.reload(_fmce)
                 source_image_path = (
                     body.get("source_image_path")
                     or body.get("raw_image_path")
@@ -2174,6 +2320,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/fashion_motion/add_character":
             try:
                 import fashion_motion_control_engine as _fmce
+                importlib.reload(_fmce)
                 char_image_path = (
                     body.get("char_image_path")
                     or body.get("pose_sheet_path")
@@ -2189,6 +2336,33 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     char_image_path=char_image_path,
                     char_name=char_name,
                     bg_image_path=bg_image_path,
+                )
+                self._send_json(res, 200 if res.get("ok") else 400)
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
+        if path == "/api/fashion_motion/upload_file":
+            try:
+                import fashion_motion_control_engine as _fmce
+                importlib.reload(_fmce)
+                filename = str(body.get("filename") or "upload.png").strip()
+                data_base64 = str(body.get("data_base64") or "").strip()
+                kind = str(body.get("kind") or "outfit").strip()
+                name = str(body.get("name") or "").strip()
+                short_desc = str(body.get("short_desc") or "").strip()
+                en_desc = str(body.get("en_desc") or "").strip()
+                project_id_slug = str(body.get("project_id") or "").strip()
+                auto_white_bg_local = bool(body.get("auto_white_bg_local", False))
+                res = _fmce.upload_custom_fashion_asset_base64(
+                    filename=filename,
+                    data_base64=data_base64,
+                    kind=kind,
+                    name=name,
+                    short_desc=short_desc,
+                    en_desc=en_desc,
+                    project_id_slug=project_id_slug,
+                    auto_white_bg_local=auto_white_bg_local,
                 )
                 self._send_json(res, 200 if res.get("ok") else 400)
             except Exception as e:
@@ -2386,15 +2560,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             self._send_json(res, 200 if res.get("ok") else 400)
             return
 
-            product_ids = [product_id] if product_id else None
-            threading.Thread(
-                target=_RUNNER.run_project_batch,
-                args=(project_id, prod_workers, scene_workers, product_ids),
-                daemon=True,
-            ).start()
-            self._send_json({"ok": True, "message": "Đã kích hoạt chạy đa luồng!"})
-            return
-
         if path == "/api/videos/delete-final":
             pid = (body.get("project_id") or "").strip()
             vkey = (body.get("vkey") or "").strip()
@@ -2436,13 +2601,27 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/projects/delete":
-            project_id = body.get("project_id") or ""
+            project_id = str(body.get("project_id") or "").strip()
             idx = core._load_projects_index()
-            idx = [p for p in idx if p["id"] != project_id]
+            extra_dirs = [
+                Path(str(p.get("project_dir") or ""))
+                for p in idx
+                if p.get("id") == project_id and str(p.get("project_dir") or "").strip()
+            ]
+            idx = [p for p in idx if p.get("id") != project_id]
             core._save_projects_index(idx)
-            pdir = core.PROJECTS_DIR / project_id
-            if pdir.is_dir():
-                shutil.rmtree(pdir, ignore_errors=True)
+            allowed_bases = [core.PROJECTS_DIR.resolve(), (SKILL_DIR / "fashion_motion_projects").resolve()]
+            cand_dirs = list(extra_dirs)
+            if project_id and Path(project_id).name == project_id and project_id not in (".", ".."):
+                for base_dir in allowed_bases:
+                    cand_dirs.append(base_dir / project_id)
+            for cand in cand_dirs:
+                try:
+                    pdir = cand.resolve()
+                    if any(pdir != b and pdir.is_relative_to(b) for b in allowed_bases) and pdir.is_dir():
+                        shutil.rmtree(pdir, ignore_errors=True)
+                except Exception:
+                    pass
             self._send_json({"ok": True})
             return
 
@@ -2624,7 +2803,11 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/accounts/open-chrome-profile":
-            prof_name = re.sub(r"[^a-zA-Z0-9._@-]+", "_", (body.get("profile_name") or "leviettung04").strip()) or "leviettung04"
+            raw_prof = (body.get("profile_name") or "").strip() or (gvt._default_google_profile_name() or "")
+            prof_name = re.sub(r"[^a-zA-Z0-9._@-]+", "_", raw_prof).strip("_")
+            if not prof_name:
+                self._send_json({"ok": False, "error": "Chưa có tên profile Google Flow. Hãy nhập tên profile (VD: flow_acc_1) hoặc thêm tài khoản mới trước."}, status=400)
+                return
             dry_run = bool(body.get("dry_run", False))
             gfa.save_browser_settings(gvt.GROK_AUTH_ROOT, prof_name, {"channel": "chrome", "login_mode": "system_chrome"})
             pdir, _ = gfa.profile_paths(gvt.GROK_AUTH_ROOT, prof_name)
@@ -3023,6 +3206,27 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 videos_per_character=vpc_int,
                 primary_product_refs=primary_refs,
                 slide_overlay_files=slide_overlays,
+                force_regenerate_prompts=force_prompts,
+                auto_run_pipeline=auto_run,
+            )
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
+        if path == "/api/products-store/batch-create-video":
+            raw_inputs = body.get("product_ids") or body.get("inputs") or []
+            if not isinstance(raw_inputs, list):
+                raw_inputs = [raw_inputs]
+            template_name = (body.get("template_name") or "Nhà Xưởng").strip()
+            crawl_method = (body.get("method") or "auto").strip()
+            vpc = body.get("videos_per_character")
+            vpc_int = int(vpc) if vpc is not None and str(vpc).strip() != "" else None
+            force_prompts = bool(body.get("force_regenerate_prompts", True))
+            auto_run = bool(body.get("auto_run", True))
+            res = _pcb.batch_prepare_and_optionally_run_products(
+                raw_inputs=raw_inputs,
+                template_name=template_name,
+                crawl_method=crawl_method,
+                videos_per_character=vpc_int,
                 force_regenerate_prompts=force_prompts,
                 auto_run_pipeline=auto_run,
             )

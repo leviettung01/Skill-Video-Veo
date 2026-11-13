@@ -154,8 +154,17 @@ def find_cookie_json_for_profile(
                         return p
         return None
 
-    # Auto-pick: prefer leviettung04, flow_acc_2, or any cookie file containing SAPISID + LSID
-    preferred = ["leviettung04", "flow_acc_2"]
+    # Auto-pick from configured Flow accounts first, then any cookie file in workspace dirs
+    preferred: list[str] = []
+    try:
+        from flow_final_pipeline.scripts import engine_settings_manager as _esm
+        preferred = [
+            str(a.get("account_id") or a.get("profile_name") or "").strip()
+            for a in (_esm.list_available_flow_accounts() or [])
+            if str(a.get("account_id") or a.get("profile_name") or "").strip()
+        ]
+    except Exception:
+        preferred = []
     for pref in preferred:
         found = find_cookie_json_for_profile(pref, workspace_dir=workspace_dir)
         if found:

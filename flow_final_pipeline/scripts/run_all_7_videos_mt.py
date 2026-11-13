@@ -246,9 +246,12 @@ def generate_variant_ref_image_in_page(page, wiz, cookie_hdr, dl_headers, task):
     pid = task["pid"]
     v_key = task["v_key"]
     project_id = task["project_id"]
-    char_id = task["char_id"]
-    max_refs = 4 if task.get("allow_multi_refs") else 1
+    char_id = task.get("char_id") or ""
+    max_refs = 5 if task.get("allow_multi_refs") else 1
     prod_uuids = [u for u in (task.get("prod_uuids") or []) if u][:max_refs]
+    if char_id and not prod_uuids:
+        prod_uuids = [char_id]
+        char_id = ""
     prompt_str = task["prompt_str"]
     out_file = task["out_file"]
 
@@ -697,8 +700,68 @@ def is_ref_image_2k(img_path):
         return False
 
 
+def _resolve_default_flow_pid(prof_name: str = "") -> str:
+    if _esm is not None:
+        try:
+            pid_v = str(_esm.get_default_flow_project_id(prof_name or PROF_NAME) or "").strip()
+            if pid_v:
+                return pid_v
+        except Exception:
+            pass
+    return str(getattr(gvt, "DEFAULT_PROJECT_ID", "") or "").strip()
+
+
+def _http_check_flow_cookies(cookies_list: list, target_pid: str = "", timeout_sec: float = 10.0) -> tuple:
+    """Kiểm tra nhanh cookie Google Flow bằng HTTP (không mở Chrome) để loại sớm tài khoản hết hạn."""
+    if not cookies_list:
+        return False, "empty_cookies"
+    chosen = {}
+    for c in cookies_list:
+        nm = str(c.get("name") or "")
+        val = str(c.get("value") or "")
+        if not nm or not val or "GRECAPTCHA" in nm.upper():
+            continue
+        dom = str(c.get("domain") or "").lower()
+        rank = 3 if "flow.google" in dom else (2 if "labs.google" in dom else 1)
+        if nm not in chosen or rank >= chosen[nm][0]:
+            chosen[nm] = (rank, val)
+    hdr = "; ".join(f"{k}={v[1]}" for k, v in chosen.items())
+    if not hdr:
+        return False, "no_valid_cookie_pairs"
+
+    urls = []
+    if target_pid:
+        urls.append(f"https://flow.google.com/project/{target_pid}")
+    urls.append("https://flow.google.com/")
+    ua = "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/136.0.0.0 Safari/537.36"
+    for idx_u, u in enumerate(urls):
+        try:
+            resp = requests.get(
+                u,
+                headers={"Cookie": hdr, "User-Agent": ua, "Accept": "text/html,application/xhtml+xml"},
+                timeout=timeout_sec,
+                allow_redirects=True,
+            )
+            final_url = str(getattr(resp, "url", "") or "")
+            if "accounts.google.com" in final_url or "CookieMismatch" in final_url:
+                return False, f"auth_redirect:{final_url[:80]}"
+            body = resp.text or ""
+            if '"SNlM0e"' in body:
+                m_pid = __import__("re").search(r"/project/([0-9a-fA-F-]{20,})", final_url or "")
+                found_pid = m_pid.group(1) if m_pid else target_pid
+                return True, found_pid
+            if resp.status_code == 404 and idx_u == 0 and len(urls) > 1:
+                continue
+        except Exception as exc:
+            if idx_u + 1 >= len(urls):
+                # Lỗi mạng thoáng qua chưa chắc cookie chết -> cho phép Chrome thử tiếp
+                return True, f"net_warn:{type(exc).__name__}"
+    return False, "missing_SNlM0e"
+
+
 def main():
-    only_pids = sys.argv[1:] if len(sys.argv) > 1 else ALL_PIDS
+    cli_pids = [a for a in sys.argv[1:] if a and not a.startswith("-")]
+    only_pids = cli_pids if cli_pids else ALL_PIDS
     cfg = _esm.load_engine_settings() if _esm is not None else {}
     VIDEO_PROVIDER = str(cfg.get("video_provider") or "google_flow").strip().lower()
     VIDS_MODEL = str(cfg.get("google_vids_model") or "omni").strip().lower()
@@ -787,15 +850,20 @@ def main():
             except Exception:
                 pass
 
+    initial_ffmpeg_checks = []
     for pid in only_pids:
         pdir = os.path.join(PROJECTS_DIR, pid)
+        prompts_file_p = os.path.join(pdir, "prompts.json")
+        if not os.path.isfile(prompts_file_p):
+            print(f"[SKIP] {pid}: chưa có prompts.json, bỏ qua.", flush=True)
+            continue
         marker_clean = os.path.join(pdir, ".cleaned_new")
         if os.path.exists(marker_clean):
             try:
                 os.remove(marker_clean)
             except OSError:
                 pass
-        prompts_data = json.load(open(os.path.join(pdir, "prompts.json"), encoding="utf-8"))
+        prompts_data = json.load(open(prompts_file_p, encoding="utf-8"))
         refs_path = os.path.join(pdir, "flow_refs_state.json")
         refs_state = json.load(open(refs_path, encoding="utf-8")) if os.path.exists(refs_path) else {"uploaded_prod_refs": {}, "variants": {}}
         refs_state.setdefault("variants", {})
@@ -820,7 +888,7 @@ def main():
             tpl_id_low = str(v_info.get("template_id") or prompts_data.get("template_id") or "").lower()
             is_pov_only = bool(v_info.get("pov_only") or "pov" in tpl_id_low or tpl_id_low == "do_an_vat")
             scene_dur_sec = int(v_info.get("scene_duration_sec") or prompts_data.get("scene_duration_sec") or 10)
-            project_id = v_info.get("project_id") or "932bc2a1-07ea-4199-b147-80ab0018d41c"
+            project_id = v_info.get("project_id") or _resolve_default_flow_pid(PROF_NAME)
             char_id = v_info.get("character_id") or ""
             voice_id = v_info.get("voice_id") or ""
             ref_img_rel = v_info["ref_image"]  # e.g. "v2-refimg.jpg"
@@ -877,7 +945,7 @@ def main():
                         "out_file": out_thumb_proj,
                         "retries": 0,
                     })
-                check_and_queue_ffmpeg(ffmpeg_pool, ffmpeg_futures, pid, pdir, v_key, scenes)
+                initial_ffmpeg_checks.append((pid, pdir, v_key, scenes))
             else:
                 needs_2k_upgrade = False
                 # Queue a ref_img generation task for this variant!
@@ -959,6 +1027,23 @@ def main():
         write_pipeline_heartbeat(f"❌ Lỗi kết nối mạng tới flow.google.com: {net_err}", is_running=False)
         raise RuntimeError(f"Network access to flow.google.com:443 is required before launching Chrome profile: {net_err}")
 
+    def _cookies_to_flow_header(clist):
+        # Giữ cookie của google.com / flow.google.com để tránh xung đột CookieMismatch từ .youtube.com / .google.com.vn
+        prio = {"flow.google.com": 4, ".flow.google.com": 3, ".google.com": 2, "google.com": 1}
+        chosen = {}
+        for c in clist or []:
+            nm = str(c.get("name") or "").strip()
+            dom = str(c.get("domain") or "").strip().lower()
+            if not nm or "GRECAPTCHA" in nm.upper():
+                continue
+            rank = prio.get(dom, 0)
+            if rank == 0:
+                continue
+            prev = chosen.get(nm)
+            if prev is None or rank >= prev[0]:
+                chosen[nm] = (rank, str(c.get("value") or ""))
+        return "; ".join(f"{k}={v[1]}" for k, v in chosen.items())
+
     with sync_playwright() as pw:
         print("Reading and refreshing auth cookies from persistent profile(s) & cookies_file...", flush=True)
         account_cookie_pool = []
@@ -976,12 +1061,14 @@ def main():
                         acc_saved = [c for c in c_json if "GRECAPTCHA" not in c.get("name", "").upper()]
                 except Exception:
                     pass
-            if acc_saved:
+            has_auth_sid = any(c.get("name") in ("SID", "__Secure-1PSID", "OSID") and c.get("value") for c in acc_saved)
+            if acc_saved and has_auth_sid:
                 merged_acc = {(c.get("domain", ""), c.get("name", "")): c for c in acc_saved}
                 account_cookie_pool.append({
                     "name": acc_item.get("name") or acc_prof,
                     "profile_name": acc_prof,
                     "profile_dir": acc_p_dir,
+                    "project_id": str(acc_item.get("project_id") or "").strip(),
                     "clean_cookies": list(merged_acc.values()),
                 })
 
@@ -997,18 +1084,18 @@ def main():
             except Exception as e:
                 print(f"[WARN] Could not read cookies_file {cookies_file}: {e}", flush=True)
 
+        _show_browser = os.environ.get("FLOW_SHOW_BROWSER", "").strip() == "1"
+        _headless_mode = not _show_browser
+
         raw_cookies = []
-        if len(saved_cookies) < 5 and not account_cookie_pool:
+        if len(saved_cookies) < 5 and not account_cookie_pool and not gfa._is_chrome_profile_open(profile_dir):
             try:
+                p_args = ["--disable-blink-features=AutomationControlled", "--window-size=1280,800", "--mute-audio"]
                 p_ctx = pw.chromium.launch_persistent_context(
                     str(profile_dir),
                     channel="chrome",
-                    headless=False,
-                    args=[
-                        "--disable-blink-features=AutomationControlled",
-                        "--window-position=-2000,-2000",
-                        "--window-size=1280,800",
-                    ],
+                    headless=_headless_mode,
+                    args=p_args,
                 )
                 if saved_cookies:
                     try:
@@ -1017,7 +1104,7 @@ def main():
                         print(f"[WARN] p_ctx.add_cookies: {e}", flush=True)
                 p_page = p_ctx.pages[0] if p_ctx.pages else p_ctx.new_page()
                 try:
-                    p_page.goto("https://flow.google.com/project/932bc2a1-07ea-4199-b147-80ab0018d41c", wait_until="domcontentloaded", timeout=35000)
+                    p_page.goto("https://flow.google.com/", wait_until="domcontentloaded", timeout=35000)
                     p_page.wait_for_timeout(2500)
                 except Exception as e:
                     print(f"[WARN] Initial profile warm-up: {e}", flush=True)
@@ -1038,24 +1125,18 @@ def main():
                 "name": f"Google_{PROF_NAME}",
                 "profile_name": PROF_NAME,
                 "profile_dir": profile_dir,
+                "project_id": "",
                 "clean_cookies": clean_cookies,
             })
         elif clean_cookies:
             account_cookie_pool[0]["clean_cookies"] = clean_cookies
 
-        cookie_map = {c["name"]: c["value"] for c in clean_cookies}
-        cookie_hdr_box = ["; ".join(f"{k}={v}" for k, v in cookie_map.items())]
-        print(f"Extracted {len(cookie_map)} clean deduplicated auth cookies across {len(account_cookie_pool)} account(s)!", flush=True)
+        cookie_hdr_box = [_cookies_to_flow_header(clean_cookies)]
+        primary_prof_name = account_cookie_pool[0]["profile_name"]
+        print(f"Prepared clean Google Flow auth cookies across {len(account_cookie_pool)} account(s)!", flush=True)
 
-        browser = pw.chromium.launch(
-            channel="chrome",
-            headless=False,
-            args=[
-                "--disable-blink-features=AutomationControlled",
-                "--window-position=-2000,-2000",
-                "--window-size=1280,800",
-            ],
-        )
+        browser_box = [None]
+        acc_contexts = {}
         ctx_box = [None]
         page_box = [None]
         wiz_box = [None]
@@ -1063,103 +1144,301 @@ def main():
         ctx_uses = [0]
         cur_proj_box = [None]
         acc_idx_box = [0]
-        cur_acc_box = [account_cookie_pool[0]["profile_name"]]
+        cur_acc_box = [primary_prof_name]
+        unhealthy_accounts = {}
 
-        def open_fresh_clean_context(project_id="932bc2a1-07ea-4199-b147-80ab0018d41c"):
-            for attempt in range(1, 5):
-                if ctx_box[0] is not None:
+        def _mark_unhealthy(p_name: str, reason: str = "", cooldown_sec: float = 180.0):
+            if not p_name:
+                return
+            unhealthy_accounts[p_name] = time.time() + cooldown_sec
+            try:
+                import fashion_motion_control_engine as _fmce
+                _fmce._mark_flow_profile_unhealthy(p_name, reason or "pipeline_error")
+            except Exception:
+                pass
+
+        def ensure_browser():
+            b = browser_box[0]
+            if b is not None:
+                try:
+                    if b.is_connected():
+                        return b
+                except Exception:
+                    pass
+                acc_contexts.clear()
+                ctx_box[0] = None
+                page_box[0] = None
+            launch_args = [
+                "--disable-blink-features=AutomationControlled",
+                "--window-size=1280,800",
+                "--mute-audio",
+                "--no-first-run",
+                "--no-default-browser-check",
+            ]
+            try:
+                b = pw.chromium.launch(channel="chrome", headless=_headless_mode, args=launch_args)
+            except Exception:
+                b = pw.chromium.launch(headless=_headless_mode, args=launch_args)
+            browser_box[0] = b
+            return b
+
+        def _activate_ctx_state(st_entry):
+            ctx_box[0] = st_entry["ctx"]
+            page_box[0] = st_entry["pg"]
+            wiz_box[0] = st_entry["wiz"]
+            dl_headers_box[0] = st_entry["dl_headers"]
+            cookie_hdr_box[0] = st_entry["cookie_hdr"]
+            cur_proj_box[0] = st_entry["project_id"]
+            cur_acc_box[0] = st_entry["profile_name"]
+            ctx_uses[0] = st_entry["uses"]
+
+        def open_fresh_clean_context(project_id="", prefer_profile=None, force_reopen=False, rotate_next=False):
+            now_ts = time.time()
+            # Giữ 1 context bền vững cho mỗi tài khoản để tránh đóng/mở Chrome liên tục
+            if not force_reopen:
+                cand_prof = prefer_profile or (
+                    account_cookie_pool[(acc_idx_box[0]) % len(account_cookie_pool)]["profile_name"]
+                    if rotate_next else cur_acc_box[0]
+                )
+                if rotate_next and not prefer_profile and len(account_cookie_pool) > 1:
+                    acc_idx_box[0] = (acc_idx_box[0] + 1) % len(account_cookie_pool)
+                    cand_prof = account_cookie_pool[acc_idx_box[0]]["profile_name"]
+                cached = acc_contexts.get(cand_prof)
+                if cached and cached.get("pg") and unhealthy_accounts.get(cand_prof, 0) <= now_ts:
                     try:
-                        ctx_box[0].close()
+                        if not cached["pg"].is_closed() and browser_box[0] and browser_box[0].is_connected():
+                            _activate_ctx_state(cached)
+                            return
                     except Exception:
                         pass
-                acc_entry = account_cookie_pool[acc_idx_box[0] % len(account_cookie_pool)]
-                acc_idx_box[0] = (acc_idx_box[0] + 1) % len(account_cookie_pool)
-                cur_acc_box[0] = acc_entry["profile_name"]
-                use_cookies = acc_entry.get("clean_cookies") or clean_cookies
-                print(
-                    f"✨ [TK: {acc_entry['profile_name']}] Opening fresh clean Chrome context for project {project_id[:8]} (attempt {attempt})...",
-                    flush=True,
-                )
-                try:
-                    ctx = browser.new_context()
-                    ctx.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
-                    ctx.add_cookies(use_cookies)
-                    pg = ctx.new_page()
-                    pg.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=45000)
-                    pg.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
-                    pg.wait_for_function(
-                        "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
-                        timeout=40000,
-                    )
-                    pg.wait_for_timeout(1500)
-                    wz = pg.evaluate(
-                        """() => {
-                            const w = window.WIZ_global_data || {};
-                            return {
-                                at: w.SNlM0e || '',
-                                bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
-                                fsid: w.FdrFJe || '',
-                                ua: navigator.userAgent,
-                            };
-                        }"""
-                    )
-                    live_c = ctx.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
-                    c_map = {c["name"]: c["value"] for c in live_c if "GRECAPTCHA" not in c.get("name", "").upper()}
-                    cookie_hdr_box[0] = "; ".join(f"{k}={v}" for k, v in c_map.items())
-                    ctx_box[0] = ctx
-                    page_box[0] = pg
-                    wiz_box[0] = wz
-                    dl_headers_box[0] = {
-                        "Cookie": cookie_hdr_box[0],
-                        "Referer": "https://flow.google.com/",
-                        "User-Agent": wz["ua"],
-                    }
-                    ctx_uses[0] = 0
-                    cur_proj_box[0] = project_id
-                    return
-                except Exception as e:
-                    print(f"[WARN] open_fresh_clean_context ({acc_entry['profile_name']}) attempt {attempt} failed: {e}", flush=True)
-                    time.sleep(3.0)
-            raise RuntimeError("Failed to open clean Chrome context after 4 attempts")
 
-        open_fresh_clean_context()
+            ordered_entries = []
+            if prefer_profile:
+                for entry in account_cookie_pool:
+                    if entry["profile_name"] == prefer_profile:
+                        ordered_entries.append(entry)
+                        break
+            start_i = acc_idx_box[0]
+            if rotate_next and not prefer_profile and len(account_cookie_pool) > 1:
+                start_i = (start_i + 1) % len(account_cookie_pool)
+            for off in range(len(account_cookie_pool)):
+                ent = account_cookie_pool[(start_i + off) % len(account_cookie_pool)]
+                if ent not in ordered_entries:
+                    ordered_entries.append(ent)
+
+            # Ưu tiên tài khoản khỏe mạnh trước, tài khoản đang cooldown xếp cuối
+            healthy_entries = [e for e in ordered_entries if unhealthy_accounts.get(e["profile_name"], 0) <= now_ts]
+            cooldown_entries = [e for e in ordered_entries if unhealthy_accounts.get(e["profile_name"], 0) > now_ts]
+            ordered_entries = healthy_entries + cooldown_entries
+
+            last_err = None
+            max_tries = max(len(ordered_entries), min(len(ordered_entries) * 2, 6))
+            for attempt_idx, acc_entry in enumerate(ordered_entries[:max_tries], 1):
+                prof_name = acc_entry["profile_name"]
+                if not force_reopen and prof_name in acc_contexts and unhealthy_accounts.get(prof_name, 0) <= now_ts:
+                    cached = acc_contexts[prof_name]
+                    try:
+                        if cached.get("pg") and not cached["pg"].is_closed() and browser_box[0] and browser_box[0].is_connected():
+                            _activate_ctx_state(cached)
+                            return
+                    except Exception:
+                        pass
+
+                old_st = acc_contexts.pop(prof_name, None)
+                if old_st and old_st.get("ctx"):
+                    try:
+                        old_st["ctx"].close()
+                    except Exception:
+                        pass
+
+                # Luôn ưu tiên project_id riêng của tài khoản đang xét trước để tránh 404/timeout do project thuộc tài khoản khác
+                acc_own_pid = str(acc_entry.get("project_id") or _resolve_default_flow_pid(prof_name) or "").strip()
+                cand_pids = []
+                for p_cand in (acc_own_pid, project_id, ""):
+                    if p_cand not in cand_pids:
+                        cand_pids.append(p_cand)
+
+                use_cookies = acc_entry.get("clean_cookies") or clean_cookies
+                ok_http, http_info = _http_check_flow_cookies(use_cookies, cand_pids[0] if cand_pids else "")
+                if not ok_http:
+                    last_err = f"HTTP cookie check failed ({http_info})"
+                    print(f"[SKIP] [{prof_name}] Bỏ qua trước khi mở Chrome ({last_err})", flush=True)
+                    _mark_unhealthy(prof_name, last_err, cooldown_sec=300.0)
+                    continue
+                if isinstance(http_info, str) and len(http_info) >= 16 and "-" in http_info and http_info not in cand_pids and not http_info.startswith("net_warn:"):
+                    cand_pids.insert(0, http_info)
+
+                for target_pid in cand_pids:
+                    target_url = f"https://flow.google.com/project/{target_pid}" if target_pid else "https://flow.google.com/"
+                    pid_tag = target_pid[:8] if target_pid else "home"
+                    print(
+                        f"✨ [TK: {prof_name}] Connecting reusable Flow context (project {pid_tag}, try {attempt_idx})...",
+                        flush=True,
+                    )
+                    ctx = None
+                    try:
+                        b = ensure_browser()
+                        ctx = b.new_context(viewport={"width": 1280, "height": 800})
+                        ctx.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
+                        ctx.add_cookies(use_cookies)
+                        pg = ctx.new_page()
+                        pg.goto(target_url, wait_until="domcontentloaded", timeout=45000)
+                        cur_u = pg.url or ""
+                        if "accounts.google.com" in cur_u or "CookieMismatch" in cur_u:
+                            raise RuntimeError(f"Auth redirected to {cur_u[:80]}")
+                        if "/404" in cur_u:
+                            print(f"   [WARN] Project {pid_tag} returned 404 for {prof_name}, trying account project...", flush=True)
+                            try:
+                                ctx.close()
+                            except Exception:
+                                pass
+                            ctx = None
+                            continue
+                        pg.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
+                        pg.wait_for_function(
+                            "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
+                            timeout=60000,
+                        )
+                        pg.wait_for_timeout(1200)
+                        final_u = pg.url or ""
+                        eff_pid = target_pid or acc_own_pid
+                        if "/project/" in final_u:
+                            parsed_pid = final_u.split("/project/", 1)[1].split("?", 1)[0].split("/", 1)[0].strip()
+                            if len(parsed_pid) >= 16:
+                                eff_pid = parsed_pid
+                        wz = pg.evaluate(
+                            """() => {
+                                const w = window.WIZ_global_data || {};
+                                return {
+                                    at: w.SNlM0e || '',
+                                    bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
+                                    fsid: w.FdrFJe || '',
+                                    ua: navigator.userAgent,
+                                };
+                            }"""
+                        )
+                        if not wz or not wz.get("at"):
+                            raise RuntimeError(f"Phiên '{prof_name}' thiếu SNlM0e")
+                        live_c = ctx.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"])
+                        hdr = _cookies_to_flow_header(live_c)
+                        st_entry = {
+                            "profile_name": prof_name,
+                            "project_id": eff_pid or _resolve_default_flow_pid(prof_name),
+                            "ctx": ctx,
+                            "pg": pg,
+                            "wiz": wz,
+                            "cookie_hdr": hdr,
+                            "dl_headers": {
+                                "Cookie": hdr,
+                                "Referer": "https://flow.google.com/",
+                                "User-Agent": wz["ua"],
+                            },
+                            "uses": 0,
+                        }
+                        unhealthy_accounts.pop(prof_name, None)
+                        acc_contexts[prof_name] = st_entry
+                        for idx_pos, e_pool in enumerate(account_cookie_pool):
+                            if e_pool["profile_name"] == prof_name:
+                                acc_idx_box[0] = idx_pos
+                                break
+                        _activate_ctx_state(st_entry)
+                        return
+                    except Exception as e:
+                        last_err = e
+                        print(f"[WARN] open_fresh_clean_context ({prof_name}) failed: {e}", flush=True)
+                        if ctx is not None:
+                            try:
+                                ctx.close()
+                            except Exception:
+                                pass
+                        err_low = str(e).lower()
+                        if "accounts.google.com" in err_low or "cookiemismatch" in err_low or "snlm0e" in err_low:
+                            _mark_unhealthy(prof_name, str(e), cooldown_sec=300.0)
+                            break
+                        if "closed" in err_low or "timeout" in err_low:
+                            _mark_unhealthy(prof_name, str(e), cooldown_sec=90.0)
+                            break
+                        time.sleep(1.5)
+
+            raise RuntimeError(f"Failed to open clean Chrome context across {len(ordered_entries)} account(s): {last_err}")
+
+        def _handle_task_failure_switch(project_id_arg, failed_prof, err_msg, prefer_profile=None, rotate_next=True):
+            err_up = str(err_msg or "").upper()
+            is_auth_or_cap = any(k in err_up for k in ("401", "403", "UNAUTHENTICATED", "UNUSUAL_ACTIVITY", "RECAPTCHA", "SNLM0E", "CLOSED"))
+            if is_auth_or_cap and failed_prof:
+                _mark_unhealthy(failed_prof, str(err_msg), cooldown_sec=180.0)
+            open_fresh_clean_context(
+                project_id_arg or _resolve_default_flow_pid(failed_prof),
+                prefer_profile=prefer_profile,
+                rotate_next=rotate_next and (len(account_cookie_pool) > 1),
+                force_reopen=bool(is_auth_or_cap),
+            )
+
+        needs_chrome_on_start = any(
+            t.get("type") in ("ref_img", "upsample_ref_2k", "upsample_1080p")
+            or (t.get("type") == "vid_scene" and VIDEO_PROVIDER != "google_vids")
+            for t in pending_queue
+        )
+        if needs_chrome_on_start:
+            first_pid = next((t.get("project_id") for t in pending_queue if t.get("project_id")), _resolve_default_flow_pid(primary_prof_name))
+            open_fresh_clean_context(first_pid)
         last_submit_ts = [0.0]
 
-        def ensure_single_prod_uuid(pid, pdir, state, refs_state, base_char, project_id, primary_prod_img):
-            refs_state.setdefault("uploaded_prod_refs", {})
-            cur_prod_uuids = refs_state["uploaded_prod_refs"].get(base_char) or []
-            if cur_prod_uuids:
-                return cur_prod_uuids[0]
-            print(f"📤 [{pid} | {base_char.upper()}] Uploading 1 single-variant product image {os.path.basename(primary_prod_img)}...", flush=True)
+        uploaded_prod_by_acc = {}
+        uploaded_char_by_acc = {}
+        acc_variant_uploads = {}
+
+        def ensure_single_prod_uuid(pid, pdir, state, refs_state, base_char, eff_project_id, primary_prod_img):
+            cur_acc = cur_acc_box[0]
+            acc_map = uploaded_prod_by_acc.setdefault(cur_acc, {})
+            if (pid, base_char) in acc_map:
+                return acc_map[(pid, base_char)]
+            if cur_acc == primary_prof_name:
+                refs_state.setdefault("uploaded_prod_refs", {})
+                cur_prod_uuids = refs_state["uploaded_prod_refs"].get(base_char) or []
+                if cur_prod_uuids:
+                    acc_map[(pid, base_char)] = cur_prod_uuids[0]
+                    return cur_prod_uuids[0]
+            print(f"📤 [{pid} | {base_char.upper()} | {cur_acc}] Uploading product image {os.path.basename(primary_prod_img)}...", flush=True)
             ok_u, u_id, err_u = upload_single_product_ref_in_page(
-                page_box[0], wiz_box[0], project_id, primary_prod_img
+                page_box[0], wiz_box[0], eff_project_id, primary_prod_img
             )
             if not ok_u or not u_id:
                 print(f"⚠️ [{pid} | {base_char.upper()}] Product upload failed ({err_u})", flush=True)
                 return None
-            refs_state["uploaded_prod_refs"][base_char] = [u_id]
-            save_prod_state(pdir, state, refs_state)
-            print(f"✅ [{pid} | {base_char.upper()}] Uploaded single product image {os.path.basename(primary_prod_img)} -> uuid={u_id}", flush=True)
+            acc_map[(pid, base_char)] = u_id
+            if cur_acc == primary_prof_name:
+                refs_state.setdefault("uploaded_prod_refs", {})[base_char] = [u_id]
+                save_prod_state(pdir, state, refs_state)
+            print(f"✅ [{pid} | {base_char.upper()} | {cur_acc}] Uploaded single product image {os.path.basename(primary_prod_img)} -> uuid={u_id}", flush=True)
             time.sleep(2.5)
             return u_id
 
-        def ensure_char_photo_uuid(pid, pdir, state, refs_state, base_char, project_id):
-            refs_state.setdefault("uploaded_char_refs", {})
-            cached_u = refs_state["uploaded_char_refs"].get(base_char)
-            if cached_u:
-                return cached_u
+        def ensure_char_photo_uuid(pid, pdir, state, refs_state, base_char, eff_project_id):
+            cur_acc = cur_acc_box[0]
+            acc_cmap = uploaded_char_by_acc.setdefault(cur_acc, {})
+            if (pid, base_char) in acc_cmap:
+                return acc_cmap[(pid, base_char)]
+            if cur_acc == primary_prof_name:
+                refs_state.setdefault("uploaded_char_refs", {})
+                cached_u = refs_state["uploaded_char_refs"].get(base_char)
+                if cached_u:
+                    acc_cmap[(pid, base_char)] = cached_u
+                    return cached_u
             chars_dir = os.path.join(WS_DIR, "flow_final_pipeline", "characters")
             for ext in ("jpg", "png", "jpeg"):
                 cand_p = os.path.join(chars_dir, f"{base_char}_ref.{ext}")
                 if os.path.isfile(cand_p) and os.path.getsize(cand_p) > 5000:
-                    print(f"📤 [{pid} | {base_char.upper()}] Uploading character reference photo {os.path.basename(cand_p)}...", flush=True)
+                    print(f"📤 [{pid} | {base_char.upper()} | {cur_acc}] Uploading character reference photo {os.path.basename(cand_p)}...", flush=True)
                     ok_c, c_uid, err_c = upload_single_product_ref_in_page(
-                        page_box[0], wiz_box[0], project_id, cand_p, quality=96
+                        page_box[0], wiz_box[0], eff_project_id, cand_p, quality=96
                     )
                     if ok_c and c_uid:
-                        refs_state["uploaded_char_refs"][base_char] = c_uid
-                        save_prod_state(pdir, state, refs_state)
-                        print(f"✅ [{pid} | {base_char.upper()}] Uploaded character photo -> uuid={c_uid}", flush=True)
+                        acc_cmap[(pid, base_char)] = c_uid
+                        if cur_acc == primary_prof_name:
+                            refs_state.setdefault("uploaded_char_refs", {})[base_char] = c_uid
+                            save_prod_state(pdir, state, refs_state)
+                        print(f"✅ [{pid} | {base_char.upper()} | {cur_acc}] Uploaded character photo -> uuid={c_uid}", flush=True)
                         time.sleep(2.0)
                         return c_uid
                     else:
@@ -1210,16 +1489,45 @@ def main():
                     )
                     continue
 
-                if ctx_uses[0] >= 12 or cur_proj_box[0] != t["project_id"]:
-                    open_fresh_clean_context(t["project_id"])
+                if t_type == "thumb_img":
+                    # All entry points use the same AI-first renderer and selected provider.
+                    v_key = t['v_key']
+                    write_pipeline_heartbeat(f"Thumbnail AI: {pid} / {v_key}", is_running=True)
+                    result = _esm.generate_thumbnail_for_variant(
+                        pid=pid, vkey=v_key, provider=cfg.get('thumbnail_provider','google_flow'),
+                        inject_01s=bool(cfg.get('auto_inject_thumbnail_01s',False)),
+                        add_text_badge=False,
+                    ) if _esm else {'ok':False,'error':'Thumbnail engine unavailable'}
+                    if result.get('ok'):
+                        print(f"Thumbnail AI saved: {result.get('thumbnail_path')}", flush=True)
+                        safe_sync_ui()
+                    else:
+                        print(f"Thumbnail AI failed: {result.get('error')}", flush=True)
+                    continue
 
-                ctx_uses[0] += 1
+                pref_acc = t.get("preferred_account") or (
+                    t.get("owner_account") if t_type in ("upsample_ref_2k", "upsample_1080p") else None
+                )
+                need_rotate = bool(not pref_acc and ctx_uses[0] >= 18 and len(account_cookie_pool) > 1)
+                open_fresh_clean_context(
+                    t.get("project_id") or _resolve_default_flow_pid(cur_acc_box[0]),
+                    prefer_profile=pref_acc,
+                    rotate_next=need_rotate,
+                )
+                eff_proj_id = cur_proj_box[0] or t["project_id"]
+                if need_rotate and cur_acc_box[0] in acc_contexts:
+                    acc_contexts[cur_acc_box[0]]["uses"] = 0
+                if cur_acc_box[0] in acc_contexts:
+                    acc_contexts[cur_acc_box[0]]["uses"] += 1
+                    ctx_uses[0] = acc_contexts[cur_acc_box[0]]["uses"]
+                else:
+                    ctx_uses[0] += 1
                 last_submit_ts[0] = time.time()
 
                 if t_type == "upsample_ref_2k":
                     v_key = t["v_key"]
                     ok_2k, nbytes_2k, err_2k = upsample_image_2k_in_page(
-                        page_box[0], wiz_box[0], t["project_id"], t["ref_uuid"], t["out_file"]
+                        page_box[0], wiz_box[0], eff_proj_id, t["ref_uuid"], t["out_file"]
                     )
                     if not (ok_2k and nbytes_2k > 50000) and t["retries"] >= 2 and os.path.exists(t["out_file"]):
                         try:
@@ -1238,7 +1546,7 @@ def main():
                     if ok_2k and nbytes_2k > 50000:
                         try:
                             ok_u2k, uuid_2k, _ = upload_single_product_ref_in_page(
-                                page_box[0], wiz_box[0], t["project_id"], t["out_file"], quality=98
+                                page_box[0], wiz_box[0], eff_proj_id, t["out_file"], quality=98
                             )
                             if ok_u2k and uuid_2k:
                                 ref_rel_name = os.path.basename(t["out_file"])
@@ -1249,6 +1557,7 @@ def main():
                                 for q_item in pending_queue:
                                     if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
                                         q_item["ref_uuid"] = uuid_2k
+                                        q_item["owner_account"] = cur_acc_box[0]
                         except Exception:
                             pass
                         print(f"✨ [{pid} | {v_key.upper()}] Upgraded existing Ref Image to 2K (1536x2752) & re-uploaded ({nbytes_2k//1024} KB)!", flush=True)
@@ -1258,23 +1567,23 @@ def main():
                         print(f"⚠️ [{pid} | {v_key.upper()} 2K] SPrCad failed ({err_2k}) ({t['retries']}/4)", flush=True)
                         if t["retries"] <= 4:
                             pending_queue.insert(0, t)
-                        open_fresh_clean_context(t["project_id"])
+                        _handle_task_failure_switch(t["project_id"], cur_acc_box[0], err_2k)
 
                 elif t_type == "ref_img":
                     v_key = t["v_key"]
                     base_char = t["base_char"]
                     u_id = ensure_single_prod_uuid(
-                        pid, pdir, state, refs_state, base_char, t["project_id"], t["primary_prod_img"]
+                        pid, pdir, state, refs_state, base_char, eff_proj_id, t["primary_prod_img"]
                     )
                     if not u_id:
                         t["retries"] += 1
                         if t["retries"] <= 15:
                             pending_queue.insert(0, t)
-                        open_fresh_clean_context(t["project_id"])
+                        _handle_task_failure_switch(t["project_id"], cur_acc_box[0], "upload_prod_ref_failed")
                         continue
                     if not t.get("char_id") and not t.get("pov_only"):
                         c_photo_uuid = ensure_char_photo_uuid(
-                            pid, pdir, state, refs_state, base_char, t["project_id"]
+                            pid, pdir, state, refs_state, base_char, eff_proj_id
                         )
                         if c_photo_uuid:
                             t["prod_uuids"] = [c_photo_uuid, u_id]
@@ -1283,8 +1592,10 @@ def main():
                             t["prod_uuids"] = [u_id]
                     else:
                         t["prod_uuids"] = [u_id]
+                    t_ref = dict(t)
+                    t_ref["project_id"] = eff_proj_id
                     ok, gen_uuid, err = generate_variant_ref_image_in_page(
-                        page_box[0], wiz_box[0], cookie_hdr_box[0], dl_headers_box[0], t
+                        page_box[0], wiz_box[0], cookie_hdr_box[0], dl_headers_box[0], t_ref
                     )
                     if ok and gen_uuid:
                         refs_state["variants"][v_key] = {
@@ -1296,6 +1607,7 @@ def main():
                         state["uploaded_refs"][t["ref_img_rel"]] = gen_uuid
                         save_prod_state(pdir, state, refs_state)
                         safe_sync_ui()
+                        acc_variant_uploads[(cur_acc_box[0], pid, v_key)] = (gen_uuid, u_id)
 
                         # Immediately insert the scene tasks (+ AI Thumbnail task) for this variant at the front of pending_queue!
                         # All scenes share the exact same ingredients: [gen_uuid (2K Ref Image), u_id (Product Image)] + voice_id!
@@ -1317,7 +1629,8 @@ def main():
                                 "ref_img_abs": t["out_file"],
                                 "sc": sc,
                                 "scene_duration_sec": int(sc.get("duration_sec") or t.get("scene_duration_sec") or 10),
-                                "project_id": t["project_id"],
+                                "project_id": eff_proj_id,
+                                "owner_account": cur_acc_box[0],
                                 "ref_uuid": gen_uuid,
                                 "prod_uuid": u_id,
                                 "voice_id": t["voice_id"],
@@ -1336,7 +1649,7 @@ def main():
                                 "char_v": t.get("char_v") or v_key,
                                 "base_char": base_char,
                                 "primary_prod_img": t["primary_prod_img"],
-                                "project_id": t["project_id"],
+                                "project_id": eff_proj_id,
                                 "char_id": t.get("char_id") or "",
                                 "ref_uuid": gen_uuid,
                                 "prod_uuid": u_id,
@@ -1349,26 +1662,11 @@ def main():
                         print(f"⚠️ [{pid} | {v_key} REF] Image gen failed ({err}), recycling context ({t['retries']}/15)...", flush=True)
                         if t["retries"] <= 15:
                             pending_queue.insert(0, t)
-                        open_fresh_clean_context(t["project_id"])
-
-                elif t_type == "thumb_img":
-                    # All entry points use the same AI-first renderer and selected provider.
-                    v_key = t['v_key']
-                    write_pipeline_heartbeat(f"Thumbnail AI: {pid} / {v_key}", is_running=True)
-                    result = _esm.generate_thumbnail_for_variant(
-                        pid=pid, vkey=v_key, provider=cfg.get('thumbnail_provider','google_flow'),
-                        inject_01s=bool(cfg.get('auto_inject_thumbnail_01s',False)),
-                        add_text_badge=False,
-                    ) if _esm else {'ok':False,'error':'Thumbnail engine unavailable'}
-                    if result.get('ok'):
-                        print(f"Thumbnail AI saved: {result.get('thumbnail_path')}", flush=True)
-                        safe_sync_ui()
-                    else:
-                        # Do not automatically resubmit paid image jobs.
-                        print(f"Thumbnail AI failed: {result.get('error')}", flush=True)
+                        _handle_task_failure_switch(t["project_id"], cur_acc_box[0], err)
 
                 elif t_type == "upsample_1080p":
                     sc_id = t["sc"]["id"]
+                    t["project_id"] = eff_proj_id
                     ok, up_uuid, err = submit_upsample_1080p_in_page(page_box[0], wiz_box[0], t)
                     if ok and up_uuid:
                         t["media_uuid"] = up_uuid
@@ -1378,6 +1676,7 @@ def main():
                         t["wiz"] = wiz_box[0]
                         t["dl_headers"] = dict(dl_headers_box[0])
                         t["account_name"] = cur_acc_box[0]
+                        t["preferred_account"] = cur_acc_box[0]
                         state["scene_uuids"][sc_id] = up_uuid
                         save_prod_state(pdir, state)
                         inflight_tasks[t["key"]] = t
@@ -1386,6 +1685,7 @@ def main():
                         t["retries"] += 1
                         print(f"⚠️ [{pid} | {sc_id}] 1080p Upsample submit failed ({err}) ({t['retries']}/5)...", flush=True)
                         if t["retries"] <= 5:
+                            t["preferred_account"] = t.get("account_name") or cur_acc_box[0]
                             pending_queue.insert(0, t)
                         elif os.path.exists(t["out_mp4"] + ".720p.tmp"):
                             shutil.move(t["out_mp4"] + ".720p.tmp", t["out_mp4"])
@@ -1394,48 +1694,58 @@ def main():
                             check_and_queue_ffmpeg(
                                 ffmpeg_pool, ffmpeg_futures, pid, pdir, t["v_key"], prompts_data["videos"][t["v_key"]]["scenes"]
                             )
-                        open_fresh_clean_context(t["project_id"])
+                        _handle_task_failure_switch(
+                            t["project_id"],
+                            cur_acc_box[0],
+                            err,
+                            prefer_profile=t.get("preferred_account"),
+                            rotate_next=False,
+                        )
 
                 else:
                     sc_id = t["sc"]["id"]
                     v_key = t["v_key"]
-                    if not t.get("prod_uuid"):
+                    owner_acc = t.get("owner_account") or primary_prof_name
+                    cached_pair = acc_variant_uploads.get((cur_acc_box[0], pid, v_key))
+                    if cached_pair:
+                        t["ref_uuid"], t["prod_uuid"] = cached_pair
+                        t["owner_account"] = cur_acc_box[0]
+                    elif not t.get("prod_uuid"):
                         u_id = ensure_single_prod_uuid(
-                            pid, pdir, state, refs_state, t["base_char"], t["project_id"], t["primary_prod_img"]
+                            pid, pdir, state, refs_state, t["base_char"], eff_proj_id, t["primary_prod_img"]
                         )
                         if u_id:
                             t["prod_uuid"] = u_id
                             for q_item in pending_queue:
                                 if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
                                     q_item["prod_uuid"] = u_id
-                    # If retrying after a failed submission (e.g. account switch in multi-account mode),
-                    # re-upload both the 2K Ref Image and Product Image to the current account's project and sync across all 3 scenes!
-                    if t.get("retries", 0) > 0:
-                        ref_img_local = t.get("ref_img_abs") or os.path.join(pdir, prompts_data["videos"][v_key]["ref_image"])
-                        if os.path.isfile(ref_img_local):
-                            ok_r, new_ref_u, _ = upload_single_product_ref_in_page(
-                                page_box[0], wiz_box[0], t["project_id"], ref_img_local, quality=98
-                            )
-                            if ok_r and new_ref_u:
-                                t["ref_uuid"] = new_ref_u
-                                state["uploaded_refs"][os.path.basename(ref_img_local)] = new_ref_u
-                                if v_key in refs_state.get("variants", {}):
-                                    refs_state["variants"][v_key]["ref_image_uuid"] = new_ref_u
-                                for q_item in pending_queue:
-                                    if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
-                                        q_item["ref_uuid"] = new_ref_u
-                        if os.path.isfile(t["primary_prod_img"]):
-                            ok_p, new_prod_u, _ = upload_single_product_ref_in_page(
-                                page_box[0], wiz_box[0], t["project_id"], t["primary_prod_img"], quality=95
-                            )
-                            if ok_p and new_prod_u:
-                                t["prod_uuid"] = new_prod_u
-                                refs_state["uploaded_prod_refs"][t["base_char"]] = [new_prod_u]
-                                for q_item in pending_queue:
-                                    if q_item.get("pid") == pid and q_item.get("v_key") == v_key and q_item.get("type") in ("vid_scene", "thumb_img"):
-                                        q_item["prod_uuid"] = new_prod_u
-                        save_prod_state(pdir, state, refs_state)
 
+                    # Khi đổi tài khoản hoặc retry, tự động upload Ref 2K + ảnh SP sang project của tài khoản đang chạy
+                    if t.get("retries", 0) > 0 or (t.get("owner_account") or owner_acc) != cur_acc_box[0]:
+                        if not cached_pair or t.get("retries", 0) > 0:
+                            ref_img_local = t.get("ref_img_abs") or os.path.join(pdir, prompts_data["videos"][v_key]["ref_image"])
+                            if os.path.isfile(ref_img_local):
+                                ok_r, new_ref_u, _ = upload_single_product_ref_in_page(
+                                    page_box[0], wiz_box[0], eff_proj_id, ref_img_local, quality=98
+                                )
+                                if ok_r and new_ref_u:
+                                    t["ref_uuid"] = new_ref_u
+                                    if cur_acc_box[0] == primary_prof_name:
+                                        state["uploaded_refs"][os.path.basename(ref_img_local)] = new_ref_u
+                                        if v_key in refs_state.get("variants", {}):
+                                            refs_state["variants"][v_key]["ref_image_uuid"] = new_ref_u
+                            new_prod_u = ensure_single_prod_uuid(
+                                pid, pdir, state, refs_state, t["base_char"], eff_proj_id, t["primary_prod_img"]
+                            )
+                            if new_prod_u:
+                                t["prod_uuid"] = new_prod_u
+                            if t.get("ref_uuid") and t.get("prod_uuid"):
+                                acc_variant_uploads[(cur_acc_box[0], pid, v_key)] = (t["ref_uuid"], t["prod_uuid"])
+                            t["owner_account"] = cur_acc_box[0]
+                            if cur_acc_box[0] == primary_prof_name:
+                                save_prod_state(pdir, state, refs_state)
+
+                    t["project_id"] = eff_proj_id
                     t["worker_profile"] = cur_acc_box[0]
                     ok, ret_uuid, err = submit_scene_in_page(page_box[0], wiz_box[0], t)
                     if ok and ret_uuid:
@@ -1446,18 +1756,21 @@ def main():
                         t["wiz"] = wiz_box[0]
                         t["dl_headers"] = dict(dl_headers_box[0])
                         t["account_name"] = cur_acc_box[0]
+                        t["preferred_account"] = cur_acc_box[0]
                         state["scene_uuids"][sc_id] = ret_uuid
                         save_prod_state(pdir, state)
                         inflight_tasks[t["key"]] = t
                         write_pipeline_heartbeat(f"🚀 [{pid} | {sc_id}] Đã gửi render cảnh 10s ({cur_acc_box[0]})", is_running=True)
                     else:
                         t["retries"] += 1
-                        print(f"⚠️ [{pid} | {sc_id}] Submit failed ({err}), recycling clean context (retry {t['retries']}/15)...", flush=True)
+                        print(f"⚠️ [{pid} | {sc_id}] Submit failed ({err}), switching/reopening context (retry {t['retries']}/15)...", flush=True)
                         if t["retries"] <= 15:
                             pending_queue.insert(0, t)
-                        open_fresh_clean_context(t["project_id"])
+                        _handle_task_failure_switch(t["project_id"], cur_acc_box[0], err)
 
         fill_inflight_slots(wait_for_delay=False)
+        for _pid_ff, _pdir_ff, _vkey_ff, _sc_ff in initial_ffmpeg_checks:
+            check_and_queue_ffmpeg(ffmpeg_pool, ffmpeg_futures, _pid_ff, _pdir_ff, _vkey_ff, _sc_ff)
 
         loop_start = time.time()
         while inflight_tasks or pending_queue:
@@ -1510,6 +1823,7 @@ def main():
                     t["base_video_uuid"] = t["media_uuid"]
                     t["media_uuid"] = None
                     t["retries"] = 0
+                    t["preferred_account"] = t.get("account_name") or cur_acc_box[0]
                     pending_queue.insert(0, t)
 
                 elif res_state == "done":
@@ -1537,6 +1851,7 @@ def main():
                         t["media_uuid"] = None
                         print(f"🔁 [{pid} | {sc_id}] 1080p Upsample {res_state} ({elapsed}s), retrying ({t['retries']}/5)...", flush=True)
                         if t["retries"] <= 5:
+                            t["preferred_account"] = t.get("account_name") or cur_acc_box[0]
                             pending_queue.insert(0, t)
                         elif os.path.exists(t["out_mp4"] + ".720p.tmp"):
                             shutil.move(t["out_mp4"] + ".720p.tmp", t["out_mp4"])
@@ -1577,13 +1892,20 @@ def main():
                 print("Global timeout reached!", flush=True)
                 break
 
-        if ctx_box[0] is not None:
+        for _acc_st in list(acc_contexts.values()):
+            if _acc_st.get("ctx") is not None:
+                try:
+                    _acc_st["ctx"].close()
+                except Exception:
+                    pass
+        acc_contexts.clear()
+        if browser_box[0] is not None:
             try:
-                ctx_box[0].close()
+                browser_box[0].close()
             except Exception:
                 pass
-        browser.close()
 
+    initial_ffmpeg_checks = []
     for pid in only_pids:
         pdir, prompts_data, _, _ = prod_meta[pid]
         for v_key in list(prompts_data.get("videos", {}).keys()):
