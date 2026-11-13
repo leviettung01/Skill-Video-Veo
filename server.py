@@ -1074,6 +1074,24 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             self._send_json(_tm.get_template_detail(tname))
             return
 
+        if path == "/api/cloud/status":
+            import cloud_account_client as _cac
+            refresh_flag = (qs.get("refresh") or ["0"])[0].strip().lower() in ("1", "true", "yes")
+            self._send_json(_cac.CloudAccountClient().get_status(refresh_online=refresh_flag))
+            return
+
+        if path == "/api/cloud/check-update":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().check_app_update()
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 400))
+            return
+
+        if path == "/api/cloud/store/catalog":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().fetch_store_catalog()
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 401))
+            return
+
         if path == "/api/products-store":
             _ensure_latest_sws()
             self._send_json(_pcb.list_all_products_store())
@@ -1449,6 +1467,76 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+
+        if not path.startswith("/api/cloud/"):
+            import cloud_account_client as _cac
+            if _cac.is_cloud_enforcement_enabled():
+                st = _cac.CloudAccountClient().get_status(refresh_online=False)
+                if not st.get("authenticated"):
+                    self._send_json(
+                        {
+                            "ok": False,
+                            "error_code": "CLOUD_AUTH_REQUIRED",
+                            "error": st.get("error") or "Vui lòng đăng nhập tài khoản bản quyền để sử dụng.",
+                        },
+                        403,
+                    )
+                    return
+
+        if path == "/api/cloud/register":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().register(
+                email=str(body.get("email") or ""),
+                password=str(body.get("password") or ""),
+                full_name=str(body.get("full_name") or ""),
+                phone_zalo=str(body.get("phone_zalo") or ""),
+                server_url=str(body.get("server_url") or ""),
+            )
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 400))
+            return
+
+        if path == "/api/cloud/login":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().login(
+                email=str(body.get("email") or ""),
+                password=str(body.get("password") or ""),
+                server_url=str(body.get("server_url") or ""),
+            )
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 401))
+            return
+
+        if path == "/api/cloud/logout":
+            import cloud_account_client as _cac
+            self._send_json(_cac.CloudAccountClient().logout())
+            return
+
+        if path == "/api/cloud/unbind":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().unbind_current_device()
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 400))
+            return
+
+        if path == "/api/cloud/stage-update":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().stage_app_update()
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
+        if path == "/api/cloud/store/sync-template":
+            import cloud_account_client as _cac
+            res = _cac.CloudAccountClient().sync_template_from_store(
+                template_id=str(body.get("template_id") or "").strip(),
+                kind=str(body.get("kind") or "video_template").strip(),
+                include_video=body.get("include_video", True) is not False,
+            )
+            if res.get("ok") and str(body.get("kind") or "") == "fashion_clip":
+                try:
+                    import fashion_motion_control_engine as _fmce
+                    _fmce.scan_and_sync_fashion_video_templates(force_rescan=True)
+                except Exception:
+                    pass
+            self._send_json(res, 200 if res.get("ok") else int(res.get("http_status") or 400))
+            return
 
         if path == "/api/cooking/generate-script":
             import cooking_storyboard_engine as cooking
