@@ -54,6 +54,20 @@ _TM_MTIME = 0.0
 _PCB_MTIME = 0.0
 _FWE_MTIME = 0.0
 _FWE_MOD = None
+_TE_MTIME = 0.0
+
+
+def _get_transform_engine():
+    global _TE_MTIME
+    import transform_engine as transform
+    try:
+        mt = (PIPELINE_SCRIPTS_DIR / "transform_engine.py").stat().st_mtime
+        if _TE_MTIME and mt != _TE_MTIME:
+            importlib.reload(transform)
+        _TE_MTIME = mt
+    except Exception:
+        pass
+    return transform
 
 
 def _get_fwe():
@@ -286,10 +300,16 @@ def _sync_cookie_file_to_skill_dirs(prof_name: str):
         pass
 
 
+_AUTO_REFRESH_COOLDOWN: dict[str, float] = {}
+_AUTO_REFRESH_COOLDOWN_LOCK = threading.Lock()
+_AUTO_REFRESH_INTERVAL_SEC = 1800.0
+
+
 def _refresh_and_commit_google_account(
     prof_name: str,
     force_refresh: bool = False,
     check_credits: bool = False,
+    auto_refresh_expired: bool = False,
 ) -> dict:
     """Kiểm tra token/cookie hiện tại của Profile Chrome; nếu hết hạn hoặc force_refresh=True thì tự động mở ngầm Profile Chrome để lấy Cookie/Token mới (chuẩn grok_video_tool.py)."""
     prof_clean = re.sub(r"[^a-zA-Z0-9._@-]+", "_", (prof_name or "").strip())
@@ -326,18 +346,35 @@ def _refresh_and_commit_google_account(
     cur_proj = (
         str(target_acc.proxy_url or "").strip()
         if (target_acc and target_acc.proxy_url and not str(target_acc.proxy_url).startswith("http"))
-        else gvt.DEFAULT_PROJECT_ID
+        else ""
     )
+    if cur_proj and cur_proj == getattr(gvt, "DEFAULT_PROJECT_ID", "") and prof_clean.lower() != "leviettung04":
+        cur_proj = ""
     cur_email = (
         getattr(target_acc, "google_email", "")
         or (target_acc.name[len("Google_"):] if (target_acc and target_acc.name.startswith("Google_")) else "")
     )
+    is_existing_acc = target_acc is not None
+
+    def _safe_commit_account(email_val: str, tok_val: str, proj_val: str, source_tag: str = "auto_refresh"):
+        gfa.save_session_metadata(
+            gvt.GROK_AUTH_ROOT,
+            prof_clean,
+            email_val,
+            project=proj_val,
+            token=tok_val,
+            token_source=source_tag,
+        )
+        try:
+            gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, email_val, tok_val, proj_val, refresh=is_existing_acc)
+        except ValueError:
+            gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, email_val, tok_val, proj_val, refresh=False)
 
     if not force_refresh and cur_tok:
         ok_ck, ck_detail = gvt.GoogleTokenRefreshWorker._check_token(cur_tok)
         if ok_ck or gfa.transient_auth_error(ck_detail):
             verified_email = ck_detail if (ok_ck and "@" in str(ck_detail or "")) else (cur_email or f"{prof_clean}@gmail.com")
-            gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, verified_email, cur_tok, cur_proj)
+            _safe_commit_account(verified_email, cur_tok, cur_proj, "token_check")
             gvt._upsert_flow_profile_registry(verified_email, prof_clean, cur_proj, mark_login=True)
             _sync_cookie_file_to_skill_dirs(prof_clean)
             return {
@@ -351,7 +388,7 @@ def _refresh_and_commit_google_account(
 
     # Nếu chưa có cur_tok (hoặc hết hạn) nhưng đã có file cookie JSON -> thử kiểm tra HTTP nhẹ, KHÔNG mở Chrome khi idle
     if not force_refresh:
-        if not cur_tok and cfile.is_file():
+        if cfile.is_file():
             try:
                 snap = gfa.read_json(cfile, default=None)
                 c_list = snap.get("cookies", []) if isinstance(snap, dict) else (snap if isinstance(snap, list) else [])
@@ -360,7 +397,7 @@ def _refresh_and_commit_google_account(
                     ok_ck2, ck_detail2 = gvt.GoogleTokenRefreshWorker._check_token(flow_tok_from_file)
                     if ok_ck2:
                         verified_email = ck_detail2 if "@" in str(ck_detail2 or "") else (cur_email or f"{prof_clean}@gmail.com")
-                        gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, verified_email, flow_tok_from_file, cur_proj)
+                        _safe_commit_account(verified_email, flow_tok_from_file, cur_proj, "cookie_file")
                         gvt._upsert_flow_profile_registry(verified_email, prof_clean, cur_proj, mark_login=True)
                         _sync_cookie_file_to_skill_dirs(prof_clean)
                         return {
@@ -371,18 +408,45 @@ def _refresh_and_commit_google_account(
                             "refreshed": False,
                             "message": f"✅ Phiên Google Flow '{verified_email}' (Profile: {prof_clean}) đã xác thực từ Cookie lưu sẵn.",
                         }
-            except Exception:
-                pass
-        return {
-            "ok": False,
-            "profile_name": prof_clean,
-            "email": cur_email or prof_clean,
-            "refreshed": False,
-            "error": "Phiên chưa sẵn sàng hoặc đã hết hạn (chỉ kiểm tra HTTP khi chạy ngầm, không tự bật Chrome).",
-        }
+            except Exception as _ck_err:
+                print(f"[AuthRefresh][CookieCheck] {prof_clean}: {_ck_err}", flush=True)
+        if not auto_refresh_expired:
+            return {
+                "ok": False,
+                "profile_name": prof_clean,
+                "email": cur_email or prof_clean,
+                "refreshed": False,
+                "error": "Phiên chưa sẵn sàng hoặc đã hết hạn (chỉ kiểm tra HTTP khi chạy ngầm, không tự bật Chrome).",
+            }
+        meta_saved = gfa.load_session_metadata(gvt.GROK_AUTH_ROOT, prof_clean)
+        has_saved_session = (
+            cfile.is_file()
+            or bool(meta_saved.get("email") or meta_saved.get("token"))
+            or gfa._profile_has_google_cookies_on_disk(pdir)
+        )
+        if not has_saved_session:
+            return {
+                "ok": False,
+                "profile_name": prof_clean,
+                "email": cur_email or prof_clean,
+                "refreshed": False,
+                "error": "Profile chưa từng đăng nhập Google Flow.",
+            }
+        now_ts = time.monotonic()
+        with _AUTO_REFRESH_COOLDOWN_LOCK:
+            last_ts = _AUTO_REFRESH_COOLDOWN.get(prof_clean.lower(), 0.0)
+            if last_ts > 0.0 and (now_ts - last_ts) < _AUTO_REFRESH_INTERVAL_SEC:
+                return {
+                    "ok": False,
+                    "profile_name": prof_clean,
+                    "email": cur_email or prof_clean,
+                    "refreshed": False,
+                    "error": "Đang trong thời gian chờ tự động làm mới định kỳ (cooldown 30 phút).",
+                }
+            _AUTO_REFRESH_COOLDOWN[prof_clean.lower()] = now_ts
 
-    # Khi force_refresh=True -> Mở Chrome Profile để lấy lại Cookie/Token mới
-    ok_ref, new_tok, new_proj, note = gvt._refresh_google_profile(prof_clean)
+    # Mở Chrome Profile (headless) để lấy lại Cookie/Token mới
+    ok_ref, new_tok, new_proj, note = gvt._refresh_google_profile(prof_clean, True)
     if ok_ref and new_tok:
         verified_email = cur_email
         if isinstance(note, str) and note.startswith("session_verified:"):
@@ -392,8 +456,8 @@ def _refresh_and_commit_google_account(
         if not verified_email or "@" not in verified_email:
             meta = gfa.load_session_metadata(gvt.GROK_AUTH_ROOT, prof_clean)
             verified_email = str(meta.get("email") or "").strip() or f"{prof_clean}@gmail.com"
-        eff_proj = new_proj or cur_proj or gvt.DEFAULT_PROJECT_ID
-        gfa.commit_login(gvt.GROK_AUTH_ROOT, prof_clean, verified_email, new_tok, eff_proj)
+        eff_proj = new_proj or cur_proj or ""
+        _safe_commit_account(verified_email, new_tok, eff_proj, "browser_refresh")
         gvt._upsert_flow_profile_registry(verified_email, prof_clean, eff_proj, mark_login=True)
         _sync_cookie_file_to_skill_dirs(prof_clean)
 
@@ -401,7 +465,10 @@ def _refresh_and_commit_google_account(
         tier_tag = ""
         if check_credits:
             try:
-                credits_val, tier_tag = gvt.GoogleTokenRefreshWorker._fetch_google_credits(prof_clean, token=new_tok)
+                if hasattr(gvt.GoogleTokenRefreshWorker, "_fetch_google_credits"):
+                    credits_val, tier_tag = gvt.GoogleTokenRefreshWorker._fetch_google_credits(prof_clean, token=new_tok)
+                elif hasattr(gvt, "get_live_flow_account_credits"):
+                    credits_val = gvt.get_live_flow_account_credits(prof_clean)
                 if credits_val is not None or tier_tag:
                     am2 = gvt.AccountManager()
                     for a2 in am2.accounts:
@@ -411,8 +478,8 @@ def _refresh_and_commit_google_account(
                             if tier_tag:
                                 a2.tag = tier_tag
                     am2.save()
-            except Exception:
-                pass
+            except Exception as _cr_e:
+                print(f"[AuthRefresh][Credits] {prof_clean}: {_cr_e}", flush=True)
 
         return {
             "ok": True,
@@ -474,6 +541,7 @@ def auto_refresh_all_google_accounts(
     force_refresh: bool = False,
     check_credits: bool = False,
     reason: str = "startup",
+    auto_refresh_expired: bool = False,
 ) -> dict:
     """Tự động quét toàn bộ Profile Chrome đã lưu và làm mới Cookie/Token Google Flow khi khởi động tool hoặc định kỳ."""
     with _GOOGLE_REFRESH_LOCK:
@@ -516,7 +584,7 @@ def auto_refresh_all_google_accounts(
                         api_key=tok,
                         profile_name=prof,
                         google_email=em if "@" in em else "",
-                        auth_state="ready" if tok else " stale",
+                        auth_state="ready" if tok else "stale",
                         active=True,
                     )
                 )
@@ -540,6 +608,7 @@ def auto_refresh_all_google_accounts(
                 prof,
                 force_refresh=force_refresh,
                 check_credits=check_credits,
+                auto_refresh_expired=auto_refresh_expired,
             )
             results.append(res)
             if res.get("ok"):
@@ -705,19 +774,68 @@ def _start_periodic_google_cookie_refresher():
     _PERIODIC_REFRESHER_STARTED = True
 
     def _loop():
-        time.sleep(1.5)
+        time.sleep(2.5)
         try:
-            auto_refresh_all_google_accounts(force_refresh=False, check_credits=False, reason="khởi động tool")
-        except Exception:
-            pass
+            auto_refresh_all_google_accounts(
+                force_refresh=False,
+                check_credits=False,
+                reason="khởi động tool",
+                auto_refresh_expired=True,
+            )
+        except Exception as _ref_e1:
+            print(f"[AuthRefresher][Startup] {_ref_e1}", flush=True)
         while True:
-            time.sleep(900)  # Kiểm tra định kỳ mỗi 15 phút
+            time.sleep(900)  # Kiểm tra & tự làm mới tài khoản hết hạn mỗi 15 phút
             try:
-                auto_refresh_all_google_accounts(force_refresh=False, check_credits=False, reason="tự động định kỳ")
-            except Exception:
-                pass
+                auto_refresh_all_google_accounts(
+                    force_refresh=False,
+                    check_credits=False,
+                    reason="tự động định kỳ",
+                    auto_refresh_expired=True,
+                )
+            except Exception as _ref_e2:
+                print(f"[AuthRefresher][Periodic] {_ref_e2}", flush=True)
 
     threading.Thread(target=_loop, daemon=True).start()
+
+
+_LAST_AUTO_SOLVER_LAUNCH_TS = 0.0
+_AUTO_SOLVER_LAUNCH_LOCK = threading.Lock()
+
+
+def ensure_captcha_solver_window_if_needed(force: bool = False) -> bool:
+    """Tự động mở cửa sổ Chrome Captcha Solver nếu CaptchaBridge (:4000) chưa nhận kết nối từ Extension."""
+    global _LAST_AUTO_SOLVER_LAUNCH_TS
+    if not force:
+        if os.environ.get("VEO_DISABLE_AUTO_SOLVER_CHROME") == "1" or "unittest" in sys.modules:
+            return False
+    try:
+        bridge = _RUNNER.ensure_captcha_bridge()
+        if bridge and hasattr(bridge, "extension_liveness") and bridge.extension_liveness() == "connected":
+            return True
+        bridge_port = getattr(gvt, "CAPTCHA_BRIDGE_PORT", 4000)
+        if _is_port_open(bridge_port):
+            try:
+                with urllib.request.urlopen(f"http://127.0.0.1:{bridge_port}/status", timeout=1.0) as _r_st:
+                    _st_j = json.loads(_r_st.read().decode("utf-8", errors="replace"))
+                    if _st_j.get("extension_online") or _st_j.get("extension_liveness") == "connected":
+                        return True
+            except Exception:
+                pass
+        with _AUTO_SOLVER_LAUNCH_LOCK:
+            now_ts = time.monotonic()
+            if not force and _LAST_AUTO_SOLVER_LAUNCH_TS > 0 and (now_ts - _LAST_AUTO_SOLVER_LAUNCH_TS) < 120.0:
+                return False
+            solver_prof_dir = (gvt.GROK_AUTH_ROOT / "native_profiles" / "captcha_bridge_solver").resolve()
+            if not force and gfa._is_chrome_profile_open(solver_prof_dir):
+                _LAST_AUTO_SOLVER_LAUNCH_TS = now_ts
+                return True
+            _LAST_AUTO_SOLVER_LAUNCH_TS = now_ts
+        _launch_captcha_extension_chrome_window(dry_run=False)
+        return True
+    except Exception as _sol_e:
+        print(f"[CaptchaSolverAuto] Không thể tự bật Chrome Solver: {_sol_e}", flush=True)
+        return False
 
 
 def _is_port_open(port: int) -> bool:
@@ -750,7 +868,14 @@ def _get_token_manager_module():
 
 
 def ensure_background_services():
-    """Đảm bảo CaptchaBridge (:4000), CLIProxy (:8317) và Tự động làm mới Cookie Google Flow luôn sẵn sàng."""
+    """Đảm bảo ProxyManager, CaptchaBridge (:4000), CLIProxy (:8317) và Tự động làm mới Cookie Google Flow luôn sẵn sàng."""
+    try:
+        import proxy_manager as _pm
+        if getattr(_pm, "_global_proxy_manager", None) is None:
+            _pm_inst = _pm.ProxyManager(log_fn=lambda m: print(f"[ProxyMgr] {m}", flush=True))
+            _pm.set_global_proxy_manager(_pm_inst)
+    except Exception as _pm_e:
+        print(f"[ProxyMgr] Init warning: {_pm_e}", flush=True)
     _RUNNER.ensure_captcha_bridge()
     _start_periodic_google_cookie_refresher()
     # Đăng ký guard patch cho gvt mà không bật luồng mở Chrome headless=False định kỳ mỗi 20 phút khi tool đang rảnh
@@ -768,12 +893,110 @@ def ensure_background_services():
                 stderr=subprocess.DEVNULL,
                 creationflags=subprocess.CREATE_NO_WINDOW if sys.platform == "win32" else 0,
             )
+        except Exception as _cp_e:
+            print(f"[CLIProxy] Start warning: {_cp_e}", flush=True)
+
+
+def _load_valid_index_html(index_file: Path | None = None) -> bytes:
+    """Đọc static/index.html và tự động vá nếu file từng bị trình soạn thảo cắt cụt (...[truncated for diff preview])."""
+    target = index_file or (STATIC_DIR / "index.html")
+    raw = target.read_bytes()
+    lower_tail = raw.rstrip().lower()
+    if b"truncated for diff preview" not in raw and lower_tail.endswith(b"</html>"):
+        return raw
+
+    recovery_file = target.parent / "_index_tail_recovery.html"
+    if not recovery_file.is_file():
+        recovery_file = STATIC_DIR / "_index_tail_recovery.html"
+    if not recovery_file.is_file():
+        return raw
+
+    text = raw.decode("utf-8", errors="replace")
+    eol = "\r\n" if "\r\n" in text else "\n"
+    anchor = "          if (rCook && rCook.ok) {"
+    anchor_pos = text.rfind(anchor)
+    run_batch_anchor = "    async function runProjectBatch(projectId, productId) {"
+    run_batch_pos = text.rfind(run_batch_anchor)
+    if anchor_pos != -1 and anchor_pos > run_batch_pos:
+        prefix = text[:anchor_pos]
+    elif run_batch_pos != -1:
+        run_batch_header = eol.join([
+            "    async function runProjectBatch(projectId, productId) {",
+            "      const proj = STATE.projectDetailsCache[projectId] || STATE.currentProject;",
+            "      const rawTpl = (STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId])",
+            "        || document.getElementById(\"selStudioCenterTemplate\")?.value",
+            "        || document.getElementById(\"selStudioToolbarTemplate\")?.value",
+            "        || (proj && proj.template_code)",
+            "        || \"001\";",
+            "      const tpl = String(rawTpl).replace(/^#/, \"\");",
+            "      if (tpl === \"004\" || (proj && proj.is_fashion_motion_project && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {",
+            "        if (proj && proj.is_fashion_motion_project && (proj.products || []).length > 0) {",
+            "          const hasFailed = (proj.products || []).some(p => p.status === \"failed\" || (p.scenes || []).some(s => s.status === \"error\"));",
+            "          const endpoint = hasFailed ? \"/api/fashion_motion/retry_failed\" : \"/api/fashion_motion/run_flow\";",
+            "          const rRun = await apiPost(endpoint, { project_id: projectId });",
+            "          if (rRun && rRun.ok) {",
+            "            if (typeof toast === \"function\") toast(rRun.message || \"🚀 Đã khởi chạy dự án Thời trang ngầm!\", \"ok\");",
+            "            delete STATE.projectDetailsCache[projectId];",
+            "            STATE.renderedProjectSig = \"\";",
+            "            await refreshAll(false);",
+            "            await loadProjectDetail(projectId, false);",
+            "            return;",
+            "          }",
+            "        }",
+            "        switchTab(\"fashion\", document.getElementById(\"navBtn-fashion\"));",
+            "        setTimeout(() => {",
+            "          if (proj && proj.is_fashion_motion_project && typeof onSelectFashionProjectSlug === \"function\") {",
+            "            onSelectFashionProjectSlug(projectId);",
+            "          }",
+            "        }, 120);",
+            "        return;",
+            "      }",
+            "      if ((typeof isTransformStudioTemplate === \"function\" && isTransformStudioTemplate(tpl, proj)) || tpl === \"006\" || proj?.pipeline_kind === \"fashion_transformation\") {",
+            "        if (proj && proj.pipeline_kind === \"fashion_transformation\" && (proj.products || []).length > 0) {",
+            "          const rTf = await apiPost(\"/api/transform/resume\", { id: projectId });",
+            "          if (rTf && rTf.ok) {",
+            "            if (typeof toast === \"function\") toast(\"🚀 Đã xếp hàng chạy tiếp dự án Biến Hình đa luồng tại Studio!\", \"ok\");",
+            "            delete STATE.projectDetailsCache[projectId];",
+            "            STATE.renderedProjectSig = \"\";",
+            "            await refreshAll(false);",
+            "            await loadProjectDetail(projectId, false);",
+            "            return;",
+            "          }",
+            "        }",
+            "        await window.openTransformStudio(proj?.pipeline_kind === \"fashion_transformation\" ? projectId : \"\", tpl);",
+            "        return;",
+            "      }",
+            "      if (tpl === \"005\" || (proj && proj.pipeline_kind === \"cooking_storyboard\" && !(STATE.studioSelectedTemplate && STATE.studioSelectedTemplate[projectId]))) {",
+            "        if (proj && proj.pipeline_kind === \"cooking_storyboard\" && (proj.products || []).length > 0) {",
+            "          const rCook = await apiPost(\"/api/cooking/run\", { project_id: projectId, stage: \"auto\" });",
+            "",
+        ])
+        prefix = text[:run_batch_pos] + run_batch_header
+    else:
+        marker_lines = [
+            ln for ln in text.splitlines(keepends=True)
+            if "truncated for diff preview" not in ln
+        ]
+        prefix = "".join(marker_lines)
+        if prefix and not prefix.endswith(("\n", "\r")):
+            prefix += eol
+
+    tail_text = recovery_file.read_text(encoding="utf-8")
+    tail_norm = tail_text.replace("\r\n", "\n").replace("\n", eol)
+    healed = (prefix + tail_norm).encode("utf-8")
+    if b"</html>" in healed.lower():
+        try:
+            target.write_bytes(healed)
+            print("[WebUI] Đã tự động khôi phục phần cuối static/index.html bị cắt cụt.", flush=True)
         except Exception:
             pass
+        return healed
+    return raw
 
 
 def launch_microsoft_edge_app(url: str):
     """Mở giao diện trên nhân Microsoft Edge ở chế độ App Mode (--app) trên màn hình chính (WinSta0\\Default)."""
+    print(f"🌐 Đang mở cửa sổ giao diện Web UI: {url}", flush=True)
     _allow_foreground_window()
     edge_candidates = [
         Path(r"C:\Program Files (x86)\Microsoft\Edge\Application\msedge.exe"),
@@ -893,6 +1116,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
             pass
         except Exception as e:
+            err_msg = f"{type(e).__name__}: {e}"
+            print(f"[API ERROR][GET {self.path}] {err_msg}", flush=True)
+            if hasattr(gvt, "record_diagnostic_error"):
+                gvt.record_diagnostic_error("WebServerAPI", target=f"GET {self.path}", error_text=err_msg)
             self._send_json({"ok": False, "error": str(e)}, 500)
 
     def _do_GET_inner(self):
@@ -905,7 +1132,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             if not index_file.is_file():
                 self._send_json({"error": "Missing static/index.html"}, 404)
                 return
-            raw = index_file.read_bytes()
+            loader = globals().get("_load_valid_index_html")
+            raw = loader(index_file) if callable(loader) else index_file.read_bytes()
             self.send_response(200)
             self.send_header("Content-Type", "text/html; charset=utf-8")
             self.send_header("Content-Length", str(len(raw)))
@@ -979,7 +1207,18 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 "login_status": _LOGIN_STATUS,
                 "engine_settings": _esm.load_engine_settings(),
                 "running_pipelines": _esm.list_all_running_pipelines(),
+                "recent_errors": gvt.get_recent_diagnostic_errors(15) if hasattr(gvt, "get_recent_diagnostic_errors") else [],
             })
+            return
+
+        if path == "/api/diagnostics/errors":
+            limit_val = 80
+            try:
+                limit_val = max(1, min(300, int((qs.get("limit") or ["80"])[0])))
+            except Exception:
+                pass
+            errs = gvt.get_recent_diagnostic_errors(limit_val) if hasattr(gvt, "get_recent_diagnostic_errors") else []
+            self._send_json({"ok": True, "errors": errs, "count": len(errs)})
             return
 
         if path == "/api/settings":
@@ -1016,6 +1255,28 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     headline=(qs.get("headline") or [""])[0],
                 ),
             })
+            return
+
+        if path.startswith("/api/transform/"):
+            transform = _get_transform_engine()
+            try:
+                if path == "/api/transform/default":
+                    tpl_q = (qs.get("template") or qs.get("code") or [""])[0].strip() or None
+                    result = transform.default(template_code=tpl_q)
+                elif path == "/api/transform/products":
+                    result = transform.products()
+                elif path == "/api/transform/status":
+                    result = transform.status((qs.get("id") or [""])[0])
+                elif path == "/api/transform/jobs":
+                    tpl_q = (qs.get("template") or qs.get("code") or [""])[0].strip()
+                    lim_q = int((qs.get("limit") or ["24"])[0] or 24)
+                    result = transform.list_jobs(template_code=tpl_q, limit=lim_q)
+                else:
+                    self._send_json({"ok": False, "error": "Không tìm thấy chức năng."}, 404)
+                    return
+                self._send_json(result)
+            except (ValueError, FileNotFoundError) as e:
+                self._send_json({"ok": False, "error": str(e)}, 400)
             return
 
         if path == "/api/cooking/default":
@@ -1066,6 +1327,11 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/templates":
             _ensure_latest_sws()
             self._send_json({"ok": True, "templates": _tm.list_video_templates(), "template_root_dir": _tm.TEMPLATE_ROOT_DIR})
+            return
+
+        if path == "/api/templates/check-updates":
+            _ensure_latest_sws()
+            self._send_json(_tm.check_code_updates())
             return
 
         if path == "/api/templates/detail":
@@ -1283,7 +1549,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path in ("/api/fashion_motion/projects", "/api/fashion_motion/project"):
             try:
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fmce)
                 req_pid = (qs.get("project_id") or [""])[0].strip()
                 projs = _fmce.list_fashion_motion_projects()
                 if not projs:
@@ -1443,12 +1708,54 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         except (ConnectionAbortedError, ConnectionResetError, BrokenPipeError):
             pass
         except Exception as e:
+            err_msg = f"{type(e).__name__}: {e}"
+            print(f"[API ERROR][POST {self.path}] {err_msg}", flush=True)
+            if hasattr(gvt, "record_diagnostic_error"):
+                gvt.record_diagnostic_error("WebServerAPI", target=f"POST {self.path}", error_text=err_msg)
             self._send_json({"ok": False, "error": str(e)}, 500)
 
     def _do_POST_inner(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
         body = self._read_json_body()
+
+        if path == "/api/transform/start":
+            transform = _get_transform_engine()
+            try:
+                ensure_captcha_solver_window_if_needed()
+                res = transform.start(body, _RUNNER)
+                sync_web_ui(force=True)
+                self._send_json(res, 202)
+            except (ValueError, TypeError, OSError) as e:
+                if hasattr(gvt, "record_diagnostic_error"):
+                    gvt.record_diagnostic_error("TransformEngine", target="start", error_text=str(e))
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            return
+
+        if path == "/api/transform/resume":
+            transform = _get_transform_engine()
+            try:
+                ensure_captcha_solver_window_if_needed()
+                pid = str(body.get("id") or body.get("project_id") or "").strip()
+                res = transform.resume(pid, _RUNNER)
+                sync_web_ui(force=True)
+                self._send_json(res, 202)
+            except (ValueError, TypeError, OSError) as e:
+                if hasattr(gvt, "record_diagnostic_error"):
+                    gvt.record_diagnostic_error("TransformEngine", target="resume", error_text=str(e))
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            return
+
+        if path == "/api/transform/stop":
+            transform = _get_transform_engine()
+            try:
+                pid = str(body.get("id") or body.get("project_id") or "").strip()
+                res = transform.stop_job(pid)
+                sync_web_ui(force=True)
+                self._send_json(res)
+            except (ValueError, TypeError, OSError) as e:
+                self._send_json({"ok": False, "error": str(e)}, 400)
+            return
 
         if path == "/api/cooking/generate-script":
             import cooking_storyboard_engine as cooking
@@ -1649,6 +1956,43 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             pdir = core.PROJECTS_DIR / project_id
             mt_script = PIPELINE_SCRIPTS_DIR / "run_all_7_videos_mt.py"
             marker = pdir / ".cleaned_new"
+            ensure_captcha_solver_window_if_needed()
+
+            # Hỗ trợ các Dự án tùy chỉnh (proj_*) có project.json chuẩn mà không phải mã sản phẩm TikTok Shop:
+            if (
+                pdir.is_dir()
+                and (pdir / "project.json").is_file()
+                and not (pdir / "prompts.json").is_file()
+                and not project_id.isdigit()
+                and not force_prompts
+                and not template_name
+            ):
+                def _bg_custom_proj():
+                    try:
+                        _RUNNER.run_project_batch(
+                            project_id=project_id,
+                            product_workers=prod_workers,
+                            scene_workers=scene_workers,
+                            only_products=[product_id] if product_id else None,
+                        )
+                    except Exception as _cp_err:
+                        print(f"[CustomProjectRun][ERROR] {project_id}: {_cp_err}", flush=True)
+                        if hasattr(gvt, "record_diagnostic_error"):
+                            gvt.record_diagnostic_error("ProjectBatchRunner", target=project_id, error_text=str(_cp_err))
+                    finally:
+                        try:
+                            sync_web_ui(force=True)
+                        except Exception:
+                            pass
+
+                threading.Thread(target=_bg_custom_proj, daemon=True).start()
+                self._send_json({
+                    "ok": True,
+                    "async": True,
+                    "project_id": project_id,
+                    "message": f"🚀 Đã kích hoạt chạy Đa Luồng cho Dự án '{project_id}'!",
+                })
+                return
 
             # Nếu sản phẩm chưa có prompts.json, hoặc đang ở trạng thái Sản Phẩm Mới (.cleaned_new), hoặc người dùng chọn Template mới:
             # Tự động sinh kịch bản theo Template rồi kích hoạt đa luồng!
@@ -1669,6 +2013,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         **res,
                     })
                 else:
+                    if hasattr(gvt, "record_diagnostic_error"):
+                        gvt.record_diagnostic_error("PrepareAndRunProduct", target=project_id, error_text=str(res.get("error") or res))
                     self._send_json(res, 400)
                 return
 
@@ -1678,30 +2024,22 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         marker.unlink()
                     except OSError:
                         pass
-                log_file = pdir / "pipeline_run.log"
-                log_fp = open(log_file, "a", encoding="utf-8", errors="replace")
-                log_fp.write(f"\n=== RESUMED PIPELINE AT {time.strftime('%Y-%m-%d %H:%M:%S')} ===\n")
-                log_fp.flush()
-                proc = subprocess.Popen(
-                    [sys.executable, "-u", str(mt_script), project_id],
-                    cwd=str(SKILL_DIR),
-                    stdout=log_fp,
-                    stderr=subprocess.STDOUT,
-                )
-                try:
-                    st_init = {
-                        "pid": project_id,
-                        "pid_os": proc.pid,
-                        "is_running": True,
-                        "current_step_text": f"🚀 Đang khởi động tiến trình Đa Luồng cho SP {project_id}...",
-                        "updated_at": time.strftime("%H:%M:%S"),
-                    }
-                    json.dump(st_init, open(pdir / "pipeline_status.json", "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-                except Exception:
-                    pass
+                spawn_res = _pcb.enqueue_or_spawn_mt_pipeline([project_id])
                 sync_web_ui(force=True)
-                self._send_json({"ok": True, "pid_os": proc.pid, "message": f"Đã kích hoạt chạy Đa Luồng cho SP {project_id} (PID={proc.pid})!"})
+                if isinstance(spawn_res, tuple):
+                    pid_os = int(spawn_res[0] or 0)
+                    was_enq = bool(spawn_res[2]) if len(spawn_res) > 2 else False
+                else:
+                    pid_os = int((spawn_res or {}).get("pid_os") or 0)
+                    was_enq = bool((spawn_res or {}).get("enqueued"))
+                if was_enq:
+                    msg = f"📥 Đã xếp hàng SP {project_id} vào tiến trình Đa Luồng chung (PID={pid_os})!"
+                else:
+                    msg = f"🚀 Đã kích hoạt chạy Đa Luồng cho SP {project_id} (PID={pid_os})!"
+                self._send_json({"ok": True, "pid_os": pid_os, "enqueued": was_enq, "message": msg})
                 return
+            self._send_json({"ok": False, "error": f"Không tìm thấy dự án hoặc kịch bản cho '{project_id}'."}, 404)
+            return
 
         if path == "/api/projects/stop":
             pid = (body.get("project_id") or "").strip()
@@ -1719,8 +2057,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             try:
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fava)
-                importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
                 title = (body.get("title") or "Lookbook Thời Trang Thay Đồ Theo Nhạc (2K Omni Flash)").strip()
                 base_char_path = (body.get("base_char_path") or "").strip().strip('"')
@@ -1764,8 +2100,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             try:
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fava)
-                importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
                 gen_mode = str(body.get("generation_mode") or "chained_i2v").strip()
                 res = _fmce.switch_fashion_project_generation_mode(slug, generation_mode=gen_mode)
@@ -1778,13 +2112,18 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/fashion_motion/run_scene":
             try:
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
                 scene_id = (body.get("scene_id") or "s1").strip()
                 prof = (body.get("profile_name") or "").strip()
                 gen_mode = (body.get("generation_mode") or "").strip()
                 run_async = bool(body.get("async", True))
+                ensure_captcha_solver_window_if_needed()
                 if run_async:
+                    with _FASHION_RUN_GUARD:
+                        if slug in _FASHION_RUNNING:
+                            self._send_json({"ok": False, "error": f"Dự án '{slug}' đang chạy một tác vụ khác; vui lòng đợi hoặc bấm Dừng."}, 409)
+                            return
+                        _FASHION_RUNNING.add(slug)
                     proj_dir = os.path.join(_fmce.FASHION_STUDIO_DIR, slug)
                     m_path = os.path.join(proj_dir, "fashion_project.json")
                     cur_manifest = None
@@ -1822,6 +2161,11 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                             _fmce.run_single_fashion_motion_scene_on_flow(slug, scene_id, profile_name=prof, generation_mode=gen_mode)
                         except Exception as exc:
                             print(f"[FASHION-SCENE-FLOW ERR] {exc}", flush=True)
+                            if hasattr(gvt, "record_diagnostic_error"):
+                                gvt.record_diagnostic_error("FashionEngine", target=f"{slug}:{scene_id}", account=prof, error_text=str(exc))
+                        finally:
+                            with _FASHION_RUN_GUARD:
+                                _FASHION_RUNNING.discard(slug)
                     threading.Thread(target=_bg_scene_run, daemon=True).start()
                     try:
                         sync_web_ui(force=True)
@@ -1844,21 +2188,34 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     res = _fmce.run_single_fashion_motion_scene_on_flow(slug, scene_id, profile_name=prof, generation_mode=gen_mode)
                     self._send_json(res, 200 if res.get("ok") else 500)
             except Exception as e:
+                if "slug" in locals():
+                    with _FASHION_RUN_GUARD:
+                        _FASHION_RUNNING.discard(slug)
                 self._send_json({"ok": False, "error": str(e)}, 500)
             return
 
         if path == "/api/fashion_motion/retry_failed":
             try:
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
                 prof = (body.get("profile_name") or "").strip()
+                ensure_captcha_solver_window_if_needed()
+                with _FASHION_RUN_GUARD:
+                    if slug in _FASHION_RUNNING:
+                        self._send_json({"ok": False, "error": f"Dự án '{slug}' đang chạy; vui lòng đợi hoặc bấm Dừng."}, 409)
+                        return
+                    _FASHION_RUNNING.add(slug)
 
                 def _bg_retry_failed():
                     try:
                         _fmce.retry_failed_fashion_scenes_on_flow(slug, profile_name=prof)
                     except Exception as exc:
                         print(f"[FASHION-RETRY-ERR] {exc}", flush=True)
+                        if hasattr(gvt, "record_diagnostic_error"):
+                            gvt.record_diagnostic_error("FashionEngineRetry", target=slug, account=prof, error_text=str(exc))
+                    finally:
+                        with _FASHION_RUN_GUARD:
+                            _FASHION_RUNNING.discard(slug)
 
                 threading.Thread(target=_bg_retry_failed, daemon=True).start()
                 try:
@@ -1872,6 +2229,9 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                     "message": f"🔁 Đang tự động Retry toàn bộ phân cảnh lỗi của dự án '{slug}' trên Google Flow!",
                 })
             except Exception as e:
+                if "slug" in locals():
+                    with _FASHION_RUN_GUARD:
+                        _FASHION_RUNNING.discard(slug)
                 self._send_json({"ok": False, "error": str(e)}, 500)
             return
 
@@ -1879,8 +2239,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             try:
                 import fashion_motion_control_engine as _fmce
                 import fashion_ai_video_analyzer as _fava
-                importlib.reload(_fmce)
-                importlib.reload(_fava)
                 slug = (body.get("project_id") or "fashion_lookbook_chan_vay_6e19").strip()
                 proj_dir = os.path.join(_fmce.FASHION_STUDIO_DIR, slug)
                 manifest_path = os.path.join(proj_dir, "fashion_project.json")
@@ -1900,10 +2258,10 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/fashion_motion/run_flow":
             try:
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fmce)
                 slug = (body.get("project_id") or "fashion_motion_demo_7anh_2k").strip()
                 prof = (body.get("profile_name") or "").strip()
                 gen_mode = (body.get("generation_mode") or "").strip()
+                ensure_captcha_solver_window_if_needed()
 
                 proj_dir = os.path.join(_fmce.FASHION_STUDIO_DIR, slug)
                 m_path = os.path.join(proj_dir, "fashion_project.json")
@@ -1953,6 +2311,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                         _fmce.run_fashion_motion_project_on_flow(slug, profile_name=prof, generation_mode=gen_mode)
                     except Exception as exc:
                         print(f"[FASHION-FLOW ERR] {exc}", flush=True)
+                        if hasattr(gvt, "record_diagnostic_error"):
+                            gvt.record_diagnostic_error("FashionEngine", target=slug, account=prof, error_text=str(exc))
                     finally:
                         with _FASHION_RUN_GUARD: _FASHION_RUNNING.discard(slug)
 
@@ -2004,19 +2364,28 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/flow/launch_chrome_cdp":
             try:
-                # Kill Chrome and restart with debug port
-                subprocess.run(["taskkill", "/f", "/im", "chrome.exe"], 
-                               capture_output=True, timeout=5)
-                time.sleep(2)
-                chrome_exe = r"C:\Program Files\Google\Chrome\Application\chrome.exe"
+                if _is_port_open(9222):
+                    self._send_json({
+                        "ok": True,
+                        "already_running": True,
+                        "message": "Chrome Debug Port 9222 đã mở sẵn — không cần khởi động lại Chrome.",
+                    })
+                    return
+                chrome_exe = gfa.find_system_chrome()
+                cdp_prof_dir = (gvt.GROK_AUTH_ROOT / "native_profiles" / "cdp_debug_profile").resolve()
+                cdp_prof_dir.mkdir(parents=True, exist_ok=True)
                 subprocess.Popen([
-                    chrome_exe,
+                    str(chrome_exe),
+                    f"--user-data-dir={cdp_prof_dir}",
                     "--remote-debugging-port=9222",
-                    "--restore-last-session",
+                    "--no-first-run",
+                    "--no-default-browser-check",
+                    "https://labs.google/fx/vi/tools/flow",
                 ])
                 self._send_json({
                     "ok": True,
-                    "message": "Chrome đang khởi động lại với Debug Port 9222. Chờ 5-8 giây rồi nhấn Kiểm Tra.",
+                    "profile_dir": str(cdp_prof_dir),
+                    "message": "Đã mở cửa sổ Chrome riêng với Debug Port 9222 (giữ nguyên toàn bộ Chrome Solver & Worker đang chạy).",
                 })
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
@@ -2195,8 +2564,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             try:
                 import fashion_ai_video_analyzer as _fava
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fava)
-                importlib.reload(_fmce)
                 template_code = (body.get("template_code") or "FVT_001").strip()
                 base_char_path = (body.get("base_char_path") or "").strip().strip('"') or None
                 char_sheet_path = (body.get("char_sheet_path") or "").strip().strip('"') or None
@@ -2345,7 +2712,6 @@ class SkillWebHandler(BaseHTTPRequestHandler):
         if path == "/api/fashion_motion/upload_file":
             try:
                 import fashion_motion_control_engine as _fmce
-                importlib.reload(_fmce)
                 filename = str(body.get("filename") or "upload.png").strip()
                 data_base64 = str(body.get("data_base64") or "").strip()
                 kind = str(body.get("kind") or "outfit").strip()
@@ -2400,6 +2766,17 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 selected_node_ids = body.get("selected_node_ids") if isinstance(body.get("selected_node_ids"), list) else None
                 prof = (body.get("profile_name") or "").strip()
                 saved = _fwe.save_workflow_document(wf_doc, wf_id_slug=wf_id_slug)
+                saved_wf_id = str(saved.get("_wf_id") or wf_id_slug or "").strip()
+                if saved_wf_id and not target_node_id:
+                    cur_wf_st = _fwe.get_workflow_run_status(saved_wf_id) or {}
+                    if cur_wf_st.get("running"):
+                        self._send_json({
+                            "ok": False,
+                            "wf_id": saved_wf_id,
+                            "error": f"Workflow '{saved_wf_id}' đang chạy; vui lòng đợi hoặc bấm Dừng trước khi chạy lại.",
+                        }, 409)
+                        return
+                ensure_captcha_solver_window_if_needed()
                 run_sync = bool(body.get("sync", False))
                 if run_sync:
                     res = _fwe.run_workflow_execution_pipeline(
@@ -2419,16 +2796,31 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                                 selected_node_ids=selected_node_ids,
                             )
                         except Exception as ex:
-                            print(f"[WorkflowRunErr] {ex}")
+                            print(f"[WorkflowRunErr] {saved_wf_id}: {ex}", flush=True)
+                            if hasattr(gvt, "record_diagnostic_error"):
+                                gvt.record_diagnostic_error("WorkflowEngine", target=saved_wf_id or "workflow", account=prof, error_text=str(ex))
                     threading.Thread(target=_bg_wf_run, daemon=True).start()
                     self._send_json({
                         "ok": True,
                         "async": True,
-                        "wf_id": saved.get("_wf_id"),
+                        "wf_id": saved_wf_id,
                         "target_node_id": target_node_id,
                         "selected_node_ids": selected_node_ids,
                         "message": f"Đã khởi chạy {'Node ' + target_node_id if target_node_id else 'Workflow'} ngầm!",
                     })
+            except Exception as e:
+                self._send_json({"ok": False, "error": str(e)}, 500)
+            return
+
+        if path == "/api/workflows/stop":
+            try:
+                _fwe = _get_fwe()
+                wf_id = (body.get("wf_id") or body.get("workflow_id") or "").strip()
+                if hasattr(_fwe, "request_stop_workflow"):
+                    res = _fwe.request_stop_workflow(wf_id)
+                else:
+                    res = {"ok": False, "error": "Workflow engine chưa hỗ trợ dừng."}
+                self._send_json(res, 200 if res.get("ok") else 400)
             except Exception as e:
                 self._send_json({"ok": False, "error": str(e)}, 500)
             return
@@ -2508,6 +2900,7 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             pid = (body.get("project_id") or body.get("pid") or "").strip()
             vkey = (body.get("vkey") or "v1").strip()
             all_variants = bool(body.get("all_variants", False))
+            run_async = bool(body.get("async", False))
             provider = (body.get("provider") or "").strip()
             custom_master = (body.get("custom_master_prompt") or "").strip()
             custom_prod_info = (body.get("custom_product_info") or body.get("product_info") or "").strip()
@@ -2516,37 +2909,63 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             inject_01s = body.get("inject_01s")
             prefer_ref = bool(body.get("prefer_existing_ref", False))
             apply_template_only = bool(body.get("apply_template_only", False))
+            subj_mode = str(body.get("subject_mode") or "auto")
+            headline_val = str(body.get("headline") or "")
             if not pid:
                 self._send_json({"ok": False, "error": "Thiếu project_id"}, 400)
                 return
-            if all_variants:
-                res = _esm.generate_thumbnails_for_all_variants(
-                    pid=pid,
-                    provider=provider,
-                    custom_master_prompt=custom_master,
-                    preset_id=preset_id,
-                    custom_product_info=custom_prod_info,
-                    subject_mode=str(body.get("subject_mode") or "auto"),
-                    headline=str(body.get("headline") or ""),
-                    add_text_badge=add_badge,
-                    inject_01s=inject_01s,
-                    apply_template_only=apply_template_only,
-                )
-            else:
-                res = _esm.generate_thumbnail_for_variant(
+
+            def _do_thumb_gen():
+                if all_variants:
+                    return _esm.generate_thumbnails_for_all_variants(
+                        pid=pid,
+                        provider=provider,
+                        custom_master_prompt=custom_master,
+                        preset_id=preset_id,
+                        custom_product_info=custom_prod_info,
+                        subject_mode=subj_mode,
+                        headline=headline_val,
+                        add_text_badge=add_badge,
+                        inject_01s=inject_01s,
+                        apply_template_only=apply_template_only,
+                    )
+                return _esm.generate_thumbnail_for_variant(
                     pid=pid,
                     vkey=vkey,
                     provider=provider,
                     custom_master_prompt=custom_master,
                     preset_id=preset_id,
                     custom_product_info=custom_prod_info,
-                    subject_mode=str(body.get("subject_mode") or "auto"),
-                    headline=str(body.get("headline") or ""),
+                    subject_mode=subj_mode,
+                    headline=headline_val,
                     add_text_badge=add_badge,
                     inject_01s=inject_01s,
                     prefer_existing_ref=prefer_ref,
                     apply_template_only=apply_template_only,
                 )
+
+            if run_async:
+                def _bg_thumb():
+                    try:
+                        r_th = _do_thumb_gen()
+                        if not r_th.get("ok") and hasattr(gvt, "record_diagnostic_error"):
+                            gvt.record_diagnostic_error("ThumbnailGenerator", target=f"{pid}:{vkey if not all_variants else 'all'}", error_text=str(r_th.get("error") or r_th))
+                    except Exception as _th_e:
+                        print(f"[ThumbGen][ERROR] {pid}: {_th_e}", flush=True)
+                        if hasattr(gvt, "record_diagnostic_error"):
+                            gvt.record_diagnostic_error("ThumbnailGenerator", target=pid, error_text=str(_th_e))
+                    finally:
+                        try:
+                            sync_web_ui(force=True)
+                        except Exception:
+                            pass
+                threading.Thread(target=_bg_thumb, daemon=True).start()
+                self._send_json({"ok": True, "async": True, "project_id": pid, "message": f"🎨 Đang tạo Thumbnail ngầm cho {pid}..."})
+                return
+
+            res = _do_thumb_gen()
+            if not res.get("ok") and hasattr(gvt, "record_diagnostic_error"):
+                gvt.record_diagnostic_error("ThumbnailGenerator", target=f"{pid}:{vkey if not all_variants else 'all'}", error_text=str(res.get("error") or res))
             sync_web_ui(force=True)
             self._send_json(res, 200 if res.get("ok") else 400)
             return
@@ -2718,6 +3137,46 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             content = body.get("content") or ""
             res = _tm.save_template_doc(tname, doc_name, content)
             self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
+        if path == "/api/templates/sync-updates":
+            global _SWS_MTIME, _TM_MTIME, _PCB_MTIME, _TE_MTIME
+            _ensure_latest_sws()
+            res = _tm.sync_updates_from_git()
+            if res.get("ok") and not res.get("up_to_date"):
+                _SWS_MTIME = 0.0
+                _TM_MTIME = 0.0
+                _PCB_MTIME = 0.0
+                _TE_MTIME = 0.0
+                _ensure_latest_sws()
+                try:
+                    import transform_engine as _te
+                    importlib.reload(_te)
+                except Exception:
+                    pass
+                res["reload_ui_scripts"] = True
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
+        if path == "/api/templates/import-zip":
+            _ensure_latest_sws()
+            raw_b64 = str(body.get("zip_base64") or "").strip()
+            if not raw_b64:
+                self._send_json({"ok": False, "error": "Thiếu dữ liệu gói .ZIP."}, 400)
+                return
+            try:
+                import base64 as _b64
+                zip_bytes = _b64.b64decode(raw_b64.split(",", 1)[-1], validate=True)
+                overwrite = body.get("overwrite", True) is not False
+                res = _tm.import_template_zip(zip_bytes, overwrite=overwrite)
+                try:
+                    import transform_engine as _te
+                    importlib.reload(_te)
+                except Exception:
+                    pass
+                self._send_json(res, 200)
+            except (ValueError, Exception) as exc:
+                self._send_json({"ok": False, "error": str(exc)}, 400)
             return
 
         if path == "/api/roles/save":
@@ -3098,9 +3557,16 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 def _bg_batch_crawl(pids_to_crawl, m):
                     for p_id in pids_to_crawl:
                         try:
-                            _pcb.ensure_product_crawled(p_id, method=m, force_crawl=False)
-                        except Exception:
-                            pass
+                            r_c = _pcb.ensure_product_crawled(p_id, method=m, force_crawl=False)
+                            if isinstance(r_c, dict) and not r_c.get("ok"):
+                                err_txt = str(r_c.get("error") or r_c)
+                                print(f"[BatchCrawl][WARN] {p_id}: {err_txt}", flush=True)
+                                if hasattr(gvt, "record_diagnostic_error"):
+                                    gvt.record_diagnostic_error("ProductCrawler", target=p_id, error_text=err_txt)
+                        except Exception as _bc_e:
+                            print(f"[BatchCrawl][ERROR] {p_id}: {_bc_e}", flush=True)
+                            if hasattr(gvt, "record_diagnostic_error"):
+                                gvt.record_diagnostic_error("ProductCrawler", target=p_id, error_text=str(_bc_e))
                     try:
                         sync_web_ui(force=True)
                     except Exception:
@@ -3199,6 +3665,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             slide_overlays = body.get("slide_overlay_files") or None
             force_prompts = bool(body.get("force_regenerate_prompts", True))
             auto_run = bool(body.get("auto_run", True))
+            if auto_run:
+                ensure_captcha_solver_window_if_needed()
             res = _pcb.prepare_and_optionally_run_product(
                 raw_id_or_url=raw_input,
                 template_name=template_name,
@@ -3209,6 +3677,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 force_regenerate_prompts=force_prompts,
                 auto_run_pipeline=auto_run,
             )
+            if not res.get("ok") and hasattr(gvt, "record_diagnostic_error"):
+                gvt.record_diagnostic_error("CreateVideoProduct", target=raw_input, error_text=str(res.get("error") or res))
             self._send_json(res, 200 if res.get("ok") else 400)
             return
 
@@ -3222,6 +3692,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             vpc_int = int(vpc) if vpc is not None and str(vpc).strip() != "" else None
             force_prompts = bool(body.get("force_regenerate_prompts", True))
             auto_run = bool(body.get("auto_run", True))
+            if auto_run:
+                ensure_captcha_solver_window_if_needed()
             res = _pcb.batch_prepare_and_optionally_run_products(
                 raw_inputs=raw_inputs,
                 template_name=template_name,
@@ -3230,6 +3702,9 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 force_regenerate_prompts=force_prompts,
                 auto_run_pipeline=auto_run,
             )
+            for _fi in (res.get("failed_items") or []):
+                if hasattr(gvt, "record_diagnostic_error"):
+                    gvt.record_diagnostic_error("BatchCreateVideo", target=str(_fi.get("input") or ""), error_text=str(_fi.get("error") or ""))
             self._send_json(res, 200 if res.get("ok") else 400)
             return
 
@@ -3335,6 +3810,10 @@ def main():
             _kill_process_on_port(args.port)
 
     ensure_background_services()
+    try:
+        _load_valid_index_html()
+    except Exception:
+        pass
     core.sync_role_skills_dirs()
     trigger_async_sync_web_ui()
 

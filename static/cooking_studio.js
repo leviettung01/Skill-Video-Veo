@@ -522,8 +522,16 @@
       if (res.manifest) {
         renderProject(res.manifest);
       }
+      try {
+        if (typeof STATE === "object" && STATE) {
+          STATE.currentProjectId = projectId;
+          STATE.renderedProjectSig = "";
+        }
+        if (typeof switchTab === "function") switchTab("dashboard", document.getElementById("navBtn-dashboard"));
+        if (typeof loadProjectDetail === "function") loadProjectDetail(projectId, false);
+      } catch (_) { }
       show(
-        `✅ Đã đẩy món "${dish}" sang chạy ngầm đa tác vụ! Bạn có thể bấm "📊 Xem Tiến Trình Tại Studio Dự Án" hoặc nhập tên món ăn khác để tạo tiếp ngay!`
+        `✅ Đã đẩy món "${dish}" sang chạy ngầm đa tác vụ tại Studio Dự Án! Bạn có thể bấm "📊 Xem Tiến Trình Tại Studio Dự Án" hoặc nhập tên món ăn khác để tạo tiếp ngay!`
       );
       if (typeof refreshAll === "function") refreshAll(false);
     } catch (error) {

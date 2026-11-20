@@ -17,6 +17,7 @@ import asyncio
 import concurrent.futures
 import json
 import os
+import random
 import shutil
 import subprocess
 import sys
@@ -178,24 +179,63 @@ def delete_role_skill(filename: str) -> bool:
 # ═══════════════════════════════════════════════════════════════════════════
 
 _STORE_LOCK = threading.RLock()
+_STOPPED_PROJECTS_LOCK = threading.Lock()
+_STOPPED_PROJECT_IDS: set[str] = set()
+_ACTIVE_PROJECT_BATCHES: set[str] = set()
+
+
+def request_stop_project(project_id: str) -> bool:
+    pid = str(project_id or "").strip()
+    if not pid:
+        return False
+    with _STOPPED_PROJECTS_LOCK:
+        was_active = pid in _ACTIVE_PROJECT_BATCHES
+        _STOPPED_PROJECT_IDS.add(pid)
+    return was_active
+
+
+def is_project_stopped(project_id: str) -> bool:
+    with _STOPPED_PROJECTS_LOCK:
+        return str(project_id or "").strip() in _STOPPED_PROJECT_IDS
+
+
+def _atomic_write_store_json(target: Path, payload_obj: Any) -> None:
+    target.parent.mkdir(parents=True, exist_ok=True)
+    text = json.dumps(payload_obj, indent=2, ensure_ascii=False)
+    tmp = target.parent / f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+    try:
+        tmp.write_text(text, encoding="utf-8")
+        for attempt in range(7):
+            try:
+                os.replace(str(tmp), str(target))
+                return
+            except OSError:
+                time.sleep(0.02 * (attempt + 1))
+        target.write_text(text, encoding="utf-8")
+    finally:
+        if tmp.exists():
+            try:
+                tmp.unlink()
+            except Exception:
+                pass
 
 
 def _load_projects_index() -> List[Dict[str, Any]]:
     with _STORE_LOCK:
         if not PROJECTS_INDEX_FILE.is_file():
             return []
-        try:
-            return json.loads(PROJECTS_INDEX_FILE.read_text(encoding="utf-8"))
-        except Exception:
-            return []
+        for attempt in range(3):
+            try:
+                return json.loads(PROJECTS_INDEX_FILE.read_text(encoding="utf-8"))
+            except Exception:
+                if attempt < 2:
+                    time.sleep(0.03)
+        return []
 
 
 def _save_projects_index(projects: List[Dict[str, Any]]) -> None:
     with _STORE_LOCK:
-        PROJECTS_INDEX_FILE.write_text(
-            json.dumps(projects, indent=2, ensure_ascii=False),
-            encoding="utf-8",
-        )
+        _atomic_write_store_json(PROJECTS_INDEX_FILE, projects)
 
 
 def get_project_dir(project_id: str) -> Path:
@@ -245,7 +285,7 @@ def save_project(proj: Dict[str, Any]) -> Dict[str, Any]:
     with _STORE_LOCK:
         proj["updated_at"] = datetime.now().strftime("%Y-%m-%d %H:%M:%S")
         pfile = get_project_file(proj["id"])
-        pfile.write_text(json.dumps(proj, indent=2, ensure_ascii=False), encoding="utf-8")
+        _atomic_write_store_json(pfile, proj)
 
         idx = _load_projects_index()
         products = proj.get("products", [])
@@ -553,7 +593,8 @@ class MultiThreadSkillRunner:
     trực tiếp lõi Google Flow + CaptchaBridge + CLIProxy + FFmpeg của grok_video_tool.py.
     """
 
-    FLOW_SUBMIT_DELAY_SEC = 15.0
+    FLOW_SUBMIT_DELAY_SEC = float(os.environ.get("FLOW_SUBMIT_DELAY_SEC", "4.5") or "4.5")
+    FLOW_GLOBAL_STAGGER_SEC = float(os.environ.get("FLOW_GLOBAL_STAGGER_SEC", "0.7") or "0.7")
 
     def __init__(self, captcha_bridge=None):
         import grok_video_tool as gvt
@@ -563,44 +604,155 @@ class MultiThreadSkillRunner:
         self._rr_idx = 0
         self._flow_submit_lock = threading.Lock()
         self._last_flow_submit_ts = 0.0
+        self._account_submit_ts: Dict[str, float] = {}
+        self._account_cooldown_until: Dict[str, float] = {}
+        self._bg_heal_inflight: set = set()
 
-    def _throttle_flow_submit(self, log_fn=None):
-        """Giãn cách các request gửi lên Google Flow ~15s giữa các luồng để tránh rate-limit / reCAPTCHA score tụt."""
-        with self._flow_submit_lock:
-            now = time.time()
-            elapsed = now - self._last_flow_submit_ts
-            if self._last_flow_submit_ts > 0 and elapsed < self.FLOW_SUBMIT_DELAY_SEC:
-                wait_s = self.FLOW_SUBMIT_DELAY_SEC - elapsed
-                if log_fn:
-                    log_fn(f"⏱️ Chờ {wait_s:.1f}s trước khi gửi request tiếp theo lên Google Flow (delay 15s)...")
-                time.sleep(wait_s)
-            self._last_flow_submit_ts = time.time()
-
-    def ensure_captcha_bridge(self):
-        if self.captcha_bridge is not None:
-            return self.captcha_bridge
-        # Kiểm tra xem cổng 4000 đã có CaptchaBridge của server hay tool chạy chưa
-        import socket
-        bridge_port = getattr(self.gvt, "CAPTCHA_BRIDGE_PORT", 4000)
-        port_open = False
+    def _get_flow_limits(self) -> Dict[str, Any]:
+        """Lấy cấu hình luồng thực thi mới nhất (Auto/Custom) từ engine_settings_manager."""
+        defaults = {
+            "flow_api_workers": 6,
+            "max_inflight_per_account": 5,
+            "max_total_inflight": 10,
+            "submit_delay_sec": float(self.FLOW_SUBMIT_DELAY_SEC),
+            "global_submit_stagger_sec": float(self.FLOW_GLOBAL_STAGGER_SEC),
+            "parallel_products": 4,
+            "upscale_download_workers": 6,
+            "extension_pool_tabs": 4,
+        }
         try:
-            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
-                s.settimeout(0.5)
-                s.connect(("127.0.0.1", bridge_port))
-                port_open = True
+            scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+            if scripts_dir not in sys.path:
+                sys.path.insert(0, scripts_dir)
+            import engine_settings_manager as _esm_lim
+            eff = _esm_lim.get_effective_flow_concurrency()
+            if isinstance(eff, dict):
+                defaults.update(eff)
         except Exception:
             pass
+        if "FLOW_SUBMIT_DELAY_SEC" in self.__dict__:
+            defaults["submit_delay_sec"] = float(self.__dict__["FLOW_SUBMIT_DELAY_SEC"])
+        elif os.environ.get("FLOW_SUBMIT_DELAY_SEC", "").strip():
+            defaults["submit_delay_sec"] = float(os.environ["FLOW_SUBMIT_DELAY_SEC"])
+        if "FLOW_GLOBAL_STAGGER_SEC" in self.__dict__:
+            defaults["global_submit_stagger_sec"] = float(self.__dict__["FLOW_GLOBAL_STAGGER_SEC"])
+        elif os.environ.get("FLOW_GLOBAL_STAGGER_SEC", "").strip():
+            defaults["global_submit_stagger_sec"] = float(os.environ["FLOW_GLOBAL_STAGGER_SEC"])
+        try:
+            if hasattr(self.gvt, "get_flow_media_download_pool"):
+                self.gvt.get_flow_media_download_pool(max_workers=int(defaults.get("upscale_download_workers") or 6))
+        except Exception:
+            pass
+        return defaults
 
-        bridge = self.gvt.CaptchaBridge(print, port=bridge_port)
-        if not port_open:
-            bridge.start()
-        self.captcha_bridge = bridge
+    def _throttle_flow_submit(self, log_fn=None, account_key: str = ""):
+        """Giãn cách request theo từng tài khoản riêng biệt (đồng bộ Auto/Custom từ Engine Settings)."""
+        limits = self._get_flow_limits()
+        per_acc_delay = float(limits.get("submit_delay_sec") or self.FLOW_SUBMIT_DELAY_SEC)
+        glob_stagger = float(limits.get("global_submit_stagger_sec") or self.FLOW_GLOBAL_STAGGER_SEC)
+        key = str(account_key or "").strip().lower()
+        with self._flow_submit_lock:
+            now = time.time()
+            acc_last = self._account_submit_ts.get(key, 0.0) if key else self._last_flow_submit_ts
+            acc_target = (acc_last + per_acc_delay) if acc_last > 0 else now
+            glob_target = (
+                (self._last_flow_submit_ts + glob_stagger)
+                if self._last_flow_submit_ts > 0
+                else now
+            )
+            slot_ts = max(now, acc_target, glob_target)
+            if key:
+                self._account_submit_ts[key] = slot_ts
+            self._last_flow_submit_ts = slot_ts
+            wait_s = max(0.0, slot_ts - now)
+        if wait_s > 0.05:
+            if log_fn:
+                tag = f" [{account_key}]" if account_key else ""
+                log_fn(f"⏱️ Chờ {wait_s:.1f}s cooldown tài khoản{tag} trước khi gửi request lên Google Flow...")
+            time.sleep(wait_s)
+
+    def mark_account_cooldown(self, account_key: str, seconds: float = 90.0):
+        key = str(account_key or "").strip().lower()
+        if not key or seconds <= 0:
+            return
+        with self._rr_lock:
+            self._account_cooldown_until[key] = max(
+                self._account_cooldown_until.get(key, 0.0),
+                time.time() + float(seconds),
+            )
+
+    def _schedule_profile_heal(self, profile_name: str):
+        prof = str(profile_name or "").strip()
+        if not prof:
+            return
+        with self._rr_lock:
+            if prof in self._bg_heal_inflight:
+                return
+            self._bg_heal_inflight.add(prof)
+
+        def _heal():
+            try:
+                ok_h, new_tok, new_pid, err_h = self.gvt._refresh_google_profile(prof, True)
+                if ok_h and new_tok:
+                    try:
+                        from google_flow_auth import commit_login, identity_matches, expected_email
+                        auth_root = self.gvt._auth_root_value(None)
+                        email = str(err_h or "").removeprefix("session_verified:")
+                        if identity_matches(expected_email(auth_root, prof), email):
+                            commit_login(auth_root, prof, email, new_tok, new_pid or self.gvt.DEFAULT_PROJECT_ID, refresh=True)
+                    except Exception:
+                        pass
+            except Exception:
+                pass
+            finally:
+                with self._rr_lock:
+                    self._bg_heal_inflight.discard(prof)
+
+        threading.Thread(target=_heal, daemon=True).start()
+
+    def ensure_captcha_bridge(self):
+        need_rebind = self.captcha_bridge is None
+        if not need_rebind and getattr(self.captcha_bridge, "_server", None) is None and getattr(self.captcha_bridge, "_remote_bridge", False):
+            # If the companion GUI process holding :4000 closed, self-heal by binding :4000 locally!
+            try:
+                st = self.captcha_bridge._remote_call("GET", "/status", timeout=1.5)
+                if not isinstance(st, dict) or st.get("bridge") != "CaptchaBridge":
+                    need_rebind = True
+            except Exception:
+                need_rebind = True
+        if need_rebind:
+            bridge_port = getattr(self.gvt, "CAPTCHA_BRIDGE_PORT", 4000)
+            bridge = self.gvt.CaptchaBridge(print, port=bridge_port)
+            try:
+                bridge.start(allow_remote=True)
+            except TypeError:
+                bridge.start()
+            self.captcha_bridge = bridge
+        try:
+            if hasattr(self.captcha_bridge, "apply_concurrency_settings"):
+                lim = self._get_flow_limits()
+                self.captcha_bridge.apply_concurrency_settings(
+                    per_account_delay_sec=lim.get("submit_delay_sec"),
+                    global_stagger_sec=lim.get("global_submit_stagger_sec"),
+                    pool_tabs=lim.get("extension_pool_tabs"),
+                )
+        except Exception:
+            pass
         return self.captcha_bridge
 
     def get_accounts_info(self) -> Dict[str, Any]:
         acc_mgr = self.gvt.AccountManager()
         google_accs = []
         grok_accs = []
+        cliproxy_models = []
+        try:
+            import engine_settings_manager as _esm_vsc
+            ok_cm, cliproxy_models, _ = _esm_vsc._cliproxy_fetch_models(timeout=1.5)
+            if not ok_cm:
+                cliproxy_models = []
+        except Exception:
+            cliproxy_models = []
+
         for a in acc_mgr.accounts:
             is_google = self.gvt._is_google_flow_account(a)
             prof = (
@@ -617,20 +769,42 @@ class MultiThreadSkillRunner:
                     has_cookie = False
             has_token = bool(raw_key and len(raw_key) > 10)
             g_email = getattr(a, "google_email", "") or (a.name[len("Google_"):] if a.name.startswith("Google_") else "")
+            if is_google:
+                avail_models = self.gvt.get_veo_ui_video_models(prof or a.name)
+            else:
+                low_name = str(a.name or "").lower()
+                img_vid_models = [
+                    m for m in cliproxy_models
+                    if any(k in m.lower() for k in ("gpt-image", "gemini-3.1-flash-image", "grok-imagine"))
+                ]
+                if "codex" in low_name:
+                    avail_models = [m for m in img_vid_models if "gpt-image" in m.lower()] or ["gpt-image-2 (chưa sẵn sàng)"]
+                elif "grok" in low_name:
+                    avail_models = [m for m in img_vid_models if "grok" in m.lower()] or ["grok-imagine-* (chưa login xAI trên :8317)"]
+                else:
+                    avail_models = img_vid_models or ["CLIProxy (:8317 offline hoặc chưa có model ảnh/video)"]
+            live_cred = (
+                self.gvt.get_live_flow_account_credits(prof or a.name)
+                if hasattr(self.gvt, "get_live_flow_account_credits")
+                else None
+            )
+            eff_cred = live_cred if live_cred is not None else getattr(a, "credits", None)
+            own_pid = a.proxy_url if (is_google and a.proxy_url and not str(a.proxy_url).startswith("http")) else ""
             entry = {
                 "name": a.name,
                 "active": a.active,
                 "profile_name": prof,
                 "google_email": g_email,
-                "credits": getattr(a, "credits", None),
+                "credits": eff_cred,
                 "tag": getattr(a, "tag", "Pro"),
                 "auth_state": getattr(a, "auth_state", "") or ("ready" if (has_cookie or has_token) else "missing"),
                 "proxy_url": a.proxy_url,
-                "project_id": a.proxy_url if (is_google and a.proxy_url and not str(a.proxy_url).startswith("http")) else self.gvt.DEFAULT_PROJECT_ID,
+                "project_id": own_pid,
                 "has_cookie": has_cookie,
                 "has_token": has_token,
                 "type": "google_flow" if is_google else "cliproxy",
-                "available_video_models": self.gvt.get_veo_ui_video_models(prof or a.name) if is_google else ["grok-imagine-video"],
+                "available_video_models": avail_models,
+                "cliproxy_models": [] if is_google else list(cliproxy_models),
                 "has_low_priority_lite": self.gvt.is_veo_low_priority_available(prof or a.name) if is_google else False,
             }
             if is_google:
@@ -644,6 +818,93 @@ class MultiThreadSkillRunner:
             "grok_accounts": grok_accs,
         }
 
+    def _resolve_flow_token_for_account(self, account) -> str:
+        raw_tok = str(getattr(account, "api_key", "") or "").strip()
+        if raw_tok.startswith("ya29."):
+            return raw_tok
+        prof = self.gvt._google_profile_name_for_account(account, allow_unresolved=True)
+        if prof:
+            try:
+                disk_hdr = self.gvt._load_flow_cookie_header(prof)
+                if disk_hdr:
+                    return f"flow_cookie:{disk_hdr}"
+            except Exception:
+                pass
+        return raw_tok
+
+    def _is_usable_flow_account(self, account) -> bool:
+        if not account.active or not self.gvt._is_google_flow_account(account):
+            return False
+        auth_st = str(getattr(account, "auth_state", "") or "").strip().lower()
+        tok = self._resolve_flow_token_for_account(account)
+        if not tok and auth_st in ("logging_in", "login_required", "missing", ""):
+            return False
+        prof = self.gvt._google_profile_name_for_account(account, allow_unresolved=True) or account.name
+        if hasattr(self.gvt, "is_flow_account_credits_exhausted") and self.gvt.is_flow_account_credits_exhausted(prof):
+            return False
+        disk_cred = getattr(account, "credits", None)
+        if isinstance(disk_cred, (int, float)) and 0 <= disk_cred < 10:
+            return False
+        return True
+
+    def _own_flow_project_id(self, account, seen_pids: Optional[set] = None) -> str:
+        raw_p = str(getattr(account, "proxy_url", "") or "").strip()
+        if not raw_p or raw_p.startswith("http"):
+            return ""
+        if seen_pids is not None:
+            if raw_p in seen_pids:
+                return ""
+            seen_pids.add(raw_p)
+        return raw_p
+
+    def flow_account_candidates(self):
+        """Return enabled, authenticated, credit-available Flow accounts in rotating order."""
+        all_google = [
+            acc for acc in self.gvt.AccountManager().accounts
+            if self.gvt._is_google_flow_account(acc)
+        ]
+        # Track project_ids already claimed by earlier accounts so a stamped DEFAULT_PROJECT_ID isn't reused across accounts
+        pid_owner: Dict[str, str] = {}
+        for acc in all_google:
+            raw_p = str(getattr(acc, "proxy_url", "") or "").strip()
+            if raw_p and not raw_p.startswith("http") and raw_p not in pid_owner:
+                pid_owner[raw_p] = acc.name
+
+        accounts = [acc for acc in all_google if self._is_usable_flow_account(acc)]
+        if not accounts:
+            return []
+        now = time.time()
+        with self._rr_lock:
+            start = self._rr_idx % len(accounts)
+            self._rr_idx += 1
+            cooldowns = dict(self._account_cooldown_until)
+        rotated = accounts[start:] + accounts[:start]
+        healthy = []
+        cooled = []
+        for idx, acc in enumerate(rotated):
+            prof = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) or acc.name
+            rem_local = max(0.0, cooldowns.get(str(prof).strip().lower(), 0.0) - now)
+            rem_global = 0.0
+            if hasattr(self.gvt, "is_flow_account_in_cooldown"):
+                for _k in {str(prof or "").strip(), str(getattr(acc, "name", "") or "").strip()}:
+                    if _k:
+                        in_cd, rem_g, _ = self.gvt.is_flow_account_in_cooldown(_k)
+                        if in_cd:
+                            rem_global = max(rem_global, float(rem_g))
+            rem = max(rem_local, rem_global)
+            if rem > 0.0:
+                cooled.append((rem, idx, acc))
+            else:
+                healthy.append(acc)
+        cooled.sort(key=lambda x: (x[0], x[1]))
+        ordered = healthy + [x[2] for x in cooled]
+        out = []
+        for account in ordered:
+            raw_p = str(getattr(account, "proxy_url", "") or "").strip()
+            safe_pid = raw_p if (raw_p and not raw_p.startswith("http") and pid_owner.get(raw_p) == account.name) else ""
+            out.append((account, self._resolve_flow_token_for_account(account), safe_pid))
+        return out
+
     def _next_account(self, for_veo: bool = True):
         acc_mgr = self.gvt.AccountManager()
         active = [a for a in acc_mgr.accounts if a.active]
@@ -653,10 +914,9 @@ class MultiThreadSkillRunner:
             return None, "", ""
 
         if for_veo:
-            veo_candidates = [
-                a for a in active
-                if self.gvt._is_google_flow_account(a)
-            ]
+            veo_candidates = [a for a in active if self._is_usable_flow_account(a)]
+            if not veo_candidates:
+                veo_candidates = [a for a in active if self.gvt._is_google_flow_account(a)]
             if veo_candidates:
                 active = veo_candidates
 
@@ -664,9 +924,105 @@ class MultiThreadSkillRunner:
             acc = active[self._rr_idx % len(active)]
             self._rr_idx += 1
 
-        bearer = str(acc.api_key or "").strip()
-        proj_id = acc.proxy_url if (acc.proxy_url and not str(acc.proxy_url).startswith("http")) else self.gvt.DEFAULT_PROJECT_ID
+        bearer = self._resolve_flow_token_for_account(acc) if for_veo else str(acc.api_key or "").strip()
+        proj_id = acc.proxy_url if (acc.proxy_url and not str(acc.proxy_url).startswith("http")) else ""
         return acc, bearer, proj_id
+
+    def _run_veo_flow_with_failover(self, make_job_fn, flow_project_override: str, _log, defer_media: bool = False) -> str:
+        candidates = self.flow_account_candidates()
+        if not candidates:
+            acc, bearer, veo_proj_id = self._next_account(for_veo=True)
+            candidates = [(acc, bearer, veo_proj_id)] if acc or bearer else []
+        if not candidates:
+            raise RuntimeError("Chưa có tài khoản Google Flow nào đang bật.")
+
+        def _clear_acct_cd(*keys):
+            for _k in keys:
+                if _k:
+                    with self._rr_lock:
+                        self._account_cooldown_until.pop(str(_k).strip().lower(), None)
+                    if hasattr(self.gvt, "clear_flow_account_cooldown"):
+                        self.gvt.clear_flow_account_cooldown(_k)
+
+        def _mark_acct_cd(kind: str, reason: str, *keys):
+            for _k in keys:
+                if not _k:
+                    continue
+                if hasattr(self.gvt, "mark_flow_account_cooldown"):
+                    dur = self.gvt.mark_flow_account_cooldown(_k, kind, reason)
+                else:
+                    dur = {"account_quota": 900.0, "account_auth": 180.0, "rate_limit": 120.0, "captcha_score": 45.0}.get(kind, 15.0)
+                if dur > 0:
+                    self.mark_account_cooldown(_k, dur)
+
+        last_err = ""
+        for idx, (acc, bearer, veo_proj_id) in enumerate(candidates):
+            prof_name = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) if acc else ""
+            acc_name = str(getattr(acc, "name", "") or "").strip() if acc else ""
+            acct_key = prof_name or acc_name
+            eff_proj_id = str(flow_project_override or veo_proj_id)
+            job = make_job_fn(acc, prof_name)
+            if len(candidates) > 1 and getattr(job, "max_retries", 3) > 1:
+                job.max_retries = 1
+            if defer_media and hasattr(job, "async_media_finalize"):
+                job.async_media_finalize = True
+            bridge = self.ensure_captcha_bridge()
+            self._throttle_flow_submit(_log, account_key=acct_key)
+            loop = asyncio.new_event_loop()
+            asyncio.set_event_loop(loop)
+            try:
+                ok = loop.run_until_complete(
+                    self.gvt.run_veo_flow(
+                        job, bearer, eff_proj_id, bridge, log=_log, progress=None
+                    )
+                )
+                if ok and defer_media and getattr(job, "media_finalize_future", None) is not None:
+                    _clear_acct_cd(prof_name, acc_name)
+                    return job
+                if ok and job.local_path and Path(job.local_path).is_file():
+                    _clear_acct_cd(prof_name, acc_name)
+                    return str(Path(job.local_path).resolve())
+                if ok and hasattr(self.gvt, "wait_for_job_media") and self.gvt.wait_for_job_media(job):
+                    _clear_acct_cd(prof_name, acc_name)
+                    return str(Path(job.local_path).resolve())
+                last_err = str(job.error or "Google Flow thất bại")
+                err_kind = (
+                    self.gvt.classify_flow_error(last_err)
+                    if hasattr(self.gvt, "classify_flow_error")
+                    else "transient"
+                )
+                short_err = (
+                    self.gvt.format_flow_error_short(last_err, 120)
+                    if hasattr(self.gvt, "format_flow_error_short")
+                    else last_err[:120]
+                )
+                if (
+                    (hasattr(self.gvt, "should_stop_all_accounts") and self.gvt.should_stop_all_accounts(last_err))
+                    or err_kind == "content_policy"
+                ):
+                    vi_err = (
+                        self.gvt.describe_flow_error_vi(last_err)
+                        if hasattr(self.gvt, "describe_flow_error_vi")
+                        else last_err
+                    )
+                    _log(f"❌ {vi_err} — dừng ngay, không xoay sang tài khoản khác.")
+                    raise RuntimeError(vi_err)
+
+                if err_kind in ("account_quota", "rate_limit", "account_auth", "captcha_score", "transient"):
+                    _mark_acct_cd(err_kind, last_err, prof_name, acc_name)
+                if err_kind == "account_auth" or getattr(job, "_force_google_token_refresh", False):
+                    if prof_name and not getattr(job, "_inline_cookie_refreshed", False):
+                        self._schedule_profile_heal(prof_name)
+                if idx + 1 < len(candidates):
+                    _log(f"⚠️ {acct_key or 'Flow'} lỗi [{err_kind}] ({short_err}), tự động chuyển tài khoản tiếp theo...")
+            finally:
+                loop.close()
+        final_vi = (
+            self.gvt.describe_flow_error_vi(last_err)
+            if last_err and hasattr(self.gvt, "describe_flow_error_vi")
+            else (last_err or "Tạo nội dung Google Flow thất bại")
+        )
+        raise RuntimeError(final_vi)
 
     def _generate_single_scene_image(self, project_id: str, prod: Dict[str, Any], scene: Dict[str, Any]) -> str:
         s_num = scene["scene_number"]
@@ -682,7 +1038,6 @@ class MultiThreadSkillRunner:
         out_base = str(out_dir / f"scene_{s_num:02d}")
 
         is_veo = self.gvt.is_veo_model(model)
-        acc, bearer, veo_proj_id = self._next_account(for_veo=is_veo)
 
         def _log(m: str):
             append_project_log(project_id, f"[{prod['product_name']} | Cảnh {s_num}] {m}")
@@ -692,65 +1047,67 @@ class MultiThreadSkillRunner:
                 str(scene.get("character_id") or prod.get("character_id") or ""),
                 str(scene.get("voice_id") or prod.get("voice_id") or ""),
             )
-            eff_proj_id = str(prod.get("flow_project_id") or resolved_cv["project_id"] or veo_proj_id)
-            prof_name = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) if acc else ""
-            job = self.gvt.VideoJob(
-                id=f"skill_img_{prod['id']}_{s_num}_{int(time.time())}",
-                model=model,
-                prompt=prompt,
-                resolution="1K",
-                aspect_ratio=aspect,
-                local_path=out_base,
-                account_name=acc.name if acc else "",
-                google_profile_name=prof_name,
-            )
-            if ref_img and Path(ref_img).is_file():
-                job.image_url = ref_img
-            if resolved_cv["character_id"]:
-                job.character_id = resolved_cv["character_id"]
+            override_pid = str(prod.get("flow_project_id") or resolved_cv["project_id"] or "")
 
-            self._throttle_flow_submit(_log)
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                ok = loop.run_until_complete(
-                    self.gvt.run_veo_flow(
-                        job, bearer, eff_proj_id, self.captcha_bridge, log=_log, progress=None
-                    )
+            def _make_img_job(cand_acc, cand_prof):
+                job = self.gvt.VideoJob(
+                    id=f"skill_img_{prod['id']}_{s_num}_{int(time.time())}",
+                    model=model,
+                    prompt=prompt,
+                    resolution="1K",
+                    aspect_ratio=aspect,
+                    local_path=out_base,
+                    account_name=cand_acc.name if cand_acc else "",
+                    google_profile_name=cand_prof,
                 )
-                if ok and job.local_path and Path(job.local_path).is_file():
-                    return str(Path(job.local_path).resolve())
-                raise RuntimeError(job.error or "Tạo ảnh Google Flow thất bại")
-            finally:
-                loop.close()
+                if ref_img and Path(ref_img).is_file():
+                    job.image_url = ref_img
+                if resolved_cv["character_id"]:
+                    job.character_id = resolved_cv["character_id"]
+                return job
+
+            return self._run_veo_flow_with_failover(_make_img_job, override_pid, _log)
         else:
-            # Grok / OpenAI image generation qua CLIProxy (:8317)
-            import httpx
+            # ChatGPT (Codex) / Gemini / Grok image generation qua CLIProxy (:8317)
+            acc, _, _ = self._next_account(for_veo=False)
             import base64
             proxy = acc.proxy_url if (acc and acc.proxy_url.startswith("http")) else self.gvt.DEFAULT_PROXY_URL
-            api_key = acc.api_key if acc else "grok-video-key-001"
-            size = "1024x1792" if "9:16" in aspect else ("1792x1024" if "16:9" in aspect else "1024x1024")
-            url = f"{proxy}/v1/images/generations"
-            headers = {"Authorization": f"Bearer {api_key}", "Content-Type": "application/json"}
-            payload = {"model": model, "prompt": prompt, "n": 1, "size": size}
-            with self.gvt.make_httpx_client(timeout=300, target_url=url) as client:
-                resp = client.post(url, headers=headers, json=payload)
-            if resp.status_code >= 400:
-                raise RuntimeError(f"Image API error {resp.status_code}: {resp.text[:300]}")
-            item = resp.json()["data"][0]
+            api_key = (acc.api_key if acc else "") or "grok-video-key-001"
+            size = "1024x1536" if "9:16" in aspect else ("1536x1024" if "16:9" in aspect else "1024x1024")
+            refs = self.gvt._cliproxy_collect_unique_refs(
+                ref_img,
+                list(scene.get("reference_images") or []) + list(prod.get("reference_images") or []),
+            )
+            kind, val = self.gvt._cliproxy_run_image_sync(
+                proxy,
+                api_key,
+                model,
+                prompt,
+                size,
+                aspect=aspect,
+                ref_paths=refs,
+                log_fn=_log,
+            )
             out_file = out_dir / f"scene_{s_num:02d}.png"
-            if item.get("url"):
-                with self.gvt.make_httpx_client(timeout=60) as client:
-                    r = client.get(item["url"])
+            if kind == "url":
+                with self.gvt.make_httpx_client(timeout=60, target_url=val) as client:
+                    r = client.get(val)
                     r.raise_for_status()
-                    out_file.write_bytes(r.content)
-            elif item.get("b64_json"):
-                out_file.write_bytes(base64.b64decode(item["b64_json"]))
+                    img_bytes = r.content
+            elif kind == "base64":
+                img_bytes = base64.b64decode(val)
             else:
                 raise RuntimeError("Không nhận được URL hoặc b64_json từ API ảnh")
+            self.gvt._save_image_payload_to_path(img_bytes, str(out_file))
             return str(out_file.resolve())
 
-    def _generate_single_scene_video(self, project_id: str, prod: Dict[str, Any], scene: Dict[str, Any]) -> str:
+    def _generate_single_scene_video(
+        self,
+        project_id: str,
+        prod: Dict[str, Any],
+        scene: Dict[str, Any],
+        defer_media: bool = False,
+    ) -> Any:
         s_num = scene["scene_number"]
         source_img = scene.get("image_path", "")
         if not source_img or not Path(source_img).is_file():
@@ -775,7 +1132,6 @@ class MultiThreadSkillRunner:
         out_video = str(out_dir / f"video_scene_{s_num:02d}.mp4")
 
         is_veo = self.gvt.is_veo_model(model)
-        acc, bearer, veo_proj_id = self._next_account(for_veo=is_veo)
 
         def _log(m: str):
             append_project_log(project_id, f"[{prod['product_name']} | Video Cảnh {s_num}] {m}")
@@ -785,44 +1141,35 @@ class MultiThreadSkillRunner:
                 str(scene.get("character_id") or prod.get("character_id") or ""),
                 str(scene.get("voice_id") or prod.get("voice_id") or ""),
             )
-            eff_proj_id = str(prod.get("flow_project_id") or resolved_cv["project_id"] or veo_proj_id)
+            override_pid = str(prod.get("flow_project_id") or resolved_cv["project_id"] or "")
             vid_mode = "reference-to-video" if resolved_cv["voice_id"] else "image-to-video"
-            prof_name = self.gvt._google_profile_name_for_account(acc, allow_unresolved=True) if acc else ""
-            job = self.gvt.VideoJob(
-                id=f"skill_vid_{prod['id']}_{s_num}_{int(time.time())}",
-                model=model,
-                mode=vid_mode,
-                prompt=vid_prompt,
-                image_url=source_img,
-                aspect_ratio=aspect,
-                duration=duration,
-                resolution=resolution,
-                local_path=out_video,
-                account_name=acc.name if acc else "",
-                google_profile_name=prof_name,
-            )
-            if resolved_cv["voice_id"]:
-                job.voice_id = resolved_cv["voice_id"]
-                job.reference_image_urls = [source_img]
-            self._throttle_flow_submit(_log)
-            loop = asyncio.new_event_loop()
-            asyncio.set_event_loop(loop)
-            try:
-                ok = loop.run_until_complete(
-                    self.gvt.run_veo_flow(
-                        job, bearer, eff_proj_id, self.captcha_bridge, log=_log, progress=None
-                    )
+
+            def _make_vid_job(cand_acc, cand_prof):
+                job = self.gvt.VideoJob(
+                    id=f"skill_vid_{prod['id']}_{s_num}_{int(time.time())}",
+                    model=model,
+                    mode=vid_mode,
+                    prompt=vid_prompt,
+                    image_url=source_img,
+                    aspect_ratio=aspect,
+                    duration=duration,
+                    resolution=resolution,
+                    local_path=out_video,
+                    account_name=cand_acc.name if cand_acc else "",
+                    google_profile_name=cand_prof,
                 )
-                if ok and job.local_path and Path(job.local_path).is_file():
-                    return str(Path(job.local_path).resolve())
-                raise RuntimeError(job.error or "Tạo video Veo thất bại")
-            finally:
-                loop.close()
+                if resolved_cv["voice_id"]:
+                    job.voice_id = resolved_cv["voice_id"]
+                    job.reference_image_urls = [source_img]
+                return job
+
+            return self._run_veo_flow_with_failover(_make_vid_job, override_pid, _log, defer_media=defer_media)
         else:
             # Grok I2V qua CLIProxy (:8317)
+            acc, _, _ = self._next_account(for_veo=False)
             import base64
             proxy = acc.proxy_url if (acc and acc.proxy_url.startswith("http")) else self.gvt.DEFAULT_PROXY_URL
-            api_key = acc.api_key if acc else "grok-video-key-001"
+            api_key = (acc.api_key if acc else "") or "grok-video-key-001"
             img_bytes = Path(source_img).read_bytes()
             ext = Path(source_img).suffix.lower().lstrip(".") or "jpg"
             mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
@@ -840,10 +1187,10 @@ class MultiThreadSkillRunner:
                 "duration": duration,
                 "resolution": resolution,
             }
-            with self.gvt.make_httpx_client(timeout=120) as client:
+            with self.gvt.make_httpx_client(timeout=120, target_url=submit_url) as client:
                 resp = client.post(submit_url, headers=headers, json=payload)
             if resp.status_code >= 400:
-                raise RuntimeError(f"Grok Video API error {resp.status_code}: {resp.text[:300]}")
+                raise RuntimeError(self.gvt._cliproxy_format_api_error(resp.status_code, resp.text, model, proxy))
             req_id = resp.json().get("id") or resp.json().get("request_id", "")
             if not req_id:
                 raise RuntimeError("Không nhận được request_id từ Grok Video API")
@@ -851,7 +1198,7 @@ class MultiThreadSkillRunner:
             poll_url = f"{proxy}/v1/videos/{req_id}"
             for _ in range(90):
                 time.sleep(8)
-                with self.gvt.make_httpx_client(timeout=30) as client:
+                with self.gvt.make_httpx_client(timeout=30, target_url=poll_url) as client:
                     r = client.get(poll_url, headers={"Authorization": f"Bearer {api_key}"})
                     if r.status_code < 400:
                         st_data = r.json()
@@ -864,7 +1211,7 @@ class MultiThreadSkillRunner:
                                 or ((st_data.get("data") or [{}])[0]).get("url")
                             )
                             if vurl:
-                                with self.gvt.make_httpx_client(timeout=120) as dl:
+                                with self.gvt.make_httpx_client(timeout=120, target_url=vurl) as dl:
                                     vr = dl.get(vurl)
                                     vr.raise_for_status()
                                     Path(out_video).write_bytes(vr.content)
@@ -924,9 +1271,15 @@ class MultiThreadSkillRunner:
             shutil.copy2(video_paths[0], final_path)
         return str(final_path.resolve())
 
-    def run_single_product(self, project_id: str, product_id: str, max_scene_workers: int = 3) -> Dict[str, Any]:
-        """Chạy trọn gói 1 sản phẩm: Đa luồng Tạo Ảnh -> Đa luồng Tạo Video -> FFmpeg Ghép Video Final."""
-        self.ensure_captcha_bridge()
+    def run_single_product(self, project_id: str, product_id: str, max_scene_workers: Optional[int] = None) -> Dict[str, Any]:
+        """Chạy trọn gói 1 sản phẩm (Pipeline gối đầu): Tạo Ảnh -> Gửi Video ngay khi từng cảnh có ảnh + tải nền."""
+        limits = self._get_flow_limits()
+        eff_scene_workers = (
+            int(max_scene_workers)
+            if (max_scene_workers is not None and int(max_scene_workers) > 0)
+            else int(limits.get("flow_api_workers") or 6)
+        )
+        eff_scene_workers = max(1, min(32, eff_scene_workers))
 
         def _update_state(fn):
             with _STORE_LOCK:
@@ -947,9 +1300,20 @@ class MultiThreadSkillRunner:
             _update_state(lambda item: item.update({"status": "waiting_agent", "error_msg": "Chưa có kịch bản phân cảnh từ AI Agent"}))
             raise ValueError(f"Sản phẩm '{prod['product_name']}' chưa có kịch bản phân cảnh từ AI Agent.")
 
-        append_project_log(project_id, f"🚀 [{prod['product_name']}] Bắt đầu tạo ảnh {len(scenes)} phân cảnh (Đa luồng: {max_scene_workers})...")
+        append_project_log(
+            project_id,
+            f"🚀 [{prod['product_name']}] Khởi chạy Pipeline gối đầu {len(scenes)} phân cảnh ({eff_scene_workers} luồng tạo + tải nền {limits.get('upscale_download_workers', 6)} luồng)...",
+        )
 
-        # ── BƯỚC 1: ĐA LUỒNG TẠO ẢNH CÁC PHÂN CẢNH ──
+        # ── BƯỚC 1 + 2 PIPELINE GỐI ĐẦU: TẠO ẢNH XONG CẢNH NÀO GỬI VIDEO CẢNH ĐÓ NGAY, KHÔNG CHỜ ĐỒNG BỘ ──
+        def _is_fatal_outer_err(err_msg: str) -> bool:
+            kind = (
+                self.gvt.classify_flow_error(err_msg)
+                if hasattr(self.gvt, "classify_flow_error")
+                else "transient"
+            )
+            return kind in ("content_policy", "account_quota", "account_auth")
+
         def _img_task(s_idx: int):
             s_obj = prod["scenes"][s_idx]
             if s_obj.get("image_path") and Path(s_obj["image_path"]).is_file():
@@ -959,14 +1323,39 @@ class MultiThreadSkillRunner:
                     img_p = self._generate_single_scene_image(project_id, prod, s_obj)
                     return s_idx, img_p, None
                 except Exception as e:
-                    if attempt == 2:
-                        return s_idx, "", str(e)
-                    time.sleep(3)
+                    err_s = str(e)
+                    if attempt == 2 or _is_fatal_outer_err(err_s):
+                        return s_idx, "", err_s
+                    time.sleep(random.uniform(2.0, 4.5))
             return s_idx, "", "Unknown error"
 
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_scene_workers) as pool:
-            futs = [pool.submit(_img_task, i) for i in range(len(scenes))]
-            for fut in concurrent.futures.as_completed(futs):
+        def _vid_task(s_idx: int, cur_scene_obj: Dict[str, Any]):
+            if cur_scene_obj.get("video_path") and Path(cur_scene_obj["video_path"]).is_file():
+                return s_idx, cur_scene_obj["video_path"], None, None
+            for attempt in range(1, 3):
+                try:
+                    try:
+                        res_v = self._generate_single_scene_video(project_id, prod, cur_scene_obj, defer_media=True)
+                    except TypeError:
+                        res_v = self._generate_single_scene_video(project_id, prod, cur_scene_obj)
+                    if isinstance(res_v, str):
+                        return s_idx, res_v, None, None
+                    return s_idx, "", res_v, None
+                except Exception as e:
+                    err_s = str(e)
+                    if attempt == 2 or _is_fatal_outer_err(err_s):
+                        return s_idx, "", None, err_s
+                    time.sleep(random.uniform(3.0, 6.0))
+            return s_idx, "", None, "Unknown video error"
+
+        pool_size = max(1, min(max(eff_scene_workers, len(scenes) * 2), eff_scene_workers))
+        pending_vid_futs = []
+        deferred_vid_jobs = []
+        img_done_count = 0
+
+        with concurrent.futures.ThreadPoolExecutor(max_workers=pool_size) as pool:
+            img_futs = {pool.submit(_img_task, i): i for i in range(len(scenes))}
+            for fut in concurrent.futures.as_completed(img_futs):
                 s_idx, img_path, err = fut.result()
                 def _apply_img(item, idx=s_idx, p=img_path, e=err):
                     sc = item["scenes"][idx]
@@ -978,48 +1367,62 @@ class MultiThreadSkillRunner:
                         sc["status"] = "failed"
                         sc["error_msg"] = e or "Lỗi tạo ảnh"
                 prod = _update_state(_apply_img)
+                if img_path:
+                    img_done_count += 1
+                    sc_ready = dict(prod["scenes"][s_idx])
+                    append_project_log(
+                        project_id,
+                        f"🎬 [{prod['product_name']}] Ảnh cảnh {sc_ready.get('scene_number', s_idx + 1)} xong -> Đẩy tạo Video I2V ngay lập tức!",
+                    )
+                    pending_vid_futs.append(pool.submit(_vid_task, s_idx, sc_ready))
 
-        img_ready_indices = [
-            i for i, s in enumerate(prod["scenes"])
-            if s.get("image_path") and Path(s["image_path"]).is_file()
-        ]
-        if not img_ready_indices:
+            if img_done_count > 0:
+                prod = _update_state(lambda item: item.update({"status": "vid_gen"}))
+
+            for vfut in concurrent.futures.as_completed(pending_vid_futs):
+                s_idx, vid_path, deferred_job, err = vfut.result()
+                if deferred_job is not None:
+                    deferred_vid_jobs.append((s_idx, deferred_job))
+                else:
+                    def _apply_vid(item, idx=s_idx, p=vid_path, e=err):
+                        sc = item["scenes"][idx]
+                        if p:
+                            sc["video_path"] = p
+                            sc["status"] = "done"
+                            sc["error_msg"] = ""
+                        else:
+                            sc["status"] = "failed"
+                            sc["error_msg"] = e or "Lỗi tạo video"
+                    prod = _update_state(_apply_vid)
+
+        if not img_done_count:
             _update_state(lambda item: item.update({"status": "failed", "error_msg": "Tất cả phân cảnh đều lỗi tạo ảnh"}))
             append_project_log(project_id, f"❌ [{prod['product_name']}] Thất bại: Không tạo được ảnh phân cảnh nào.")
             return load_project(project_id)
 
-        # ── BƯỚC 2: ĐA LUỒNG TẠO VIDEO I2V TỪ ẢNH PHÂN CẢNH ──
-        prod = _update_state(lambda item: item.update({"status": "vid_gen"}))
-        append_project_log(project_id, f"🎬 [{prod['product_name']}] Đã xong {len(img_ready_indices)}/{len(scenes)} ảnh. Bắt đầu dựng Video I2V đa luồng...")
-
-        def _vid_task(s_idx: int):
-            s_obj = prod["scenes"][s_idx]
-            if s_obj.get("video_path") and Path(s_obj["video_path"]).is_file():
-                return s_idx, s_obj["video_path"], None
-            for attempt in range(1, 3):
+        # Hoàn tất các file video đang tải nền (nếu defer_media=True)
+        for s_idx, d_job in deferred_vid_jobs:
+            vid_ok = hasattr(self.gvt, "wait_for_job_media") and self.gvt.wait_for_job_media(d_job, timeout=300.0)
+            vid_path = str(Path(d_job.local_path).resolve()) if (vid_ok and getattr(d_job, "local_path", None) and Path(d_job.local_path).is_file()) else ""
+            err_msg = "" if vid_path else str(getattr(d_job, "error", None) or "Lỗi tải video nền")
+            if not vid_path and not _is_fatal_outer_err(err_msg):
+                # Fallback đồng bộ qua failover nếu tải CDN nền lỗi (không retry nếu vi phạm/hết quota)
                 try:
-                    vid_p = self._generate_single_scene_video(project_id, prod, s_obj)
-                    return s_idx, vid_p, None
-                except Exception as e:
-                    if attempt == 2:
-                        return s_idx, "", str(e)
-                    time.sleep(5)
-            return s_idx, "", "Unknown video error"
-
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_scene_workers) as pool:
-            futs = [pool.submit(_vid_task, i) for i in img_ready_indices]
-            for fut in concurrent.futures.as_completed(futs):
-                s_idx, vid_path, err = fut.result()
-                def _apply_vid(item, idx=s_idx, p=vid_path, e=err):
-                    sc = item["scenes"][idx]
-                    if p:
-                        sc["video_path"] = p
-                        sc["status"] = "done"
-                        sc["error_msg"] = ""
-                    else:
-                        sc["status"] = "failed"
-                        sc["error_msg"] = e or "Lỗi tạo video"
-                prod = _update_state(_apply_vid)
+                    sc_fb = dict(prod["scenes"][s_idx])
+                    vid_path = self._generate_single_scene_video(project_id, prod, sc_fb, defer_media=False)
+                    err_msg = ""
+                except Exception as fb_exc:
+                    err_msg = str(fb_exc)
+            def _apply_dl(item, idx=s_idx, p=vid_path, e=err_msg):
+                sc = item["scenes"][idx]
+                if p:
+                    sc["video_path"] = p
+                    sc["status"] = "done"
+                    sc["error_msg"] = ""
+                else:
+                    sc["status"] = "failed"
+                    sc["error_msg"] = e or "Lỗi tải video"
+            prod = _update_state(_apply_dl)
 
         vid_ready = [s for s in prod["scenes"] if s.get("video_path") and Path(s["video_path"]).is_file()]
         if not vid_ready:
@@ -1031,7 +1434,26 @@ class MultiThreadSkillRunner:
         prod = _update_state(lambda item: item.update({"status": "assembling"}))
         try:
             final_vid = self._concat_final_video(project_id, prod)
-            _update_state(lambda item: item.update({"status": "done", "final_video_path": final_vid, "error_msg": ""}))
+            thumb_cli = ""
+            try:
+                scripts_dir = str(SKILL_DIR / "flow_final_pipeline" / "scripts")
+                if scripts_dir not in sys.path:
+                    sys.path.insert(0, scripts_dir)
+                import engine_settings_manager as _esm_cli
+                vkey_cli = str(prod.get("vkey") or prod.get("char_v_code") or prod.get("id") or "v1")
+                th_res = _esm_cli.ensure_project_variant_thumbnail_and_inject(
+                    project_id,
+                    vkey=vkey_cli,
+                    final_video_path=final_vid,
+                    log_cb=lambda m: append_project_log(project_id, m),
+                )
+                thumb_cli = str(th_res.get("thumbnail_path") or th_res.get("project_thumbnail_path") or "").strip()
+            except Exception as _th_err:
+                append_project_log(project_id, f"⚠️ [{prod['product_name']}] Bỏ qua tự tạo thumbnail: {_th_err}")
+            upd = {"status": "done", "final_video_path": final_vid, "error_msg": ""}
+            if thumb_cli:
+                upd["thumbnail_path"] = thumb_cli
+            _update_state(lambda item: item.update(upd))
             append_project_log(project_id, f"✅ [{prod['product_name']}] HOÀN TẤT VIDEO FINAL: {final_vid}")
         except Exception as e:
             _update_state(lambda item: item.update({"status": "failed", "error_msg": f"Lỗi ghép video: {e}"}))
@@ -1042,8 +1464,8 @@ class MultiThreadSkillRunner:
     def run_project_batch(
         self,
         project_id_or_name: str,
-        max_product_workers: int = 2,
-        max_scene_workers: int = 3,
+        max_product_workers: Optional[int] = None,
+        max_scene_workers: Optional[int] = None,
         product_ids: Optional[List[str]] = None,
     ) -> Dict[str, Any]:
         """Chạy hàng loạt sản phẩm song song trong dự án."""
@@ -1051,38 +1473,98 @@ class MultiThreadSkillRunner:
         if not proj:
             raise ValueError(f"Không tìm thấy dự án: {project_id_or_name}")
 
-        self.ensure_captcha_bridge()
-        pid = proj["id"]
-        targets = []
-        for p in proj.get("products", []):
-            if product_ids and p["id"] not in product_ids:
-                continue
-            if p.get("scenes") and p.get("status") in ("queued", "failed", "img_gen", "vid_gen"):
-                targets.append(p["id"])
-
-        if not targets:
-            append_project_log(pid, "ℹ️ Không có sản phẩm nào ở trạng thái sẵn sàng chạy (queued/failed có kịch bản).")
-            return proj
-
-        append_project_log(
-            pid,
-            f"🔥 BẮT ĐẦU CHẠY ĐA LUỒNG {len(targets)} SẢN PHẨM (Song song {max_product_workers} sản phẩm x {max_scene_workers} cảnh)...",
+        limits = self._get_flow_limits()
+        eff_prod_workers = (
+            int(max_product_workers)
+            if (max_product_workers is not None and int(max_product_workers) > 0)
+            else int(limits.get("parallel_products") or 4)
         )
-        with concurrent.futures.ThreadPoolExecutor(max_workers=max_product_workers) as pool:
-            futs = [
-                pool.submit(self.run_single_product, pid, prod_id, max_scene_workers)
-                for prod_id in targets
-            ]
-            for fut in concurrent.futures.as_completed(futs):
-                try:
-                    fut.result()
-                except Exception as e:
-                    append_project_log(pid, f"⚠️ Lỗi xử lý sản phẩm: {e}")
+        eff_scene_workers = (
+            int(max_scene_workers)
+            if (max_scene_workers is not None and int(max_scene_workers) > 0)
+            else int(limits.get("flow_api_workers") or 6)
+        )
+        eff_prod_workers = max(1, min(16, eff_prod_workers))
+        eff_scene_workers = max(1, min(32, eff_scene_workers))
 
-        final_proj = load_project(pid)
-        done_cnt = sum(1 for p in final_proj.get("products", []) if p.get("status") == "done")
-        append_project_log(pid, f"🎉 HOÀN THÀNH BATCH DỰ ÁN '{final_proj['name']}': {done_cnt}/{len(final_proj.get('products', []))} sản phẩm có Video Final!")
-        return final_proj
+        pid = proj["id"]
+        with _STOPPED_PROJECTS_LOCK:
+            _STOPPED_PROJECT_IDS.discard(pid)
+            _ACTIVE_PROJECT_BATCHES.add(pid)
+        status_file = get_project_dir(pid) / "pipeline_status.json"
+        _atomic_write_store_json(
+            status_file,
+            {
+                "is_running": True,
+                "pid_os": os.getpid(),
+                "runner_mode": "in_process_batch",
+                "message": f"🔥 Đang chạy đa luồng dự án '{proj['name']}'...",
+                "updated_at": time.time(),
+            },
+        )
+        try:
+            targets = []
+            for p in proj.get("products", []):
+                if product_ids and p["id"] not in product_ids:
+                    continue
+                if p.get("scenes") and p.get("status") in ("queued", "failed", "img_gen", "vid_gen"):
+                    targets.append(p["id"])
+
+            if not targets:
+                append_project_log(pid, "ℹ️ Không có sản phẩm nào ở trạng thái sẵn sàng chạy (queued/failed có kịch bản).")
+                _atomic_write_store_json(
+                    status_file,
+                    {
+                        "is_running": False,
+                        "pid_os": None,
+                        "message": "ℹ️ Không có sản phẩm nào ở trạng thái sẵn sàng chạy.",
+                        "updated_at": time.time(),
+                    },
+                )
+                return proj
+
+            append_project_log(
+                pid,
+                f"🔥 BẮT ĐẦU CHẠY ĐA LUỒNG {len(targets)} SẢN PHẨM (Song song {eff_prod_workers} SP × {eff_scene_workers} luồng/cảnh | Delay/TK {limits.get('submit_delay_sec', 4.5)}s)...",
+            )
+            with concurrent.futures.ThreadPoolExecutor(max_workers=eff_prod_workers) as pool:
+                futs = [
+                    pool.submit(
+                        lambda pr_id=prod_id: (
+                            None if is_project_stopped(pid) else self.run_single_product(pid, pr_id, eff_scene_workers)
+                        )
+                    )
+                    for prod_id in targets
+                ]
+                for fut in concurrent.futures.as_completed(futs):
+                    try:
+                        fut.result()
+                    except Exception as e:
+                        append_project_log(pid, f"⚠️ Lỗi xử lý sản phẩm: {e}")
+
+            final_proj = load_project(pid)
+            done_cnt = sum(1 for p in final_proj.get("products", []) if p.get("status") == "done")
+            fail_cnt = sum(1 for p in final_proj.get("products", []) if p.get("status") == "failed")
+            stopped_now = is_project_stopped(pid)
+            end_msg = (
+                f"⏹ Đã dừng dự án '{final_proj['name']}' theo yêu cầu ({done_cnt} xong, {fail_cnt} lỗi)."
+                if stopped_now
+                else f"🎉 HOÀN THÀNH BATCH DỰ ÁN '{final_proj['name']}': {done_cnt}/{len(final_proj.get('products', []))} sản phẩm có Video Final ({fail_cnt} lỗi)!"
+            )
+            append_project_log(pid, end_msg)
+            _atomic_write_store_json(
+                status_file,
+                {
+                    "is_running": False,
+                    "pid_os": None,
+                    "message": end_msg,
+                    "updated_at": time.time(),
+                },
+            )
+            return final_proj
+        finally:
+            with _STOPPED_PROJECTS_LOCK:
+                _ACTIVE_PROJECT_BATCHES.discard(pid)
 
 
 # ═══════════════════════════════════════════════════════════════════════════
@@ -1127,14 +1609,14 @@ def main():
     p_sub.add_argument("--project", required=True, help="Tên hoặc ID dự án")
     p_sub.add_argument("--payload-file", required=True, help="Đường dẫn file JSON chứa kịch bản các sản phẩm")
     p_sub.add_argument("--auto-run", action="store_true", help="Tự động chạy tạo Ảnh -> Video -> Final ngay sau khi nạp prompt")
-    p_sub.add_argument("--product-workers", type=int, default=2, help="Số sản phẩm chạy song song")
-    p_sub.add_argument("--scene-workers", type=int, default=3, help="Số phân cảnh chạy song song mỗi sản phẩm")
+    p_sub.add_argument("--product-workers", type=int, default=0, help="Số sản phẩm chạy song song (0 = Auto theo Engine Settings)")
+    p_sub.add_argument("--scene-workers", type=int, default=0, help="Số phân cảnh chạy song song mỗi sản phẩm (0 = Auto theo Engine Settings)")
 
     # 7. run-batch
     p_run = sub.add_parser("run-batch", help="Chạy đa luồng tạo Ảnh -> Video -> Final cho dự án")
     p_run.add_argument("--project", required=True, help="Tên hoặc ID dự án")
-    p_run.add_argument("--product-workers", type=int, default=2, help="Số sản phẩm chạy song song")
-    p_run.add_argument("--scene-workers", type=int, default=3, help="Số phân cảnh chạy song song mỗi sản phẩm")
+    p_run.add_argument("--product-workers", type=int, default=0, help="Số sản phẩm chạy song song (0 = Auto theo Engine Settings)")
+    p_run.add_argument("--scene-workers", type=int, default=0, help="Số phân cảnh chạy song song mỗi sản phẩm (0 = Auto theo Engine Settings)")
 
     # 8. crawl-product (Tự động tải ảnh & thông tin sản phẩm TikTokShop theo Cách 1 SPAI hoặc Cách 2 Browser)
     p_crawl = sub.add_parser("crawl-product", help="Crawl thông tin & ảnh sản phẩm TikTokShop theo Link hoặc ID")

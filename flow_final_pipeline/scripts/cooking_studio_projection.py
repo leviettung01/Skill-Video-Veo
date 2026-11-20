@@ -1,6 +1,7 @@
 # -*- coding: utf-8 -*-
 """Read cooking manifests into the shared Studio/Matrix project contract."""
 import json
+import time
 from pathlib import Path
 
 
@@ -144,6 +145,16 @@ def build_project(folder):
         'vid_model': 'Flow',
         'role_skill_file': 'Template/Nấu Ăn POV Storyboard/ROLE_SKILL.md',
     }
+    manifest_file = folder / 'cooking_manifest.json'
+    base_mtime = (
+        final.stat().st_mtime if done
+        else (manifest_file.stat().st_mtime if manifest_file.is_file() else (folder.stat().st_mtime if folder.is_dir() else time.time()))
+    )
+    updated_ts = float(manifest.get('updated_ts') or base_mtime)
+    created_ts = float(manifest.get('created_ts') or (folder.stat().st_ctime if folder.is_dir() else updated_ts))
+    updated_at = str(manifest.get('updated_at') or time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(updated_ts)))
+    created_at = str(manifest.get('created_at') or time.strftime('%Y-%m-%d %H:%M:%S', time.localtime(created_ts)))
+
     result = {
         'id': pid,
         'name': name,
@@ -157,6 +168,10 @@ def build_project(folder):
         'template_code': '005',
         'template_name': 'Nấu Ăn POV Storyboard',
         'videos_per_character': 1,
+        'created_at': created_at,
+        'updated_at': updated_at,
+        'created_ts': round(created_ts, 3),
+        'updated_ts': round(updated_ts, 3),
         'final_videos_dir': str(folder.parent.parent / 'final_videos'),
         'project_dir': str(folder),
         'primary_product_image_path': ref,

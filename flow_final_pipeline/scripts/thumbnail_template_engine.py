@@ -937,6 +937,21 @@ def get_template_by_id(template_id: str) -> dict:
 
 def detect_product_thumbnail_category(product_name: str, product_info: str = "", category_hint: str = "") -> str:
     """Tự động phân tích Tên sản phẩm + Mô tả + Ngành hàng để nhận diện chính xác mã ngành hàng Thumbnail."""
+    hint_norm = str(category_hint or "").strip().lower()
+    alias_map = {
+        "thoi_trang": "quan_ao_nu",
+        "thời trang": "quan_ao_nu",
+        "fashion": "quan_ao_nu",
+        "am_thuc": "food",
+        "ẩm thực": "food",
+        "cooking": "food",
+        "nau_an": "food",
+    }
+    if hint_norm in alias_map:
+        return alias_map[hint_norm]
+    if hint_norm and any(c["id"] == hint_norm for c in THUMBNAIL_CATEGORIES):
+        return hint_norm
+
     combined = f"{category_hint or ''} {product_name or ''} {product_info or ''}".lower()
     best_cat = "gia_dung"
     best_score = 0

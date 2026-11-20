@@ -1,13 +1,226 @@
 # -*- coding: utf-8 -*-
 import os
+from pathlib import Path
 import re
 import sys
 import glob
 import json
 import time
 import shutil
+import ast
+import builtins
+import importlib
+import threading
 
-sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+if hasattr(sys.stdout, "reconfigure"):
+    try:
+        sys.stdout.reconfigure(encoding="utf-8", errors="replace")
+    except Exception:
+        pass
+
+
+def _hotpatch_live_modules():
+    """Keep long-lived server.py in-memory transform_engine & grok_video_tool Flow
+    RPC helpers synchronized with disk without restarting CaptchaBridge on :4000.
+    """
+    cache = getattr(builtins, "_SKILLVEO_HOTPATCH_MTIMES", None)
+    if not isinstance(cache, dict):
+        cache = {}
+        setattr(builtins, "_SKILLVEO_HOTPATCH_MTIMES", cache)
+
+    here = Path(__file__).resolve()
+    root_dir = here.parents[2]
+    try:
+        sws_mtime = here.stat().st_mtime
+        if cache.get("sws_mtime") != sws_mtime:
+            cache.clear()
+            cache["sws_mtime"] = sws_mtime
+    except Exception:
+        pass
+
+    for mod_name in ("transform_engine", "flow_final_pipeline.scripts.transform_engine"):
+        t_mod = sys.modules.get(mod_name)
+        t_file = here.parent / "transform_engine.py"
+        if t_mod is not None and t_file.is_file():
+            try:
+                mtime = t_file.stat().st_mtime
+                if cache.get(f"te:{mod_name}") != mtime:
+                    prev_lock = getattr(t_mod, "LOCK", None)
+                    prev_queue_cond = getattr(t_mod, "_QUEUE_COND", None)
+                    prev_active_jobs = getattr(t_mod, "_ACTIVE_JOBS", None)
+                    prev_stopped_jobs = getattr(t_mod, "_STOPPED_JOBS", None)
+                    importlib.reload(t_mod)
+                    if prev_lock is not None:
+                        t_mod.LOCK = prev_lock
+                    if prev_queue_cond is not None:
+                        t_mod._QUEUE_COND = prev_queue_cond
+                    if isinstance(prev_active_jobs, set):
+                        t_mod._ACTIVE_JOBS = prev_active_jobs
+                    if isinstance(prev_stopped_jobs, set):
+                        t_mod._STOPPED_JOBS = prev_stopped_jobs
+                    cache[f"te:{mod_name}"] = mtime
+            except Exception:
+                pass
+
+    for mod_name in ("thumbnail_template_engine", "flow_final_pipeline.scripts.thumbnail_template_engine"):
+        tt_mod = sys.modules.get(mod_name)
+        tt_file = here.parent / "thumbnail_template_engine.py"
+        if tt_mod is not None and tt_file.is_file():
+            try:
+                mtime = tt_file.stat().st_mtime
+                if cache.get(f"tte:{mod_name}") != mtime:
+                    importlib.reload(tt_mod)
+                    cache[f"tte:{mod_name}"] = mtime
+            except Exception:
+                pass
+
+    for mod_name in ("cooking_studio_projection", "flow_final_pipeline.scripts.cooking_studio_projection"):
+        csp_mod = sys.modules.get(mod_name)
+        csp_file = here.parent / "cooking_studio_projection.py"
+        if csp_mod is not None and csp_file.is_file():
+            try:
+                mtime = csp_file.stat().st_mtime
+                if cache.get(f"csp:{mod_name}") != mtime:
+                    importlib.reload(csp_mod)
+                    cache[f"csp:{mod_name}"] = mtime
+            except Exception:
+                pass
+
+    for mod_name in ("engine_settings_manager", "flow_final_pipeline.scripts.engine_settings_manager"):
+        e_mod = sys.modules.get(mod_name)
+        e_file = here.parent / "engine_settings_manager.py"
+        if e_mod is not None and e_file.is_file():
+            try:
+                mtime = e_file.stat().st_mtime
+                if cache.get(f"esm:{mod_name}") != mtime:
+                    prev_hw = getattr(e_mod, "_HW_CACHE", None)
+                    prev_pref_lock = getattr(e_mod, "_THUMB_PREFERRED_LOCK", None)
+                    prev_pref_list = getattr(e_mod, "_THUMB_PREFERRED_PROFILES", None)
+                    importlib.reload(e_mod)
+                    if prev_hw is not None:
+                        e_mod._HW_CACHE = prev_hw
+                    if prev_pref_lock is not None:
+                        e_mod._THUMB_PREFERRED_LOCK = prev_pref_lock
+                    if isinstance(prev_pref_list, list):
+                        e_mod._THUMB_PREFERRED_PROFILES = prev_pref_list
+                    if mod_name == "engine_settings_manager":
+                        globals()["_esm"] = e_mod
+                    cache[f"esm:{mod_name}"] = mtime
+            except Exception:
+                pass
+
+    gvt_mod = sys.modules.get("grok_video_tool")
+    gvt_file = root_dir / "grok_video_tool.py"
+    if gvt_mod is not None and gvt_file.is_file():
+        try:
+            mtime = gvt_file.stat().st_mtime
+            if cache.get("gvt") != mtime:
+                import threading as _th_hp
+                prev_actor = getattr(gvt_mod, "_flow_browser_actor_instance", None)
+                if prev_actor is not None and hasattr(prev_actor, "shutdown"):
+                    try:
+                        prev_actor.shutdown()
+                    except Exception:
+                        pass
+                src = gvt_file.read_text(encoding="utf-8")
+                tree = ast.parse(src, filename=str(gvt_file))
+                target_names = {
+                    "VideoJob",
+                    "_FLOW_HIJACK_BYPASS_JS",
+                    "_FLOW_RECAPTCHA_SITEKEY",
+                    "_cookie_str_to_playwright_list",
+                    "_load_playwright_cookies_for_flow",
+                    "_FlowBrowserActor",
+                    "_get_flow_browser_actor",
+                    "invalidate_flow_chrome_session",
+                    "_execute_flow_rpc_in_chrome",
+                    "_find_signed_flow_urls",
+                    "_request_captcha_for_account",
+                    "get_connected_extension_bridge",
+                    "fetch_flow_wiz_http",
+                    "ExtensionHttpFlowPage",
+                    "open_extension_flow_session",
+                    "_cookie_header_to_dict_list",
+                    "_ExtBrowserContext",
+                    "_ExtBrowser",
+                    "_ExtChromiumLauncher",
+                    "_ExtPlaywrightShim",
+                    "flow_playwright_or_extension",
+                    "_run_veo_flow_batchexecute",
+                    "_run_veo_flow_single_attempt",
+                    "run_veo_flow",
+                }
+                nodes = []
+                for node in tree.body:
+                    if isinstance(node, ast.ImportFrom) and node.module == "__future__":
+                        nodes.append(node)
+                    elif isinstance(node, (ast.FunctionDef, ast.AsyncFunctionDef, ast.ClassDef)):
+                        if node.name in target_names:
+                            nodes.append(node)
+                    elif isinstance(node, ast.Assign):
+                        if any(isinstance(t, ast.Name) and t.id in target_names for t in node.targets):
+                            nodes.append(node)
+                if "_flow_browser_actor_lock" not in gvt_mod.__dict__:
+                    gvt_mod.__dict__["_flow_browser_actor_lock"] = _th_hp.Lock()
+                if "_flow_mzza6b_preferred_profiles" not in gvt_mod.__dict__:
+                    gvt_mod.__dict__["_flow_mzza6b_preferred_profiles"] = set()
+                if "_SHARED_EXT_BRIDGE_LOCK" not in gvt_mod.__dict__:
+                    gvt_mod.__dict__["_SHARED_EXT_BRIDGE_LOCK"] = _th_hp.Lock()
+                if "_SHARED_EXT_BRIDGE" not in gvt_mod.__dict__:
+                    gvt_mod.__dict__["_SHARED_EXT_BRIDGE"] = None
+                gvt_mod.__dict__["_flow_browser_actor_instance"] = None
+                if nodes:
+                    patch_mod = ast.Module(body=nodes, type_ignores=[])
+                    ast.fix_missing_locations(patch_mod)
+                    exec(compile(patch_mod, str(gvt_file), "exec"), gvt_mod.__dict__)
+                cache["gvt"] = mtime
+        except Exception:
+            pass
+
+    vsc_mod = sys.modules.get("veo_skill_cli")
+    vsc_file = root_dir / "veo_skill_cli.py"
+    if vsc_mod is not None and vsc_file.is_file():
+        try:
+            mtime = vsc_file.stat().st_mtime
+            if cache.get("veo_skill_cli") != mtime:
+                src = vsc_file.read_text(encoding="utf-8")
+                tree = ast.parse(src, filename=str(vsc_file))
+                cls_nodes = [
+                    node for node in tree.body
+                    if isinstance(node, ast.ClassDef) and node.name == "MultiThreadSkillRunner"
+                ]
+                if cls_nodes:
+                    tmp_ns = dict(vsc_mod.__dict__)
+                    patch_mod = ast.Module(body=cls_nodes, type_ignores=[])
+                    ast.fix_missing_locations(patch_mod)
+                    exec(compile(patch_mod, str(vsc_file), "exec"), tmp_ns)
+                    new_cls = tmp_ns.get("MultiThreadSkillRunner")
+                    old_cls = getattr(vsc_mod, "MultiThreadSkillRunner", None)
+                    if new_cls is not None and old_cls is not None:
+                        for attr_name in (
+                            "FLOW_SUBMIT_DELAY_SEC",
+                            "FLOW_GLOBAL_STAGGER_SEC",
+                            "_throttle_flow_submit",
+                            "mark_account_cooldown",
+                            "_schedule_profile_heal",
+                            "ensure_captcha_bridge",
+                            "_resolve_flow_token_for_account",
+                            "flow_account_candidates",
+                            "_next_account",
+                            "_run_veo_flow_with_failover",
+                            "_generate_single_scene_image",
+                            "_generate_single_scene_video",
+                            "run_single_product",
+                            "run_project_batch",
+                        ):
+                            if attr_name in new_cls.__dict__:
+                                setattr(old_cls, attr_name, new_cls.__dict__[attr_name])
+                cache["veo_skill_cli"] = mtime
+        except Exception:
+            pass
+
+
+_hotpatch_live_modules()
 
 SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
 if SCRIPTS_DIR not in sys.path:
@@ -61,6 +274,7 @@ DEFAULT_HOOK_LABELS = {
 }
 
 _LAST_SYNC_TS = 0.0
+_SYNC_LOCK = threading.RLock()
 
 
 def get_char_v_code(vkey: str, char_key: str = "") -> str:
@@ -181,7 +395,8 @@ def delete_final_video(pid: str, vkey: str = "", final_video_path: str = "") -> 
         state = {"uploaded_refs": {}, "scene_uuids": {}, "built_finals": []}
         if os.path.exists(state_path):
             try:
-                state = json.load(open(state_path, encoding="utf-8"))
+                with open(state_path, encoding="utf-8") as _f_st0:
+                    state = json.load(_f_st0)
             except Exception:
                 pass
         bf = set(state.get("built_finals") or [])
@@ -293,8 +508,92 @@ def clean_product_rendered_cache(pid: str, also_delete_finals: bool = False) -> 
     }
 
 
-def sync_web_ui(force: bool = True):
+def _parse_ts_value(val, default: float = 0.0) -> float:
+    if isinstance(val, (int, float)):
+        return float(val) if val > 0 else default
+    text = str(val or "").strip()
+    if not text:
+        return default
+    from datetime import datetime
+    for fmt in ("%Y-%m-%d %H:%M:%S", "%Y-%m-%dT%H:%M:%S", "%Y-%m-%d %H:%M"):
+        try:
+            return datetime.strptime(text[:19], fmt).timestamp()
+        except ValueError:
+            continue
+    try:
+        return datetime.fromisoformat(text.replace("Z", "+00:00")).timestamp()
+    except ValueError:
+        return default
+
+
+def _compute_mtime_timestamps(paths, fallback_paths=(), extra_ts=(), explicit_created="", explicit_updated="", explicit_updated_ts=0.0):
+    candidates = [float(t) for t in extra_ts if t and float(t) > 0]
+    for fp in paths:
+        if fp and os.path.exists(fp):
+            try:
+                candidates.append(os.path.getmtime(fp))
+            except OSError:
+                pass
+    if not candidates:
+        for fp in fallback_paths:
+            if fp and os.path.exists(fp):
+                try:
+                    candidates.append(os.path.getmtime(fp))
+                except OSError:
+                    pass
+    file_mtime = max(candidates) if candidates else time.time()
+    updated_ts = max(float(explicit_updated_ts or 0.0), file_mtime)
+    parsed_upd = _parse_ts_value(explicit_updated, 0.0)
+    if parsed_upd > updated_ts and explicit_updated_ts:
+        updated_ts = parsed_upd
+    all_paths = tuple(paths) + tuple(fallback_paths)
+    created_candidates = [os.path.getctime(fp) for fp in all_paths if fp and os.path.exists(fp)]
+    parsed_crt = _parse_ts_value(explicit_created, 0.0)
+    created_ts = parsed_crt if parsed_crt > 0 else (min(created_candidates) if created_candidates else updated_ts)
+    return (
+        str(explicit_created or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(created_ts))),
+        time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(updated_ts)),
+        round(created_ts, 3),
+        round(updated_ts, 3),
+    )
+
+
+def _extract_sort_ts(item: dict) -> float:
+    for key in ("updated_ts", "created_ts"):
+        val = item.get(key)
+        if isinstance(val, (int, float)) and val > 0:
+            return float(val)
+    for key in ("updated_at", "created_at"):
+        ts = _parse_ts_value(item.get(key), 0.0)
+        if ts > 0:
+            return ts
+    pdir = str(item.get("project_dir") or "").strip()
+    if pdir and os.path.exists(pdir):
+        try:
+            return os.path.getmtime(pdir)
+        except OSError:
+            pass
+    return 0.0
+
+
+def _unified_sort_group(item: dict) -> int:
+    if item.get("is_running"):
+        return -2
+    done_cnt = int(item.get("done_products") or 0)
+    if done_cnt > 0:
+        return -1
+    failed_cnt = int(item.get("failed_products") or 0)
+    step_txt = str(item.get("current_step_text") or (item.get("live_status") or {}).get("current_step_text") or "").lower()
+    if failed_cnt > 0 or "lỗi" in step_txt:
+        return 2
+    if int(item.get("deleted_finals_count") or 0) > 0:
+        return 1
+    return 0
+
+
+def _sync_web_ui_locked(force: bool = True):
     global _LAST_SYNC_TS
+    _hotpatch_live_modules()
     now_ts = time.time()
     if not force and (now_ts - _LAST_SYNC_TS) < 1.2:
         return
@@ -318,6 +617,15 @@ def sync_web_ui(force: bool = True):
         pdir = os.path.join(PROJECTS_DIR, pid)
         if not os.path.isdir(pdir):
             continue
+        if os.path.isfile(os.path.join(pdir, 'transform.json')):
+            from transform_engine import project_view
+            try:
+                item = project_view(Path(pdir))
+                group = -2 if item['is_running'] else (-1 if item['done_products'] else 1)
+                raw_index_items.append((group, order_idx, {k: v for k, v in item.items() if k != 'products'}))
+            except (ValueError, KeyError, OSError):
+                pass
+            continue
         if os.path.isfile(os.path.join(pdir, 'cooking_manifest.json')):
             continue  # Dedicated projection preserves storyboard clips and cooking prompts.
         prod_img_dir = os.path.join(pdir, "product_images")
@@ -328,14 +636,16 @@ def sync_web_ui(force: bool = True):
         info_data = {}
         if os.path.exists(info_path):
             try:
-                info_data = json.load(open(info_path, encoding="utf-8"))
+                with open(info_path, encoding="utf-8") as _f_inf:
+                    info_data = json.load(_f_inf)
             except Exception:
                 pass
 
         prompts_data = {}
         if os.path.exists(prompts_path):
             try:
-                prompts_data = json.load(open(prompts_path, encoding="utf-8"))
+                with open(prompts_path, encoding="utf-8") as _f_prm:
+                    prompts_data = json.load(_f_prm)
             except Exception:
                 pass
 
@@ -343,7 +653,8 @@ def sync_web_ui(force: bool = True):
         existing_proj_data = {}
         if os.path.isfile(proj_json_path):
             try:
-                existing_proj_data = json.load(open(proj_json_path, encoding="utf-8"))
+                with open(proj_json_path, encoding="utf-8") as _f_prj:
+                    existing_proj_data = json.load(_f_prj)
             except Exception:
                 existing_proj_data = {}
 
@@ -364,8 +675,9 @@ def sync_web_ui(force: bool = True):
                     "final_videos_dir": FINAL_VIDEOS_DIR,
                     "project_dir": pdir,
                     "role_skill_file": existing_proj_data.get("role_skill_file") or "DoAnVat.MD",
-                    "created_at": existing_proj_data.get("created_at") or now_str,
-                    "updated_at": existing_proj_data.get("updated_at") or now_str,
+                    "created_at": existing_proj_data.get("created_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getctime(proj_json_path))),
+                    "updated_at": existing_proj_data.get("updated_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(proj_json_path))),
+                    "updated_ts": round(_parse_ts_value(existing_proj_data.get("updated_at"), 0.0) or os.path.getmtime(proj_json_path), 3),
                     "total_products": len(c_prods),
                     "done_products": c_done,
                     "running_products": c_run,
@@ -434,10 +746,12 @@ def sync_web_ui(force: bool = True):
         vpc_val = int(prompts_data.get("videos_per_character") or 3)
 
         state_path = os.path.join(pdir, "flow_state.json")
+        state_mtime_orig = os.path.getmtime(state_path) if os.path.exists(state_path) else 0.0
         state = {"uploaded_refs": {}, "scene_uuids": {}, "built_finals": []}
         if os.path.exists(state_path):
             try:
-                state = json.load(open(state_path, encoding="utf-8"))
+                with open(state_path, encoding="utf-8") as _f_st0:
+                    state = json.load(_f_st0)
             except Exception:
                 pass
         built_finals = set(state.get("built_finals") or [])
@@ -453,16 +767,12 @@ def sync_web_ui(force: bool = True):
         deleted_finals_count = 0
 
         if not is_marked_clean:
+            scene_errors_map = state.get("scene_errors") if isinstance(state.get("scene_errors"), dict) else {}
+            failed_scenes_set = set(state.get("failed_scenes") or [])
             for vkey in ordered_vkeys:
                 vcfg = videos[vkey]
                 char_key = vcfg.get("character", "nv1")
-                ck_low = (char_key or "").lower()
-                if "nv3" in ck_low or vkey.lower().startswith("nv3"):
-                    char_sheet_abs = os.path.join(CHARS_DIR, "nv3_ref.jpg")
-                elif "nv2" in ck_low or vkey.lower() in ("v2", "v4", "v6", "v8", "v10") or vkey.lower().startswith("nv2"):
-                    char_sheet_abs = os.path.join(CHARS_DIR, "nv2_ref.png")
-                else:
-                    char_sheet_abs = os.path.join(CHARS_DIR, "nv1_ref.jpg")
+                char_sheet_abs = _resolve_char_sheet_for_sync(char_key, vkey)
 
                 char_v = get_char_v_code(vkey, char_key)
                 char_label = vcfg.get("hook_title") or DEFAULT_HOOK_LABELS.get(vkey, char_v.upper())
@@ -525,11 +835,21 @@ def sync_web_ui(force: bool = True):
                         deleted_finals_count += 1
                         continue
 
+                ref_err_obj = scene_errors_map.get(f"{vkey}_ref") or scene_errors_map.get(f"ref_{vkey}")
+                ref_err_msg = ""
+                if not ref_exists and isinstance(ref_err_obj, dict):
+                    ref_err_msg = str(ref_err_obj.get("message") or ref_err_obj.get("error") or "").strip()
+                elif not ref_exists and isinstance(ref_err_obj, str):
+                    ref_err_msg = ref_err_obj.strip()
+
                 scenes_ui = []
                 any_scene_done = False
                 any_scene_tmp = False
+                any_scene_failed = False
+                first_variant_err = ref_err_msg
                 for idx, sc in enumerate(vcfg.get("scenes", []), start=1):
                     s_file = sc["file"]
+                    s_stem = os.path.splitext(s_file)[0]
                     s_abs = os.path.join(pdir, s_file)
                     s_tmp = s_abs + ".720p.tmp"
                     s_done = os.path.exists(s_abs) and os.path.getsize(s_abs) > 50000
@@ -538,21 +858,62 @@ def sync_web_ui(force: bool = True):
                         any_scene_done = True
                     if s_has_tmp:
                         any_scene_tmp = True
+
+                    s_err_msg = ""
+                    s_is_terminal_fail = False
+                    if not s_done and not final_exists:
+                        raw_sc_err = (
+                            scene_errors_map.get(s_stem)
+                            or scene_errors_map.get(f"{vkey}_s{idx}")
+                            or scene_errors_map.get(s_file)
+                        )
+                        if isinstance(raw_sc_err, dict):
+                            acc_tag = f"[TK:{raw_sc_err.get('account')}] " if raw_sc_err.get("account") else ""
+                            s_err_msg = f"{acc_tag}{raw_sc_err.get('message') or raw_sc_err.get('error') or ''}".strip()
+                            s_is_terminal_fail = bool(raw_sc_err.get("terminal")) or (s_stem in failed_scenes_set)
+                        elif isinstance(raw_sc_err, str) and raw_sc_err.strip():
+                            s_err_msg = raw_sc_err.strip()
+                            s_is_terminal_fail = (s_stem in failed_scenes_set)
+                        elif ref_err_msg and idx == 1:
+                            s_err_msg = ref_err_msg
+                            s_is_terminal_fail = (f"{vkey}_ref" in failed_scenes_set)
+
+                    if s_is_terminal_fail and not s_done:
+                        any_scene_failed = True
+                    if s_err_msg and not first_variant_err:
+                        first_variant_err = s_err_msg
+
+                    sc_ui_status = (
+                        "done"
+                        if s_done
+                        else ("failed" if s_is_terminal_fail else ("running" if s_has_tmp else "pending"))
+                    )
                     scenes_ui.append({
                         "scene_number": idx,
-                        "scene_title": f"Phân cảnh {idx} (10s - {sc['words']} từ)",
+                        "scene_title": f"Phân cảnh {idx} (10s - {sc.get('words', 0)} từ)",
                         "scene_description": f"Omni Flash 10s (9:16) — {char_v.upper()} | Voice: {vcfg.get('voice_name','')}",
                         "image_prompt": vcfg.get("ref_image_prompt", "9:16 Factory / Workshop Reference Image (Nano Banana 2.1)"),
-                        "video_prompt": sc["prompt"],
+                        "video_prompt": sc.get("prompt", ""),
                         "image_path": ref_img_abs if ref_exists else "",
                         "video_path": s_abs if s_done else (s_tmp if s_has_tmp else ""),
                         "primary_product_image_path": primary_prod_abs,
                         "character_sheet_path": char_sheet_abs if os.path.exists(char_sheet_abs) else "",
-                        "status": "done" if s_done else ("running" if s_has_tmp else "pending"),
-                        "error_msg": "",
+                        "status": sc_ui_status,
+                        "error_msg": "" if s_done else s_err_msg,
                     })
 
-                p_status = "done" if final_exists else ("vid_gen" if (any_scene_done or any_scene_tmp) else ("queued" if ref_exists else "img_gen"))
+                if final_exists:
+                    p_status = "done"
+                elif any_scene_failed:
+                    p_status = "failed"
+                elif any_scene_done or any_scene_tmp:
+                    p_status = "vid_gen"
+                elif ref_exists:
+                    p_status = "queued"
+                elif ref_err_msg and (f"{vkey}_ref" in failed_scenes_set):
+                    p_status = "failed"
+                else:
+                    p_status = "img_gen"
                 products_entries.append({
                     "id": f"{pid}_{char_v}",
                     "vkey": vkey,
@@ -580,7 +941,7 @@ def sync_web_ui(force: bool = True):
                     "output_dir": FINAL_VIDEOS_DIR,
                     "project_dir": pdir,
                     "status": p_status,
-                    "error_msg": "",
+                    "error_msg": "" if final_exists else first_variant_err,
                     "final_video_path": final_in_dedicated if final_exists else "",
                     "final_video_mtime": int(os.path.getmtime(final_in_dedicated)) if final_exists else 0,
                     "scenes": scenes_ui,
@@ -588,10 +949,18 @@ def sync_web_ui(force: bool = True):
                 })
 
         if state_dirty and os.path.exists(prompts_path) and not is_marked_clean:
-            state["built_finals"] = sorted(list(built_finals))
+            # Re-read latest flow_state.json right before merge so live scene_uuids/scene_accounts/scene_errors
+            # written concurrently by run_all_7_videos_mt.py are NEVER clobbered!
             try:
-                with open(state_path, "w", encoding="utf-8") as f:
-                    json.dump(state, f, ensure_ascii=False, indent=2)
+                latest_state = {}
+                if os.path.exists(state_path):
+                    with open(state_path, encoding="utf-8") as _f_ls:
+                        latest_state = json.load(_f_ls)
+                if not isinstance(latest_state, dict):
+                    latest_state = dict(state)
+                merged_finals = sorted(set(latest_state.get("built_finals") or []) | built_finals)
+                latest_state["built_finals"] = merged_finals
+                _sync_atomic_write_json(state_path, latest_state)
             except Exception:
                 pass
 
@@ -616,6 +985,15 @@ def sync_web_ui(force: bool = True):
         progress_pct = int(live_prog.get("progress_pct", 0))
         thumbs_cnt = sum(1 for e in products_entries if e.get("has_thumbnail"))
 
+        p_created_at, p_updated_at, p_created_ts, p_updated_ts = _compute_mtime_timestamps(
+            [prompts_path],
+            fallback_paths=[info_path, pdir],
+            extra_ts=[state_mtime_orig] + [e.get("final_video_mtime", 0) for e in products_entries],
+            explicit_created=existing_proj_data.get("created_at") or "",
+            explicit_updated=existing_proj_data.get("updated_at") or "",
+            explicit_updated_ts=float(existing_proj_data.get("updated_ts") or 0.0),
+        )
+
         proj_title = f"{pname[:48]} ({pid}) — {price_str}" if price_str else f"{pname[:48]} ({pid})"
         proj_obj = {
             "id": pid,
@@ -629,8 +1007,10 @@ def sync_web_ui(force: bool = True):
             "slide_overlay_image_paths": slide_abs_list,
             "all_product_image_paths": all_prod_imgs,
             "role_skill_file": "FlowFinalPipeline.MD",
-            "created_at": now_str,
-            "updated_at": now_str,
+            "created_at": p_created_at,
+            "updated_at": p_updated_at,
+            "created_ts": p_created_ts,
+            "updated_ts": p_updated_ts,
             "total_products": len(products_entries),
             "done_products": done_cnt,
             "running_products": run_cnt,
@@ -673,8 +1053,7 @@ def sync_web_ui(force: bool = True):
         if not is_created_studio_project:
             continue
 
-        with open(os.path.join(pdir, "project.json"), "w", encoding="utf-8") as f:
-            json.dump(proj_obj, f, ensure_ascii=False, indent=2)
+        _sync_atomic_write_json(os.path.join(pdir, "project.json"), proj_obj)
 
         # Group -1 = Đang chạy trực tiếp (TOP-MOST), Group 0 = Còn Video Final (TOP), Group 1 = Hết Video Final (BOTTOM)
         sort_group = -1 if is_pipeline_running else (0 if done_cnt > 0 else 1)
@@ -688,8 +1067,10 @@ def sync_web_ui(force: bool = True):
                 "final_videos_dir": FINAL_VIDEOS_DIR,
                 "project_dir": pdir,
                 "role_skill_file": "FlowFinalPipeline.MD",
-                "created_at": now_str,
-                "updated_at": now_str,
+                "created_at": p_created_at,
+                "updated_at": p_updated_at,
+                "created_ts": p_created_ts,
+                "updated_ts": p_updated_ts,
                 "total_products": len(products_entries),
                 "done_products": done_cnt,
                 "running_products": run_cnt,
@@ -718,7 +1099,8 @@ def sync_web_ui(force: bool = True):
         overall_sheet_default = os.path.join(WORKSPACE, "ảnh mẫu thumbnail", "Tron_Bo_7_Anh_2K", "01_Character_Sheet_4_Outfits_2K.png")
         for f_idx, fjson_path in enumerate(fashion_json_files):
             try:
-                fproj = json.load(open(fjson_path, encoding="utf-8"))
+                with open(fjson_path, encoding="utf-8") as _f_fp:
+                    fproj = json.load(_f_fp)
             except Exception:
                 continue
             fpid = str(fproj.get("project_id") or os.path.basename(os.path.dirname(fjson_path))).strip()
@@ -955,8 +1337,7 @@ def sync_web_ui(force: bool = True):
                 },
                 "products": f_products,
             }
-            with open(os.path.join(mirror_pdir, "project.json"), "w", encoding="utf-8") as f_out:
-                json.dump(f_proj_obj, f_out, ensure_ascii=False, indent=2)
+            _sync_atomic_write_json(os.path.join(mirror_pdir, "project.json"), f_proj_obj)
 
             # Đặt sort_group = -2 (nếu đang chạy) hoặc -1 (nếu đã có Video Final Thời Trang) để luôn nổi lên ĐẦU danh sách Tổng Hợp!
             f_sort_group = -2 if is_f_running else (-1 if f_done_cnt > 0 else 1)
@@ -971,8 +1352,9 @@ def sync_web_ui(force: bool = True):
                     "final_videos_dir": FINAL_VIDEOS_DIR,
                     "project_dir": fdir,
                     "role_skill_file": "FlowFinalPipeline.MD",
-                    "created_at": fproj.get("created_at") or now_str,
-                    "updated_at": fproj.get("updated_at") or now_str,
+                    "created_at": fproj.get("created_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getctime(fjson_path))),
+                    "updated_at": fproj.get("updated_at") or time.strftime("%Y-%m-%d %H:%M:%S", time.localtime(os.path.getmtime(fjson_path))),
+                    "updated_ts": float(fproj.get("updated_ts") or os.path.getmtime(fjson_path)),
                     "total_products": len(f_products),
                     "done_products": f_done_cnt,
                     "running_products": f_run_cnt,
@@ -999,12 +1381,79 @@ def sync_web_ui(force: bool = True):
         c_sort_group = -2 if cooking_item.get("is_running") else (-1 if cooking_item.get("done_products") else 1)
         raw_index_items.append((c_sort_group, -100 + cooking_idx, cooking_item))
 
-    # Products with Final Videos (>0) stay at the TOP; products with 0 Final Videos move to the BOTTOM!
-    raw_index_items.sort(key=lambda x: (x[0], x[1]))
+    # Sort uniformly across all templates: Running -> Has Final Video -> Pending/Queued -> Uploaded Empty -> Errored,
+    # always ordering NEWEST projects FIRST within every section.
     index_list = [item[2] for item in raw_index_items]
+    index_list.sort(key=lambda it: (_unified_sort_group(it), -_extract_sort_ts(it), str(it.get("id") or "")))
 
-    with open(os.path.join(PROJECTS_DIR, "projects_index.json"), "w", encoding="utf-8") as f:
-        json.dump(index_list, f, ensure_ascii=False, indent=2)
+    index_path = os.path.join(PROJECTS_DIR, "projects_index.json")
+    _sync_atomic_write_json(index_path, index_list)
+
+
+def sync_web_ui(force: bool = True):
+    with _SYNC_LOCK:
+        _sync_web_ui_locked(force=force)
+
+
+def _sync_atomic_write_json(path: str, payload: object, retries: int = 7) -> bool:
+    try:
+        os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    except Exception:
+        pass
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    tmp = f"{path}.tmp.{os.getpid()}.{threading.get_ident()}"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fw:
+            fw.write(text)
+        for attempt in range(max(1, int(retries))):
+            try:
+                os.replace(tmp, path)
+                return True
+            except OSError:
+                time.sleep(0.02 * (attempt + 1))
+        with open(path, "w", encoding="utf-8") as fw2:
+            fw2.write(text)
+        return True
+    except Exception:
+        return False
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def _resolve_char_sheet_for_sync(char_key: str, vkey: str) -> str:
+    try:
+        import character_library_manager as _clm
+        if hasattr(_clm, "resolve_character_sheet_path"):
+            eff_ck = char_key
+            if not eff_ck:
+                vk_l = (vkey or "").lower()
+                if vk_l.startswith("nv") and "_" in vk_l:
+                    eff_ck = vk_l.split("_", 1)[0]
+                elif vk_l in ("v2", "v4", "v6", "v8", "v10"):
+                    eff_ck = "nv2"
+                else:
+                    eff_ck = "nv1"
+            resolved = _clm.resolve_character_sheet_path(eff_ck, fallback_assets_dir=CHARS_DIR)
+            if resolved and os.path.isfile(resolved):
+                return resolved
+    except Exception:
+        pass
+    ck_low = (char_key or "").lower()
+    vk_low = (vkey or "").lower()
+    for n_idx in range(9, 0, -1):
+        tag = f"nv{n_idx}"
+        if tag in ck_low or vk_low.startswith(f"{tag}_"):
+            for ext in (".jpg", ".png", ".jpeg", ".webp"):
+                cand = os.path.join(CHARS_DIR, f"{tag}_ref{ext}")
+                if os.path.isfile(cand):
+                    return cand
+    if vk_low in ("v2", "v4", "v6", "v8", "v10"):
+        return os.path.join(CHARS_DIR, "nv2_ref.png")
+    return os.path.join(CHARS_DIR, "nv1_ref.jpg")
 
 
 if __name__ == "__main__":

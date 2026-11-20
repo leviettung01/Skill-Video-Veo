@@ -121,8 +121,10 @@ class ProxyManager:
         if self._log_func:
             try:
                 self._log_func(f"[Proxy] {msg}")
+                return
             except Exception:
                 pass
+        print(f"[Proxy] {msg}")
 
     # ══════════════════════════════════════════════════════
     # CRUD
@@ -131,17 +133,18 @@ class ProxyManager:
     def add_rotating(self, name: str, api_key: str, nhamang: str = "Random",
                      tinhthanh: str = "0", interval: int = 60) -> ProxyConfig:
         """Thêm proxy xoay mới."""
-        pc = ProxyConfig(
-            name=name or f"Key {len(self.proxies)+1}",
-            type="rotating",
-            api_key=api_key,
-            nhamang=nhamang,
-            tinhthanh=tinhthanh,
-            rotate_interval=interval,
-            enabled=True
-        )
-        self.proxies.append(pc)
-        self.save()
+        with self._lock:
+            pc = ProxyConfig(
+                name=name or f"Key {len(self.proxies)+1}",
+                type="rotating",
+                api_key=api_key,
+                nhamang=nhamang,
+                tinhthanh=tinhthanh,
+                rotate_interval=interval,
+                enabled=True
+            )
+            self.proxies.append(pc)
+            self.save()
         self.log(f"✅ Đã thêm proxy xoay: {pc.name} (key: {api_key[:8]}...)")
         return pc
 
@@ -149,32 +152,33 @@ class ProxyManager:
                    username: str = "", password: str = "",
                    protocol: str = "http") -> ProxyConfig:
         """Thêm proxy tĩnh."""
-        pc = ProxyConfig(
-            name=name or f"Static {len(self.proxies)+1}",
-            type="static",
-            host=host,
-            port=port,
-            username=username,
-            password=password,
-            protocol=protocol,
-            enabled=True
-        )
-        # Proxy tĩnh: current_proxy_http = host:port
-        pc.current_proxy_http = f"{host}:{port}:{username}:{password}"
-        self.proxies.append(pc)
-        self.save()
+        with self._lock:
+            pc = ProxyConfig(
+                name=name or f"Static {len(self.proxies)+1}",
+                type="static",
+                host=host,
+                port=port,
+                username=username,
+                password=password,
+                protocol=protocol,
+                enabled=True
+            )
+            pc.current_proxy_http = f"{host}:{port}:{username}:{password}"
+            self.proxies.append(pc)
+            self.save()
         self.log(f"✅ Đã thêm proxy tĩnh: {pc.name} ({host}:{port})")
         return pc
 
     def remove(self, proxy_id: str):
         """Xóa proxy theo ID."""
-        self.proxies = [p for p in self.proxies if p.id != proxy_id]
-        self.save()
+        with self._lock:
+            self.proxies = [p for p in self.proxies if p.id != proxy_id]
+            self.save()
         self.log(f"🗑 Đã xóa proxy {proxy_id}")
 
     def get_enabled_proxies(self) -> List[ProxyConfig]:
         """Trả về danh sách proxy đang bật."""
-        return [p for p in self.proxies if p.enabled]
+        return [p for p in list(self.proxies) if p.enabled]
 
     # ══════════════════════════════════════════════════════
     # ROTATION
@@ -441,14 +445,24 @@ class ProxyManager:
     # ══════════════════════════════════════════════════════
 
     def save(self):
-        """Lưu cấu hình proxy vào file JSON."""
+        """Lưu cấu hình proxy vào file JSON an toàn đa luồng."""
         try:
-            data = {
-                "proxies": [p.to_dict() for p in self.proxies],
-                "round_robin_idx": self._round_robin_idx
-            }
-            with open(PROXY_CONFIG_FILE, "w", encoding="utf-8") as f:
-                json.dump(data, f, indent=2, ensure_ascii=False)
+            with self._lock:
+                data = {
+                    "proxies": [p.to_dict() for p in self.proxies],
+                    "round_robin_idx": self._round_robin_idx
+                }
+                PROXY_CONFIG_FILE.parent.mkdir(parents=True, exist_ok=True)
+                tmp_path = PROXY_CONFIG_FILE.parent / f".{PROXY_CONFIG_FILE.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+                try:
+                    tmp_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+                    os.replace(str(tmp_path), str(PROXY_CONFIG_FILE))
+                finally:
+                    if tmp_path.exists():
+                        try:
+                            tmp_path.unlink()
+                        except Exception:
+                            pass
         except Exception as e:
             self.log(f"❌ Lỗi lưu proxy config: {e}")
 
@@ -457,10 +471,11 @@ class ProxyManager:
         if not PROXY_CONFIG_FILE.exists():
             return
         try:
-            with open(PROXY_CONFIG_FILE, "r", encoding="utf-8") as f:
-                data = json.load(f)
-            self.proxies = [ProxyConfig.from_dict(d) for d in data.get("proxies", [])]
-            self._round_robin_idx = data.get("round_robin_idx", 0)
+            with self._lock:
+                with open(PROXY_CONFIG_FILE, "r", encoding="utf-8") as f:
+                    data = json.load(f)
+                self.proxies = [ProxyConfig.from_dict(d) for d in data.get("proxies", [])]
+                self._round_robin_idx = data.get("round_robin_idx", 0)
             self.log(f"📂 Đã tải {len(self.proxies)} proxy từ config.")
         except Exception as e:
             self.log(f"❌ Lỗi đọc proxy config: {e}")

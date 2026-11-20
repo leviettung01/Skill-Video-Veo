@@ -113,7 +113,10 @@ def build_ass(spec, ass_path, scene_durations, subtitle_settings=None):
 
 
 def main():
-    spec_path = sys.argv[1]
+    cli_args = [a for a in sys.argv[1:] if not a.startswith("--")]
+    skip_auto_thumb = "--skip-auto-thumb" in sys.argv[1:]
+    inject_existing_thumb_only = "--inject-existing-thumb" in sys.argv[1:]
+    spec_path = cli_args[0]
     base = os.path.dirname(os.path.abspath(spec_path))
     spec = json.load(open(spec_path, encoding="utf-8"))
     n_scenes = len(spec["scenes"])
@@ -240,7 +243,17 @@ def main():
     cmd += [
         "-c:a", "aac", "-b:a", "128k", "-movflags", "+faststart", tmp_out_rel,
     ]
-    subprocess.run(cmd, cwd=base, check=True)
+    ff_res = subprocess.run(cmd, cwd=base, capture_output=True, text=True)
+    if ff_res.returncode != 0 and use_nvenc:
+        # Fallback sang libx264 nếu h264_nvenc quá tải phiên GPU song song
+        cmd_cpu = [c for c in cmd if c not in ("h264_nvenc", "-preset", "p4", "-cq", "20")]
+        idx_out = len(cmd_cpu) - 5
+        cmd_cpu = cmd_cpu[:idx_out] + ["-c:v", "libx264", "-preset", cpu_preset, "-crf", "19"] + cmd_cpu[idx_out:]
+        ff_res = subprocess.run(cmd_cpu, cwd=base, capture_output=True, text=True)
+    if ff_res.returncode != 0:
+        err_tail = "\n".join((ff_res.stderr or "").strip().splitlines()[-8:]) or f"exit code {ff_res.returncode}"
+        print(f"[build_final][FFmpeg ERROR] {spec_path}:\n{err_tail}", file=sys.stderr, flush=True)
+        raise RuntimeError(f"FFmpeg ghép video thất bại: {err_tail[:320]}")
 
     dst_central = out
     try:
@@ -260,20 +273,27 @@ def main():
         print("WARN copying to final_videos:", e)
 
     # Auto-generate AI Thumbnail & inject 0.1s intro frame into Final Video
-    if _esm is not None and auto_gen_thumb:
+    if _esm is not None and auto_gen_thumb and not skip_auto_thumb:
         try:
             pid_dir = os.path.basename(base)
             spec_bname = os.path.basename(spec_path)
             m_vk = re.match(r"^spec_(.+)\.json$", spec_bname, re.I)
             vkey_str = m_vk.group(1) if m_vk else "v1"
-            res_th = _esm.generate_thumbnail_for_variant(
-                pid=pid_dir,
-                vkey=vkey_str,
-                inject_01s=auto_inject_01s,
-                prefer_existing_ref=True,
-            )
-            if res_th.get("ok"):
-                print(f"THUMB_OK: {res_th.get('thumbnail_path')} (injected_01s={res_th.get('injected_01s')})")
+            if inject_existing_thumb_only:
+                char_key_sp = str(spec.get("character") or "nv1")
+                char_v_sp = vkey_str if re.match(r"^nv\d+_v\d+$", vkey_str.lower()) else f"{char_key_sp}_{vkey_str}"
+                ex_th = _esm.get_variant_thumbnail_path(pid_dir, char_v_sp)
+                if ex_th and auto_inject_01s and os.path.isfile(dst_central):
+                    _esm.inject_thumbnail_01s_into_video(dst_central, ex_th)
+            else:
+                res_th = _esm.generate_thumbnail_for_variant(
+                    pid=pid_dir,
+                    vkey=vkey_str,
+                    inject_01s=auto_inject_01s,
+                    prefer_existing_ref=True,
+                )
+                if res_th.get("ok"):
+                    print(f"THUMB_OK: {res_th.get('thumbnail_path')} (injected_01s={res_th.get('injected_01s')})")
         except Exception as th_err:
             print("WARN generating/injecting thumbnail:", th_err)
 

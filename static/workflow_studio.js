@@ -4093,11 +4093,45 @@ async function runWorkflowExecution(singleNodeId = null, selectedNodeIds = null,
   }
 }
 
+async function stopWorkflowExecution() {
+  const wfId = WF_STATE.currentWfId || (WF_STATE.doc && (WF_STATE.doc._wf_id || WF_STATE.doc.id)) || "";
+  if (!wfId) {
+    if (typeof toast === "function") toast("Chưa xác định được mã Workflow đang chạy.", "err");
+    return;
+  }
+  try {
+    const r = await fetch("/api/workflows/stop", {
+      method: "POST",
+      headers: { "Content-Type": "application/json" },
+      body: JSON.stringify({ wf_id: wfId }),
+    }).then(x => x.json());
+    if (WF_STATE.pollTimer) {
+      clearInterval(WF_STATE.pollTimer);
+      WF_STATE.pollTimer = null;
+    }
+    const wf = _getWfBody();
+    (wf.nodes || []).forEach(n => {
+      if (n.config && n.config.status === "running") {
+        n.config.status = "idle";
+      }
+    });
+    renderWorkflowCanvas();
+    if (typeof toast === "function") {
+      toast((r && r.message) || `⏹ Đã gửi lệnh dừng Workflow "${wfId}"!`, r && r.ok ? "info" : "err");
+    }
+  } catch (e) {
+    if (typeof toast === "function") toast("Lỗi gửi lệnh dừng Workflow: " + e.message, "err");
+  }
+}
+
 function startPollingWorkflowRunStatus(wfId) {
   if (WF_STATE.pollTimer) clearInterval(WF_STATE.pollTimer);
+  WF_STATE.pollFailCount = 0;
   WF_STATE.pollTimer = setInterval(async () => {
     try {
-      const r = await fetch(`/api/workflows/status?wf_id=${encodeURIComponent(wfId)}`).then(x => x.json());
+      const resp = await fetch(`/api/workflows/status?wf_id=${encodeURIComponent(wfId)}`);
+      const r = await resp.json();
+      WF_STATE.pollFailCount = 0;
       const st = r.status || {};
       const nodeStates = st.node_states || {};
       const wf = _getWfBody();
@@ -4106,13 +4140,19 @@ function startPollingWorkflowRunStatus(wfId) {
       Object.keys(nodeStates).forEach(nid => {
         const ns = nodeStates[nid] || {};
         const node = (wf.nodes || []).find(n => n.id === nid);
-        if (node && node.config) {
+        if (node) {
+          if (!node.config) node.config = {};
           if (ns.status && node.config.status !== ns.status) {
             node.config.status = ns.status;
             changed = true;
           }
+          const nextErr = ns.error ? String(ns.error) : "";
+          if ((node.config.error || "") !== nextErr) {
+            node.config.error = nextErr;
+            changed = true;
+          }
           const resObj = ns.result || {};
-          const pPath = resObj.primary_path || ((resObj.media_paths || [])[0]) || "";
+          const pPath = ns.primary_path || resObj.primary_path || ((resObj.media_paths || [])[0]) || "";
           if (pPath && node.config.result_path !== pPath) {
             node.config.result_path = pPath;
             node.config.file_path = pPath;
@@ -4134,14 +4174,23 @@ function startPollingWorkflowRunStatus(wfId) {
         if (typeof toast === "function") {
           if (st.status === "done") {
             toast("✅ Đã hoàn tất render trên Google Flow! Ảnh 2K & Video 1080p mới đã hiển thị trên từng Node.", "ok");
+          } else if (st.status === "stopped") {
+            toast("⏹ Đã dừng thực thi Workflow theo yêu cầu.", "info");
           } else {
-            toast(`⚠️ Kết thúc chạy Workflow (${st.status}). Kiểm tra chi tiết trên từng Node.`, "err");
+            const errDetail = st.error ? `: ${String(st.error).slice(0, 140)}` : "";
+            toast(`⚠️ Kết thúc chạy Workflow (${st.status})${errDetail}`, "err");
           }
         }
       }
-    } catch (_) {
-      clearInterval(WF_STATE.pollTimer);
-      WF_STATE.pollTimer = null;
+    } catch (pollErr) {
+      WF_STATE.pollFailCount = (WF_STATE.pollFailCount || 0) + 1;
+      if (WF_STATE.pollFailCount >= 5) {
+        clearInterval(WF_STATE.pollTimer);
+        WF_STATE.pollTimer = null;
+        if (typeof toast === "function") {
+          toast("⚠️ Mất kết nối theo dõi tiến trình Workflow sau 5 lần thử lại: " + (pollErr.message || pollErr), "err");
+        }
+      }
     }
   }, 2000);
 }

@@ -36,7 +36,7 @@ spSaveBtn.addEventListener('click', () => {
   const bridgeBase = spUrlInput.value.trim().replace(/\/+$/, '') || DEFAULT_BRIDGE_BASE;
   const bridgeSecret = spSecretInput.value.trim() || DEFAULT_BRIDGE_SECRET;
   chrome.storage.local.set({ bridgeBase, bridgeSecret }, () => {
-    chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {});
+    chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => { });
     spSaveBtn.textContent = '✓ Đã lưu';
     setTimeout(() => { spSaveBtn.textContent = 'Lưu cấu hình'; }, 1500);
     testBridgeConnection(false);
@@ -131,11 +131,16 @@ function updateStatus(data) {
     spFlowEmailBadge.textContent = data.flowEmail ? `📧 ${data.flowEmail}` : '';
   }
   if (data.flowKeyPresent) {
-    tokenEl.textContent = data.flowEmail ? `✓ ${data.flowEmail}` : `✓ Cookie Flow (${data.cookieCount || 0})`;
+    const ready = data.readyTabs ?? 0;
+    const pool = data.poolSize ?? 2;
+    const baseLabel = data.flowEmail ? `✓ ${data.flowEmail}` : `✓ Cookie Flow (${data.cookieCount || 0})`;
+    tokenEl.textContent = `${baseLabel} · ${ready}/${pool} tab`;
     tokenEl.className = 'ok';
   } else if (data.hasFlowTab) {
-    tokenEl.textContent = 'Chưa đăng nhập Flow';
-    tokenEl.className = 'warn';
+    const ready = data.readyTabs ?? 1;
+    const pool = data.poolSize ?? 2;
+    tokenEl.textContent = `✓ Solver Pool (${ready}/${pool} tab)`;
+    tokenEl.className = 'ok';
   } else {
     tokenEl.textContent = 'Chưa mở tab Flow';
     tokenEl.className = 'bad';
@@ -229,8 +234,23 @@ document.getElementById('btn-token').addEventListener('click', () => {
   });
 });
 
+const cleanTabsBtn = document.getElementById('btn-clean-tabs');
+if (cleanTabsBtn) {
+  cleanTabsBtn.addEventListener('click', () => {
+    cleanTabsBtn.textContent = 'Đang dọn tab & cache...';
+    chrome.runtime.sendMessage({ type: 'CLEAN_TABS_CACHE' }, (res) => {
+      const closed = res?.closed ?? 0;
+      cleanTabsBtn.textContent = `✓ Đã đóng ${closed} tab & xoá cache`;
+      setTimeout(() => {
+        cleanTabsBtn.textContent = '🧹 Đóng Tab Thừa & Xóa Cache Ngay';
+      }, 2200);
+      fetchStatus();
+    });
+  });
+}
+
 document.addEventListener('DOMContentLoaded', () => {
-  chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => {});
+  chrome.runtime.sendMessage({ type: 'RECONNECT' }, () => { });
   fetchStatus();
   fetchLog();
   setInterval(fetchStatus, 2000);

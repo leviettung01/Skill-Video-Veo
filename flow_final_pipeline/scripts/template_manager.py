@@ -12,13 +12,18 @@ chứa:
   - demo_videos/ (các video demo thực tế 9:16 của template)
   - demo_images/ (các ảnh demo thực tế: ảnh gốc sản phẩm, ảnh ref 2K / storyboard từng cảnh)
 """
+import io
 import os
 import re
 import sys
 import glob
 import json
+import shutil
+import subprocess
 import urllib.parse
+import zipfile
 import importlib.util
+from pathlib import Path
 
 WS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
 TEMPLATE_ROOT_DIR = os.path.join(WS_DIR, "Template")
@@ -30,6 +35,7 @@ RESERVED_SUBFOLDERS = {
     "Thumbnail_Templates",
     "Subtitle_Templates",
     "__pycache__",
+    "Biến hình Làm nông, Bán cá",
 }
 
 
@@ -142,14 +148,14 @@ def list_video_templates() -> list:
                     cfg = json.load(f)
             except Exception:
                 pass
-        code = str(cfg.get("code") or "").strip()
+        code = str(cfg.get("code") or cfg.get("template_code") or "").strip()
         if code:
             used_codes.add(code)
         raw_entries.append((entry, tdir, cfg_path, cfg))
 
     next_code_int = 1
     for entry, tdir, cfg_path, cfg in raw_entries:
-        code = str(cfg.get("code") or "").strip()
+        code = str(cfg.get("code") or cfg.get("template_code") or "").strip()
         if not code:
             while f"{next_code_int:03d}" in used_codes:
                 next_code_int += 1
@@ -173,14 +179,44 @@ def list_video_templates() -> list:
         if primary_demo_video:
             primary_demo_video["label"] = demo_caption
 
+        pipeline_kind = str(cfg.get("pipeline_kind") or "product")
+        raw_ui_studio = str(cfg.get("ui_studio") or "").strip().lower()
+        raw_presets = cfg.get("presets") or cfg.get("transform_presets")
+        preset_titles: list[str] = []
+        if isinstance(raw_presets, dict):
+            preset_titles = [str((v or {}).get("title") or k) for k, v in raw_presets.items()]
+        elif isinstance(raw_presets, list):
+            preset_titles = [str((v or {}).get("title") or (v or {}).get("id") or f"Kịch bản {i}") for i, v in enumerate(raw_presets, 1) if isinstance(v, dict)]
+        if (
+            raw_ui_studio in {"transform", "transform_studio", "character_product"}
+            or pipeline_kind.lower() in {"fashion_transformation", "transform_studio", "character_product_studio"}
+            or bool(preset_titles)
+            or code == "006"
+        ):
+            ui_studio = "transform"
+            if not preset_titles and code == "006":
+                preset_titles = ["Làm nông", "Bán cá"]
+        elif pipeline_kind.lower() == "cooking":
+            ui_studio = "cooking"
+        elif pipeline_kind.lower() == "fashion_motion":
+            ui_studio = "fashion_motion"
+        else:
+            ui_studio = "standard"
+
         templates.append({
             "code": code,
             "id": cfg.get("id") or entry.lower().replace(" ", "_"),
             "folder_name": entry,
-            "name": cfg.get("name") or entry,
+            "name": cfg.get("name") or cfg.get("template_name") or entry,
+            "subtitle": cfg.get("subtitle") or "",
             "badge": cfg.get("badge") or "TEMPLATE VIDEO",
             "category": cfg.get("category") or "Thương Mại Điện Tử / TikTok Affiliate",
-            "pipeline_kind": cfg.get("pipeline_kind", "product"),
+            "pipeline_kind": pipeline_kind,
+            "ui_studio": ui_studio,
+            "supports_character": cfg.get("supports_character", True) is not False if ui_studio == "transform" else bool(cfg.get("supports_character", False)),
+            "supports_product": cfg.get("supports_product", True) is not False,
+            "presets_count": len(preset_titles),
+            "preset_titles": preset_titles,
             "input_kind": cfg.get("input_kind", "product"),
             "has_subtitles": cfg.get("has_subtitles", True),
             "price_label": cfg.get("price_label") or "Miễn Phí • Sẵn Sàng",
@@ -408,7 +444,10 @@ def generate_prompts_for_product(
     tdir = resolve_template_dir(template_name)
     if os.path.isfile(os.path.join(tdir, "template_config.json")):
         with open(os.path.join(tdir, "template_config.json"), encoding="utf-8") as cooking_cfg_file:
-            if json.load(cooking_cfg_file).get("pipeline_kind") == "cooking_storyboard":
+            pipeline_kind = json.load(cooking_cfg_file).get("pipeline_kind")
+            if pipeline_kind == "fashion_transformation":
+                raise ValueError("Mở Template 006 trong Chợ Template để chọn ảnh quần áo và kịch bản.")
+            if pipeline_kind == "cooking_storyboard":
                 raise ValueError("Template 005 dùng công thức nấu ăn. Mở Nấu Ăn POV trong Chợ Template hoặc dùng cooking_storyboard_engine.py.")
     target_tpl_folder = os.path.basename(tdir)
 
@@ -493,3 +532,291 @@ def generate_prompts_for_product(
         except Exception:
             pass
     return prompts_obj
+
+
+# ==============================================================================
+# CẬP NHẬT CODE / TEMPLATE MỚI (GIT FAST-FORWARD & GÓI .ZIP AN TOÀN)
+# ==============================================================================
+
+_DANGEROUS_ZIP_EXTS = {".exe", ".bat", ".cmd", ".ps1", ".vbs", ".dll", ".msi", ".scr", ".com"}
+
+
+def _run_git(args: list[str], timeout: int = 35) -> tuple[int, str, str]:
+    git_bin = shutil.which("git")
+    if not git_bin:
+        return (127, "", "Máy chưa cài Git CLI.")
+    try:
+        r = subprocess.run(
+            [git_bin, "-C", WS_DIR, *args],
+            capture_output=True,
+            text=True,
+            encoding="utf-8",
+            errors="replace",
+            timeout=timeout,
+            creationflags=getattr(subprocess, "CREATE_NO_WINDOW", 0),
+        )
+        return (r.returncode, (r.stdout or "").strip(), (r.stderr or "").strip())
+    except Exception as exc:
+        return (1, "", str(exc))
+
+
+def _extract_template_folders_from_paths(paths: list[str]) -> list[str]:
+    folders: list[str] = []
+    for p in paths:
+        norm = str(p or "").replace("\\", "/").lstrip("./")
+        if norm.startswith("Template/"):
+            parts = norm.split("/")
+            if len(parts) >= 2 and parts[1] and parts[1] not in RESERVED_SUBFOLDERS:
+                if parts[1] not in folders:
+                    folders.append(parts[1])
+    return folders
+
+
+def check_code_updates() -> dict:
+    """Kiểm tra phiên bản Git cục bộ so với remote origin mà không ghi đè dữ liệu người dùng."""
+    git_dir = os.path.join(WS_DIR, ".git")
+    if not os.path.isdir(git_dir) or not shutil.which("git"):
+        return {
+            "ok": True,
+            "git_available": False,
+            "can_import_zip": True,
+            "has_updates": False,
+            "behind_count": 0,
+            "message": "Bản cài đặt không gắn Git — hãy dùng nút Cài Gói Template (.ZIP) để nạp template mới ngay.",
+        }
+
+    rc_b, branch, _ = _run_git(["rev-parse", "--abbrev-ref", "HEAD"])
+    rc_h, head_short, _ = _run_git(["rev-parse", "--short", "HEAD"])
+    _, remote_url, _ = _run_git(["remote", "get-url", "origin"])
+    rc_f, _, err_f = _run_git(["fetch", "origin", "--prune"], timeout=45)
+    if rc_f != 0:
+        return {
+            "ok": True,
+            "git_available": True,
+            "can_import_zip": True,
+            "has_updates": False,
+            "behind_count": 0,
+            "branch": branch or "main",
+            "head": head_short or "",
+            "remote_url": remote_url,
+            "network_error": err_f or "Không kết nối được tới máy chủ Git.",
+            "message": f"Không kiểm tra được bản cập nhật ({err_f or 'offline'}). Bạn vẫn có thể cài gói .ZIP trực tiếp.",
+        }
+
+    rc_up, upstream, _ = _run_git(["rev-parse", "--abbrev-ref", "--symbolic-full-name", "@{u}"])
+    if rc_up != 0 or not upstream:
+        upstream = f"origin/{branch}" if branch and branch != "HEAD" else "origin/main"
+
+    _, behind_raw, _ = _run_git(["rev-list", "--count", f"HEAD..{upstream}"])
+    _, ahead_raw, _ = _run_git(["rev-list", "--count", f"{upstream}..HEAD"])
+    behind = int(behind_raw) if str(behind_raw).isdigit() else 0
+    ahead = int(ahead_raw) if str(ahead_raw).isdigit() else 0
+
+    incoming_files: list[str] = []
+    commit_notes: list[str] = []
+    if behind > 0:
+        _, diff_out, _ = _run_git(["diff", "--name-only", f"HEAD..{upstream}"])
+        incoming_files = [ln.strip() for ln in diff_out.splitlines() if ln.strip()]
+        _, log_out, _ = _run_git(["log", "--oneline", "-n", "6", f"HEAD..{upstream}"])
+        commit_notes = [ln.strip() for ln in log_out.splitlines() if ln.strip()]
+
+    _, mod_unstaged, _ = _run_git(["diff", "--name-only"])
+    _, mod_staged, _ = _run_git(["diff", "--cached", "--name-only"])
+    local_modified = sorted({ln.strip() for ln in (mod_unstaged + "\n" + mod_staged).splitlines() if ln.strip()})
+    conflicts = sorted(set(local_modified) & set(incoming_files))
+    new_templates = _extract_template_folders_from_paths(incoming_files)
+
+    return {
+        "ok": True,
+        "git_available": True,
+        "can_import_zip": True,
+        "branch": branch or "main",
+        "upstream": upstream,
+        "head": head_short or "",
+        "remote_url": remote_url,
+        "has_updates": behind > 0,
+        "behind_count": behind,
+        "ahead_count": ahead,
+        "incoming_files": incoming_files[:60],
+        "incoming_templates": new_templates,
+        "commit_notes": commit_notes,
+        "conflicts": conflicts,
+        "message": (
+            f"Có {behind} bản cập nhật mới ({len(new_templates)} thư mục template thay đổi)."
+            if behind > 0 else "Hệ thống và Chợ Template đang ở phiên bản mới nhất."
+        ),
+    }
+
+
+def sync_updates_from_git() -> dict:
+    """Kéo bản cập nhật code & template mới nhất qua `git pull --ff-only`, bảo vệ tuyệt đối dữ liệu dự án."""
+    status = check_code_updates()
+    if not status.get("git_available"):
+        return {
+            "ok": False,
+            "error": status.get("message") or "Thư mục cài đặt không dùng Git. Hãy dùng chức năng Cài Gói Template (.ZIP).",
+        }
+    if status.get("network_error"):
+        return {"ok": False, "error": f"Không thể kết nối Git remote: {status['network_error']}"}
+    if not status.get("has_updates"):
+        return {
+            "ok": True,
+            "up_to_date": True,
+            "head": status.get("head", ""),
+            "updated_files": [],
+            "updated_templates": [],
+            "message": "Bạn đang dùng phiên bản mới nhất rồi.",
+            "templates": list_video_templates(),
+        }
+    if status.get("conflicts"):
+        c_list = ", ".join(status["conflicts"][:5])
+        return {
+            "ok": False,
+            "conflicts": status["conflicts"],
+            "error": f"Có thay đổi cục bộ trùng với bản cập nhật ({c_list}). Hãy commit/sao lưu trước khi cập nhật.",
+        }
+
+    rc_p, out_p, err_p = _run_git(["pull", "--ff-only"], timeout=60)
+    if rc_p != 0:
+        return {
+            "ok": False,
+            "error": f"Không thể tự đồng bộ (pull --ff-only): {err_p or out_p or 'Lịch sử commit bị rẽ nhánh'}",
+        }
+
+    _, new_head, _ = _run_git(["rev-parse", "--short", "HEAD"])
+    templates = list_video_templates()
+    return {
+        "ok": True,
+        "up_to_date": False,
+        "head": new_head or "",
+        "updated_files": status.get("incoming_files", []),
+        "updated_templates": status.get("incoming_templates", []),
+        "message": f"Đã cập nhật thành công lên bản {new_head or 'mới'} ({len(templates)} template sẵn sàng)!",
+        "templates": templates,
+    }
+
+
+def _safe_zip_rel_parts(member_name: str) -> list[str] | None:
+    raw = str(member_name or "").replace("\\", "/").strip()
+    if not raw or raw.startswith("/") or re.match(r"^[A-Za-z]:", raw):
+        return None
+    parts = [p for p in raw.split("/") if p and p != "."]
+    if not parts or any(p == ".." for p in parts):
+        return None
+    return parts
+
+
+def _sanitize_template_folder_name(raw_name: str) -> str:
+    clean = re.sub(r'[<>:"/\\|?*\x00-\x1f]+', "_", str(raw_name or "").strip()).strip(". ")
+    if not clean or clean in {".", ".."} or clean in RESERVED_SUBFOLDERS:
+        return ""
+    return clean[:80]
+
+
+def import_template_zip(zip_bytes: bytes, overwrite: bool = True) -> dict:
+    """
+    Cài đặt / cập nhật một gói Template (.zip) vào `Template/<Folder>/`.
+    Hỗ trợ cả zip có `template_config.json` ở root, `<Folder>/template_config.json`, hoặc `Template/<Folder>/template_config.json`.
+    Bảo vệ Zip-Slip, symlink và giới hạn kích thước giải nén.
+    """
+    if not zip_bytes or len(zip_bytes) > 160 * 1024 * 1024:
+        raise ValueError("File ZIP trống hoặc vượt quá 160 MB.")
+
+    ensure_template_root()
+    try:
+        zf = zipfile.ZipFile(io.BytesIO(zip_bytes))
+    except zipfile.BadZipFile as exc:
+        raise ValueError("File tải lên không phải gói .ZIP hợp lệ.") from exc
+
+    with zf:
+        infos = [i for i in zf.infolist() if not i.is_dir()]
+        if not infos:
+            raise ValueError("Gói ZIP rỗng.")
+        if len(infos) > 500:
+            raise ValueError("Gói ZIP chứa quá nhiều tệp (tối đa 500 tệp).")
+
+        total_size = 0
+        parsed_entries: list[tuple[zipfile.ZipInfo, list[str]]] = []
+        config_candidates: list[tuple[int, zipfile.ZipInfo, list[str]]] = []
+
+        for info in infos:
+            is_symlink = ((info.external_attr >> 16) & 0o170000) == 0o120000
+            if is_symlink:
+                raise ValueError(f"Gói ZIP chứa liên kết (symlink) không an toàn: {info.filename}")
+            parts = _safe_zip_rel_parts(info.filename)
+            if not parts:
+                raise ValueError(f"Đường dẫn tệp không hợp lệ trong ZIP: {info.filename}")
+            if parts[0] in {"__MACOSX", ".git"}:
+                continue
+            ext = Path(parts[-1]).suffix.lower()
+            if ext in _DANGEROUS_ZIP_EXTS:
+                raise ValueError(f"Không cho phép tệp thực thi ({ext}) trong gói template: {parts[-1]}")
+            total_size += int(info.file_size or 0)
+            if total_size > 400 * 1024 * 1024:
+                raise ValueError("Tổng dung lượng giải nén vượt quá 400 MB.")
+            parsed_entries.append((info, parts))
+            if parts[-1] == "template_config.json":
+                config_candidates.append((len(parts), info, parts))
+
+        if not config_candidates:
+            raise ValueError("Gói ZIP thiếu tệp `template_config.json`.")
+
+        config_candidates.sort(key=lambda t: t[0])
+        _, cfg_info, cfg_parts = config_candidates[0]
+        try:
+            cfg_obj = json.loads(zf.read(cfg_info).decode("utf-8-sig"))
+            if not isinstance(cfg_obj, dict):
+                raise ValueError("template_config.json phải là JSON object.")
+        except Exception as exc:
+            raise ValueError(f"Không đọc được template_config.json: {exc}") from exc
+
+        prefix_parts = cfg_parts[:-1]
+        if not prefix_parts:
+            raw_folder = str(cfg_obj.get("folder_name") or cfg_obj.get("name") or cfg_obj.get("template_name") or cfg_obj.get("id") or "Template_Moi")
+        elif len(prefix_parts) >= 2 and prefix_parts[0].lower() == "template":
+            raw_folder = prefix_parts[1]
+            prefix_parts = prefix_parts[:2]
+        else:
+            raw_folder = prefix_parts[0]
+            prefix_parts = prefix_parts[:1]
+
+        folder_name = _sanitize_template_folder_name(raw_folder)
+        if not folder_name:
+            raise ValueError(f"Tên thư mục template không hợp lệ hoặc bị trùng vùng hệ thống: {raw_folder}")
+
+        target_root = Path(TEMPLATE_ROOT_DIR).resolve()
+        dest_dir = (target_root / folder_name).resolve()
+        if not dest_dir.is_relative_to(target_root) or dest_dir == target_root:
+            raise ValueError("Đường dẫn đích nằm ngoài thư mục Template.")
+
+        if dest_dir.exists() and not overwrite:
+            raise ValueError(f"Template `{folder_name}` đã tồn tại.")
+
+        dest_dir.mkdir(parents=True, exist_ok=True)
+        written_files = 0
+        for info, parts in parsed_entries:
+            if prefix_parts and parts[: len(prefix_parts)] != prefix_parts:
+                continue
+            rel_parts = parts[len(prefix_parts):]
+            if not rel_parts:
+                continue
+            out_path = (dest_dir / Path(*rel_parts)).resolve()
+            if not out_path.is_relative_to(dest_dir):
+                raise ValueError(f"Phát hiện Zip-Slip path traversal: {info.filename}")
+            out_path.parent.mkdir(parents=True, exist_ok=True)
+            with zf.open(info, "r") as src_f, open(out_path, "wb") as dst_f:
+                shutil.copyfileobj(src_f, dst_f, length=1024 * 256)
+            written_files += 1
+
+    all_templates = list_video_templates()
+    installed = next((t for t in all_templates if t.get("folder_name") == folder_name), None)
+    label_code = (installed or {}).get("code") or cfg_obj.get("code") or cfg_obj.get("template_code") or "NEW"
+    label_name = (installed or {}).get("name") or cfg_obj.get("name") or folder_name
+    return {
+        "ok": True,
+        "folder_name": folder_name,
+        "files_written": written_files,
+        "installed": installed,
+        "templates": all_templates,
+        "message": f"Đã cài đặt thành công Template #{label_code} — {label_name} ({written_files} tệp)!",
+    }

@@ -22,6 +22,7 @@ import os
 import pathlib
 import random
 import re
+import sys
 import threading
 import time
 import urllib.error
@@ -957,7 +958,47 @@ class GoogleVidsClient:
             profiles_order.append("auto")
 
         last_error = "Unknown Google Vids error"
+        cur_prompt = str(prompt or "")
+        cur_segments = [dict(s) if isinstance(s, dict) else s for s in segments_spec] if isinstance(segments_spec, list) else segments_spec
+        policy_sanitized_retried = False
+        stop_all_profiles = False
+
+        def _gvt_helpers():
+            try:
+                if str(WS_DIR) not in sys.path:
+                    sys.path.insert(0, str(WS_DIR))
+                import grok_video_tool as _gvt
+                return _gvt
+            except Exception:
+                return None
+
+        def _try_sanitize_once(subtype: str) -> bool:
+            nonlocal cur_prompt, cur_segments, policy_sanitized_retried
+            if policy_sanitized_retried:
+                return False
+            gvt_mod = _gvt_helpers()
+            if gvt_mod is None or not hasattr(gvt_mod, "sanitize_prompt_for_flow_policy"):
+                return False
+            changed = False
+            if cur_prompt.strip():
+                safe_p, c1 = gvt_mod.sanitize_prompt_for_flow_policy(cur_prompt, subtype)
+                if c1 and safe_p:
+                    cur_prompt = safe_p
+                    changed = True
+            if isinstance(cur_segments, list):
+                for seg in cur_segments:
+                    if isinstance(seg, dict) and seg.get("prompt"):
+                        safe_sp, c2 = gvt_mod.sanitize_prompt_for_flow_policy(str(seg["prompt"]), subtype)
+                        if c2 and safe_sp:
+                            seg["prompt"] = safe_sp
+                            changed = True
+            if changed:
+                policy_sanitized_retried = True
+            return changed
+
         for prof_cand in profiles_order:
+            if stop_all_profiles:
+                break
             force_ref = False
             use_blob_cache = True
             for attempt in range(max_retries + 1):
@@ -966,9 +1007,9 @@ class GoogleVidsClient:
                     sess = self.bootstrap_session(profile_name=prof_cand, force_refresh=force_ref)
                     prompt_ast, mentioned_ctx, action_code = self._prepare_prompt_ast_and_mentions(
                         sess=sess,
-                        prompt=prompt,
+                        prompt=cur_prompt,
                         image_paths=image_paths,
-                        segments_spec=segments_spec,
+                        segments_spec=cur_segments,
                         asset_path_map=asset_path_map,
                         ingredient_role=ingredient_role,
                         use_blob_cache=use_blob_cache,
@@ -1000,10 +1041,20 @@ class GoogleVidsClient:
                     quota_telemetry = parse_generate_quota_telemetry(resp_json)
 
                     if not urls:
-                        last_error = f"[{sess['profile']}] Google Vids không trả về link tải video (có thể vướng bộ lọc an toàn nội dung)."
-                        if attempt < max_retries:
-                            time.sleep(2.5)
+                        raw_filter_msg = (
+                            f"[{sess['profile']}] Google Vids không trả về link tải video "
+                            "(vướng bộ lọc an toàn nội dung SAFETY_FILTER)."
+                        )
+                        if attempt < max_retries and _try_sanitize_once("unsafe_generation"):
+                            time.sleep(1.5)
                             continue
+                        gvt_mod = _gvt_helpers()
+                        last_error = (
+                            gvt_mod.describe_flow_error_vi(raw_filter_msg)
+                            if gvt_mod and hasattr(gvt_mod, "describe_flow_error_vi")
+                            else raw_filter_msg
+                        )
+                        stop_all_profiles = True
                         break
 
                     dl_req = urllib.request.Request(
@@ -1042,12 +1093,35 @@ class GoogleVidsClient:
                         err_txt = he.read().decode("utf-8", errors="replace")
                     except Exception:
                         pass
-                    last_error = f"[{prof_cand}] HTTP {he.code}: {err_txt[:320]}"
-                    # 429 / RESOURCE_EXHAUSTED -> switch immediately to next fallback account if available
-                    if he.code == 429 or "RESOURCE_EXHAUSTED" in err_txt.upper():
+                    raw_http_err = f"[{prof_cand}] HTTP {he.code}: {err_txt[:320]}"
+                    gvt_mod = _gvt_helpers()
+                    err_kind = (
+                        gvt_mod.classify_flow_error(raw_http_err)
+                        if gvt_mod and hasattr(gvt_mod, "classify_flow_error")
+                        else ("content_policy" if he.code == 400 else "transient")
+                    )
+                    last_error = (
+                        gvt_mod.describe_flow_error_vi(raw_http_err)
+                        if gvt_mod and hasattr(gvt_mod, "describe_flow_error_vi")
+                        else raw_http_err
+                    )
+                    # Content policy / invalid prompt -> optional 1x safe rewrite, otherwise stop all accounts
+                    if err_kind == "content_policy":
+                        sub = (
+                            gvt_mod.classify_content_rejection_subtype(raw_http_err)
+                            if gvt_mod and hasattr(gvt_mod, "classify_content_rejection_subtype")
+                            else "unsafe_generation"
+                        )
+                        if sub != "invalid_input" and attempt < max_retries and _try_sanitize_once(sub):
+                            time.sleep(1.5)
+                            continue
+                        stop_all_profiles = True
                         break
-                    # 400/401/403 -> refresh session token & re-upload blobs once
-                    if he.code in (400, 401, 403) and attempt < max_retries:
+                    # 429 / RESOURCE_EXHAUSTED -> switch immediately to next fallback account if available
+                    if he.code == 429 or "RESOURCE_EXHAUSTED" in err_txt.upper() or err_kind == "account_quota":
+                        break
+                    # 401/403 auth -> refresh session token & re-upload blobs once
+                    if he.code in (401, 403) and attempt < max_retries:
                         force_ref = True
                         use_blob_cache = False
                         self.invalidate_profile_blobs(prof_cand)

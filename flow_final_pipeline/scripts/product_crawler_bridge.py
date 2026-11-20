@@ -644,6 +644,182 @@ def list_all_products_store() -> dict:
     }
 
 
+_BATCH_SPAWN_LOCK = __import__("threading").RLock()
+
+
+def _pcb_atomic_write_json(path: str, payload: object) -> None:
+    os.makedirs(os.path.dirname(os.path.abspath(path)), exist_ok=True)
+    text = json.dumps(payload, ensure_ascii=False, indent=2)
+    tmp = f"{path}.tmp.{os.getpid()}.{__import__('threading').get_ident()}"
+    try:
+        with open(tmp, "w", encoding="utf-8") as fw:
+            fw.write(text)
+        for attempt in range(6):
+            try:
+                os.replace(tmp, path)
+                return
+            except OSError:
+                time.sleep(0.02 * (attempt + 1))
+        with open(path, "w", encoding="utf-8") as fw2:
+            fw2.write(text)
+    finally:
+        if os.path.exists(tmp):
+            try:
+                os.remove(tmp)
+            except OSError:
+                pass
+
+
+def _clear_cancelled_pids(pids: list) -> None:
+    cancel_file = os.path.join(WS_DIR, "flow_final_pipeline", "cancelled_batch_pids.json")
+    if not os.path.isfile(cancel_file):
+        return
+    try:
+        with open(cancel_file, "r", encoding="utf-8") as _f_cc:
+            cur = json.load(_f_cc)
+        if isinstance(cur, list):
+            nxt = [x for x in cur if str(x) not in set(str(p) for p in pids)]
+            if len(nxt) != len(cur):
+                _pcb_atomic_write_json(cancel_file, nxt)
+    except Exception:
+        pass
+
+
+def enqueue_or_spawn_mt_pipeline(pids: list, template_name: str = "Nhà Xưởng") -> tuple:
+    """
+    Điều phối tập trung tiến trình `run_all_7_videos_mt.py`:
+    - Không bao giờ chạy trùng 2 tiến trình trên cùng 1 sản phẩm đang chạy.
+    - Nếu đã có 1 tiến trình `run_all_7_videos_mt.py` đang hoạt động, đẩy thêm các PID mới vào
+      `pending_batch_pids.json` để worker hiện tại tự nạp nóng (không mở trùng nhiều Chrome hay nhân đôi hạn mức tài khoản).
+    - Ghi đầy đủ header log vào `projects/<pid>/pipeline_run.log` của TỪNG sản phẩm (và đóng file handle ngay lập tức).
+    Returns `(proc_pid, newly_scheduled_pids, joined_existing_runner)`.
+    """
+    import engine_settings_manager as _esm_coord
+    clean_pids = []
+    for raw_p in (pids or []):
+        s_p = str(raw_p or "").strip()
+        if s_p and s_p not in clean_pids:
+            clean_pids.append(s_p)
+    if not clean_pids:
+        return None, [], False
+
+    ffp_dir = os.path.join(WS_DIR, "flow_final_pipeline")
+    os.makedirs(ffp_dir, exist_ok=True)
+    active_runner_file = os.path.join(ffp_dir, "active_mt_runner.json")
+    pending_pids_file = os.path.join(ffp_dir, "pending_batch_pids.json")
+
+    with _BATCH_SPAWN_LOCK:
+        _clear_cancelled_pids(clean_pids)
+
+        # Kiểm tra xem có sản phẩm nào đang chạy sẵn rồi không
+        to_schedule = []
+        existing_alive_pid = None
+        for pid_val in clean_pids:
+            st_p = os.path.join(PROJECTS_DIR, pid_val, "pipeline_status.json")
+            if os.path.isfile(st_p):
+                try:
+                    with open(st_p, "r", encoding="utf-8") as _f_stp:
+                        st_d = json.load(_f_stp)
+                    p_os = int(st_d.get("pid_os") or 0)
+                    if bool(st_d.get("is_running")) and p_os > 0 and _esm_coord.is_os_pid_running(p_os):
+                        existing_alive_pid = p_os
+                        continue
+                except Exception:
+                    pass
+            to_schedule.append(pid_val)
+
+        if not to_schedule:
+            return existing_alive_pid, [], True
+
+        # Kiểm tra tiến trình điều phối chung `active_mt_runner.json`
+        active_os_pid = 0
+        if os.path.isfile(active_runner_file):
+            try:
+                with open(active_runner_file, "r", encoding="utf-8") as _f_arf:
+                    ar = json.load(_f_arf)
+                cand_os = int(ar.get("pid_os") or 0)
+                if cand_os > 0 and _esm_coord.is_os_pid_running(cand_os):
+                    active_os_pid = cand_os
+            except Exception:
+                active_os_pid = 0
+
+        now_ts_str = time.strftime("%Y-%m-%d %H:%M:%S")
+        now_short = time.strftime("%H:%M:%S")
+
+        if active_os_pid > 0:
+            # Gắn nóng các PID mới vào hàng đợi của tiến trình đang chạy
+            cur_pending = []
+            if os.path.isfile(pending_pids_file):
+                try:
+                    with open(pending_pids_file, "r", encoding="utf-8") as _f_ppf:
+                        cur_pending = json.load(_f_ppf)
+                    if not isinstance(cur_pending, list):
+                        cur_pending = []
+                except Exception:
+                    cur_pending = []
+            for p_add in to_schedule:
+                if p_add not in cur_pending:
+                    cur_pending.append(p_add)
+            _pcb_atomic_write_json(pending_pids_file, cur_pending)
+
+            for p_add in to_schedule:
+                p_log = os.path.join(PROJECTS_DIR, p_add, "pipeline_run.log")
+                os.makedirs(os.path.dirname(p_log), exist_ok=True)
+                with open(p_log, "a", encoding="utf-8", errors="replace") as f_lg:
+                    f_lg.write(
+                        f"\n=== QUEUED INTO ACTIVE MULTI-THREAD RUNNER PID={active_os_pid} ({now_ts_str}) | Template: {template_name} ===\n"
+                    )
+                _pcb_atomic_write_json(
+                    os.path.join(PROJECTS_DIR, p_add, "pipeline_status.json"),
+                    {
+                        "pid": p_add,
+                        "pid_os": active_os_pid,
+                        "is_running": True,
+                        "current_step_text": f"⏳ Đã ghép vào luồng Đa Tài Khoản đang chạy (PID {active_os_pid} • Template: {template_name})...",
+                        "updated_at": now_short,
+                    },
+                )
+            return active_os_pid, to_schedule, True
+
+        # Chưa có runner nào chạy -> khởi động 1 tiến trình duy nhất cho toàn bộ to_schedule
+        runner_script = os.path.join(SCRIPTS_DIR, "run_all_7_videos_mt.py")
+        first_pid = to_schedule[0]
+        first_log = os.path.join(PROJECTS_DIR, first_pid, "pipeline_run.log")
+        os.makedirs(os.path.dirname(first_log), exist_ok=True)
+        for p_init in to_schedule:
+            p_log = os.path.join(PROJECTS_DIR, p_init, "pipeline_run.log")
+            os.makedirs(os.path.dirname(p_log), exist_ok=True)
+            with open(p_log, "a", encoding="utf-8", errors="replace") as f_hdr:
+                f_hdr.write(
+                    f"\n=== START MULTI-THREAD PIPELINE ({now_ts_str}) | {len(to_schedule)} SP | Template: {template_name} ===\n"
+                )
+
+        with open(first_log, "a", encoding="utf-8", errors="replace") as lf:
+            proc = subprocess.Popen(
+                [sys.executable, "-u", runner_script, *to_schedule],
+                cwd=WS_DIR,
+                stdout=lf,
+                stderr=subprocess.STDOUT,
+            )
+        proc_pid = proc.pid
+        _pcb_atomic_write_json(
+            active_runner_file,
+            {"pid_os": proc_pid, "started_at": now_ts_str, "initial_pids": to_schedule},
+        )
+        for pid_val in to_schedule:
+            _pcb_atomic_write_json(
+                os.path.join(PROJECTS_DIR, pid_val, "pipeline_status.json"),
+                {
+                    "pid": pid_val,
+                    "pid_os": proc_pid,
+                    "is_running": True,
+                    "current_step_text": f"🚀 Đang khởi động Đa Luồng ({len(to_schedule)} SP • Template: {template_name})...",
+                    "updated_at": now_short,
+                },
+            )
+        return proc_pid, to_schedule, False
+
+
 def prepare_and_optionally_run_product(
     raw_id_or_url: str,
     template_name: str = "Nhà Xưởng",
@@ -659,7 +835,7 @@ def prepare_and_optionally_run_product(
       1. Nhận Link hoặc ID sản phẩm -> Kiểm tra local / cache hoặc tự động Crawl về `projects/<pid>/product_images/`.
       2. Sinh `prompts.json` + `spec_*.json` từ `Template/<template_name>`.
       3. Đồng bộ trạng thái lên Web UI (`sync_web_ui(force=True)`).
-      4. Nếu `auto_run_pipeline=True`, khởi chạy tiến trình đa luồng `run_all_7_videos_mt.py <pid>`.
+      4. Nếu `auto_run_pipeline=True`, điều phối vào tiến trình đa luồng `run_all_7_videos_mt.py`.
     """
     crawl_info = ensure_product_crawled(raw_id_or_url, method=crawl_method, force_crawl=False)
     if not crawl_info.get("ok"):
@@ -683,30 +859,9 @@ def prepare_and_optionally_run_product(
     sync_web_ui(force=True)
 
     proc_pid = None
+    joined_existing = False
     if auto_run_pipeline:
-        runner_script = os.path.join(SCRIPTS_DIR, "run_all_7_videos_mt.py")
-        log_file = os.path.join(PROJECTS_DIR, pid, "pipeline_run.log")
-        lf = open(log_file, "a", encoding="utf-8", errors="replace")
-        lf.write(f"\n=== AUTO START PIPELINE ({time.strftime('%Y-%m-%d %H:%M:%S')}) | Template: {template_name} ===\n")
-        lf.flush()
-        p = subprocess.Popen(
-            [sys.executable, "-u", runner_script, pid],
-            cwd=WS_DIR,
-            stdout=lf,
-            stderr=subprocess.STDOUT,
-        )
-        proc_pid = p.pid
-        try:
-            st_init = {
-                "pid": pid,
-                "pid_os": proc_pid,
-                "is_running": True,
-                "current_step_text": f"🚀 Đang khởi động Đa Luồng cho SP {pid} (Template: {template_name})...",
-                "updated_at": time.strftime("%H:%M:%S"),
-            }
-            json.dump(st_init, open(os.path.join(PROJECTS_DIR, pid, "pipeline_status.json"), "w", encoding="utf-8"), ensure_ascii=False, indent=2)
-        except Exception:
-            pass
+        proc_pid, _, joined_existing = enqueue_or_spawn_mt_pipeline([pid], template_name=template_name)
         sync_web_ui(force=True)
 
     return {
@@ -720,6 +875,7 @@ def prepare_and_optionally_run_product(
         "source": crawl_info.get("source", ""),
         "pipeline_started": bool(auto_run_pipeline),
         "pipeline_pid": proc_pid,
+        "joined_active_batch": joined_existing,
     }
 
 
@@ -732,70 +888,61 @@ def batch_prepare_and_optionally_run_products(
     auto_run_pipeline: bool = True,
 ) -> dict:
     """
-    Chuẩn bị kịch bản cho nhiều sản phẩm cùng lúc và đẩy toàn bộ vào MỘT tiến trình
-    run_all_7_videos_mt.py dùng chung (tối ưu đa luồng, đa tài khoản, không mở nhiều Chrome trùng).
+    Chuẩn bị kịch bản cho nhiều sản phẩm cùng lúc và đẩy toàn bộ vào tiến trình
+    run_all_7_videos_mt.py điều phối chung (đa luồng, đa tài khoản, log chi tiết từng sản phẩm).
     """
     items = [str(x or "").strip() for x in (raw_inputs or []) if str(x or "").strip()]
     if not items:
-        return {"ok": False, "error": "Danh sách sản phẩm trống.", "results": [], "pids": []}
+        return {"ok": False, "error": "Danh sách sản phẩm trống.", "results": [], "pids": [], "failed_items": []}
 
     results = []
     prepared_pids = []
+    failed_items = []
     for raw_in in items:
-        res = prepare_and_optionally_run_product(
-            raw_id_or_url=raw_in,
-            template_name=template_name,
-            crawl_method=crawl_method,
-            videos_per_character=videos_per_character,
-            force_regenerate_prompts=force_regenerate_prompts,
-            auto_run_pipeline=False,
-        )
+        try:
+            res = prepare_and_optionally_run_product(
+                raw_id_or_url=raw_in,
+                template_name=template_name,
+                crawl_method=crawl_method,
+                videos_per_character=videos_per_character,
+                force_regenerate_prompts=force_regenerate_prompts,
+                auto_run_pipeline=False,
+            )
+        except Exception as exc_prep:
+            res = {"ok": False, "input": raw_in, "error": f"{type(exc_prep).__name__}: {exc_prep}"}
         results.append(res)
         if res.get("ok") and res.get("pid"):
             pid_val = str(res["pid"])
             if pid_val not in prepared_pids:
                 prepared_pids.append(pid_val)
+        else:
+            err_reason = str(res.get("error") or "Không thể tải hoặc tạo kịch bản sản phẩm")
+            failed_items.append({"input": raw_in, "error": err_reason})
+            print(f"[BatchPrepare][ERROR] '{raw_in}': {err_reason}", flush=True)
 
     proc_pid = None
+    joined_existing = False
     if auto_run_pipeline and prepared_pids:
-        runner_script = os.path.join(SCRIPTS_DIR, "run_all_7_videos_mt.py")
-        first_pid = prepared_pids[0]
-        log_path = os.path.join(PROJECTS_DIR, first_pid, "pipeline_mt.log")
-        with open(log_path, "a", encoding="utf-8") as lf:
-            lf.write(
-                f"\n=== BATCH MULTI-THREADED START ({time.strftime('%Y-%m-%d %H:%M:%S')}) "
-                f"| {len(prepared_pids)} SP | Template: {template_name} ===\n"
-            )
-            lf.flush()
-            p = subprocess.Popen(
-                [sys.executable, "-u", runner_script, *prepared_pids],
-                cwd=WS_DIR,
-                stdout=lf,
-                stderr=subprocess.STDOUT,
-            )
-        proc_pid = p.pid
-        for pid_val in prepared_pids:
-            try:
-                st_init = {
-                    "pid": pid_val,
-                    "pid_os": proc_pid,
-                    "is_running": True,
-                    "current_step_text": f"⏳ Đang xếp lịch Đa Luồng ({len(prepared_pids)} SP • Template: {template_name})...",
-                    "updated_at": time.strftime("%H:%M:%S"),
-                }
-                with open(os.path.join(PROJECTS_DIR, pid_val, "pipeline_status.json"), "w", encoding="utf-8") as f_st:
-                    json.dump(st_init, f_st, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+        proc_pid, _, joined_existing = enqueue_or_spawn_mt_pipeline(prepared_pids, template_name=template_name)
         sync_web_ui(force=True)
+
+    err_top = ""
+    if not prepared_pids and failed_items:
+        err_top = f"Không chuẩn bị được {len(failed_items)}/{len(items)} sản phẩm. Lỗi đầu tiên ({failed_items[0]['input']}): {failed_items[0]['error']}"
+    elif failed_items:
+        err_top = f"Cảnh báo: {len(failed_items)}/{len(items)} sản phẩm lỗi ({failed_items[0]['input']}: {failed_items[0]['error']})"
 
     return {
         "ok": len(prepared_pids) > 0,
+        "error": err_top,
         "pids": prepared_pids,
         "results": results,
+        "failed_items": failed_items,
+        "failed_count": len(failed_items),
         "count": len(prepared_pids),
         "pipeline_started": bool(auto_run_pipeline and prepared_pids),
         "pipeline_pid": proc_pid,
+        "joined_active_batch": joined_existing,
     }
 
 

@@ -102,6 +102,7 @@ DEFAULT_CAMERA_BROLL_SETTINGS = {
     "broll_macro_sliding_pan": True,        # SHOT 2 trượt máy 50mm Macro dọc theo sản phẩm thật từ [PRODUCT REFERENCE IMAGE]
     "broll_hand_func_demo": True,           # B-Roll cận cảnh bàn tay test công năng / chất liệu sản phẩm khi nói tới USP
     "broll_angle_variety": True,            # Đổi góc máy cận giữa các cảnh (Low-Angle Hero / 45-Degree Detail / Top-Down)
+    "broll_moderate_frequency": True,       # Chỉ chèn SHOT 1->2->3 vào 1 phân cảnh đinh (Scene 3 USP), tránh lạm dụng cắt cảnh liên tục ở cả 3 cảnh
     "broll_dynamic_camera_motion": False,   # Máy quay Steadicam tiến nhẹ theo nhân vật (Tuỳ chọn)
 }
 
@@ -412,6 +413,7 @@ def build_scene_video_prompt_with_broll(
     use_macro_pan = bool(cfg.get("broll_macro_sliding_pan", True))
     use_func_demo = bool(cfg.get("broll_hand_func_demo", True))
     use_angle_var = bool(cfg.get("broll_angle_variety", True))
+    moderate_broll = bool(cfg.get("broll_moderate_frequency", True)) or (not use_angle_var)
     use_dyn_motion = bool(cfg.get("broll_dynamic_camera_motion", False))
     bg_type = str(cfg.get("background_environment_type") or "auto_template")
 
@@ -431,7 +433,8 @@ def build_scene_video_prompt_with_broll(
         else " Do not move the foreground table or change the workshop/store layout."
     )
 
-    if enable_broll and use_3cuts:
+    allow_3cuts_here = enable_broll and use_3cuts and ((not moderate_broll) or scene_idx >= 3)
+    if allow_3cuts_here:
         if scene_idx == 1:
             shot1_window = "0.0 to 1.6 seconds"
             shot2_window = "1.6 to 5.4 seconds"

@@ -1789,10 +1789,12 @@ def render_fashion_postprod_final_video(
         "-shortest",
         local_final_mp4,
     ]
-    subprocess.run(cmd_final, capture_output=True, timeout=120)
+    res_f = subprocess.run(cmd_final, capture_output=True, text=True, timeout=180)
 
-    if not os.path.exists(local_final_mp4) or os.path.getsize(local_final_mp4) < 10000:
-        return {"ok": False, "error": "Lỗi FFmpeg khi ghép hậu kỳ Video Final."}
+    if res_f.returncode != 0 or not os.path.exists(local_final_mp4) or os.path.getsize(local_final_mp4) < 10000:
+        err_tail = "\n".join((res_f.stderr or "").strip().splitlines()[-6:]) or f"rc={res_f.returncode}"
+        print(f"[FashionPostProd FFmpeg Error] {project_id_slug}:\n{err_tail}", flush=True)
+        return {"ok": False, "error": f"Lỗi FFmpeg khi ghép hậu kỳ Video Final: {err_tail[:240]}"}
 
     os.makedirs(final_videos_dir, exist_ok=True)
     shutil.copy2(local_final_mp4, export_final_mp4)

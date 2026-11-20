@@ -78,6 +78,303 @@ UA_CHROME_131_WIN = (
 # Chrome ≥ 129: dùng "Not(A:Brand";v="99" (xem Veo3Studio/cookieTokenService.js)
 SEC_CH_UA_131 = '"Chromium";v="131", "Google Chrome";v="131", "Not(A:Brand";v="99"'
 
+
+def sanitize_chrome_ua(raw_ua: str = "", browser=None) -> str:
+    """Return a clean desktop Chrome User-Agent without HeadlessChrome leakage."""
+    ua = str(raw_ua or "").strip()
+    if ua:
+        ua = ua.replace("HeadlessChrome/", "Chrome/")
+        if "Chrome/" in ua and "Headless" not in ua:
+            return ua
+    if browser is not None:
+        try:
+            ver_major = str(getattr(browser, "version", "") or "").split(".")[0].strip()
+            if ver_major.isdigit():
+                return (
+                    f"Mozilla/5.0 (Windows NT 10.0; Win64; x64) "
+                    f"AppleWebKit/537.36 (KHTML, like Gecko) Chrome/{ver_major}.0.0.0 Safari/537.36"
+                )
+        except Exception:
+            pass
+    return UA_CHROME_131_WIN
+
+
+_SPRCAD_COOLDOWN_LOCK = threading.Lock()
+_SPRCAD_FAIL_STREAK = [0]
+_SPRCAD_SKIP_UNTIL = [0.0]
+
+
+def is_sprcad_circuit_open() -> bool:
+    """Return True when SPrCad 2K RPC is in cooldown after repeated rejections."""
+    with _SPRCAD_COOLDOWN_LOCK:
+        return time.time() < _SPRCAD_SKIP_UNTIL[0]
+
+
+def record_sprcad_result(ok: bool, err_msg: str = "") -> None:
+    """Update shared SPrCad circuit-breaker state across all pipelines."""
+    with _SPRCAD_COOLDOWN_LOCK:
+        if ok:
+            _SPRCAD_FAIL_STREAK[0] = 0
+            _SPRCAD_SKIP_UNTIL[0] = 0.0
+            return
+        _SPRCAD_FAIL_STREAK[0] += 1
+        if _SPRCAD_FAIL_STREAK[0] >= 3:
+            _SPRCAD_SKIP_UNTIL[0] = max(_SPRCAD_SKIP_UNTIL[0], time.time() + 300.0)
+
+
+def upscale_image_local_2k(img_path: str, width: int = 1536, height: int = 2752):
+    """Upscale an image cleanly to 2K JPEG on disk using LANCZOS + light UnsharpMask."""
+    try:
+        from PIL import Image as _PilImage, ImageFilter as _PilFilter
+        with _PilImage.open(img_path) as im_fb:
+            im_2k = im_fb.convert("RGB").resize((int(width), int(height)), _PilImage.Resampling.LANCZOS)
+            im_2k = im_2k.filter(_PilFilter.UnsharpMask(radius=1.1, percent=115, threshold=2))
+            im_2k.save(img_path, format="JPEG", quality=98, subsampling=0)
+        return True, os.path.getsize(img_path)
+    except Exception:
+        return False, (os.path.getsize(img_path) if os.path.exists(img_path) else 0)
+
+
+CAPTCHA_BRIDGE_PORT = int(os.environ.get("CAPTCHA_BRIDGE_PORT", "4000") or "4000")
+
+_ATOMIC_JSON_LOCKS: dict[str, threading.Lock] = {}
+_ATOMIC_JSON_LOCKS_GUARD = threading.Lock()
+
+
+def _get_atomic_json_lock(target_path: str) -> threading.Lock:
+    norm = os.path.normcase(os.path.abspath(str(target_path)))
+    with _ATOMIC_JSON_LOCKS_GUARD:
+        lk = _ATOMIC_JSON_LOCKS.get(norm)
+        if lk is None:
+            lk = threading.Lock()
+            _ATOMIC_JSON_LOCKS[norm] = lk
+        return lk
+
+
+def atomic_write_json(path, data, retries: int = 7, indent: int = 2) -> bool:
+    """Thread-safe and Windows-safe atomic JSON writer with PermissionError retry."""
+    target = Path(path)
+    lk = _get_atomic_json_lock(str(target))
+    payload = json.dumps(data, ensure_ascii=False, indent=indent)
+    with lk:
+        try:
+            target.parent.mkdir(parents=True, exist_ok=True)
+        except Exception:
+            pass
+        tmp = target.parent / f".{target.name}.{os.getpid()}.{threading.get_ident()}.tmp"
+        try:
+            tmp.write_text(payload, encoding="utf-8")
+            last_err = None
+            for attempt in range(max(1, int(retries))):
+                try:
+                    os.replace(str(tmp), str(target))
+                    return True
+                except PermissionError as exc:
+                    last_err = exc
+                    time.sleep(0.02 * (attempt + 1))
+                except OSError as exc:
+                    last_err = exc
+                    time.sleep(0.02 * (attempt + 1))
+            # Final fallback if another Windows reader holds handle on target
+            try:
+                target.write_text(payload, encoding="utf-8")
+                return True
+            except Exception:
+                if last_err:
+                    print(f"[AtomicJSON] Failed writing {target}: {last_err}")
+                return False
+        finally:
+            if tmp.exists():
+                try:
+                    tmp.unlink()
+                except Exception:
+                    pass
+
+
+_DIAG_ERRORS_LOCK = threading.Lock()
+_DIAG_ERRORS_RING = __import__("collections").deque(maxlen=150)
+
+
+def record_diagnostic_error(
+    module: str,
+    target: str = "",
+    scene: str = "",
+    account: str = "",
+    rpc: str = "",
+    error_text: str = "",
+    hint: str = "",
+) -> dict:
+    """Record a structured diagnostic error in memory and logs/system_errors.jsonl."""
+    raw = str(error_text or "").strip()
+    kind = "unknown"
+    short_msg = raw[:240]
+    try:
+        if "classify_flow_error" in globals():
+            kind = classify_flow_error(raw)
+        if "describe_flow_error_vi" in globals() and raw:
+            short_msg = describe_flow_error_vi(raw)
+    except Exception:
+        pass
+    auto_hint = str(hint or "").strip()
+    if not auto_hint:
+        _hint_map = {
+            "rate_limit": "Google Flow đang giới hạn tốc độ [8] TOO_MUCH_TRAFFIC — hệ thống tự giãn nhịp & xoay tài khoản.",
+            "captcha_score": "Điểm reCAPTCHA thấp [7] — kiểm tra cửa sổ Chrome Captcha Solver (:4000).",
+            "account_auth": "Cookie/Token Google Flow hết hạn — vào Quản Lý Tài Khoản bấm Làm Mới Cookie.",
+            "account_quota": "Tài khoản đã hết Credit Google Flow — tự động chuyển tài khoản khác.",
+            "content_policy": "Prompt hoặc ảnh vi phạm chính sách nội dung Google Flow — kiểm tra lại câu lệnh/ảnh.",
+        }
+        auto_hint = _hint_map.get(kind, "Kiểm tra chi tiết trong logs/system_errors.jsonl hoặc Nhật ký dự án.")
+    entry = {
+        "ts": time.time(),
+        "time": datetime.now().strftime("%Y-%m-%d %H:%M:%S"),
+        "module": str(module or "system"),
+        "target": str(target or ""),
+        "scene": str(scene or ""),
+        "account": str(account or ""),
+        "rpc": str(rpc or ""),
+        "kind": kind,
+        "category": kind,
+        "message": short_msg,
+        "error_text": short_msg,
+        "raw": raw[:400],
+        "hint": auto_hint,
+    }
+    with _DIAG_ERRORS_LOCK:
+        _DIAG_ERRORS_RING.appendleft(entry)
+        try:
+            log_dir = Path(__file__).resolve().parent / "logs"
+            log_dir.mkdir(parents=True, exist_ok=True)
+            err_file = log_dir / "system_errors.jsonl"
+            with open(err_file, "a", encoding="utf-8") as fh:
+                fh.write(json.dumps(entry, ensure_ascii=False) + "\n")
+        except Exception:
+            pass
+    return entry
+
+
+def get_recent_diagnostic_errors(limit: int = 60) -> list[dict]:
+    with _DIAG_ERRORS_LOCK:
+        return list(_DIAG_ERRORS_RING)[: max(1, int(limit or 60))]
+
+
+def format_structured_flow_log(
+    engine: str,
+    target: str = "",
+    scene: str = "",
+    account: str = "",
+    rpc: str = "",
+    error_text: str = "",
+    credits_left: Optional[int] = None,
+    record: bool = True,
+) -> str:
+    """Return clear human-readable `[Engine][Target][Scene][Acc]` log line and optionally record it."""
+    parts = [f"[{engine or 'Flow'}]"]
+    if target:
+        parts.append(f"[{target}]")
+    if scene:
+        parts.append(f"[{scene}]")
+    if account:
+        parts.append(f"[TK:{account}]")
+    if rpc:
+        parts.append(f"[RPC:{rpc}]")
+    if credits_left is not None:
+        parts.append(f"[Credits:{credits_left}]")
+    msg = describe_flow_error_vi(error_text) if "describe_flow_error_vi" in globals() else str(error_text or "")
+    if record and error_text:
+        record_diagnostic_error(
+            module=engine,
+            target=target,
+            scene=scene,
+            account=account,
+            rpc=rpc,
+            error_text=error_text,
+        )
+    return f"{''.join(parts)} {msg}"
+
+
+_LIVE_CREDITS_LOCK = threading.Lock()
+_LIVE_ACCOUNT_CREDITS: dict[str, int] = {}
+_LAST_CREDITS_DISK_SYNC: dict[str, float] = {}
+
+
+def get_live_flow_account_credits(account_or_profile: str) -> Optional[int]:
+    key = str(account_or_profile or "").strip().lower()
+    if not key:
+        return None
+    with _LIVE_CREDITS_LOCK:
+        if key in _LIVE_ACCOUNT_CREDITS:
+            return _LIVE_ACCOUNT_CREDITS[key]
+    return None
+
+
+def is_flow_account_credits_exhausted(account_or_profile: str, min_credits: int = 10) -> bool:
+    live_c = get_live_flow_account_credits(account_or_profile)
+    if live_c is not None:
+        return 0 <= int(live_c) < int(min_credits)
+    return False
+
+
+def update_flow_account_credits_realtime(account_or_profile: str, credits_left: Optional[int]) -> None:
+    """Persist real-time Flow credits from Boq responses into memory and accounts.json."""
+    if credits_left is None or not isinstance(credits_left, (int, float)):
+        return
+    c_int = int(credits_left)
+    if c_int < 0:
+        return
+    raw_k = str(account_or_profile or "").strip()
+    if not raw_k:
+        return
+    low_k = raw_k.lower()
+    now = time.time()
+    need_disk = False
+    with _LIVE_CREDITS_LOCK:
+        prev = _LIVE_ACCOUNT_CREDITS.get(low_k)
+        _LIVE_ACCOUNT_CREDITS[low_k] = c_int
+        last_sync = _LAST_CREDITS_DISK_SYNC.get(low_k, 0.0)
+        if c_int < 10 or prev is None or abs((prev or 0) - c_int) >= 60 or (now - last_sync) >= 30.0:
+            _LAST_CREDITS_DISK_SYNC[low_k] = now
+            need_disk = True
+
+    if c_int < 10 and "mark_flow_account_cooldown" in globals():
+        try:
+            mark_flow_account_cooldown(
+                raw_k,
+                "account_quota",
+                f"PUBLIC_ERROR_INSUFFICIENT_CREDITS (Credits={c_int})",
+                cooldown_sec=3600.0,
+            )
+            record_diagnostic_error(
+                module="FlowCredits",
+                account=raw_k,
+                error_text=f"PUBLIC_ERROR_INSUFFICIENT_CREDITS: Tài khoản '{raw_k}' chỉ còn {c_int} credit.",
+                hint="Nạp thêm credit hoặc bật tài khoản Google Flow khác.",
+            )
+        except Exception:
+            pass
+
+    if need_disk:
+        try:
+            if "ACCOUNTS_FILE" in globals() and ACCOUNTS_FILE.is_file():
+                with _google_accounts_io_lock:
+                    rows = json.loads(ACCOUNTS_FILE.read_text(encoding="utf-8", errors="ignore"))
+                    changed = False
+                    if isinstance(rows, list):
+                        for r in rows:
+                            if not isinstance(r, dict):
+                                continue
+                            r_prof = str(r.get("profile_name") or "").strip().lower()
+                            r_name = str(r.get("name") or "").strip().lower()
+                            r_mail = str(r.get("google_email") or "").strip().lower()
+                            if low_k in (r_prof, r_name, r_mail):
+                                if r.get("credits") != c_int:
+                                    r["credits"] = c_int
+                                    changed = True
+                    if changed:
+                        atomic_write_json(ACCOUNTS_FILE, rows)
+        except Exception:
+            pass
+
 # ─── Essential cookies whitelist (anti-431 "Request Header Fields Too Large") ──────────────────────
 # Chỉ gửi các cookies này, không gửi toàn bộ (tránh 431 + leak analytics cookies)
 _ESSENTIAL_COOKIE_NAMES = frozenset({
@@ -882,17 +1179,29 @@ def classify_403_error(error_text: str) -> str:
     if not error_text:
         return 'unknown'
     t = error_text
-    if 'PUBLIC_ERROR_UNUSUAL_ACTIVITY' in t or 'reCAPTCHA evaluation failed' in t:
-        return 'unusual_activity'
-    if 'PUBLIC_ERROR_MODEL_ACCESS_DENIED' in t:
-        return 'model_access_denied'
-    if 'PUBLIC_ERROR_PER_MODEL_DAILY_QUOTA_REACHED' in t:
+    tu = t.upper()
+    if any(
+        code in tu
+        for code in (
+            'PUBLIC_ERROR_PER_MODEL_DAILY_QUOTA_REACHED',
+            'PUBLIC_ERROR_USER_QUOTA_REACHED',
+            'PUBLIC_ERROR_CREDITS_EXHAUSTED',
+            'PUBLIC_ERROR_INSUFFICIENT_CREDITS',
+            'USER_QUOTA_REACHED',
+            'INSUFFICIENT_CREDITS',
+            'CREDITS_EXHAUSTED',
+        )
+    ):
         return 'quota_reached'
-    if 'PUBLIC_ERROR_HIGH_TRAFFIC' in t:
+    if 'TOO_MUCH_TRAFFIC' in tu or 'PUBLIC_ERROR_HIGH_TRAFFIC' in tu:
         return 'high_traffic'
-    if 'PUBLIC_ERROR_USER_REQUESTS_THROTTLED' in t:
+    if 'PUBLIC_ERROR_USER_REQUESTS_THROTTLED' in tu:
         return 'throttled'
-    if 'PUBLIC_ERROR_GENERATION_ALREADY_IN_PROGRESS' in t or 'ALREADY_EXISTS' in t:
+    if 'PUBLIC_ERROR_UNUSUAL_ACTIVITY' in tu or 'RECAPTCHA EVALUATION FAILED' in tu:
+        return 'unusual_activity'
+    if 'PUBLIC_ERROR_MODEL_ACCESS_DENIED' in tu:
+        return 'model_access_denied'
+    if 'PUBLIC_ERROR_GENERATION_ALREADY_IN_PROGRESS' in tu or 'ALREADY_EXISTS' in tu:
         return 'already_in_progress'
     # Content policy errors (Change 10: Enhanced Error Classification)
     _content_policy_codes = (
@@ -903,17 +1212,21 @@ def classify_403_error(error_text: str) -> str:
         'PUBLIC_ERROR_IP_VIOLATION', 'PUBLIC_ERROR_COPYRIGHT',
         'PUBLIC_ERROR_CELEBRITY', 'PUBLIC_ERROR_PUBLIC_FIGURE',
         'PUBLIC_ERROR_PROMINENT_PEOPLE_FILTER_FAILED',
+        'PUBLIC_ERROR_INVALID_INPUT', 'PUBLIC_ERROR_POLICY_VIOLATION',
+        'PUBLIC_ERROR_SAFETY_FILTER', 'PUBLIC_ERROR_SAFETY',
+        'PUBLIC_ERROR_NSFW', 'PUBLIC_ERROR_PROHIBITED',
+        'PUBLIC_ERROR_BLOCKED',
     )
     for code in _content_policy_codes:
-        if code in t:
+        if code in tu:
             return 'content_policy'
-    if 'UNAUTHORIZED' in t or 'unauthorized' in t:
+    if 'UNAUTHORIZED' in tu or 'UNAUTHENTICATED' in tu:
         return 'auth'
     return 'unknown'
 
 
 def is_non_retryable_error(error_text: str) -> bool:
-    """Check if error should NEVER be retried (content policy, quota, access denied).
+    """Check if error should NEVER be retried on the same account (content policy, quota, access denied).
     Source: Veo3Studio/veo3ErrorHandler.js (isNonRetryableError).
     Change 10: Enhanced Error Classification.
     Hỗ trợ so khớp cả mã lỗi API và các chuỗi hiển thị tiếng Việt tương ứng."""
@@ -937,19 +1250,38 @@ def is_non_retryable_error(error_text: str) -> bool:
         'public_error_celebrity',
         'public_error_public_figure',
         'public_error_prominent_people_filter_failed',
+        'public_error_invalid_input',
+        'public_error_policy_violation',
+        'public_error_safety_filter',
+        'public_error_nsfw',
+        'public_error_prohibited',
+        'public_error_blocked',
         'public_error_model_access_denied',
         'invalid_argument',
         'request contains an invalid argument',
         'content policy',
         'policy violation',
+        'policy_violation',
+        'safety_error',
+        'safety_filter',
         # Vietnamese patterns
         'mã 400',
         'prompt bị từ chối (mã 400)',
+        'nội dung không hợp lệ',
+        'nghi ngờ trẻ vị thành niên',
+        'vướng bộ lọc an toàn',
+        'bộ lọc người nổi tiếng',
         'vui lòng sửa prompt',
         'không thể refresh từ cookies',
         'cookies đã hết hạn',
         'vui lòng cập nhật cookies',
         'public_error_per_model_daily_quota_reached',
+        'public_error_user_quota_reached',
+        'public_error_credits_exhausted',
+        'public_error_insufficient_credits',
+        'user_quota_reached',
+        'credits_exhausted',
+        'insufficient_credits',
         # Mapped messages we set in grok_video_tool.py:
         'không có quyền dùng model',
         'hết quota hàng ngày',
@@ -973,13 +1305,604 @@ def is_google_rate_limit_error(error_text: str) -> bool:
 
     These responses come from the Google generation API, not from the
     reCAPTCHA bridge.  Keeping this classification in one place prevents a
-    transient 429 from being mistaken for a Captcha/session failure.
+    transient 429 or [8] TOO_MUCH_TRAFFIC from being mistaken for a Captcha/policy failure.
     """
-    text = str(error_text or "").lower()
-    return any(marker in text for marker in (
+    raw = str(error_text or "")
+    text = raw.lower()
+    if any(marker in text for marker in (
         "http 429", "status_code=429", "resource_exhausted",
         "resource has been exhausted", "too many requests",
-    ))
+        "public_error_user_requests_throttled", "public_error_high_traffic",
+        "public_error_too_much_traffic", "public_error_unusual_activity_too_much_traffic",
+        "too_much_traffic", "throttled", "high_traffic",
+        "code=8", "failed:8", "failed_8:",
+    )):
+        return True
+    if re.search(r"(?:^|\s|:)\[8\](?:\s|:|$)", raw):
+        return True
+    return False
+
+
+def format_flow_error_short(error_text: str, max_len: int = 160) -> str:
+    """Extract readable PUBLIC_ERROR / HTTP / reason code from verbose Google RPC dumps."""
+    raw = str(error_text or "").strip()
+    if not raw:
+        return "Lỗi Google Flow không xác định"
+    m_pub = re.search(r"PUBLIC_ERROR_[A-Z0-9_]+", raw)
+    m_http = re.search(r"HTTP\s*(\d{3})", raw, re.I)
+    parts = []
+    if m_http:
+        parts.append(f"HTTP {m_http.group(1)}")
+    if m_pub:
+        parts.append(m_pub.group(0))
+    if parts:
+        return " - ".join(parts)
+    clean = re.sub(r"\s+", " ", raw)
+    return clean if len(clean) <= max_len else (clean[:max_len - 3] + "...")
+
+
+def _collect_nested_strings(obj, limit: int = 320) -> list[str]:
+    """Extract clean human-readable strings from nested Google batchexecute payloads."""
+    out: list[str] = []
+    total = 0
+
+    def _walk(node):
+        nonlocal total
+        if total >= limit or node is None:
+            return
+        if isinstance(node, str):
+            s = node.strip()
+            if s and not s.startswith("http") and s not in out:
+                out.append(s)
+                total += len(s)
+        elif isinstance(node, list):
+            for x in node:
+                _walk(x)
+                if total >= limit:
+                    break
+        elif isinstance(node, dict):
+            for v in node.values():
+                _walk(v)
+                if total >= limit:
+                    break
+
+    _walk(obj)
+    return out
+
+
+def extract_flow_as29s_error(inner_p) -> tuple[bool, int | str | None, str]:
+    """Inspect decoded `as29s` payload when no signed media URL is ready yet.
+
+    Catches status codes hidden at `inner_p[5][8][0]`, `inner_p[0][0][5][8][0]`,
+    `inner_p[0][0][3]`, or `inner_p[5][7][0]`, as well as nested `PUBLIC_ERROR_*`,
+    `POLICY_VIOLATION`, `SAFETY_ERROR`, `GENERATION_FAILED`, and `REJECTED` markers.
+    Returns `(is_failed, status_code, detail_str)`.
+    """
+    if not isinstance(inner_p, list) or not inner_p:
+        return False, None, ""
+
+    status_code = None
+    _probes = (
+        lambda p: p[5][8][0],
+        lambda p: p[0][0][5][8][0],
+        lambda p: p[0][0][3],
+        lambda p: p[5][7][0],
+    )
+    for _probe in _probes:
+        try:
+            cand = _probe(inner_p)
+            if cand is not None:
+                status_code = cand
+                break
+        except Exception:
+            pass
+
+    try:
+        raw_s = json.dumps(inner_p, ensure_ascii=False)
+    except Exception:
+        raw_s = str(inner_p)
+    raw_up = raw_s.upper()
+
+    m_pub = re.search(r"PUBLIC_ERROR_[A-Z0-9_]+", raw_up)
+    pub_code = m_pub.group(0) if m_pub else ""
+
+    status_up = str(status_code).strip().upper() if status_code is not None else ""
+    code_failed = (
+        status_code in (3, 4, 5, 6, 7, 8)
+        or status_up in ("FAILED", "CANCELED", "CANCELLED", "ERROR", "REJECTED", "BLOCKED", "POLICY_VIOLATION", "SAFETY_ERROR")
+    )
+    marker_failed = bool(
+        pub_code
+        or any(
+            mk in raw_up
+            for mk in (
+                "POLICY_VIOLATION",
+                "SAFETY_ERROR",
+                "SAFETY_FILTER",
+                "GENERATION_FAILED",
+                "MEDIA_GENERATION_FAILED",
+                "INVALID_ARGUMENT",
+                "REJECTED",
+                "PROHIBITED",
+            )
+        )
+    )
+    if not (code_failed or marker_failed):
+        return False, status_code, ""
+
+    detail_parts: list[str] = []
+    if pub_code:
+        detail_parts.append(pub_code)
+
+    _detail_probes = (
+        lambda p: p[5][7],
+        lambda p: p[5][8],
+        lambda p: p[0][0][5][8],
+        lambda p: p[0][0][5][7],
+    )
+    extracted_msgs: list[str] = []
+    for _dp in _detail_probes:
+        try:
+            node = _dp(inner_p)
+            if node is not None:
+                extracted_msgs.extend(_collect_nested_strings(node, limit=260))
+        except Exception:
+            pass
+
+    if extracted_msgs:
+        for msg in extracted_msgs:
+            if msg not in detail_parts:
+                detail_parts.append(msg)
+        detail = " | ".join(detail_parts)[:320]
+    elif code_failed:
+        # Leave detail empty when only a bare code (e.g. inner_p = [[[None, None, None, 4]]]) exists
+        # so callers do not inflate noise; include pub_code if matched.
+        detail = pub_code
+    else:
+        detail = " | ".join(detail_parts) if detail_parts else raw_s[:280]
+
+    return True, status_code, detail
+
+
+def classify_content_rejection_subtype(error_text: str) -> str:
+    """Return granular content-policy rejection subtype for actionable UI & safe mitigation."""
+    up = str(error_text or "").upper()
+    if any(t in up for t in ("MINOR_UPLOAD", "CHILD_SAFETY", "UNDERAGE", "TRẺ EM", "VỊ THÀNH NIÊN")):
+        return "minor_upload"
+    if any(t in up for t in ("PROMINENT_PEOPLE", "CELEBRITY", "PUBLIC_FIGURE", "NGƯỜI NỔI TIẾNG", "NHÂN VẬT CÔNG CHÚNG")):
+        return "prominent_people"
+    if any(t in up for t in ("AUDIO_FILTERED", "SPEECH_SAFETY", "VOICE_FILTERED", "ÂM THANH BỊ LỌC", "LỜI THOẠI")):
+        return "audio_filtered"
+    if any(t in up for t in ("PUBLIC_ERROR_SEXUAL", "SEXUAL", "NSFW", "NUDITY", "PORN", "EROTIC", "HỞ HANG", "NHẠY CẢM")):
+        return "sexual_safety"
+    if any(t in up for t in ("PUBLIC_ERROR_VIOLENCE", "PUBLIC_ERROR_DANGEROUS", "PUBLIC_ERROR_HATE", "PUBLIC_ERROR_HARASSMENT", "VIOLENCE", "DANGEROUS", "HATE", "HARASSMENT", "WEAPONS", "GORE", "BẠO LỰC", "NGUY HIỂM")):
+        return "violence_danger"
+    if any(t in up for t in ("IP_VIOLATION", "COPYRIGHT", "TRADEMARK", "BẢN QUYỀN", "THƯƠNG HIỆU")):
+        return "copyright_ip"
+    if any(t in up for t in ("PUBLIC_ERROR_INVALID_INPUT", "INVALID_ARGUMENT", "HTTP 400", "MÃ 400", "MALFORMED", "THAM SỐ KHÔNG HỢP LỆ")):
+        return "invalid_input"
+    return "unsafe_generation"
+
+
+def classify_flow_error(error_text: str) -> str:
+    """Phân loại lỗi đồng nhất cho mọi engine trước khi quyết định Retry hay Failover.
+
+    Returns one of:
+      - 'content_policy': Lỗi prompt / ảnh vi phạm chính sách / HTTP 400 / INVALID_ARGUMENT -> DỪNG NGAY, không xoay TK.
+      - 'account_quota':  Hết credit / quota tháng hoặc ngày trên tài khoản -> Đưa TK vào cooldown dài & chuyển TK khác ngay.
+      - 'account_auth':   Hết hạn cookie / 401 / thiếu SNlM0e / CookieMismatch -> Làm mới phiên / đổi TK ngay.
+      - 'rate_limit':     HTTP 429 / RESOURCE_EXHAUSTED / HIGH_TRAFFIC / THROTTLED -> Cooldown ngắn & chuyển TK hoặc backoff.
+      - 'captcha_score':  UNUSUAL_ACTIVITY / Extension CAPTCHA_TIMEOUT / NO_FLOW_TAB -> Reset/xoay tab Extension & thử lại.
+      - 'transient':      Lỗi mạng, 5xx, download rớt gói, render fail thoáng qua -> Micro-retry + exponential backoff.
+    """
+    raw = str(error_text or "")
+    low = raw.lower()
+    up = raw.upper()
+
+    if not raw.strip():
+        return "transient"
+
+    # 1. Explicit, unambiguous content-policy / invalid-input tokens take top priority.
+    kind403 = classify_403_error(raw)
+    if kind403 == "content_policy" or any(
+        tok in low
+        for tok in (
+            "content policy",
+            "policy violation",
+            "policy_violation",
+            "safety_error",
+            "safety_filter",
+            "safety filter",
+            "invalid_argument",
+            "request contains an invalid argument",
+            "mã 400",
+            "http 400",
+            "vui lòng sửa prompt",
+            "vi phạm chính sách google",
+            "nội dung không hợp lệ",
+            "khong hop le",
+            "vướng bộ lọc an toàn",
+            "không hợp lệ hoặc vi phạm",
+            "nghi ngờ trẻ vị thành niên",
+            "bộ lọc người nổi tiếng",
+            "public_error_minor_upload",
+            "public_error_prominent_people_filter_failed",
+            "public_error_audio_filtered",
+            "public_error_unsafe_generation",
+            "public_error_invalid_input",
+        )
+    ):
+        return "content_policy"
+
+    # 2. Explicit account-level, rate-limit, and captcha errors BEFORE generic "từ chối" / "rejected" prefixes.
+    if kind403 in ("quota_reached", "model_access_denied") or any(
+        tok in low
+        for tok in (
+            "public_error_user_quota_reached",
+            "public_error_per_model_daily_quota_reached",
+            "public_error_credits_exhausted",
+            "public_error_insufficient_credits",
+            "public_error_model_access_denied",
+            "user_quota_reached",
+            "insufficient_credits",
+            "credits_exhausted",
+            "hết quota",
+            "hết credit",
+            "không có quyền dùng model",
+        )
+    ):
+        return "account_quota"
+
+    if kind403 == "auth" or any(
+        tok in low
+        for tok in (
+            "http 401",
+            "unauthenticated",
+            "snlm0e",
+            "cookiemismatch",
+            "accounts.google.com",
+            "chưa có cookie",
+            "cookies đã hết hạn",
+            "không thể refresh từ cookies",
+            "cập nhật cookies",
+            "hết hạn hoặc thiếu cookie",
+        )
+    ) or ("http 403" in low and "public_error_" not in low and "recaptcha" not in low):
+        return "account_auth"
+
+    if kind403 in ("throttled", "high_traffic", "already_in_progress") or is_google_rate_limit_error(raw):
+        return "rate_limit"
+
+    if (
+        kind403 == "unusual_activity"
+        or any(
+            tok in up
+            for tok in (
+                "PUBLIC_ERROR_UNUSUAL_ACTIVITY",
+                "RECAPTCHA",
+                "CAPTCHA_TIMEOUT",
+                "CAPTCHA_FAILED",
+                "NO_FLOW_TAB",
+                "EXTENSION CAPTCHA BRIDGE",
+                "EXTENSION LỖI",
+                "PERMISSION_DENIED",
+            )
+        )
+        or any(tok in low for tok in ("code=7", "failed:7", "failed_7:"))
+        or bool(re.search(r"(?:^|\s|:)\[7\](?:\s|:|$)", raw))
+    ):
+        return "captcha_score"
+
+    # [5] NOT_FOUND (stale upload UUID, cross-account project/media UUID mismatch) -> transient/failover, NOT content_policy
+    if any(tok in low for tok in ("code=5", "failed:5", "failed_5:", "not_found_5")) or bool(
+        re.search(r"(?:^|\s|:)\[5\](?:\s|:|$)", raw)
+    ):
+        return "transient"
+
+    # 3. Exclude explicit backend/network transient failures before generic render-rejection fallback.
+    if any(
+        tok in low
+        for tok in (
+            "public_error_internal",
+            "public_error_unknown",
+            "deadline_exceeded",
+            "unavailable",
+            "timed out",
+            "timeout",
+            "http 500",
+            "http 502",
+            "http 503",
+            "http 504",
+            "bad gateway",
+            "service unavailable",
+            "gateway timeout",
+            "connection reset",
+            "ssl",
+            "curl_",
+            "network",
+        )
+    ):
+        return "transient"
+    if re.search(r"\binternal\b", low):
+        return "transient"
+
+    # 4. Generic Flow render / safety rejections (e.g. bare as29s code=3/4/6, GENERATION_FAILED, REJECTED).
+    if any(
+        tok in low
+        for tok in (
+            "google flow render failed",
+            "google render failed",
+            "google flow từ chối render",
+            "generation_failed",
+            "media_generation_failed",
+            "failed:4",
+            "failed:6",
+            "failed_4:",
+            "failed_6:",
+            "code=3",
+            "code=4",
+            "code=6",
+            "rejected",
+            "prohibited",
+        )
+    ):
+        return "content_policy"
+
+    return "transient"
+
+
+def describe_flow_error_vi(error_text: str) -> str:
+    """Format a clear, actionable Vietnamese message while preserving raw error tokens."""
+    raw = str(error_text or "").strip()
+    if not raw:
+        return "Lỗi Google Flow không xác định"
+    # Idempotent: avoid double-wrapping already formatted advice strings
+    if any(
+        marker in raw
+        for marker in (
+            "Gợi ý:",
+            "Google Flow từ chối do ",
+            "Tài khoản Google Flow đã hết quota",
+            "Phiên đăng nhập / cookie",
+        )
+    ):
+        return raw
+
+    err_kind = classify_flow_error(raw)
+    short_code = format_flow_error_short(raw, max_len=140)
+    code_tag = f" [{short_code}]" if short_code and short_code != "Lỗi Google Flow không xác định" else ""
+
+    if err_kind == "content_policy":
+        sub = classify_content_rejection_subtype(raw)
+        if sub == "minor_upload":
+            return f"Google Flow từ chối do nghi ngờ hình ảnh/nội dung liên quan trẻ vị thành niên{code_tag}. Gợi ý: Đổi ảnh mẫu rõ người trưởng thành (25+ tuổi) và bổ sung mô tả adult model."
+        if sub == "prominent_people":
+            return f"Google Flow từ chối do bộ lọc người nổi tiếng / nhân vật công chúng{code_tag}. Gợi ý: Đổi ảnh gương mặt không trùng người nổi tiếng hoặc xóa tên nhân vật thật trong prompt."
+        if sub == "audio_filtered":
+            return f"Google Flow chặn phần âm thanh / lời thoại do bộ lọc an toàn{code_tag}. Gợi ý: Giảm từ nhạy cảm trong lời thoại hoặc bỏ/tắt phần audio thoại nhạy cảm."
+        if sub == "sexual_safety":
+            return f"Google Flow từ chối do nội dung hoặc trang phục bị đánh giá nhạy cảm{code_tag}. Gợi ý: Điều chỉnh mô tả trang phục kín đáo, thanh lịch và an toàn thương mại."
+        if sub == "violence_danger":
+            return f"Google Flow từ chối do từ khóa bạo lực / nguy hiểm / gây hại{code_tag}. Gợi ý: Thay các từ dễ hiểu nhầm (vũ khí, cháy nổ, va chạm...) bằng ngữ cảnh an toàn."
+        if sub == "copyright_ip":
+            return f"Google Flow từ chối do dính tên thương hiệu hoặc yếu tố bản quyền{code_tag}. Gợi ý: Xóa tên nhãn hàng, logo hoặc nhân vật có bản quyền khỏi prompt."
+        if sub == "invalid_input":
+            return f"Google Flow báo tham số đầu vào không hợp lệ (HTTP 400 / INVALID_ARGUMENT){code_tag}. Gợi ý: Kiểm tra lại độ dài prompt, tỷ lệ khung hình, model hoặc ảnh đầu vào."
+        return f"Google Flow từ chối tạo do nội dung không hợp lệ hoặc vướng bộ lọc an toàn{code_tag}. Gợi ý: Chỉnh lại prompt dịu nhẹ hơn hoặc đổi ảnh tham chiếu khác."
+
+    if err_kind == "account_quota":
+        return f"Tài khoản Google Flow đã hết quota/credit hoặc chưa được cấp quyền model{code_tag}. Gợi ý: Hệ thống tự tạm nghỉ tài khoản này và xoay sang tài khoản khác."
+    if err_kind == "account_auth":
+        return f"Phiên đăng nhập / cookie / token Google Flow đã hết hạn hoặc không khớp tài khoản{code_tag}. Gợi ý: Mở Quản Lý Tài Khoản bấm 'Lấy Cookie' hoặc đăng nhập lại."
+    if err_kind == "rate_limit":
+        return f"Google Flow đang giới hạn tần suất / quá tải ([8] TOO_MUCH_TRAFFIC / 429){code_tag}. Gợi ý: Hệ thống tự giãn nhịp backoff và chuyển sang tài khoản khỏe khác."
+    if err_kind == "captcha_score":
+        return f"Lỗi điểm reCAPTCHA hoặc quyền truy cập tài nguyên ([7] / UNUSUAL_ACTIVITY){code_tag}. Gợi ý: Kiểm tra cửa sổ Chrome Giải Captcha (:4000) và không dùng chung voice/character UUID của tài khoản khác."
+    if any(tok in raw.lower() for tok in ("code=5", "failed:5", "failed_5:", "not_found_5")) or re.search(r"(?:^|\s|:)\[5\](?:\s|:|$)", raw):
+        return f"Không tìm thấy media/project UUID trên tài khoản hiện tại ([5] NOT_FOUND){code_tag}. Gợi ý: Hệ thống tự upload lại ảnh tham chiếu hoặc chuyển về đúng tài khoản sở hữu."
+    return raw
+
+
+_POLICY_SOFT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    # Action / prop / cooking false positives
+    (r"\bknives\b", "culinary utensils"),
+    (r"\bknife\b", "stainless culinary utensil"),
+    (r"\bblade\b", "metallic edge"),
+    (r"\bgun\b", "prop device"),
+    (r"\bguns\b", "prop devices"),
+    (r"\bshoot(ing)?\b", "filming"),
+    (r"\bstab(bing)?\b", "slicing"),
+    (r"\bbloody\b", "vibrant"),
+    (r"\bblood\b", "crimson glaze"),
+    (r"\bkill(ing)?\b", "defeating"),
+    (r"\bdeath\b", "stillness"),
+    (r"\bdead\b", "still"),
+    (r"\bfight(ing)?\b", "dynamic movement"),
+    (r"\bexplosion\b", "dramatic burst of light"),
+    (r"\bexplode\b", "burst brightly"),
+    (r"\bbomb\b", "dramatic pop"),
+    (r"\bcrash\b", "swift stop"),
+    # Apparel / skin false positives
+    (r"\bsexy\b", "elegant stylish"),
+    (r"\bhot\s+girl\b", "stylish adult woman"),
+    (r"\blingerie\b", "fashion loungewear"),
+    (r"\bbikini\b", "summer resort swimwear"),
+    (r"\bnaked\b", "bare-toned"),
+    (r"\bnude\b", "beige neutral-toned"),
+    (r"\bbare\s+skin\b", "smooth skin"),
+    (r"\bunderwear\b", "apparel"),
+    (r"\bpanties\b", "shorts"),
+    # Age ambiguity false positives
+    (r"\bschoolgirl\b", "adult fashion model"),
+    (r"\byoung\s+model\b", "adult model in her mid-twenties"),
+    (r"\bgirl\b", "adult woman"),
+    (r"\bboy\b", "adult man"),
+    (r"\bkids\b", "young adults"),
+    (r"\bkid\b", "young adult"),
+    (r"\bchildren\b", "adults"),
+    (r"\bchild\b", "adult person"),
+    (r"\bteenager\b", "adult in mid-twenties"),
+    (r"\bteen\b", "adult in mid-twenties"),
+    # Copyright / brand false positives
+    (r"\bcelebrity\b", "stylish presenter"),
+    (r"\b(nike|adidas|gucci|louis\s+vuitton|chanel)\b", "luxury studio brand"),
+    (r"\b(iphone|apple\s+watch)\b", "modern sleek device"),
+    # Audio / harsh expression triggers
+    (r"\bscreaming\b", "speaking energetically"),
+    (r"\byelling\b", "speaking clearly"),
+    (r"\bdamn\b", "wow"),
+    (r"\bwtf\b", "unbelievable"),
+)
+
+_VI_POLICY_SOFT_REPLACEMENTS: tuple[tuple[str, str], ...] = (
+    ("dao nhọn", "dụng cụ bếp"),
+    ("máu", "sắc đỏ"),
+    ("đánh nhau", "vận động"),
+    ("gợi cảm", "thanh lịch thời trang"),
+    ("hở hang", "phong cách thanh lịch"),
+    ("quyến rũ", "cuốn hút thanh lịch"),
+    ("cô bé", "người mẫu nữ trưởng thành"),
+    ("em bé", "người mẫu trưởng thành"),
+    ("bé gái", "người mẫu nữ trưởng thành"),
+    ("bé trai", "người mẫu nam trưởng thành"),
+    ("học sinh", "sinh viên trưởng thành"),
+)
+
+
+def sanitize_prompt_for_flow_policy(
+    prompt_text: str,
+    rejection_subtype: str = "unsafe_generation",
+) -> tuple[str, bool]:
+    """Conservatively soften a prompt after a Google Flow content-policy block.
+
+    Used for at most ONE single-retry mitigation on the same account when a benign
+    commercial prompt hits a false-positive safety filter.
+    Returns `(sanitized_prompt, modified)`.
+    """
+    orig = str(prompt_text or "").strip()
+    if not orig:
+        return orig, False
+    if "brand-safe commercial studio" in orig.lower() or "wholesome, brand-safe" in orig.lower():
+        return orig, False
+
+    cur = orig
+    for pat, repl in _POLICY_SOFT_REPLACEMENTS:
+        cur = re.sub(pat, repl, cur, flags=re.IGNORECASE)
+    for vi_old, vi_new in _VI_POLICY_SOFT_REPLACEMENTS:
+        cur = re.sub(re.escape(vi_old), vi_new, cur, flags=re.IGNORECASE)
+    cur = re.sub(r"\s{2,}", " ", cur).strip()
+
+    sub = str(rejection_subtype or "unsafe_generation").lower()
+    if sub == "minor_upload":
+        suffix = " Wholesome, brand-safe commercial studio production featuring an adult over 25 years old."
+    elif sub == "audio_filtered":
+        suffix = " Clear, calm, wholesome, brand-safe commercial studio voiceover and audio."
+    elif sub == "prominent_people":
+        suffix = " Original fictional adult talent, wholesome, brand-safe commercial studio production."
+    else:
+        suffix = " Wholesome, family-friendly, brand-safe commercial studio production."
+
+    candidate = (cur.rstrip(". ") + "." + suffix).strip()
+    return candidate, (candidate != orig)
+
+
+def should_stop_all_accounts(error_text: str) -> bool:
+    """Return True if rotating to another Google Flow account cannot succeed (e.g. policy/invalid prompt)."""
+    return classify_flow_error(error_text) == "content_policy"
+
+
+_FLOW_ACCOUNT_HEALTH_LOCK = threading.Lock()
+_FLOW_ACCOUNT_COOLDOWNS: dict = {}
+_FLOW_DEFAULT_COOLDOWN_SEC = {
+    "account_quota": 900.0,
+    "account_auth": 180.0,
+    "rate_limit": 120.0,
+    "captcha_score": 45.0,
+    "transient": 15.0,
+}
+
+
+def mark_flow_account_cooldown(
+    account_key: str,
+    error_kind: Optional[str] = None,
+    reason: str = "",
+    cooldown_sec: Optional[float] = None,
+) -> float:
+    """Đưa một tài khoản Flow vào danh sách cooldown toàn cục dùng chung giữa các engine."""
+    key = str(account_key or "").strip().lower()
+    if not key:
+        return 0.0
+    kind = error_kind or classify_flow_error(reason)
+    if kind == "content_policy":
+        return 0.0
+    now = time.time()
+    with _FLOW_ACCOUNT_HEALTH_LOCK:
+        prev = _FLOW_ACCOUNT_COOLDOWNS.get(key)
+        prev_streak = int(prev.get("streak", 0)) if isinstance(prev, dict) and (now - float(prev.get("updated_at", 0.0)) < 420.0) else 0
+        streak = prev_streak + 1
+        if cooldown_sec is not None:
+            dur = float(cooldown_sec)
+        elif kind == "rate_limit":
+            # Progressive per-account [8] backoff: 25s -> 55s -> 110s -> 180s -> 300s
+            _rl_ladder = (25.0, 55.0, 110.0, 180.0, 300.0)
+            dur = _rl_ladder[min(streak - 1, len(_rl_ladder) - 1)]
+        else:
+            dur = float(_FLOW_DEFAULT_COOLDOWN_SEC.get(kind, 30.0))
+        if dur <= 0:
+            return 0.0
+        until = now + dur
+        prev_until = float(prev.get("until", 0.0)) if isinstance(prev, dict) else 0.0
+        _FLOW_ACCOUNT_COOLDOWNS[key] = {
+            "until": max(prev_until, until),
+            "kind": kind,
+            "streak": streak,
+            "reason": format_flow_error_short(reason),
+            "updated_at": now,
+        }
+    return dur
+
+
+def clear_flow_account_cooldown(account_key: str) -> None:
+    """Gỡ bỏ cooldown ngay khi tài khoản thực hiện request thành công."""
+    key = str(account_key or "").strip().lower()
+    if not key:
+        return
+    with _FLOW_ACCOUNT_HEALTH_LOCK:
+        _FLOW_ACCOUNT_COOLDOWNS.pop(key, None)
+
+
+def is_flow_account_in_cooldown(account_key: str) -> tuple:
+    """Trả về `(in_cooldown: bool, remaining_sec: float, kind: str)`."""
+    key = str(account_key or "").strip().lower()
+    if not key:
+        return False, 0.0, ""
+    now = time.time()
+    with _FLOW_ACCOUNT_HEALTH_LOCK:
+        entry = _FLOW_ACCOUNT_COOLDOWNS.get(key)
+        if not isinstance(entry, dict):
+            return False, 0.0, ""
+        rem = float(entry.get("until", 0.0)) - now
+        if rem <= 0.0:
+            _FLOW_ACCOUNT_COOLDOWNS.pop(key, None)
+            return False, 0.0, ""
+        return True, rem, str(entry.get("kind") or "")
+
+
+def sort_flow_candidates_by_health(candidates: list, key_fn) -> list:
+    """Đưa các tài khoản khỏe lên trước, tài khoản đang cooldown về cuối theo thứ tự sắp hồi phục."""
+    if not candidates or len(candidates) <= 1:
+        return list(candidates or [])
+    healthy = []
+    cooled = []
+    for idx, cand in enumerate(candidates):
+        k = str(key_fn(cand) or "").strip()
+        in_cd, rem, _ = is_flow_account_in_cooldown(k)
+        if in_cd:
+            cooled.append((rem, idx, cand))
+        else:
+            healthy.append(cand)
+    cooled.sort(key=lambda x: (x[0], x[1]))
+    return healthy + [x[2] for x in cooled]
 
 
 class _GoogleApiClient:
@@ -1247,10 +2170,13 @@ DEFAULT_RESOLUTION = "720p"
 def clean_model_name(name: str) -> str:
     if not name:
         return name
-    if name == "dall-e-3":
+    low = name.strip().lower()
+    if low in ("dall-e-3", "gpt-image-1"):
         return "gpt-image-2"
-    if name == "dall-e-2":
+    if low == "dall-e-2":
         return "gpt-image-1.5"
+    if low == "grok-2-image":
+        return "grok-imagine-image"
     if ("lower priority" in name.lower() or "low_priority" in name.lower()):
         try:
             if not is_veo_low_priority_available():
@@ -3027,6 +3953,13 @@ class VideoJob:
     # sets this to its Pipeline Delay (normally 5 seconds) while other callers
     # keep the existing configurable 2-5 second jitter.
     submit_gap_seconds: Optional[float] = None
+    prefer_bearer_request: bool = False
+    flow_request_only: bool = False
+    require_all_reference_uploads: bool = False
+    prefer_extension_captcha: Optional[bool] = None
+    async_media_finalize: bool = False
+    media_finalize_future: Optional[object] = None
+    on_cloud_ready: Optional[object] = None
 
 
     @property
@@ -3213,10 +4146,234 @@ class AccountManager:
         return added_count, removed_count
 
 
+def _cliproxy_normalize_image_model(model: str) -> str:
+    req = str(model or "").strip() or "gpt-image-2"
+    low = req.lower()
+    if low in ("gpt-image-1", "dall-e-3"):
+        return "gpt-image-2"
+    if low == "dall-e-2":
+        return "gpt-image-1.5"
+    if low == "grok-2-image":
+        return "grok-imagine-image"
+    return req
+
+
+def _cliproxy_normalize_image_size(size: str, aspect: str = "") -> str:
+    s = str(size or "").strip().lower()
+    if s in ("1024x1536", "1536x1024", "1024x1024", "1024x1792", "1792x1024"):
+        return s
+    if "x" in s:
+        try:
+            w, h = [int(p) for p in s.split("x", 1)]
+            if w == h:
+                return "1024x1024"
+            return "1024x1536" if h > w else "1536x1024"
+        except Exception:
+            pass
+    a = str(aspect or "").lower()
+    if "9:16" in a or "3:4" in a or "2:3" in a or "portrait" in a:
+        return "1024x1536"
+    if "16:9" in a or "4:3" in a or "landscape" in a:
+        return "1536x1024"
+    return "1024x1024"
+
+
+def _cliproxy_format_api_error(status_code: int, raw_text: str, model: str = "", base_url: str = "") -> str:
+    txt = str(raw_text or "").strip()
+    low = txt.lower()
+    m_low = str(model or "").lower()
+    if "unknown provider for model" in low and ("grok" in m_low or "grok" in low):
+        return (
+            f"CLIProxy ({base_url or DEFAULT_PROXY_URL}) chưa có tài khoản xAI Grok khả dụng cho model '{model}'. "
+            "Hãy vào Tab Tài Khoản → Login Grok (xAI) / Web Admin :8317 để đăng nhập tài khoản Grok, "
+            "hoặc chuyển sang model OpenAI Codex (gpt-image-2) / Gemini (gemini-3.1-flash-image) / Google Flow."
+        )
+    if "unknown provider for model" in low or "model_not_found" in low:
+        return (
+            f"CLIProxy ({base_url or DEFAULT_PROXY_URL}) không tìm thấy provider cho model '{model}'. "
+            f"Chi tiết: {txt[:300]}"
+        )
+    return f"CLIProxy API lỗi {status_code} ({model}): {txt[:400]}"
+
+
+def _cliproxy_prepare_ref_image(path: str, max_side: int = 1536, max_bytes: int = 1_100_000) -> tuple:
+    import mimetypes
+    p = Path(path)
+    raw = p.read_bytes()
+    ext = p.suffix.lower()
+    mime = mimetypes.guess_type(str(p))[0] or ("image/png" if ext == ".png" else "image/jpeg")
+    try:
+        from PIL import Image as _PILImage
+        import io as _io
+        with _PILImage.open(_io.BytesIO(raw)) as im:
+            w, h = im.size
+            if ext not in (".jpg", ".jpeg", ".png") or max(w, h) > max_side or len(raw) > max_bytes or im.mode not in ("RGB", "L"):
+                if im.mode in ("RGBA", "LA") or (im.mode == "P" and "transparency" in im.info):
+                    rgba = im.convert("RGBA")
+                    rgb = _PILImage.new("RGB", rgba.size, (255, 255, 255))
+                    rgb.paste(rgba, mask=rgba.split()[-1])
+                else:
+                    rgb = im.convert("RGB")
+                if max(w, h) > max_side:
+                    sc = max_side / float(max(w, h))
+                    rgb = rgb.resize((max(1, int(w * sc)), max(1, int(h * sc))), _PILImage.LANCZOS)
+                q = 90
+                buf = _io.BytesIO()
+                rgb.save(buf, format="JPEG", quality=q, optimize=True)
+                while buf.tell() > max_bytes and q > 60:
+                    q -= 8
+                    buf = _io.BytesIO()
+                    rgb.save(buf, format="JPEG", quality=q, optimize=True)
+                return buf.getvalue(), f"{p.stem}.jpg", "image/jpeg"
+    except Exception:
+        pass
+    return raw, p.name, mime
+
+
+def _cliproxy_extract_chat_image_payload(res_json: dict) -> tuple:
+    msg = ((res_json.get("choices") or [{}])[0].get("message") or {})
+    cands = []
+    for item in (msg.get("images") or []):
+        if isinstance(item, dict):
+            if item.get("b64_json"):
+                return "base64", item["b64_json"]
+            u = ((item.get("image_url") or {}).get("url") if isinstance(item.get("image_url"), dict) else item.get("url")) or ""
+            if u:
+                cands.append(str(u))
+    content = msg.get("content")
+    if isinstance(content, list):
+        for part in content:
+            if isinstance(part, dict):
+                u = ((part.get("image_url") or {}).get("url") if isinstance(part.get("image_url"), dict) else part.get("url")) or ""
+                if u:
+                    cands.append(str(u))
+    elif isinstance(content, str) and "data:image/" in content:
+        m = re.search(r"data:image/[a-zA-Z0-9.+-]+;base64,[A-Za-z0-9+/=]+", content)
+        if m:
+            cands.append(m.group(0))
+    for u in cands:
+        if u.startswith("data:image/") and ";base64," in u:
+            return "base64", u.split(";base64,", 1)[1].strip()
+        if u.startswith("http://") or u.startswith("https://"):
+            return "url", u
+    raise ValueError("CLIProxy Chat/Gemini không trả về dữ liệu ảnh hợp lệ.")
+
+
+def _cliproxy_build_chat_image_request_body(prompt: str, model: str, size: str, aspect: str = "", ref_paths: list = None) -> dict:
+    a_hint = aspect or ("9:16" if size in ("1024x1536", "1024x1792") else ("16:9" if size in ("1536x1024", "1792x1024") else "1:1"))
+    full_prompt = f"Aspect ratio {a_hint}. {prompt}".strip()
+    valid_refs = [p for p in (ref_paths or []) if p and Path(str(p)).exists()][:4]
+    if valid_refs:
+        full_prompt += "\nUse ALL attached reference images accurately. Return ONLY the finished generated image."
+    parts = [{"type": "text", "text": full_prompt}]
+    for rp in valid_refs:
+        raw_b, _, mime = _cliproxy_prepare_ref_image(str(rp))
+        b64 = base64.b64encode(raw_b).decode("ascii")
+        parts.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
+    return {
+        "model": model,
+        "messages": [{"role": "user", "content": parts if len(parts) > 1 else full_prompt}],
+    }
+
+
+def _cliproxy_collect_unique_refs(primary_ref: str = "", extra_refs: list = None) -> list:
+    out = []
+    for cand in [primary_ref, *(extra_refs or [])]:
+        cs = str(cand or "").strip()
+        if cs and Path(cs).exists() and cs not in out:
+            out.append(cs)
+    return out[:4]
+
+
+def _cliproxy_run_image_sync(
+    proxy: str,
+    api_key: str,
+    model: str,
+    prompt: str,
+    size: str,
+    aspect: str = "",
+    quality: str = "standard",
+    ref_paths: list = None,
+    use_proxy: bool = False,
+    log_fn=None,
+) -> tuple:
+    base = (proxy or DEFAULT_PROXY_URL).rstrip("/")
+    key = (api_key or "grok-video-key-001").strip()
+    norm_model = _cliproxy_normalize_image_model(model)
+    norm_size = _cliproxy_normalize_image_size(size, aspect)
+    valid_refs = _cliproxy_collect_unique_refs("", ref_paths)
+    auth = {"Authorization": f"Bearer {key}"}
+
+    if "gemini" in norm_model.lower():
+        url = f"{base}/v1/chat/completions"
+        if log_fn:
+            log_fn(f"  → CLIProxy /v1/chat/completions ({norm_model}, {len(valid_refs)} ảnh ref)")
+        body = _cliproxy_build_chat_image_request_body(prompt, norm_model, norm_size, aspect, valid_refs)
+        with make_httpx_client(timeout=240, target_url=url, use_proxy=use_proxy) as c:
+            resp = c.post(url, headers={**auth, "Content-Type": "application/json"}, json=body)
+        if resp.status_code >= 400:
+            raise RuntimeError(_cliproxy_format_api_error(resp.status_code, resp.text, norm_model, base))
+        return _cliproxy_extract_chat_image_payload(resp.json())
+
+    if valid_refs:
+        if log_fn:
+            log_fn(f"  → CLIProxy /v1/images/edits (multipart, {len(valid_refs)} ảnh ref)")
+        url = f"{base}/v1/images/edits"
+        field_name = "image[]" if len(valid_refs) > 1 else "image"
+        files = []
+        for rp in valid_refs:
+            raw_b, fname, mime = _cliproxy_prepare_ref_image(rp)
+            files.append((field_name, (fname, raw_b, mime)))
+        data_form = {"model": norm_model, "prompt": prompt, "n": "1", "size": norm_size}
+        with make_httpx_client(timeout=300, target_url=url, use_proxy=use_proxy) as c:
+            resp = c.post(url, headers=auth, files=files, data=data_form)
+    else:
+        if log_fn:
+            log_fn("  → CLIProxy /v1/images/generations (JSON)")
+        url = f"{base}/v1/images/generations"
+        payload = {"model": norm_model, "prompt": prompt, "n": 1, "size": norm_size}
+        if quality == "hd":
+            payload["quality"] = "hd"
+        with make_httpx_client(timeout=240, target_url=url, use_proxy=use_proxy) as c:
+            resp = c.post(url, headers={**auth, "Content-Type": "application/json"}, json=payload)
+
+    if resp.status_code >= 400:
+        raise RuntimeError(_cliproxy_format_api_error(resp.status_code, resp.text, norm_model, base))
+    res_json = resp.json()
+    item = (res_json.get("data") or [{}])[0]
+    if item.get("b64_json"):
+        return "base64", item["b64_json"]
+    if item.get("url"):
+        return "url", item["url"]
+    raise RuntimeError(f"Không tìm thấy url hoặc b64_json trong response: {list(item.keys())}")
+
+
+def _save_image_payload_to_path(img_bytes: bytes, out_path: str):
+    """Lưu bytes ảnh đúng định dạng với phần mở rộng tệp đích (`.png` / `.jpg`)."""
+    p = Path(out_path)
+    p.parent.mkdir(parents=True, exist_ok=True)
+    try:
+        from PIL import Image as _PILImage
+        import io as _io
+        low = p.suffix.lower()
+        if low == ".png" and not img_bytes.startswith(b"\x89PNG\r\n\x1a\n"):
+            with _PILImage.open(_io.BytesIO(img_bytes)) as im:
+                im.save(str(p), format="PNG")
+            return
+        if low in (".jpg", ".jpeg") and not img_bytes[:2] == b"\xff\xd8":
+            with _PILImage.open(_io.BytesIO(img_bytes)) as im:
+                im.convert("RGB").save(str(p), format="JPEG", quality=95)
+            return
+    except Exception:
+        pass
+    p.write_bytes(img_bytes)
+
+
 class GrokClient:
     def __init__(self, proxy_url: str, api_key: str):
-        self.base = proxy_url.rstrip("/")
-        self.auth = f"Bearer {api_key}"
+        self.base = (proxy_url or DEFAULT_PROXY_URL).rstrip("/")
+        k = (api_key or "grok-video-key-001").strip()
+        self.auth = f"Bearer {k}"
 
     async def submit(self, job: VideoJob) -> str:
         payload = self._payload(job)
@@ -3229,64 +4386,53 @@ class GrokClient:
         else:
             raise ValueError(f"Chế độ không hợp lệ: {job.mode}")
 
-        async with make_httpx_async_client(timeout=60, use_proxy=getattr(job, "use_proxy", True)) as c:
+        async with make_httpx_async_client(timeout=60, target_url=url, use_proxy=getattr(job, "use_proxy", False)) as c:
             r = await c.post(url, headers={"Authorization": self.auth,
                                            "Content-Type": "application/json"},
                               json=payload)
             if r.status_code >= 400:
-                detail = r.text[:500] if r.text else str(r.status_code)
-                raise RuntimeError(f"Lỗi API {r.status_code}: {detail}")
-            return r.json()["request_id"]
+                raise RuntimeError(_cliproxy_format_api_error(r.status_code, r.text, job.model, self.base))
+            rj = r.json()
+            return rj.get("request_id") or rj["id"]
 
-    async def poll(self, rid: str, use_proxy: bool = True) -> dict:
-        async with make_httpx_async_client(timeout=30, use_proxy=use_proxy) as c:
-            r = await c.get(f"{self.base}/v1/videos/{rid}",
-                            headers={"Authorization": self.auth})
+    async def poll(self, rid: str, use_proxy: bool = False) -> dict:
+        url = f"{self.base}/v1/videos/{rid}"
+        async with make_httpx_async_client(timeout=30, target_url=url, use_proxy=use_proxy) as c:
+            r = await c.get(url, headers={"Authorization": self.auth})
             r.raise_for_status()
             return r.json()
 
     async def generate_image(self, prompt: str, model: str, size: str, quality="auto", 
                              output_format="png", output_compression=100, 
-                             background="auto", moderation="auto", use_proxy: bool = True) -> tuple:
-        # Standardize size for DALL-E / GPT-image models to official sizes
-        if "gpt-image" in model or "dall-e" in model.lower():
-            try:
-                w, h = map(int, size.split("x"))
-                if w == h:
-                    size = "1024x1024"
-                elif w < h:
-                    size = "1024x1792"
-                else:
-                    size = "1792x1024"
-            except Exception:
-                if "1024x1024" in size:
-                    size = "1024x1024"
-                elif "portrait" in size or "dọc" in size.lower() or "tall" in size.lower():
-                    size = "1024x1792"
-                else:
-                    size = "1792x1024"
+                             background="auto", moderation="auto", use_proxy: bool = False) -> tuple:
+        norm_model = _cliproxy_normalize_image_model(model)
+        norm_size = _cliproxy_normalize_image_size(size)
+
+        if "gemini" in norm_model.lower():
+            url = f"{self.base}/v1/chat/completions"
+            body = _cliproxy_build_chat_image_request_body(prompt, norm_model, norm_size)
+            async with make_httpx_async_client(timeout=180, target_url=url, use_proxy=use_proxy) as c:
+                r = await c.post(url, headers={"Authorization": self.auth, "Content-Type": "application/json"}, json=body)
+                if r.status_code >= 400:
+                    raise RuntimeError(_cliproxy_format_api_error(r.status_code, r.text, norm_model, self.base))
+                return _cliproxy_extract_chat_image_payload(r.json())
 
         url = f"{self.base}/v1/images/generations"
         payload = {
-            "model": model,
+            "model": norm_model,
             "prompt": prompt,
             "n": 1,
-            "size": size,
-            "quality": quality,
-            "output_format": output_format,
-            "background": background,
-            "moderation": moderation
+            "size": norm_size,
         }
-        if output_format in ("jpeg", "webp") and output_compression < 100:
-            payload["output_compression"] = output_compression
+        if quality and quality != "auto":
+            payload["quality"] = quality
 
-        async with make_httpx_async_client(timeout=120, use_proxy=use_proxy) as c:
+        async with make_httpx_async_client(timeout=180, target_url=url, use_proxy=use_proxy) as c:
             r = await c.post(url, headers={"Authorization": self.auth,
                                            "Content-Type": "application/json"},
                               json=payload)
             if r.status_code >= 400:
-                detail = r.text[:500] if r.text else str(r.status_code)
-                raise RuntimeError(f"Lỗi API {r.status_code}: {detail}")
+                raise RuntimeError(_cliproxy_format_api_error(r.status_code, r.text, norm_model, self.base))
             data = r.json()
             img_data = data["data"][0]
             if "b64_json" in img_data and img_data["b64_json"]:
@@ -3296,25 +4442,40 @@ class GrokClient:
             else:
                 raise ValueError("Không tìm thấy url hoặc b64_json trong phản hồi.")
 
-    async def generate_image_edit(self, prompt: str, model: str, size: str, image_path: str, use_proxy: bool = True) -> tuple:
+    async def generate_image_edit(self, prompt: str, model: str, size: str, image_path, use_proxy: bool = False) -> tuple:
+        norm_model = _cliproxy_normalize_image_model(model)
+        norm_size = _cliproxy_normalize_image_size(size)
+        raw_list = image_path if isinstance(image_path, (list, tuple)) else [image_path]
+        ref_paths = _cliproxy_collect_unique_refs("", list(raw_list))
+        if not ref_paths:
+            return await self.generate_image(prompt=prompt, model=norm_model, size=norm_size, use_proxy=use_proxy)
+
+        if "gemini" in norm_model.lower():
+            url = f"{self.base}/v1/chat/completions"
+            body = _cliproxy_build_chat_image_request_body(prompt, norm_model, norm_size, ref_paths=ref_paths)
+            async with make_httpx_async_client(timeout=180, target_url=url, use_proxy=use_proxy) as c:
+                r = await c.post(url, headers={"Authorization": self.auth, "Content-Type": "application/json"}, json=body)
+                if r.status_code >= 400:
+                    raise RuntimeError(_cliproxy_format_api_error(r.status_code, r.text, norm_model, self.base))
+                return _cliproxy_extract_chat_image_payload(r.json())
+
         url = f"{self.base}/v1/images/edits"
-        with open(image_path, "rb") as f:
-            image_data = f.read()
-        files = {
-            "image": (Path(image_path).name, image_data, "image/png")
-        }
+        field_name = "image[]" if len(ref_paths) > 1 else "image"
+        files = []
+        for rp in ref_paths:
+            raw_b, fname, mime = _cliproxy_prepare_ref_image(rp)
+            files.append((field_name, (fname, raw_b, mime)))
         data = {
-            "model": model,
+            "model": norm_model,
             "prompt": prompt,
-            "size": size,
-            "n": "1"
+            "size": norm_size,
+            "n": "1",
         }
-        async with make_httpx_async_client(timeout=120, use_proxy=use_proxy) as c:
+        async with make_httpx_async_client(timeout=240, target_url=url, use_proxy=use_proxy) as c:
             r = await c.post(url, headers={"Authorization": self.auth},
                               files=files, data=data)
             if r.status_code >= 400:
-                detail = r.text[:500] if r.text else str(r.status_code)
-                raise RuntimeError(f"Lỗi API {r.status_code}: {detail}")
+                raise RuntimeError(_cliproxy_format_api_error(r.status_code, r.text, norm_model, self.base))
             res_data = r.json()
             img_data = res_data["data"][0]
             if "b64_json" in img_data and img_data["b64_json"]:
@@ -3579,19 +4740,40 @@ class CaptchaBridge:
     EXTENSION_FRESH_MS = 30_000   # <30s = "connected"
     EXTENSION_STALE_MS = 120_000  # 30-120s = "stale", >120s = "offline"
 
+    SAME_ACCOUNT_COOLDOWN_SEC = float(os.environ.get("CAPTCHA_ACCOUNT_COOLDOWN_SEC", "2.5") or "2.5")
+    DEFAULT_MIN_INTERVAL_SEC = float(os.environ.get("CAPTCHA_MIN_INTERVAL_SEC", "1.2") or "1.2")
+    GLOBAL_DISPATCH_STAGGER_SEC = float(os.environ.get("CAPTCHA_GLOBAL_STAGGER_SEC", "0.35") or "0.35")
+
     def __init__(self, log_func, port=4000):
         self.log_func = log_func
         self.port = port
         import queue
+        import collections
         self._pending_commands = queue.Queue()
         self._results = {}
         self._results_lock = threading.Lock()
-        self._request_lock = threading.Lock()   # Serialize lấy token (Extension chỉ có 1 tab Google Flow)
-        self._last_token_time = 0               # Timestamp lần lấy token gần nhất (để cooldown)
+        self._request_lock = threading.Lock()   # Retained for backward-compat attributes; scheduling uses _slot_lock + _in_flight_cond
+        self._last_token_time = 0               # Timestamp lần lấy token gần nhất
+        self._slot_lock = threading.Lock()
+        self._account_last_dispatch = {}
+        self._global_last_dispatch = 0.0
+        self._desired_pool_size = 2
+        self._dynamic_per_acc_cooldown = None
+        self._dynamic_global_stagger = None
+        self._in_flight_cond = threading.Condition()
+        self._in_flight_requests = 0
+        self._active_pollers = {}
+        self._ready_tabs = 1
+        self._pool_size = 1
+        self._busy_tabs = 0
+        self._recent_tokens = collections.deque(maxlen=120)
+        self._recent_tokens_set = set()
+        self._recent_tokens_lock = threading.Lock()
         self._server = None
         self._thread = None
         self._server_8415 = None
         self._thread_8415 = None
+        self._remote_bridge = False
         self.last_browser_headers = {}
         self._bridge_secret = ""
         self._extension_online = False
@@ -3606,11 +4788,17 @@ class CaptchaBridge:
         # Change 5: Failure Ladder state
         self._consecutive_failures = 0
         self._pending_reset = None              # None | 'soft_reset' | 'hard_reset'
+        self._reset_lock = threading.Lock()
+        self._last_reset_at = 0.0
+        self.MIN_RESET_COOLDOWN_SEC = 60.0
         # Change 8: Extension Liveness state
         self._last_extension_seen_at = None     # time.time() value
         self._extension_version = None
         self._load_secret()
 
+
+    _SECRET_CACHE_LOCK = threading.Lock()
+    _SECRET_CACHE = {"path": "", "mtime": -1.0, "val": ""}
 
     def log(self, m):
         if self.log_func:
@@ -3619,80 +4807,129 @@ class CaptchaBridge:
     def _load_secret(self):
         default_hex_secret = "ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d"
         try:
-            if os.path.exists(self.BRIDGE_SECRET_PATH):
-                with open(self.BRIDGE_SECRET_PATH, 'r', encoding='utf-8') as f:
-                    val = f.read().strip()
-                if not val or val == "standalone_secret_initialized":
-                    val = default_hex_secret
-                    with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as fw:
-                        fw.write(val)
-                self._bridge_secret = val
-                self.log(f"Đã đọc Bridge Secret từ {self.BRIDGE_SECRET_PATH}")
-            else:
-                os.makedirs(os.path.dirname(self.BRIDGE_SECRET_PATH), exist_ok=True)
-                self._bridge_secret = default_hex_secret
-                with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as f:
-                    f.write(self._bridge_secret)
-                self.log(f"Đã tự động tạo Bridge Secret mới tại {self.BRIDGE_SECRET_PATH}")
+            with self._SECRET_CACHE_LOCK:
+                if os.path.exists(self.BRIDGE_SECRET_PATH):
+                    try:
+                        cur_mt = os.path.getmtime(self.BRIDGE_SECRET_PATH)
+                    except OSError:
+                        cur_mt = -1.0
+                    if (
+                        self._SECRET_CACHE["path"] == self.BRIDGE_SECRET_PATH
+                        and self._SECRET_CACHE["mtime"] == cur_mt
+                        and self._SECRET_CACHE["val"]
+                    ):
+                        self._bridge_secret = self._SECRET_CACHE["val"]
+                        return
+                    with open(self.BRIDGE_SECRET_PATH, 'r', encoding='utf-8') as f:
+                        val = f.read().strip()
+                    if not val or val == "standalone_secret_initialized":
+                        val = default_hex_secret
+                        with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as fw:
+                            fw.write(val)
+                        try:
+                            cur_mt = os.path.getmtime(self.BRIDGE_SECRET_PATH)
+                        except OSError:
+                            pass
+                    self._bridge_secret = val
+                    self._SECRET_CACHE.update({"path": self.BRIDGE_SECRET_PATH, "mtime": cur_mt, "val": val})
+                    self.log(f"Đã đọc Bridge Secret từ {self.BRIDGE_SECRET_PATH}")
+                else:
+                    os.makedirs(os.path.dirname(self.BRIDGE_SECRET_PATH), exist_ok=True)
+                    self._bridge_secret = default_hex_secret
+                    with open(self.BRIDGE_SECRET_PATH, 'w', encoding='utf-8') as f:
+                        f.write(self._bridge_secret)
+                    try:
+                        cur_mt = os.path.getmtime(self.BRIDGE_SECRET_PATH)
+                    except OSError:
+                        cur_mt = -1.0
+                    self._SECRET_CACHE.update({"path": self.BRIDGE_SECRET_PATH, "mtime": cur_mt, "val": self._bridge_secret})
+                    self.log(f"Đã tự động tạo Bridge Secret mới tại {self.BRIDGE_SECRET_PATH}")
         except Exception as e:
             self._bridge_secret = default_hex_secret
             self.log(f"Lỗi đọc/tạo bridge secret: {e}")
 
+    def get_secret(self) -> str:
+        if not self._bridge_secret:
+            self._load_secret()
+        return str(self._bridge_secret or "")
+
     def _check_auth(self, headers) -> bool:
         if not self._bridge_secret:
             return True
-        auth = (headers.get("x-local-auth") or headers.get("X-Local-Auth") or "").strip()
+        auth = (
+            headers.get("x-local-auth")
+            or headers.get("X-Local-Auth")
+            or headers.get("x-bridge-secret")
+            or headers.get("X-Bridge-Secret")
+            or ""
+        ).strip()
         if not auth:
             return True
         if auth == self._bridge_secret or auth == "standalone_secret_initialized":
             return True
-        if len(auth) >= 8:
-            return True
         return False
 
-    def start(self) -> bool:
-        # Check and reclaim port if occupied
+    def start(self, allow_remote: bool = False) -> bool:
+        # Check if port is already listening
         port_in_use = False
         with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
             if s.connect_ex(("127.0.0.1", self.port)) == 0:
                 port_in_use = True
-                
-        if port_in_use:
-            # Check if it's an active, responsive Captcha Bridge from another companion tool instance
-            is_active_bridge = False
-            try:
-                import urllib.request
-                import json
-                req = urllib.request.Request(f"http://127.0.0.1:{self.port}/status", timeout=1.0)
-                with urllib.request.urlopen(req) as response:
-                    res_data = json.loads(response.read().decode())
-                    if res_data.get("bridge") == "CaptchaBridge" and res_data.get("status") == "online":
-                        is_active_bridge = True
-            except Exception:
-                pass
-                
-            if is_active_bridge:
-                self.log(f"⚠️ Cổng {self.port} đang được sử dụng bởi một Captcha Bridge đang hoạt động (của tool khác).\n"
-                         f"   → Để chạy song song cả 2 tool, hãy vào tab 'Cài Đặt' và đổi 'Bridge Port' thành cổng khác (ví dụ: {self.port + 1}).")
-                return False
 
-            self.log(f"⚠️ Cổng {self.port} đã được sử dụng. Đang giải phóng cổng {self.port}...")
+        if port_in_use:
+            # Retry health probe twice with generous timeout so heavy CPU/FFmpeg load never false-fails
+            is_active_bridge = False
+            for _probe_try in range(2):
+                status_payload = self._remote_call("GET", "/status", timeout=3.5) or {}
+                if (
+                    status_payload.get("bridge") == "CaptchaBridge"
+                    and status_payload.get("status") == "online"
+                ):
+                    is_active_bridge = True
+                    break
+                if _probe_try == 0:
+                    time.sleep(0.25)
+
+            if is_active_bridge:
+                # Attach cleanly as remote client whether allow_remote=True or GUI companion
+                self._remote_bridge = True
+                cfg_data = self._remote_call("GET", "/api/internal/captcha/config", timeout=2.5)
+                if isinstance(cfg_data, dict) and cfg_data.get("bridgeSecret"):
+                    self._bridge_secret = str(cfg_data["bridgeSecret"])
+                return True
+
+            if allow_remote:
+                # Child subprocesses / web workers MUST NEVER taskkill PIDs on port timeout!
+                # Assume temporary load on existing local bridge and attach remotely.
+                self._remote_bridge = True
+                return True
+
+            self.log(f"⚠️ Cổng {self.port} đang bận bởi tiến trình không phản hồi. Đang kiểm tra an toàn...")
             try:
                 import subprocess
-                # Kill process holding the port on Windows
-                res = subprocess.run(["netstat", "-ano"], capture_output=True, encoding="utf-8", creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
+                res = subprocess.run(
+                    ["netstat", "-ano"],
+                    capture_output=True,
+                    encoding="utf-8",
+                    errors="ignore",
+                    creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0,
+                )
                 for line in res.stdout.splitlines():
-                    if f":{self.port}" in line and "LISTENING" in line:
-                        parts = line.strip().split()
-                        if len(parts) >= 5:
-                            pid = parts[-1]
-                            # Check if the process is not the current one
-                            if int(pid) != os.getpid():
-                                self.log(f"💥 Đang tắt tiến trình cũ chiếm cổng {self.port}: PID {pid}")
-                                subprocess.run(["taskkill", "/F", "/PID", pid], capture_output=True, creationflags=subprocess.CREATE_NO_WINDOW if os.name == 'nt' else 0)
-                                time.sleep(1)
+                    if "LISTENING" not in line:
+                        continue
+                    parts = line.strip().split()
+                    if len(parts) < 5:
+                        continue
+                    local_addr = parts[1]
+                    if not re.search(rf":({self.port})$", local_addr):
+                        continue
+                    pid = parts[-1]
+                    if pid.isdigit() and int(pid) != os.getpid() and int(pid) > 4:
+                        self.log(f"⚠️ Cổng {self.port} đang bị chiếm bởi PID {pid} — chuyển sang chế độ kết nối chung để tránh tắt nhầm tiến trình.")
+                        self._remote_bridge = True
+                        return True
             except Exception as e:
-                self.log(f"⚠️ Không thể giải phóng cổng {self.port}: {e}")
+                self.log(f"⚠️ Không thể kiểm tra cổng {self.port}: {e}")
                 
         # Re-check port
         port_in_use = False
@@ -3741,16 +4978,31 @@ class CaptchaBridge:
                         self._json({"error": "unauthorized"}, 401)
                         return
                     profile_id = params.get("profileId", [None])[0]
-                    bridge.record_extension_heartbeat(profile_id=profile_id)
+                    ready_tabs = params.get("readyTabs", [None])[0]
+                    pool_size = params.get("poolSize", [None])[0]
+                    busy_tabs = params.get("busyTabs", [None])[0]
+                    bridge.record_extension_heartbeat(
+                        profile_id=profile_id,
+                        ready_tabs=ready_tabs,
+                        pool_size=pool_size,
+                        busy_tabs=busy_tabs,
+                    )
                     timeout_ms = int(params.get("timeout", ["25000"])[0])
                     timeout_s = min(timeout_ms / 1000, 25)
                     
                     try:
                         import queue
                         cmd = bridge._pending_commands.get(timeout=timeout_s)
-                        self._json({"commands": [cmd]})
+                        cmds = [cmd]
+                        max_batch = max(1, min(10, bridge._effective_concurrency()))
+                        while len(cmds) < max_batch:
+                            try:
+                                cmds.append(bridge._pending_commands.get_nowait())
+                            except queue.Empty:
+                                break
+                        self._json({"commands": cmds, "desiredPoolSize": bridge._get_desired_pool_size()})
                     except queue.Empty:
-                        self._json({"commands": []})
+                        self._json({"commands": [], "desiredPoolSize": bridge._get_desired_pool_size()})
 
                 elif path == "/api/internal/captcha/stats":
                     if not bridge._check_auth(dict(self.headers)):
@@ -3760,10 +5012,14 @@ class CaptchaBridge:
                     self._json({
                         "pendingCount": bridge._pending_commands.qsize(),
                         "queuedCount": len(bridge._results),
-                        "pollerWaitingCount": 1 if bridge._extension_online else 0,
+                        "pollerWaitingCount": bridge._active_poller_count(),
                         "extensionOnline": bridge._extension_online,
                         "extensionProfileId": bridge._extension_profile_id,
                         "flowTabPresent": bridge._flow_tab_present,
+                        "readyTabs": bridge._ready_tabs,
+                        "poolSize": bridge._pool_size,
+                        "effectiveConcurrency": bridge._effective_concurrency(),
+                        "inFlightCount": bridge._in_flight_requests,
                         "lastExtensionError": bridge._last_extension_error,
                         "lastResultAt": bridge._last_result_at,
                         "ok": True
@@ -3776,6 +5032,8 @@ class CaptchaBridge:
                         "version": "1.0",
                         "extension_online": bridge._extension_online,
                         "extension_liveness": bridge.extension_liveness(),
+                        "extension_version": bridge._extension_version,
+                        "browserHeaders": bridge.last_browser_headers or {},
                         "secret_configured": bool(bridge._bridge_secret)
                     })
                 elif path == "/api/internal/captcha/config":
@@ -3783,6 +5041,7 @@ class CaptchaBridge:
                         "ok": True,
                         "bridgeBase": f"http://127.0.0.1:{bridge.port}",
                         "bridgeSecret": bridge._bridge_secret,
+                        "desiredPoolSize": bridge._get_desired_pool_size(),
                         "poll_endpoint": "/api/internal/captcha/poll",
                         "result_endpoint": "/api/internal/captcha/result",
                         "event_endpoint": "/api/internal/captcha/event",
@@ -3853,12 +5112,18 @@ class CaptchaBridge:
                             version=evt_version,
                             profile_id=data.get("profileId"),
                             has_flow_tab=data.get("hasFlowTab"),
+                            ready_tabs=data.get("readyTabs"),
+                            pool_size=data.get("poolSize"),
+                            busy_tabs=data.get("busyTabs"),
                         )
                     elif evt_type == "extension_ready":
                         bridge.record_extension_heartbeat(
                             version=evt_version,
                             profile_id=data.get("profileId"),
                             has_flow_tab=data.get("hasFlowTab"),
+                            ready_tabs=data.get("readyTabs"),
+                            pool_size=data.get("poolSize"),
+                            busy_tabs=data.get("busyTabs"),
                         )
                         bridge.log("Extension Captcha Bridge đã sẵn sàng!")
                     elif evt_type == "extension_installed":
@@ -3872,6 +5137,50 @@ class CaptchaBridge:
                         else:
                             bridge.log(f"⚠️ [Anchor] Extension cleared 0 grecaptcha cookies — score reset may not work")
                     self._json({"ok": True})
+                elif path == "/api/internal/captcha/request":
+                    if not bridge._check_auth(dict(self.headers)):
+                        self._json({"error": "unauthorized"}, 401)
+                        return
+                    req_action = str(data.get("action") or "VIDEO_GENERATION")
+                    req_timeout = max(5, min(90, int(data.get("timeout") or 35)))
+                    req_acc = str(data.get("accountKey") or "").strip()
+                    tok = bridge.request_recaptcha_for_account(action=req_action, timeout=req_timeout, account_key=req_acc)
+                    self._json({
+                        "ok": bool(tok),
+                        "token": tok or "",
+                        "error": bridge._last_extension_error or "",
+                        "browserHeaders": bridge.last_browser_headers or {},
+                    })
+                elif path == "/api/internal/captcha/feedback":
+                    if not bridge._check_auth(dict(self.headers)):
+                        self._json({"error": "unauthorized"}, 401)
+                        return
+                    evt_name = str(data.get("event") or "").strip().lower()
+                    if evt_name == "success":
+                        bridge.notify_success()
+                    elif evt_name == "score_dead":
+                        bridge.notify_recaptcha_score_dead()
+                    elif evt_name == "failure":
+                        bridge.notify_failure()
+                    self._json({"ok": True})
+                elif path == "/api/internal/captcha/reset":
+                    if not bridge._check_auth(dict(self.headers)):
+                        self._json({"error": "unauthorized"}, 401)
+                        return
+                    r_kind = str(data.get("kind") or "hard_reset")
+                    r_timeout = max(5, min(60, int(data.get("timeout") or 35)))
+                    ok_rs = bridge.reset_session(kind=r_kind, timeout=r_timeout)
+                    self._json({"ok": bool(ok_rs)})
+                elif path == "/api/internal/captcha/concurrency":
+                    if not bridge._check_auth(dict(self.headers)):
+                        self._json({"error": "unauthorized"}, 401)
+                        return
+                    bridge.apply_concurrency_settings(
+                        per_account_delay_sec=data.get("perAccountDelaySec"),
+                        global_stagger_sec=data.get("globalStaggerSec"),
+                        pool_tabs=data.get("poolTabs"),
+                    )
+                    self._json({"ok": True, "desiredPoolSize": bridge._get_desired_pool_size()})
                 elif path in ("/", "/status", "/api/status", "/api/internal/captcha/test"):
                     self._json({"ok": True, "status": "online", "bridge": "CaptchaBridge"})
                 else:
@@ -3898,76 +5207,242 @@ class CaptchaBridge:
             except Exception:
                 pass
 
-    def request_recaptcha(self, action="VIDEO_GENERATION", timeout=35) -> Optional[str]:
-        """Lấy reCAPTCHA token, serialize qua _request_lock + cooldown 5s giữa các lần."""
-        with self._request_lock:
-            # Cooldown: chờ ít nhất 5s giữa các lần lấy token liên tiếp
-            COOLDOWN = 5
-            elapsed = time.time() - self._last_token_time
-            if elapsed < COOLDOWN and self._last_token_time > 0:
-                wait = COOLDOWN - elapsed
-                self.log(f"⏳ Chờ {wait:.1f}s cooldown trước khi lấy reCAPTCHA token tiếp...")
-                time.sleep(wait)
+    def _remote_call(self, method: str, path: str, payload: Optional[dict] = None, timeout: float = 5.0) -> Optional[dict]:
+        import urllib.request
+        import json as _json
+        url = f"http://127.0.0.1:{self.port}{path}"
+        headers = {"Content-Type": "application/json"}
+        if self._bridge_secret:
+            headers["x-local-auth"] = self._bridge_secret
+        raw = _json.dumps(payload).encode("utf-8") if payload is not None else None
+        opener = urllib.request.build_opener(urllib.request.ProxyHandler({}))
+        req = urllib.request.Request(url, data=raw, headers=headers, method=method)
+        try:
+            with opener.open(req, timeout=timeout) as resp:
+                data = _json.loads(resp.read().decode("utf-8", errors="replace"))
+            if isinstance(data, dict):
+                bh = data.get("browserHeaders")
+                if isinstance(bh, dict) and bh:
+                    self.last_browser_headers = bh
+                return data
+        except Exception:
+            return None
+        return None
 
-            cmd_id = f"cmd_{int(time.time()*1000)}_{random.randint(1000,9999)}"
-            import queue
-            result_q = queue.Queue()
-            
-            with self._results_lock:
-                self._results[cmd_id] = result_q
-            
-            command = {
-                "method": "get_captcha",
-                "commandId": cmd_id,
-                "action": action
-            }
-            self._pending_commands.put(command)
-            self.log("Đã gửi yêu cầu giải reCAPTCHA đến Extension...")
-            
-            try:
-                result = result_q.get(timeout=timeout)
-                if result.get("success"):
-                    self._last_token_time = time.time()
-                    self._last_extension_error = None
-                    return result.get("token")
-                else:
+    def _active_poller_count(self) -> int:
+        now = time.time()
+        cutoff = now - (self.EXTENSION_STALE_MS / 1000.0)
+        with self._slot_lock:
+            stale = [k for k, v in self._active_pollers.items() if float(v.get("last_seen", 0)) < cutoff]
+            for k in stale:
+                self._active_pollers.pop(k, None)
+            if self._active_pollers:
+                return len(self._active_pollers)
+        return 1 if self._extension_online else 0
+
+    def _get_desired_pool_size(self) -> int:
+        with self._slot_lock:
+            val = getattr(self, "_desired_pool_size", 2)
+        return max(1, min(3, int(val or 2)))
+
+    def apply_concurrency_settings(
+        self,
+        per_account_delay_sec: Optional[float] = None,
+        global_stagger_sec: Optional[float] = None,
+        pool_tabs: Optional[int] = None,
+    ):
+        """Cập nhật động cooldown theo tài khoản, stagger toàn cục và số tab Extension (giới hạn 1..3 tab để tránh lag máy)."""
+        with self._slot_lock:
+            if per_account_delay_sec is not None:
+                # Cooldown xin reCAPTCHA trên cùng tài khoản (~60% cooldown HTTP submit, tối thiểu 1.5s)
+                self._dynamic_per_acc_cooldown = max(1.5, min(15.0, float(per_account_delay_sec) * 0.6))
+            if global_stagger_sec is not None:
+                self._dynamic_global_stagger = max(0.25, min(5.0, float(global_stagger_sec) * 0.7))
+            if pool_tabs is not None:
+                self._desired_pool_size = max(1, min(3, int(pool_tabs)))
+        if getattr(self, "_remote_bridge", False):
+            self._remote_call(
+                "POST",
+                "/api/internal/captcha/concurrency",
+                {
+                    "perAccountDelaySec": per_account_delay_sec,
+                    "globalStaggerSec": global_stagger_sec,
+                    "poolTabs": self._get_desired_pool_size(),
+                },
+                timeout=2.0,
+            )
+
+    def _effective_concurrency(self) -> int:
+        now = time.time()
+        cutoff = now - (self.EXTENSION_FRESH_MS / 1000.0) * 1.5
+        with self._slot_lock:
+            total = 0
+            for v in self._active_pollers.values():
+                if float(v.get("last_seen", 0)) >= cutoff:
+                    rt = max(1, min(8, int(v.get("ready_tabs") or 1)))
+                    total += rt
+            if total > 0:
+                return max(1, min(16, total))
+            return max(1, min(8, int(self._ready_tabs or 1)))
+
+    def _reserve_account_dispatch_time(self, account_key: str) -> float:
+        key = str(account_key or "").strip().lower()
+        dyn_acc = getattr(self, "_dynamic_per_acc_cooldown", None)
+        dyn_glob = getattr(self, "_dynamic_global_stagger", None)
+        acc_cd = float(dyn_acc) if dyn_acc is not None else float(self.SAME_ACCOUNT_COOLDOWN_SEC)
+        glob_st = float(dyn_glob) if dyn_glob is not None else float(self.GLOBAL_DISPATCH_STAGGER_SEC)
+        per_acc_gap = acc_cd if key else (
+            self.DEFAULT_MIN_INTERVAL_SEC if self._effective_concurrency() > 1 else 2.5
+        )
+        with self._slot_lock:
+            now = time.time()
+            acc_ready = (self._account_last_dispatch.get(key, 0.0) + per_acc_gap) if self._account_last_dispatch.get(key) else now
+            glob_ready = (self._global_last_dispatch + glob_st) if self._global_last_dispatch else now
+            slot_ts = max(now, acc_ready, glob_ready)
+            self._account_last_dispatch[key] = slot_ts
+            self._global_last_dispatch = slot_ts
+        return max(0.0, slot_ts - now)
+
+    def _is_fresh_non_duplicate_token(self, tok: str) -> bool:
+        if not tok or not isinstance(tok, str):
+            return False
+        if len(tok) < 80:
+            return True
+        with self._recent_tokens_lock:
+            if tok in self._recent_tokens_set:
+                return False
+            if len(self._recent_tokens) == self._recent_tokens.maxlen:
+                oldest = self._recent_tokens.popleft()
+                self._recent_tokens_set.discard(oldest)
+            self._recent_tokens.append(tok)
+            self._recent_tokens_set.add(tok)
+            return True
+
+    def request_recaptcha(self, action="VIDEO_GENERATION", timeout=35) -> Optional[str]:
+        """Lấy reCAPTCHA token (hỗ trợ song song theo pool tab của Extension)."""
+        return self.request_recaptcha_for_account(action=action, timeout=timeout, account_key="")
+
+    def request_recaptcha_for_account(self, action="VIDEO_GENERATION", timeout=35, account_key: str = "") -> Optional[str]:
+        """Lấy reCAPTCHA token với cooldown riêng từng tài khoản + pool đa tab song song."""
+        if self._server is None and self._remote_bridge:
+            payload = {"action": action, "timeout": int(timeout)}
+            if account_key:
+                payload["accountKey"] = account_key
+            res = self._remote_call(
+                "POST",
+                "/api/internal/captcha/request",
+                payload=payload,
+                timeout=max(float(timeout) + 12.0, 30.0),
+            )
+            if isinstance(res, dict) and res.get("token"):
+                self._last_extension_error = None
+                return str(res["token"])
+            self._last_extension_error = str((res or {}).get("error") or "CAPTCHA_TIMEOUT")
+            return None
+
+        deadline = time.time() + max(float(timeout), 5.0)
+        wait_s = self._reserve_account_dispatch_time(account_key)
+        if wait_s > 0.0:
+            max_wait = max(0.0, deadline - time.time() - 3.0)
+            sleep_for = min(wait_s, max_wait)
+            if sleep_for > 0.05:
+                tag = f" [{account_key}]" if account_key else ""
+                self.log(f"⏳ Chờ {sleep_for:.1f}s cooldown{tag} trước khi lấy reCAPTCHA token...")
+                time.sleep(sleep_for)
+
+        with self._in_flight_cond:
+            while self._in_flight_requests >= self._effective_concurrency():
+                rem = deadline - time.time() - 2.0
+                if rem <= 0:
+                    self._last_extension_error = "CAPTCHA_POOL_BUSY_TIMEOUT"
+                    return None
+                self._in_flight_cond.wait(timeout=min(rem, 1.0))
+            self._in_flight_requests += 1
+
+        try:
+            for dup_try in range(2):
+                rem_timeout = max(5.0, deadline - time.time())
+                cmd_id = f"cmd_{int(time.time()*1000)}_{random.randint(1000,9999)}"
+                import queue
+                result_q = queue.Queue()
+
+                with self._results_lock:
+                    self._results[cmd_id] = result_q
+
+                command = {
+                    "method": "get_captcha",
+                    "commandId": cmd_id,
+                    "action": action,
+                }
+                if account_key:
+                    command["accountKey"] = account_key
+                self._pending_commands.put(command)
+                self.log(
+                    f"Đã gửi yêu cầu giải reCAPTCHA đến Extension"
+                    f"{f' [{account_key}]' if account_key else ''}..."
+                )
+
+                try:
+                    result = result_q.get(timeout=rem_timeout)
+                    if result.get("success"):
+                        tok = result.get("token")
+                        if tok and not self._is_fresh_non_duplicate_token(tok):
+                            if dup_try == 0:
+                                self.log("⚠️ Nhận token trùng lặp từ Extension, tự động xin token mới...")
+                                continue
+                        self._last_token_time = time.time()
+                        self._last_extension_error = None
+                        return tok
                     error = result.get("error") or "CAPTCHA_FAILED"
                     self._last_extension_error = str(error)
                     self.log(f"Extension lỗi: {error}")
                     return None
-            except queue.Empty:
-                self._last_extension_error = "CAPTCHA_TIMEOUT"
-                self.log(
-                    "Timeout chờ reCAPTCHA token! "
-                    f"liveness={self.extension_liveness()}, "
-                    f"flow_tab={self._flow_tab_present!r}, "
-                    f"profile={self._extension_profile_id!r}."
-                )
-                return None
-            finally:
-                with self._results_lock:
-                    self._results.pop(cmd_id, None)
+                except queue.Empty:
+                    self._last_extension_error = "CAPTCHA_TIMEOUT"
+                    self.log(
+                        "Timeout chờ reCAPTCHA token! "
+                        f"liveness={self.extension_liveness()}, "
+                        f"flow_tab={self._flow_tab_present!r}, "
+                        f"profile={self._extension_profile_id!r}."
+                    )
+                    return None
+                finally:
+                    with self._results_lock:
+                        self._results.pop(cmd_id, None)
+            return None
+        finally:
+            with self._in_flight_cond:
+                self._in_flight_requests = max(0, self._in_flight_requests - 1)
+                self._in_flight_cond.notify_all()
 
     def reset_session(self, kind="hard_reset", timeout=35) -> bool:
+        if self._server is None and self._remote_bridge:
+            res = self._remote_call(
+                "POST",
+                "/api/internal/captcha/reset",
+                payload={"kind": kind, "timeout": int(timeout)},
+                timeout=max(float(timeout) + 5.0, 20.0),
+            )
+            return bool(isinstance(res, dict) and res.get("ok"))
+
         cmd_id = f"cmd_{int(time.time()*1000)}_{random.randint(1000,9999)}"
         import queue
         result_q = queue.Queue()
-        
+
         with self._results_lock:
             self._results[cmd_id] = result_q
-        
+
         command = {
             "method": kind,
             "commandId": cmd_id
         }
         self._pending_commands.put(command)
         self.log(f"Gửi yêu cầu {kind} tới Extension để khôi phục điểm reCAPTCHA...")
-        
+
         try:
             result = result_q.get(timeout=timeout)
             if result.get("success"):
                 self.log(f"Extension báo {kind} thành công! Đã reset score.")
-                # Force cooldown sau reset để trang Google Flow ổn định
                 self._last_token_time = time.time()
                 return True
             else:
@@ -3984,39 +5459,78 @@ class CaptchaBridge:
     def notify_success(self):
         """Gọi khi submit API thành công → reset failure counter.
         Source: Veo3Studio/captchaManager.js (notifySuccess)."""
+        if self._server is None and self._remote_bridge:
+            self._remote_call("POST", "/api/internal/captcha/feedback", payload={"event": "success"}, timeout=2.0)
+            return
         self._consecutive_failures = 0
         self._pending_reset = None
 
     def notify_failure(self):
-        """Gọi khi submit API thất bại → tăng counter, trigger reset nếu đạt threshold.
+        """Gọi khi submit API thất bại (lỗi Captcha/RPC) → tăng counter, trigger reset nếu đạt threshold.
         Source: Veo3Studio/captchaManager.js (notifyFailure).
         3 failures → soft_reset, 7 failures → hard_reset."""
-        self._consecutive_failures += 1
-        if self._consecutive_failures >= self.HARD_RESET_THRESHOLD:
-            if self._pending_reset != 'hard_reset':
-                self.log(f"⚠️ [{self._consecutive_failures}] lỗi liên tiếp → escalating to hard_reset")
-                self._pending_reset = 'hard_reset'
-                self.reset_session("hard_reset", 35)
-        elif self._consecutive_failures >= self.SOFT_RESET_THRESHOLD and self._pending_reset is None:
-            self.log(f"⚠️ [{self._consecutive_failures}] lỗi liên tiếp → scheduling soft_reset")
-            self._pending_reset = 'soft_reset'
-            self.reset_session("soft_reset", 35)
+        if self._server is None and self._remote_bridge:
+            self._remote_call("POST", "/api/internal/captcha/feedback", payload={"event": "failure"}, timeout=2.0)
+            return
+        reset_kind = None
+        with self._reset_lock:
+            self._consecutive_failures += 1
+            now = time.time()
+            cooldown_ok = (now - getattr(self, "_last_reset_at", 0.0)) >= float(getattr(self, "MIN_RESET_COOLDOWN_SEC", 20.0))
+            if self._consecutive_failures >= self.HARD_RESET_THRESHOLD:
+                if self._pending_reset != 'hard_reset' and cooldown_ok:
+                    self.log(f"⚠️ [{self._consecutive_failures}] lỗi liên tiếp → escalating to hard_reset")
+                    self._pending_reset = 'hard_reset'
+                    reset_kind = "hard_reset"
+            elif self._consecutive_failures >= self.SOFT_RESET_THRESHOLD and self._pending_reset is None and cooldown_ok:
+                self.log(f"⚠️ [{self._consecutive_failures}] lỗi liên tiếp → scheduling soft_reset")
+                self._pending_reset = 'soft_reset'
+                reset_kind = "soft_reset"
+        if reset_kind:
+            try:
+                self.reset_session(reset_kind, 35)
+            finally:
+                with self._reset_lock:
+                    self._last_reset_at = time.time()
+                    self._pending_reset = None
 
     def notify_recaptcha_score_dead(self):
-        """Gọi khi API trả 403 PUBLIC_ERROR_UNUSUAL_ACTIVITY → bypass ladder, immediate hard_reset.
-        Source: Veo3Studio/captchaManager.js (notifyRecaptchaScoreDead).
-        Khác notify_failure(): bỏ qua threshold 3/7, reset ngay lập tức."""
-        self._consecutive_failures = max(self._consecutive_failures, self.HARD_RESET_THRESHOLD)
-        if self._pending_reset != 'hard_reset':
-            self.log("⚠️ reCAPTCHA score dead → immediate hard_reset (bypass 3/7 ladder)")
-            self._pending_reset = 'hard_reset'
-            self.reset_session("hard_reset", 35)
+        """Gọi khi API trả 403 PUBLIC_ERROR_UNUSUAL_ACTIVITY → bypass ladder, immediate hard_reset (có debounce chống reset storm)."""
+        if self._server is None and self._remote_bridge:
+            self._remote_call("POST", "/api/internal/captcha/feedback", payload={"event": "score_dead"}, timeout=38.0)
+            return
+        should_reset = False
+        with self._reset_lock:
+            self._consecutive_failures = max(self._consecutive_failures, self.HARD_RESET_THRESHOLD)
+            now = time.time()
+            cooldown_ok = (now - getattr(self, "_last_reset_at", 0.0)) >= float(getattr(self, "MIN_RESET_COOLDOWN_SEC", 20.0))
+            if self._pending_reset != 'hard_reset' and cooldown_ok:
+                self.log("⚠️ reCAPTCHA score dead → immediate hard_reset (bypass 3/7 ladder)")
+                self._pending_reset = 'hard_reset'
+                should_reset = True
+            elif not cooldown_ok:
+                cd_val = int(getattr(self, "MIN_RESET_COOLDOWN_SEC", 60.0))
+                self.log(f"ℹ️ Extension vừa hard_reset gần đây (<{cd_val}s), gộp yêu cầu reset để tránh nghẽn các luồng khác.")
+        if should_reset:
+            try:
+                self.reset_session("hard_reset", 35)
+            finally:
+                with self._reset_lock:
+                    self._last_reset_at = time.time()
+                    self._pending_reset = None
 
     # ── Change 8: Extension Liveness Detection ────────────────────────────────
     def extension_liveness(self) -> str:
         """Trả về trạng thái kết nối Extension.
         Source: Veo3Studio/captchaManager.js (extensionLiveness).
         Returns: 'connected' | 'stale' | 'offline'"""
+        if self._server is None and self._remote_bridge:
+            st = self._remote_call("GET", "/status", timeout=1.5)
+            if isinstance(st, dict) and st.get("bridge") == "CaptchaBridge":
+                if st.get("extension_version"):
+                    self._extension_version = st.get("extension_version")
+                return str(st.get("extension_liveness") or ("connected" if st.get("extension_online") else "offline"))
+            return 'offline'
         if self._last_extension_seen_at is None:
             return 'offline'
         age_ms = (time.time() - self._last_extension_seen_at) * 1000
@@ -4026,17 +5540,52 @@ class CaptchaBridge:
             return 'stale'
         return 'offline'
 
-    def record_extension_heartbeat(self, version=None, profile_id=None, has_flow_tab=None):
+    def record_extension_heartbeat(
+        self,
+        version=None,
+        profile_id=None,
+        has_flow_tab=None,
+        ready_tabs=None,
+        pool_size=None,
+        busy_tabs=None,
+    ):
         """Ghi nhận Extension đã gửi heartbeat.
         Source: Veo3Studio/captchaManager.js (recordExtensionHeartbeat)."""
+        now = time.time()
         self._extension_online = True
-        self._last_extension_seen_at = time.time()
+        self._last_extension_seen_at = now
         if version:
             self._extension_version = version
         if profile_id:
             self._extension_profile_id = profile_id
         if has_flow_tab is not None:
             self._flow_tab_present = bool(has_flow_tab)
+        try:
+            rt_val = max(1, int(ready_tabs)) if ready_tabs is not None else None
+        except Exception:
+            rt_val = None
+        try:
+            ps_val = max(1, int(pool_size)) if pool_size is not None else None
+        except Exception:
+            ps_val = None
+        try:
+            bt_val = max(0, int(busy_tabs)) if busy_tabs is not None else None
+        except Exception:
+            bt_val = None
+        if rt_val is not None:
+            self._ready_tabs = rt_val
+        if ps_val is not None:
+            self._pool_size = ps_val
+        if bt_val is not None:
+            self._busy_tabs = bt_val
+        pid_key = str(profile_id or self._extension_profile_id or "default")
+        with self._slot_lock:
+            self._active_pollers[pid_key] = {
+                "last_seen": now,
+                "ready_tabs": rt_val if rt_val is not None else self._ready_tabs,
+                "pool_size": ps_val if ps_val is not None else self._pool_size,
+                "busy_tabs": bt_val if bt_val is not None else self._busy_tabs,
+            }
 
 _LAST_SYNCED_EXT_PROFILE: str = ""
 
@@ -4200,6 +5749,21 @@ def is_veo_low_priority_available(profile_name: str = "") -> bool:
     return False
 
 
+def get_ui_image_models(include_flow: bool = True) -> list[str]:
+    """Return selectable CLIProxy + optional Google Flow image models for UI dropdowns."""
+    models = [
+        "gpt-image-2",
+        "gpt-image-2.5",
+        "gpt-image-1.5",
+        "gemini-3.1-flash-image",
+        "grok-imagine-image",
+        "grok-imagine-image-quality",
+    ]
+    if include_flow:
+        models.extend(["Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"])
+    return models
+
+
 def get_veo_ui_video_models(profile_name: str = "") -> list[str]:
     """Return selectable Veo video model names for the UI dropdowns.
     Only includes 'Veo 3.1 - Lite [Lower Priority]' if the account actually supports it.
@@ -4280,31 +5844,48 @@ def get_veo_model_key(model_name: str, mode: str, is_portrait: bool, duration: i
 
 _FLOW_HIJACK_BYPASS_JS = """
 (function () {
-  if (window.__upprojectHijackBypassInstalled) return;
-  window.__upprojectHijackBypassInstalled = true;
-  try {
-    const origAssign = Object.assign;
-    Object.assign = function (target, ...sources) {
-      const res = origAssign.apply(this, [target, ...sources]);
-      if (res && res.action === 'extension_hijack_detected') {
-        for (const src of sources) {
-          if (src && typeof src.action === 'string' && src.action !== 'extension_hijack_detected') {
-            res.action = src.action;
-            break;
+  if (!window.__upprojectHijackBypassInstalled) {
+    window.__upprojectHijackBypassInstalled = true;
+    try {
+      const origAssign = Object.assign;
+      Object.assign = function (target, ...sources) {
+        const res = origAssign.apply(this, [target, ...sources]);
+        if (res && res.action === 'extension_hijack_detected') {
+          for (const src of sources) {
+            if (src && typeof src.action === 'string' && src.action !== 'extension_hijack_detected') {
+              res.action = src.action;
+              break;
+            }
           }
         }
-      }
-      return res;
-    };
-  } catch (_) {}
+        return res;
+      };
+    } catch (_) {}
+    try {
+      const origSet = WeakMap.prototype.set;
+      WeakMap.prototype.set = function (k, v) {
+        if (typeof v === 'function' && k && typeof k.execute === 'function') {
+          window.__realGrecaptchaExecute = v;
+        }
+        return origSet.call(this, k, v);
+      };
+    } catch (_) {}
+  }
   try {
-    const origSet = WeakMap.prototype.set;
-    WeakMap.prototype.set = function (k, v) {
-      if (typeof v === 'function' && k && typeof k.execute === 'function') {
-        window.__realGrecaptchaExecute = v;
+    if (!(window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function')) {
+      if (!document.querySelector('script[src*="recaptcha/enterprise.js"]')) {
+        const s = document.createElement('script');
+        s.src = 'https://www.google.com/recaptcha/enterprise.js?render=6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV';
+        s.async = true;
+        s.defer = true;
+        const nonceEl = document.querySelector('script[nonce]');
+        if (nonceEl) {
+          const n = nonceEl.nonce || nonceEl.getAttribute('nonce');
+          if (n) s.setAttribute('nonce', n);
+        }
+        (document.head || document.documentElement).appendChild(s);
       }
-      return origSet.call(this, k, v);
-    };
+    }
   } catch (_) {}
 })();
 """
@@ -4336,8 +5917,18 @@ def _parse_batchexecute_wrb(text: str, rpcid: str):
                     except Exception as exc:
                         return False, None, f"Invalid inner JSON: {exc}"
                 err_part = item[5] if len(item) > 5 else item
-                return False, None, json.dumps(err_part, ensure_ascii=False)[:400]
-    return False, None, text[:300]
+                err_json = json.dumps(err_part, ensure_ascii=False)
+                readable = " | ".join(_collect_nested_strings(err_part, limit=260))
+                if readable and readable not in err_json:
+                    combined = f"{readable} | {err_json}"
+                    return False, None, combined[:480]
+                return False, None, err_json[:480]
+            if isinstance(item, list) and len(item) >= 2 and item[0] == "er":
+                err_json = json.dumps(item, ensure_ascii=False)
+                readable = " | ".join(_collect_nested_strings(item, limit=260))
+                combined = f"{readable} | {err_json}" if readable else err_json
+                return False, None, combined[:480]
+    return False, None, text[:360]
 
 
 def _cookie_str_to_playwright_list(cookie_str: str) -> list:
@@ -4348,18 +5939,577 @@ def _cookie_str_to_playwright_list(cookie_str: str) -> list:
             continue
         k, v = part.split("=", 1)
         k, v = k.strip(), v.strip()
-        if not k or not v:
+        if not k or not v or "GRECAPTCHA" in k.upper():
             continue
-        domain = ".flow.google.com" if "OSID" in k else ".google.com"
+        same_site = "None" if k.startswith("__Secure-3P") or k == "__Secure-OSID" else "Lax"
+        if k.startswith("__Host-"):
+            target_url = (
+                "https://accounts.google.com/"
+                if ("PLSID" in k or "GAPS" in k)
+                else "https://flow.google.com/"
+            )
+            cookies_list.append({
+                "name": k,
+                "value": v,
+                "url": target_url,
+                "secure": True,
+                "sameSite": same_site,
+            })
+            continue
+        if "OSID" in k:
+            domain = "flow.google.com"
+        elif "LSID" in k:
+            domain = "accounts.google.com"
+        else:
+            domain = ".google.com"
         cookies_list.append({
             "name": k,
             "value": v,
             "domain": domain,
             "path": "/",
-            "secure": True,
-            "sameSite": "None" if k.startswith("__Secure-3P") else "Lax",
+            "secure": True if (k.startswith("__Secure-") or domain != ".google.com") else True,
+            "sameSite": same_site,
         })
     return cookies_list
+
+
+def _load_playwright_cookies_for_flow(cookie_str: str, profile_name: str = "") -> list:
+    """Build a complete Playwright cookie list by combining persisted storage_state
+    (host-only OSID / LSID / __Host-* cookies, excluding _GRECAPTCHA) with fresh
+    name=value overrides from cookie_str.
+    """
+    kv_map = {}
+    for part in str(cookie_str or "").split(";"):
+        part = part.strip()
+        if not part or "=" not in part:
+            continue
+        k, v = part.split("=", 1)
+        k, v = k.strip(), v.strip()
+        if k and v:
+            kv_map[k] = v
+
+    cookie_dir = APP_DIR / "data" / "google_flow_grok" / "cookies"
+    cand_files = []
+    if profile_name:
+        resolved = _resolve_google_profile_name(profile_name) or profile_name.strip()
+        if resolved:
+            cand_files.append(cookie_dir / f"{resolved}.json")
+    if cookie_dir.is_dir():
+        for jf in sorted(cookie_dir.glob("*.json")):
+            if jf not in cand_files:
+                cand_files.append(jf)
+
+    chosen_raw = None
+    target_osid = kv_map.get("OSID") or kv_map.get("__Secure-OSID")
+    target_sid = kv_map.get("SID")
+    for idx_cf, cf in enumerate(cand_files):
+        if not cf.is_file():
+            continue
+        try:
+            data = json.loads(cf.read_text(encoding="utf-8"))
+        except Exception:
+            continue
+        raw = data.get("cookies", []) if isinstance(data, dict) else (data if isinstance(data, list) else [])
+        if not raw:
+            continue
+        if idx_cf == 0 and profile_name and not target_osid:
+            chosen_raw = raw
+            break
+        raw_map = {str(c.get("name", "")): str(c.get("value", "")) for c in raw if isinstance(c, dict)}
+        if target_osid and raw_map.get("OSID") == target_osid:
+            chosen_raw = raw
+            break
+        if target_sid and raw_map.get("SID") == target_sid and chosen_raw is None:
+            chosen_raw = raw
+        elif idx_cf == 0 and profile_name and chosen_raw is None:
+            chosen_raw = raw
+
+    if not chosen_raw:
+        return _cookie_str_to_playwright_list(cookie_str)
+
+    cleaned = []
+    present_keys = set()
+    for c in chosen_raw:
+        if not isinstance(c, dict):
+            continue
+        name = str(c.get("name") or "").strip()
+        val = str(c.get("value") or "")
+        domain = str(c.get("domain") or "").strip()
+        if not name or "GRECAPTCHA" in name.upper():
+            continue
+        if name in kv_map and domain in (".google.com", "flow.google.com", ".flow.google.com"):
+            val = kv_map[name]
+        same_site = c.get("sameSite")
+        if same_site not in ("Strict", "Lax", "None"):
+            same_site = "None" if name.startswith("__Secure-3P") or name == "__Secure-OSID" else "Lax"
+        entry = {
+            "name": name,
+            "value": val,
+            "path": str(c.get("path") or "/"),
+            "secure": bool(c.get("secure", True)),
+            "httpOnly": bool(c.get("httpOnly", False)),
+            "sameSite": same_site,
+        }
+        if name.startswith("__Host-"):
+            host = domain.lstrip(".") or "accounts.google.com"
+            entry["url"] = f"https://{host}{entry['path']}"
+            entry.pop("path", None)
+        else:
+            entry["domain"] = domain or ".google.com"
+        exp = c.get("expires")
+        if isinstance(exp, (int, float)) and exp > 0:
+            entry["expires"] = float(exp)
+        cleaned.append(entry)
+        present_keys.add((name, domain))
+
+    for extra in _cookie_str_to_playwright_list(cookie_str):
+        k = extra["name"]
+        dom = extra.get("domain", "")
+        if not any(pk[0] == k for pk in present_keys):
+            cleaned.append(extra)
+    return cleaned
+
+
+_FLOW_RECAPTCHA_SITEKEY = "6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV"
+_flow_browser_actor_lock = threading.Lock()
+_flow_browser_actor_instance = None
+_flow_mzza6b_preferred_profiles = set()
+
+
+class _FlowBrowserActor:
+    """Single-thread Playwright Chrome actor managing one reusable authenticated
+    flow.google.com/project/{pid} session per Flow account profile.
+
+    Keeping one warm session per (profile, project) mirrors run_all_7_videos_mt /
+    fashion_motion_control_engine / flow_workflow_engine: cookies, TLS, WIZ tokens,
+    and reCAPTCHA Enterprise stay in sync across sequential RPCs without launching
+    cold Chrome windows or depending on Extension :4000 (/about).
+    """
+
+    _MAX_CONTEXTS = 16
+    _CONTEXT_TTL_SEC = 1500.0
+
+    def __init__(self):
+        import queue
+        self._queue = queue.Queue()
+        self._thread = None
+        self._start_lock = threading.Lock()
+        self._pw = None
+        self._browser = None
+        self._contexts = {}
+
+    def _ensure_worker(self):
+        with self._start_lock:
+            if self._thread is None or not self._thread.is_alive():
+                self._thread = threading.Thread(
+                    target=self._run_loop, name="FlowChromeSessionActor", daemon=True
+                )
+                self._thread.start()
+
+    def _run_loop(self):
+        try:
+            while True:
+                fn, fut = self._queue.get()
+                if fn is None:
+                    self._close_all_sync()
+                    if fut is not None and not fut.done():
+                        fut.set_result(True)
+                    break
+                try:
+                    res = fn()
+                    if fut is not None and not fut.done():
+                        fut.set_result(res)
+                except Exception as exc:
+                    if fut is not None and not fut.done():
+                        fut.set_exception(exc)
+        finally:
+            self._close_all_sync()
+
+    def _call_sync(self, fn, timeout: float = 150.0):
+        import concurrent.futures
+        self._ensure_worker()
+        fut = concurrent.futures.Future()
+        self._queue.put((fn, fut))
+        return fut.result(timeout=timeout)
+
+    def _close_entry(self, entry: dict):
+        for obj_key in ("pg", "ctx"):
+            obj = entry.get(obj_key)
+            if obj is not None:
+                try:
+                    obj.close()
+                except Exception:
+                    pass
+
+    def _close_all_sync(self):
+        for entry in list(self._contexts.values()):
+            self._close_entry(entry)
+        self._contexts.clear()
+        for obj in (self._browser, self._pw):
+            if obj is not None:
+                try:
+                    if hasattr(obj, "close"):
+                        obj.close()
+                    elif hasattr(obj, "stop"):
+                        obj.stop()
+                except Exception:
+                    pass
+        self._browser = None
+        self._pw = None
+
+    def _ensure_browser(self):
+        from playwright.sync_api import sync_playwright
+        if self._browser is not None:
+            try:
+                if self._browser.is_connected():
+                    return self._browser
+            except Exception:
+                pass
+            self._close_all_sync()
+
+        self._pw = sync_playwright().start()
+        headless_mode = os.environ.get("FLOW_CHROME_HEADLESS", "1").strip() != "0"
+        launch_args = [
+            "--disable-blink-features=AutomationControlled",
+            "--window-size=1280,800",
+            "--mute-audio",
+            "--no-first-run",
+            "--no-default-browser-check",
+        ]
+        if not headless_mode:
+            launch_args.append("--window-position=-2000,-2000")
+        try:
+            self._browser = self._pw.chromium.launch(
+                channel="chrome", headless=headless_mode, args=launch_args
+            )
+        except Exception:
+            self._browser = self._pw.chromium.launch(
+                headless=headless_mode, args=launch_args
+            )
+        return self._browser
+
+    def _cookie_fingerprint(self, profile_name: str, cookie_str: str) -> str:
+        import hashlib as _hs
+        cookie_mtime = 0.0
+        if profile_name:
+            resolved = _resolve_google_profile_name(profile_name) or profile_name.strip()
+            cf = APP_DIR / "data" / "google_flow_grok" / "cookies" / f"{resolved}.json"
+            if cf.is_file():
+                try:
+                    cookie_mtime = cf.stat().st_mtime
+                except Exception:
+                    pass
+        raw = f"{profile_name}|{cookie_mtime}|{cookie_str}"
+        return _hs.sha256(raw.encode("utf-8", errors="ignore")).hexdigest()[:16]
+
+    def _evict_key(self, key):
+        old = self._contexts.pop(key, None)
+        if old:
+            self._close_entry(old)
+
+    def _acquire_session(self, project_id: str, cookie_str: str, profile_name: str):
+        import random as _rnd
+        prof_key = (profile_name or "").strip() or "_default"
+        eff_pid = (project_id or "").strip()
+        key = (prof_key, eff_pid)
+        fp = self._cookie_fingerprint(profile_name, cookie_str)
+        now = time.time()
+
+        cached = self._contexts.get(key)
+        if cached:
+            try:
+                pg = cached.get("pg")
+                if (
+                    self._browser is not None
+                    and self._browser.is_connected()
+                    and pg is not None
+                    and not pg.is_closed()
+                    and cached.get("fp") == fp
+                    and (now - cached.get("opened_at", 0.0)) < self._CONTEXT_TTL_SEC
+                    and cached.get("wiz", {}).get("at")
+                ):
+                    cached["last_used"] = now
+                    return key, cached, True
+            except Exception:
+                pass
+            self._evict_key(key)
+
+        while len(self._contexts) >= self._MAX_CONTEXTS:
+            oldest_k = min(self._contexts.keys(), key=lambda k: self._contexts[k].get("last_used", 0.0))
+            self._evict_key(oldest_k)
+
+        browser = self._ensure_browser()
+        ctx = browser.new_context(
+            viewport={"width": 1280, "height": 800},
+            user_agent=sanitize_chrome_ua(browser=browser),
+        )
+        try:
+            inject_stealth_scripts(ctx)
+        except Exception:
+            pass
+        try:
+            ctx.add_init_script(_FLOW_HIJACK_BYPASS_JS)
+            c_list = _load_playwright_cookies_for_flow(cookie_str, profile_name=profile_name)
+            if c_list:
+                try:
+                    ctx.add_cookies(c_list)
+                except Exception:
+                    for ck in c_list:
+                        try:
+                            ctx.add_cookies([ck])
+                        except Exception:
+                            pass
+            pg = ctx.new_page()
+            target_url = f"https://flow.google.com/project/{eff_pid}" if eff_pid else "https://flow.google.com/"
+            pg.goto(target_url, wait_until="domcontentloaded", timeout=45000)
+            cur_u = pg.url or ""
+            if "accounts.google.com" in cur_u or "CookieMismatch" in cur_u:
+                raise RuntimeError("Phiên Google Flow (Chrome) bị chuyển sang trang đăng nhập (cookie hết hạn)")
+            if "/404" in cur_u and eff_pid:
+                pg.goto("https://flow.google.com/", wait_until="domcontentloaded", timeout=45000)
+                cur_u = pg.url or ""
+                if "accounts.google.com" in cur_u or "CookieMismatch" in cur_u:
+                    raise RuntimeError("Phiên Google Flow (Chrome) bị chuyển sang trang đăng nhập (cookie hết hạn)")
+            pg.evaluate(_FLOW_HIJACK_BYPASS_JS)
+            pg.wait_for_function(
+                "() => !!(window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function')",
+                timeout=45000,
+            )
+            pg.wait_for_timeout(1200)
+            try:
+                pg.mouse.move(_rnd.randint(240, 520), _rnd.randint(260, 480), steps=6)
+                pg.evaluate(
+                    """async (siteKey) => {
+                        const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                        try { await fn(siteKey, {action: 'PAGE_VIEW'}); } catch (e) {}
+                    }""",
+                    _FLOW_RECAPTCHA_SITEKEY,
+                )
+            except Exception:
+                pass
+            wiz = pg.evaluate(
+                """() => {
+                    const w = window.WIZ_global_data || {};
+                    return {
+                        at: w.SNlM0e || '',
+                        bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
+                        fsid: w.FdrFJe || '',
+                        email: w.oPEP7c || '',
+                        ua: navigator.userAgent || ''
+                    };
+                }"""
+            )
+            if not wiz or not wiz.get("at"):
+                raise RuntimeError("Không lấy được WIZ_global_data.SNlM0e (phiên Google Flow hết hạn)")
+            live_hdr = ""
+            try:
+                seen_ck = {}
+                for ck in ctx.cookies(["https://flow.google.com", "https://google.com", "https://accounts.google.com"]):
+                    if ck.get("name"):
+                        seen_ck[ck["name"]] = ck.get("value", "")
+                live_hdr = "; ".join(f"{k}={v}" for k, v in seen_ck.items())
+            except Exception:
+                live_hdr = ""
+            entry = {
+                "ctx": ctx,
+                "pg": pg,
+                "wiz": wiz,
+                "cookie_hdr": live_hdr or cookie_str,
+                "fp": fp,
+                "profile_name": prof_key,
+                "project_id": eff_pid,
+                "opened_at": time.time(),
+                "last_used": time.time(),
+            }
+            self._contexts[key] = entry
+            return key, entry, False
+        except Exception:
+            self._close_entry({"ctx": ctx})
+            raise
+
+    def _run_rpc_in_entry(self, entry: dict, project_id: str, rpcid: str, payload_builder_fn, recaptcha_action: str):
+        import random as _rnd
+        pg = entry["pg"]
+        wiz = entry["wiz"]
+        if recaptcha_action == "VIDEO_GENERATION":
+            try:
+                pg.mouse.move(_rnd.randint(250, 760), _rnd.randint(240, 600), steps=5)
+                pg.evaluate(
+                    """async (siteKey) => {
+                        const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                        try { await fn(siteKey, {action: 'PAGE_VIEW'}); } catch (e) {}
+                        await new Promise(r => setTimeout(r, 200));
+                    }""",
+                    _FLOW_RECAPTCHA_SITEKEY,
+                )
+            except Exception:
+                pass
+
+        rcap_token = pg.evaluate(
+            """async ({siteKey, action}) => {
+                const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                return await fn(siteKey, {action});
+            }""",
+            {"siteKey": _FLOW_RECAPTCHA_SITEKEY, "action": recaptcha_action},
+        )
+        if not rcap_token:
+            raise RuntimeError("Không lấy được reCAPTCHA token từ Chrome")
+
+        payload_obj = payload_builder_fn(rcap_token)
+        f_req_str = json.dumps(
+            [[[rpcid, json.dumps(payload_obj, separators=(",", ":")), None, "generic"]]],
+            separators=(",", ":"),
+        )
+        reqid = _rnd.randint(100000, 999999)
+        resp_obj = pg.evaluate(
+            """async ({rpcid, projectId, bl, fsid, reqid, fReq, at}) => {
+                const sp = projectId ? `/project/${projectId}` : '/';
+                const url = `/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=${rpcid}&source-path=${encodeURIComponent(sp)}&bl=${encodeURIComponent(bl)}&f.sid=${encodeURIComponent(fsid)}&hl=vi&_reqid=${reqid}&rt=c`;
+                const body = `f.req=${encodeURIComponent(fReq)}&at=${encodeURIComponent(at)}&`;
+                const r = await fetch(url, {
+                    method: 'POST',
+                    headers: {
+                        'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
+                        'x-same-domain': '1'
+                    },
+                    body
+                });
+                return {status: r.status, text: await r.text()};
+            }""",
+            {
+                "rpcid": rpcid,
+                "projectId": project_id or entry.get("project_id", ""),
+                "bl": wiz["bl"],
+                "fsid": str(wiz["fsid"]),
+                "reqid": reqid,
+                "fReq": f_req_str,
+                "at": wiz["at"],
+            },
+        )
+        entry["last_used"] = time.time()
+        st = (resp_obj or {}).get("status", 0)
+        if not resp_obj or st != 200:
+            err_msg = f"HTTP {st}: {str((resp_obj or {}).get('text', ''))[:200]}"
+            return False, None, err_msg, (st in (401, 403))
+        ok_wrb, inner_wrb, err_wrb = _parse_batchexecute_wrb(resp_obj.get("text", ""), rpcid)
+        return ok_wrb, inner_wrb, err_wrb, False
+
+    def _execute_rpc_sync(
+        self,
+        project_id: str,
+        cookie_str: str,
+        rpcid: str,
+        payload_builder_fn,
+        recaptcha_action: str,
+        profile_name: str = "",
+    ) -> tuple:
+        for attempt in range(2):
+            key = None
+            reused = False
+            try:
+                key, entry, reused = self._acquire_session(project_id, cookie_str, profile_name)
+                ok, inner, err, stale_http = self._run_rpc_in_entry(
+                    entry, project_id, rpcid, payload_builder_fn, recaptcha_action
+                )
+                err_upper = str(err or "").upper()
+                if "PUBLIC_ERROR_UNUSUAL_ACTIVITY" in err_upper or "UNAUTHENTICATED" in err_upper:
+                    self._evict_key(key)
+                    return False, None, err
+                if stale_http or "SNLM0E" in err_upper:
+                    self._evict_key(key)
+                    if attempt == 0:
+                        continue
+                    return False, None, err
+                return ok, inner, err
+            except Exception as exc:
+                if key is not None:
+                    self._evict_key(key)
+                if reused and attempt == 0:
+                    continue
+                return False, None, f"{type(exc).__name__}: {exc}"
+        return False, None, "Flow Chrome session retry exhausted"
+
+    def execute_rpc(
+        self,
+        project_id: str,
+        cookie_str: str,
+        rpcid: str,
+        payload_builder_fn,
+        recaptcha_action: str,
+        profile_name: str = "",
+    ) -> tuple:
+        return self._call_sync(
+            lambda: self._execute_rpc_sync(
+                project_id, cookie_str, rpcid, payload_builder_fn, recaptcha_action, profile_name
+            ),
+            timeout=150.0,
+        )
+
+    def ensure_session_credentials(
+        self,
+        project_id: str,
+        cookie_str: str,
+        profile_name: str = "",
+    ) -> dict:
+        def _do():
+            _, entry, _ = self._acquire_session(project_id, cookie_str, profile_name)
+            wiz = dict(entry.get("wiz") or {})
+            return {
+                "ok": bool(wiz.get("at")),
+                "at": wiz.get("at", ""),
+                "bl": wiz.get("bl", ""),
+                "fsid": wiz.get("fsid", ""),
+                "email": wiz.get("email", ""),
+                "ua": wiz.get("ua", ""),
+                "cookie_hdr": entry.get("cookie_hdr") or cookie_str,
+            }
+        return self._call_sync(_do, timeout=90.0)
+
+    def invalidate(self, profile_name: str = "", *extra_args):
+        cand_prof = str(profile_name or "").strip()
+        if extra_args and ("=" in cand_prof or ";" in cand_prof or len(cand_prof) > 120):
+            # Legacy 2-arg call: invalidate(auth_cookie, prof_refresh)
+            cand_prof = str(extra_args[0] or "").strip()
+        prof_key = cand_prof
+        def _do():
+            if not prof_key:
+                self._close_all_sync()
+                return True
+            for k in list(self._contexts.keys()):
+                if k[0] == prof_key:
+                    self._evict_key(k)
+            return True
+        if self._thread is not None and self._thread.is_alive():
+            try:
+                self._call_sync(_do, timeout=15.0)
+            except Exception:
+                pass
+
+    def shutdown(self):
+        if self._thread is not None and self._thread.is_alive():
+            try:
+                import concurrent.futures
+                fut = concurrent.futures.Future()
+                self._queue.put((None, fut))
+                fut.result(timeout=10.0)
+            except Exception:
+                pass
+        self._thread = None
+
+
+def _get_flow_browser_actor() -> _FlowBrowserActor:
+    global _flow_browser_actor_instance
+    with _flow_browser_actor_lock:
+        if _flow_browser_actor_instance is None:
+            _flow_browser_actor_instance = _FlowBrowserActor()
+        return _flow_browser_actor_instance
+
+
+def invalidate_flow_chrome_session(profile_name: str = "") -> None:
+    """Drop cached Chrome session(s) for a profile after auth/rate-limit failure or cookie refresh."""
+    actor = _flow_browser_actor_instance
+    if actor is not None:
+        actor.invalidate(profile_name)
 
 
 def _execute_flow_rpc_in_chrome(
@@ -4368,125 +6518,39 @@ def _execute_flow_rpc_in_chrome(
     rpcid: str,
     payload_builder_fn,
     recaptcha_action: str,
+    profile_name: str = "",
 ) -> tuple:
-    """Mint a clean reCAPTCHA Enterprise token (with tZa hijack bypass) and execute
-    batchexecute directly inside a real Chrome context so TLS, cookies, and
-    reCAPTCHA session match 100%.
+    """Execute a Flow batchexecute RPC inside a reusable authenticated Chrome
+    session for the target account profile (with hijack bypass & PAGE_VIEW warmup).
     Returns: (ok: bool, inner_data, err_detail: str)
     """
-    from playwright.sync_api import sync_playwright
-
-    with _flow_chrome_exec_lock:
-        pw = None
-        browser = None
-        context = None
-        try:
-            pw = sync_playwright().start()
-            browser = pw.chromium.launch(
-                channel="chrome",
-                headless=False,
-                args=[
-                    "--disable-blink-features=AutomationControlled",
-                    "--window-position=-2000,-2000",
-                    "--window-size=1280,800",
-                ],
-            )
-            context = browser.new_context()
-            context.add_init_script(_FLOW_HIJACK_BYPASS_JS)
-            c_list = _cookie_str_to_playwright_list(cookie_str)
-            if c_list:
-                context.add_cookies(c_list)
-            page = context.new_page()
-            target_url = (
-                f"https://flow.google.com/project/{project_id}"
-                if project_id else "https://flow.google.com/"
-            )
-            page.goto(target_url, wait_until="domcontentloaded", timeout=35000)
-            page.evaluate(_FLOW_HIJACK_BYPASS_JS)
-            page.wait_for_function(
-                "() => window.grecaptcha && window.grecaptcha.enterprise && typeof window.grecaptcha.enterprise.execute === 'function'",
-                timeout=25000,
-            )
-            page.wait_for_timeout(1200)
-            wiz = page.evaluate(
-                """() => {
-                    const w = window.WIZ_global_data || {};
-                    return {
-                        at: w.SNlM0e || '',
-                        bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
-                        fsid: w.FdrFJe || ''
-                    };
-                }"""
-            )
-            if not wiz or not wiz.get("at"):
-                return False, None, "Không lấy được WIZ_global_data.SNlM0e (phiên Google Flow hết hạn)"
-            rcap_token = page.evaluate(
-                """async (action) => {
-                    const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
-                    return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action});
-                }""",
-                recaptcha_action,
-            )
-            if not rcap_token:
-                return False, None, "Không lấy được reCAPTCHA token từ Chrome"
-            payload_obj = payload_builder_fn(rcap_token)
-            f_req_str = json.dumps([[[rpcid, json.dumps(payload_obj, separators=(",", ":")), None, "generic"]]], separators=(",", ":"))
-            reqid = random.randint(100000, 999999)
-            resp_obj = page.evaluate(
-                """async ({rpcid, projectId, bl, fsid, reqid, fReq, at}) => {
-                    const sp = projectId ? `/project/${projectId}` : '/';
-                    const url = `/_/AiSandboxAngularFrontend/data/batchexecute?rpcids=${rpcid}&source-path=${encodeURIComponent(sp)}&bl=${encodeURIComponent(bl)}&f.sid=${encodeURIComponent(fsid)}&hl=vi&_reqid=${reqid}&rt=c`;
-                    const body = `f.req=${encodeURIComponent(f_req_str_val = fReq)}&at=${encodeURIComponent(at)}&`;
-                    const r = await fetch(url, {
-                        method: 'POST',
-                        headers: {
-                            'content-type': 'application/x-www-form-urlencoded;charset=UTF-8',
-                            'x-same-domain': '1'
-                        },
-                        body
-                    });
-                    return {status: r.status, text: await r.text()};
-                }""",
-                {
-                    "rpcid": rpcid,
-                    "projectId": project_id,
-                    "bl": wiz["bl"],
-                    "fsid": str(wiz["fsid"]),
-                    "reqid": reqid,
-                    "fReq": f_req_str,
-                    "at": wiz["at"],
-                },
-            )
-            if not resp_obj or resp_obj.get("status") != 200:
-                st = (resp_obj or {}).get("status", 0)
-                return False, None, f"HTTP {st}: {str((resp_obj or {}).get('text', ''))[:200]}"
-            return _parse_batchexecute_wrb(resp_obj.get("text", ""), rpcid)
-        except Exception as exc:
-            return False, None, f"{type(exc).__name__}: {exc}"
-        finally:
-            for obj in (context, browser, pw):
-                if obj is not None:
-                    try:
-                        if hasattr(obj, "close"):
-                            obj.close()
-                        elif hasattr(obj, "stop"):
-                            obj.stop()
-                    except Exception:
-                        pass
+    try:
+        return _get_flow_browser_actor().execute_rpc(
+            project_id=project_id,
+            cookie_str=cookie_str,
+            rpcid=rpcid,
+            payload_builder_fn=payload_builder_fn,
+            recaptcha_action=recaptcha_action,
+            profile_name=profile_name,
+        )
+    except Exception as exc:
+        return False, None, f"{type(exc).__name__}: {exc}"
 
 
-def _find_signed_flow_urls(node, prefix: str) -> list:
+def _find_signed_flow_urls(node, prefix) -> list:
+    prefixes = (prefix,) if isinstance(prefix, str) else tuple(prefix or ())
     found = []
-    stack = [node]
-    while stack:
-        curr = stack.pop()
-        if isinstance(curr, str):
-            if curr.startswith(prefix) and curr not in found:
-                found.append(curr)
-        elif isinstance(curr, list):
-            stack.extend(curr)
-        elif isinstance(curr, dict):
-            stack.extend(curr.values())
+    for pfx in prefixes:
+        stack = [node]
+        while stack:
+            curr = stack.pop()
+            if isinstance(curr, str):
+                if curr.startswith(pfx) and curr not in found:
+                    found.append(curr)
+            elif isinstance(curr, list):
+                stack.extend(curr)
+            elif isinstance(curr, dict):
+                stack.extend(curr.values())
     return found
 
 
@@ -4646,6 +6710,571 @@ def fetch_flow_model_options(auth_cookie: str = "", project_id: str = "", profil
         return {"ok": False, "error": f"{type(exc).__name__}: {exc}"}
 
 
+_SHARED_EXT_BRIDGE = None
+_SHARED_EXT_BRIDGE_LOCK = threading.Lock()
+
+
+def _request_captcha_for_account(bridge, action: str, timeout: int = 25, account_key: str = "") -> Optional[str]:
+    if not bridge:
+        return None
+    if account_key and hasattr(bridge, "request_recaptcha_for_account"):
+        return bridge.request_recaptcha_for_account(action=action, timeout=timeout, account_key=account_key)
+    return bridge.request_recaptcha(action, timeout)
+
+
+def get_connected_extension_bridge(port: int = 4000):
+    """Return a connected local/remote CaptchaBridge if LeVietTung_autoveo Extension is polling."""
+    if os.environ.get("USE_FLOW_EXTENSION_TIER1", "").strip() == "0":
+        return None
+    try:
+        import veo_skill_cli as _vsc
+        existing = getattr(_vsc, "_CAPTCHA_BRIDGE", None)
+        if existing and existing.extension_liveness() == "connected":
+            return existing
+    except Exception:
+        pass
+    global _SHARED_EXT_BRIDGE
+    with _SHARED_EXT_BRIDGE_LOCK:
+        if _SHARED_EXT_BRIDGE and getattr(_SHARED_EXT_BRIDGE, "_remote_bridge", False):
+            try:
+                if _SHARED_EXT_BRIDGE.extension_liveness() == "connected":
+                    return _SHARED_EXT_BRIDGE
+            except Exception:
+                pass
+        try:
+            with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
+                s.settimeout(0.35)
+                if s.connect_ex(("127.0.0.1", int(port))) != 0:
+                    return None
+        except Exception:
+            return None
+        cand = CaptchaBridge(lambda _m: None, port=int(port))
+        if cand.start(allow_remote=True) and cand.extension_liveness() == "connected":
+            _SHARED_EXT_BRIDGE = cand
+            return cand
+    return None
+
+
+def fetch_flow_wiz_http(
+    cookie_hdr: str,
+    project_id: str = "",
+    captcha_bridge=None,
+    profile_name: str = "",
+    auto_refresh: bool = True,
+) -> dict:
+    """Fetch Flow WIZ_global_data (SNlM0e/bl/fsid) over HTTP via curl_cffi without launching Chrome."""
+    from curl_cffi import requests as _cffi_req
+    eff_cookie = str(cookie_hdr or "").strip()
+    eff_pid = str(project_id or "").strip()
+    eff_ua, _ = _get_effective_ua_and_sec_ch_ua(captcha_bridge)
+    default_bl = "boq_labs-ai-sandbox-frontend_20261030.00_p2"
+    default_fsid = "-7675661680034497126"
+
+    def _probe(ck_str: str) -> dict:
+        at_tok, bl_v, fsid_v = "", default_bl, default_fsid
+        final_url = ""
+        saw_login = False
+        saw_404 = False
+        urls = [f"https://flow.google.com/project/{eff_pid}"] if eff_pid else []
+        urls.append("https://flow.google.com/")
+        sess = _cffi_req.Session(impersonate="chrome131")
+        try:
+            hdrs = {
+                "Cookie": ck_str,
+                "User-Agent": eff_ua,
+                "Accept": "text/html,application/xhtml+xml,application/xml;q=0.9,*/*;q=0.8",
+            }
+            for target_u in urls:
+                try:
+                    resp = sess.get(target_u, headers=hdrs, timeout=25, allow_redirects=True)
+                    final_url = str(getattr(resp, "url", "") or target_u)
+                    if "accounts.google.com" in final_url.lower() or "CookieMismatch" in final_url:
+                        saw_login = True
+                    if resp.status_code == 404 or "/404" in final_url:
+                        saw_404 = True
+                    if resp.status_code == 200:
+                        html = resp.text or ""
+                        if "accounts.google.com/v3/signin" in html:
+                            saw_login = True
+                        m_at = re.search(r'"SNlM0e"\s*:\s*"([^"]+)"', html)
+                        m_bl = re.search(r'"cfb2h"\s*:\s*"([^"]+)"', html)
+                        m_fsid = re.search(r'"FdrFJe"\s*:\s*"([^"]+)"', html)
+                        if m_at:
+                            at_tok = m_at.group(1)
+                        if m_bl:
+                            bl_v = m_bl.group(1)
+                        if m_fsid:
+                            fsid_v = m_fsid.group(1)
+                        if at_tok:
+                            break
+                except Exception:
+                    continue
+        finally:
+            try:
+                sess.close()
+            except Exception:
+                pass
+        resolved_pid = "" if saw_404 else eff_pid
+        if "/project/" in final_url:
+            parsed_p = final_url.split("/project/", 1)[1].split("?", 1)[0].split("/", 1)[0].strip()
+            if len(parsed_p) >= 16 and not resolved_pid:
+                resolved_pid = parsed_p
+        if not resolved_pid and at_tok:
+            m_html_pid = re.search(r"/project/([0-9a-fA-F]{8}-[0-9a-fA-F-]{20,36})", html if "html" in locals() else "")
+            if m_html_pid:
+                resolved_pid = m_html_pid.group(1)
+        if not resolved_pid and at_tok and profile_name:
+            resolved_pid = str(uuid.uuid4())
+        return {
+            "at": at_tok,
+            "bl": bl_v,
+            "fsid": str(fsid_v),
+            "ua": eff_ua,
+            "url": final_url or (f"https://flow.google.com/project/{resolved_pid}" if resolved_pid else "https://flow.google.com/"),
+            "project_id": resolved_pid or ("" if profile_name else DEFAULT_PROJECT_ID),
+            "cookie_hdr": ck_str,
+            "saw_login_redirect": saw_login,
+            "saw_404": saw_404,
+        }
+
+    res = _probe(eff_cookie)
+    if not res.get("at") and auto_refresh and profile_name:
+        try:
+            ok_rf, new_tok, new_pid, err_rf = _refresh_google_profile(profile_name, True)
+            if ok_rf and new_tok:
+                try:
+                    from google_flow_auth import commit_login, identity_matches, expected_email
+                    root_val = _auth_root_value(None)
+                    em_val = str(err_rf or "").removeprefix("session_verified:")
+                    if identity_matches(expected_email(root_val, profile_name), em_val):
+                        commit_login(root_val, profile_name, em_val, new_tok, new_pid or eff_pid or DEFAULT_PROJECT_ID, refresh=True)
+                except Exception:
+                    pass
+                fresh_ck = _load_flow_cookie_header(profile_name) or (
+                    new_tok[len("flow_cookie:"):].strip() if str(new_tok).startswith("flow_cookie:") else ""
+                )
+                if fresh_ck:
+                    eff_cookie = fresh_ck
+                    if new_pid and not eff_pid:
+                        eff_pid = new_pid
+                    res = _probe(eff_cookie)
+        except Exception:
+            pass
+    return res
+
+
+class ExtensionHttpFlowPage:
+    """Duck-typed Playwright Page backed by Extension CaptchaBridge (:4000) + curl_cffi HTTP."""
+
+    def __init__(self, cookie_hdr: str, wiz: dict, project_id: str, bridge, profile_name: str = ""):
+        from curl_cffi import requests as _cffi_req
+        self.cookie_hdr = str(cookie_hdr or "")
+        self.wiz = dict(wiz or {})
+        self.project_id = str(project_id or self.wiz.get("project_id") or "")
+        self.bridge = bridge
+        self.profile_name = str(profile_name or "")
+        self.url = str(self.wiz.get("url") or (f"https://flow.google.com/project/{self.project_id}" if self.project_id else "https://flow.google.com/"))
+        self.http_session = _cffi_req.Session(impersonate="chrome131")
+        self._closed = False
+
+    def is_closed(self) -> bool:
+        return self._closed
+
+    def close(self) -> None:
+        self._closed = True
+        try:
+            self.http_session.close()
+        except Exception:
+            pass
+
+    def add_init_script(self, script) -> None:
+        return None
+
+    def wait_for_function(self, expr, timeout: int = 35000) -> bool:
+        return bool(self.wiz.get("at"))
+
+    def wait_for_timeout(self, ms: int = 0) -> None:
+        if ms and ms > 0:
+            time.sleep(min(float(ms) / 1000.0, 0.05))
+
+    def goto(self, url: str, **kwargs) -> None:
+        self.url = str(url or self.url)
+        if "/project/" in self.url:
+            parsed = self.url.split("/project/", 1)[1].split("?", 1)[0].split("/", 1)[0].strip()
+            if len(parsed) >= 16:
+                self.project_id = parsed
+        self.reload()
+
+    def reload(self, **kwargs) -> None:
+        refetched = fetch_flow_wiz_http(
+            self.cookie_hdr,
+            self.project_id,
+            captcha_bridge=self.bridge,
+            profile_name=self.profile_name,
+            auto_refresh=True,
+        )
+        self.wiz.update(refetched)
+        if refetched.get("cookie_hdr"):
+            self.cookie_hdr = refetched["cookie_hdr"]
+        if refetched.get("saw_login_redirect"):
+            self.url = "https://accounts.google.com/v3/signin"
+        elif refetched.get("saw_404"):
+            self.url = "https://flow.google.com/404"
+        elif refetched.get("url"):
+            self.url = refetched["url"]
+
+    def _scotty_upload_one(self, pid: str, at_tok: str, item: dict) -> dict:
+        import base64 as _b64_mod
+        ua, _ = _get_effective_ua_and_sec_ch_ua(self.bridge)
+        file_name = str(item.get("fileName") or "reference.mp4")
+        raw_bytes = _b64_mod.b64decode(item.get("b64Video") or "")
+        byte_len = int(item.get("byteLength") or len(raw_bytes))
+        start_url = f"https://flow.google.com/upload/v1/flow/upload/video/{pid}"
+        start_headers = {
+            "Cookie": self.cookie_hdr,
+            "Origin": "https://flow.google.com",
+            "Referer": f"https://flow.google.com/project/{pid}" if pid else "https://flow.google.com/",
+            "User-Agent": ua,
+            "X-Goog-Upload-Protocol": "resumable",
+            "X-Goog-Upload-Command": "start",
+            "X-Goog-Upload-Header-Content-Length": str(byte_len),
+            "X-Goog-Upload-Header-Content-Type": "video/mp4",
+            "Slug": urllib.parse.quote(file_name),
+        }
+        if at_tok:
+            start_headers["X-Framework-Xsrf-Token"] = at_tok
+        r_start = self.http_session.post(start_url, headers=start_headers, data=b"", timeout=45)
+        upload_url = next((v for k, v in r_start.headers.items() if str(k).lower() == "x-goog-upload-url"), "")
+        if not upload_url:
+            out = {
+                "ok": False,
+                "status": r_start.status_code,
+                "error": f"Missing X-Goog-Upload-URL (HTTP {r_start.status_code}): {(r_start.text or '')[:220]}",
+            }
+            if "key" in item:
+                out["key"] = item["key"]
+            return out
+        up_headers = {
+            "Cookie": self.cookie_hdr,
+            "Origin": "https://flow.google.com",
+            "Referer": f"https://flow.google.com/project/{pid}" if pid else "https://flow.google.com/",
+            "User-Agent": ua,
+            "X-Goog-Upload-Command": "upload, finalize",
+            "X-Goog-Upload-Offset": "0",
+            "Content-Type": "video/mp4",
+        }
+        r_up = self.http_session.post(upload_url, headers=up_headers, data=raw_bytes, timeout=180)
+        out = {
+            "ok": 200 <= r_up.status_code < 300,
+            "status": r_up.status_code,
+            "text": r_up.text or "",
+        }
+        if "key" in item:
+            out["key"] = item["key"]
+        return out
+
+    def evaluate(self, script, arg=None):
+        s = str(script or "")
+        if "WIZ_global_data" in s and ("SNlM0e" in s or "cfb2h" in s):
+            return {
+                "at": self.wiz.get("at", ""),
+                "bl": self.wiz.get("bl", "boq_labs-ai-sandbox-frontend_20261030.00_p2"),
+                "fsid": str(self.wiz.get("fsid", "")),
+                "ua": self.wiz.get("ua") or _get_effective_ua_and_sec_ch_ua(self.bridge)[0],
+            }
+        if "grecaptcha" in s:
+            act = str(arg.get("action") or "") if isinstance(arg, dict) else ""
+            if not act:
+                all_acts = re.findall(r"action\s*:\s*['\"]([A-Za-z0-9_]+)['\"]", s)
+                non_pv = [a for a in all_acts if a.upper() != "PAGE_VIEW"]
+                act = non_pv[-1] if non_pv else (all_acts[-1] if all_acts else "")
+            if act:
+                tok = _request_captcha_for_account(self.bridge, act, timeout=35, account_key=self.profile_name)
+                if not tok:
+                    err_det = getattr(self.bridge, "_last_extension_error", None) or "CAPTCHA_TIMEOUT"
+                    raise RuntimeError(f"Extension Captcha Bridge không trả token ({err_det})")
+                return tok
+        if "batchexecute" in s and isinstance(arg, dict):
+            m_rpc = re.search(r"rpcids=([A-Za-z0-9_]+)", s)
+            rpcid = str(arg.get("rpcid") or (m_rpc.group(1) if m_rpc else "")).strip()
+            f_req = str(arg.get("fReq") or arg.get("f_req") or "")
+            if not rpcid and f_req:
+                try:
+                    parsed_fq = json.loads(f_req)
+                    rpcid = str(parsed_fq[0][0][0])
+                except Exception:
+                    rpcid = ""
+            pid = str(arg.get("projectId") or self.project_id or "")
+            sp = f"/project/{pid}" if pid else "/"
+            bl = str(arg.get("bl") or self.wiz.get("bl") or "boq_labs-ai-sandbox-frontend_20261030.00_p2")
+            fsid = str(arg.get("fsid") or self.wiz.get("fsid") or "")
+            reqid = str(arg.get("reqid") or random.randint(100000, 999999))
+            at = str(arg.get("at") or self.wiz.get("at") or "")
+            url = (
+                f"https://flow.google.com/_/AiSandboxAngularFrontend/data/batchexecute"
+                f"?rpcids={urllib.parse.quote(rpcid)}&source-path={urllib.parse.quote(sp)}"
+                f"&bl={urllib.parse.quote(bl)}&f.sid={urllib.parse.quote(fsid)}&hl=vi&_reqid={reqid}&rt=c"
+            )
+            body = f"f.req={urllib.parse.quote(f_req)}&at={urllib.parse.quote(at)}&"
+            ua, _ = _get_effective_ua_and_sec_ch_ua(self.bridge)
+            hdrs = {
+                "Accept": "*/*",
+                "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+                "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                "Origin": "https://flow.google.com",
+                "Referer": f"https://flow.google.com/project/{pid}" if pid else "https://flow.google.com/",
+                "User-Agent": ua,
+                "X-Same-Domain": "1",
+                "Cookie": self.cookie_hdr,
+            }
+            r = self.http_session.post(url, headers=hdrs, data=body, timeout=60)
+            return {"status": r.status_code, "text": r.text or ""}
+        if "/upload/v1/flow/upload/video/" in s and isinstance(arg, dict):
+            pid = str(arg.get("projectId") or self.project_id or "")
+            at_tok = str(arg.get("atToken") or self.wiz.get("at") or "")
+            if isinstance(arg.get("items"), list):
+                import concurrent.futures as _cf_u
+                items = arg["items"]
+                with _cf_u.ThreadPoolExecutor(max_workers=max(1, min(4, len(items)))) as pool:
+                    return list(pool.map(lambda it: self._scotty_upload_one(pid, at_tok, it), items))
+            return self._scotty_upload_one(pid, at_tok, arg)
+        return None
+
+
+def open_extension_flow_session(
+    cookie_hdr: str,
+    project_id: str = "",
+    profile_name: str = "",
+    bridge=None,
+    auto_refresh: bool = True,
+) -> Optional[dict]:
+    """Open an Extension+HTTP Flow virtual session when Captcha Extension (:4000) is connected."""
+    br = bridge or get_connected_extension_bridge()
+    if not br or br.extension_liveness() != "connected":
+        return None
+    wiz = fetch_flow_wiz_http(
+        cookie_hdr,
+        project_id=project_id,
+        captcha_bridge=br,
+        profile_name=profile_name,
+        auto_refresh=auto_refresh,
+    )
+    eff_cookie = str(wiz.get("cookie_hdr") or cookie_hdr or "")
+    eff_pid = str(wiz.get("project_id") or project_id or "")
+    pg = ExtensionHttpFlowPage(eff_cookie, wiz, eff_pid, br, profile_name=profile_name)
+    dl_headers = {
+        "Cookie": eff_cookie,
+        "Referer": "https://flow.google.com/",
+        "User-Agent": wiz.get("ua") or _get_effective_ua_and_sec_ch_ua(br)[0],
+    }
+    return {
+        "page": pg,
+        "wiz": wiz,
+        "cookie_hdr": eff_cookie,
+        "project_id": eff_pid,
+        "dl_headers": dl_headers,
+        "bridge": br,
+    }
+
+
+def _cookie_header_to_dict_list(cookie_hdr: str) -> list:
+    out = []
+    for part in str(cookie_hdr or "").split(";"):
+        if "=" in part:
+            k, v = part.split("=", 1)
+            k = k.strip()
+            if k:
+                out.append({"name": k, "value": v.strip(), "domain": ".google.com"})
+    return out
+
+
+class _ExtBrowserContext:
+    def __init__(self, bridge, profile_name: str = "", cookie_hdr: str = "", project_id: str = ""):
+        self.bridge = bridge
+        self.profile_name = str(profile_name or "")
+        self._cookie_hdr = str(cookie_hdr or "")
+        self._cookie_list = _cookie_header_to_dict_list(self._cookie_hdr)
+        self._project_id = str(project_id or "")
+        self.pages = []
+
+    def add_init_script(self, script) -> None:
+        return None
+
+    def add_cookies(self, cookie_list) -> None:
+        if not isinstance(cookie_list, list):
+            return
+        by_name = {c["name"]: dict(c) for c in self._cookie_list if c.get("name")}
+        for c in cookie_list:
+            if isinstance(c, dict) and c.get("name") and "GRECAPTCHA" not in str(c.get("name", "")).upper():
+                by_name[str(c["name"])] = dict(c)
+        self._cookie_list = list(by_name.values())
+        self._cookie_hdr = "; ".join(f"{k}={v.get('value', '')}" for k, v in by_name.items())
+        for pg in self.pages:
+            pg.cookie_hdr = self._cookie_hdr
+
+    def cookies(self, urls=None) -> list:
+        for pg in self.pages:
+            if getattr(pg, "cookie_hdr", ""):
+                self._cookie_hdr = pg.cookie_hdr
+                self._cookie_list = _cookie_header_to_dict_list(self._cookie_hdr)
+                break
+        return list(self._cookie_list)
+
+    def new_page(self) -> ExtensionHttpFlowPage:
+        pg = ExtensionHttpFlowPage(
+            self._cookie_hdr,
+            {"at": "", "bl": "boq_labs-ai-sandbox-frontend_20261030.00_p2", "fsid": "", "ua": _get_effective_ua_and_sec_ch_ua(self.bridge)[0]},
+            self._project_id,
+            self.bridge,
+            profile_name=self.profile_name,
+        )
+        self.pages.append(pg)
+        return pg
+
+    def close(self) -> None:
+        for pg in self.pages:
+            pg.close()
+
+
+class _ExtBrowser:
+    def __init__(self, bridge, profile_name: str = "", cookie_hdr: str = "", project_id: str = ""):
+        self.bridge = bridge
+        self.profile_name = profile_name
+        self.cookie_hdr = cookie_hdr
+        self.project_id = project_id
+        self._connected = True
+        self._contexts = []
+
+    def is_connected(self) -> bool:
+        return self._connected
+
+    def new_context(self, **kwargs) -> _ExtBrowserContext:
+        ctx = _ExtBrowserContext(
+            self.bridge,
+            profile_name=self.profile_name,
+            cookie_hdr=self.cookie_hdr,
+            project_id=self.project_id,
+        )
+        self._contexts.append(ctx)
+        return ctx
+
+    def close(self) -> None:
+        self._connected = False
+        for c in self._contexts:
+            c.close()
+
+
+class _ExtChromiumLauncher:
+    def __init__(self, bridge, profile_name: str = "", cookie_hdr: str = "", project_id: str = ""):
+        self.bridge = bridge
+        self.profile_name = profile_name
+        self.cookie_hdr = cookie_hdr
+        self.project_id = project_id
+
+    def launch(self, **kwargs) -> _ExtBrowser:
+        return _ExtBrowser(
+            self.bridge,
+            profile_name=self.profile_name,
+            cookie_hdr=self.cookie_hdr,
+            project_id=self.project_id,
+        )
+
+    def launch_persistent_context(self, user_data_dir: str = "", **kwargs) -> _ExtBrowserContext:
+        prof = self.profile_name or (Path(str(user_data_dir)).name if user_data_dir else "")
+        ck = self.cookie_hdr
+        if not ck and prof:
+            ck = _load_flow_cookie_header(prof) or ""
+        if not ck and prof:
+            try:
+                ok_r, tok_r, _, _ = _refresh_google_profile(prof, True)
+                if ok_r:
+                    ck = _load_flow_cookie_header(prof) or (
+                        tok_r[len("flow_cookie:"):].strip() if str(tok_r or "").startswith("flow_cookie:") else ""
+                    )
+            except Exception:
+                pass
+        ctx = _ExtBrowserContext(self.bridge, profile_name=prof, cookie_hdr=ck, project_id=self.project_id)
+        ctx.new_page()
+        return ctx
+
+
+class _ExtPlaywrightShim:
+    def __init__(self, bridge, profile_name: str = "", cookie_hdr: str = "", project_id: str = ""):
+        self.chromium = _ExtChromiumLauncher(bridge, profile_name=profile_name, cookie_hdr=cookie_hdr, project_id=project_id)
+
+
+_FLOW_MEDIA_POOL_LOCK = threading.Lock()
+_FLOW_MEDIA_DOWNLOAD_POOL = None
+_FLOW_MEDIA_POOL_WORKERS = 6
+
+
+def get_flow_media_download_pool(max_workers: Optional[int] = None):
+    """Shared background ThreadPoolExecutor dedicated to 2K upscaling (SPrCad) and CDN media downloads."""
+    global _FLOW_MEDIA_DOWNLOAD_POOL, _FLOW_MEDIA_POOL_WORKERS
+    import concurrent.futures as _cf
+    with _FLOW_MEDIA_POOL_LOCK:
+        if max_workers is not None:
+            w = max(2, min(32, int(max_workers)))
+            if _FLOW_MEDIA_DOWNLOAD_POOL is None or w != _FLOW_MEDIA_POOL_WORKERS:
+                if _FLOW_MEDIA_DOWNLOAD_POOL is None or w > _FLOW_MEDIA_POOL_WORKERS:
+                    _FLOW_MEDIA_POOL_WORKERS = w
+                    _FLOW_MEDIA_DOWNLOAD_POOL = _cf.ThreadPoolExecutor(
+                        max_workers=w, thread_name_prefix="flow_media_dl"
+                    )
+        elif _FLOW_MEDIA_DOWNLOAD_POOL is None:
+            _FLOW_MEDIA_DOWNLOAD_POOL = _cf.ThreadPoolExecutor(
+                max_workers=_FLOW_MEDIA_POOL_WORKERS, thread_name_prefix="flow_media_dl"
+            )
+        return _FLOW_MEDIA_DOWNLOAD_POOL
+
+
+def wait_for_job_media(job: 'VideoJob', timeout: float = 300.0) -> bool:
+    """Await any deferred 2K upscale / CDN download future attached to a VideoJob."""
+    if job is None:
+        return False
+    fut = getattr(job, "media_finalize_future", None)
+    if fut is None:
+        lp = getattr(job, "local_path", None)
+        return bool(lp and os.path.isfile(str(lp)))
+    try:
+        ok = bool(fut.result(timeout=timeout))
+        lp = getattr(job, "local_path", None)
+        return bool(ok and lp and os.path.isfile(str(lp)))
+    except Exception as exc:
+        if not getattr(job, "error", None):
+            job.error = f"Lỗi tải/upscale media nền: {exc}"
+        return False
+
+
+def wait_for_all_media_jobs(jobs: list, timeout: float = 300.0) -> list:
+    """Wait for a list of VideoJobs whose 2K/MP4 downloads are running concurrently in background."""
+    return [wait_for_job_media(j, timeout=timeout) for j in (jobs or [])]
+
+
+def flow_playwright_or_extension(
+    sync_playwright_fn,
+    profile_name: str = "",
+    cookie_hdr: str = "",
+    project_id: str = "",
+):
+    """Context manager preferring Extension (:4000) + curl_cffi HTTP over spawning Playwright Chrome."""
+    import contextlib
+
+    @contextlib.contextmanager
+    def _cm():
+        pw_mod = str(getattr(sync_playwright_fn, "__module__", "") or "")
+        is_patched_pw = not pw_mod.startswith("playwright.")
+        if not is_patched_pw:
+            br = get_connected_extension_bridge()
+            if br and br.extension_liveness() == "connected":
+                yield _ExtPlaywrightShim(br, profile_name=profile_name, cookie_hdr=cookie_hdr, project_id=project_id)
+                return
+        with sync_playwright_fn() as pw:
+            yield pw
+
+    return _cm()
+
+
 async def _run_veo_flow_batchexecute(
     job: 'VideoJob',
     project_id: str,
@@ -4658,13 +7287,19 @@ async def _run_veo_flow_batchexecute(
     """Execute Google Flow video/image generation using the current flow.google.com
     Boq batchexecute protocol (YhhmEf / eb1hJf / MZZa6b / maseQ / Z9cAtf / as29s).
     """
-    eff_project_id = (project_id or "").strip() or DEFAULT_PROJECT_ID
+    _acct_key = str(getattr(job, "google_profile_name", "") or getattr(job, "account_name", "") or "").strip()
+    eff_project_id = (project_id or "").strip() or ("" if _acct_key else DEFAULT_PROJECT_ID)
     is_video = "banana" not in job.model.lower()
     is_portrait = "9:16" in str(job.aspect_ratio) or "portrait" in str(job.aspect_ratio).lower()
     model_key = get_veo_model_key(job.model, job.mode, is_portrait, job.duration)
     clone_num = max(1, int(getattr(job, "clone_count", 1) or 1))
 
     # Align User-Agent with the Chrome Extension browser if connected
+    if captcha_bridge and hasattr(captcha_bridge, "extension_liveness"):
+        try:
+            captcha_bridge.extension_liveness()
+        except Exception:
+            pass
     _eff_ua, _eff_sec_ch_ua = _get_effective_ua_and_sec_ch_ua(captcha_bridge)
 
     # Step 1: Fetch WIZ global data (at token, bl, fsid) via curl_cffi (_GoogleApiClient)
@@ -4683,25 +7318,145 @@ async def _run_veo_flow_batchexecute(
         else ""
     )
 
-    async with _GoogleApiClient(proxy_url=proxy_for_flow, timeout=60, impersonate="chrome131") as gclient:
+    _disable_chrome = os.environ.get("FLOW_DISABLE_CHROME_FALLBACK", "").strip() == "1"
+    _auth_root = str(getattr(job, "google_auth_root", "") or "").strip() or None
+
+    async def _fetch_wiz_data(gclient, cur_cookie: str) -> tuple:
+        nonlocal eff_project_id
+        cur_headers = {**wiz_headers, "Cookie": cur_cookie}
+        found_at = ""
+        found_bl = bl_val
+        found_fsid = fsid_val
+        saw_login = False
+        wiz_urls = [f"https://flow.google.com/project/{eff_project_id}"] if eff_project_id else []
+        if "https://flow.google.com/" not in wiz_urls:
+            wiz_urls.append("https://flow.google.com/")
+        for proj_page_url in wiz_urls:
+            try:
+                r_wiz = await gclient.get(proj_page_url, headers=cur_headers, timeout=25, allow_redirects=True)
+                final_url = str(getattr(r_wiz, "url", "") or "")
+                if "accounts.google.com" in final_url.lower():
+                    saw_login = True
+                if r_wiz.status_code == 404 or "/404" in final_url:
+                    if eff_project_id and f"/project/{eff_project_id}" in proj_page_url:
+                        eff_project_id = ""
+                if r_wiz.status_code == 200:
+                    html_wiz = r_wiz.text or ""
+                    if "accounts.google.com/v3/signin" in html_wiz:
+                        saw_login = True
+                    m_at = re.search(r'"SNlM0e"\s*:\s*"([^"]+)"', html_wiz)
+                    m_bl = re.search(r'"cfb2h"\s*:\s*"([^"]+)"', html_wiz)
+                    m_fsid = re.search(r'"FdrFJe"\s*:\s*"([^"]+)"', html_wiz)
+                    if m_at:
+                        found_at = m_at.group(1)
+                    if m_bl:
+                        found_bl = m_bl.group(1)
+                    if m_fsid:
+                        found_fsid = m_fsid.group(1)
+                    if not eff_project_id:
+                        m_u_pid = re.search(r"/project/([0-9a-fA-F]{8}-[0-9a-fA-F-]{20,36})", final_url) or re.search(
+                            r"/project/([0-9a-fA-F]{8}-[0-9a-fA-F-]{20,36})", html_wiz
+                        )
+                        if m_u_pid:
+                            eff_project_id = m_u_pid.group(1)
+                    if found_at:
+                        break
+            except Exception as exc:
+                _log(f"⚠️ [{_acct_key or 'Flow'}] Lỗi kết nối WIZ {proj_page_url}: {exc}")
+        if found_at and not eff_project_id:
+            eff_project_id = str(uuid.uuid4())
+        return found_at, found_bl, found_fsid, saw_login
+
+    async def _try_inline_refresh_session(gclient, reason: str) -> bool:
+        nonlocal auth_cookie, at_token, bl_val, fsid_val
+        setattr(job, "_force_google_token_refresh", True)
+        if getattr(job, "_inline_cookie_refreshed", False):
+            return False
+        prof_refresh = str(getattr(job, "google_profile_name", "") or "").strip()
+        if not prof_refresh:
+            acc_hint = str(getattr(job, "account_name", "") or "").strip()
+            prof_refresh = (
+                _resolve_google_profile_name(acc_hint, auth_root=_auth_root)
+                or (_default_google_profile_name(auth_root=_auth_root) if not acc_hint else "")
+            )
+        if not prof_refresh:
+            return False
+        setattr(job, "_inline_cookie_refreshed", True)
         try:
-            proj_page_url = f"https://flow.google.com/project/{eff_project_id}"
-            r_wiz = await gclient.get(proj_page_url, headers=wiz_headers, timeout=25, allow_redirects=True)
-            if r_wiz.status_code == 200:
-                html_wiz = r_wiz.text or ""
-                m_at = re.search(r'"SNlM0e"\s*:\s*"([^"]+)"', html_wiz)
-                m_bl = re.search(r'"cfb2h"\s*:\s*"([^"]+)"', html_wiz)
-                m_fsid = re.search(r'"FdrFJe"\s*:\s*"([^"]+)"', html_wiz)
-                if m_at:
-                    at_token = m_at.group(1)
-                if m_bl:
-                    bl_val = m_bl.group(1)
-                if m_fsid:
-                    fsid_val = m_fsid.group(1)
-        except Exception as exc:
-            _log(f"⚠️ Lỗi kết nối WIZ flow.google.com: {exc}")
+            _get_flow_browser_actor().invalidate(prof_refresh)
+        except Exception as exc_inv:
+            _log(f"⚠️ [{prof_refresh}] Lỗi dọn cache phiên Chrome Flow: {exc_inv}")
+        _log(f"🔄 [{prof_refresh}] {reason} — tự động làm mới cookie/token Google Flow (headless)...")
+        try:
+            loop_cur = asyncio.get_running_loop()
+            ok_rf, new_tok, new_pid, err_rf = await loop_cur.run_in_executor(
+                None, _refresh_google_profile, prof_refresh, True, _auth_root
+            )
+            if ok_rf and new_tok:
+                try:
+                    from google_flow_auth import commit_login, identity_matches, expected_email
+                    new_email = str(err_rf or "").removeprefix("session_verified:")
+                    root_val = _auth_root_value(_auth_root)
+                    if identity_matches(expected_email(root_val, prof_refresh), new_email):
+                        commit_login(
+                            root_val,
+                            prof_refresh,
+                            new_email,
+                            new_tok,
+                            new_pid or eff_project_id,
+                            str(getattr(job, "account_name", "") or ""),
+                            refresh=True,
+                        )
+                except Exception:
+                    pass
+                fresh_ck = _load_flow_cookie_header(prof_refresh, auth_root=_auth_root)
+                if not fresh_ck and str(new_tok).startswith("flow_cookie:"):
+                    fresh_ck = str(new_tok)[len("flow_cookie:"):].strip()
+                if fresh_ck:
+                    auth_cookie = fresh_ck
+                    wiz_headers["Cookie"] = auth_cookie
+                    got_at, got_bl, got_fsid, _ = await _fetch_wiz_data(gclient, auth_cookie)
+                    if got_at:
+                        at_token = got_at
+                        bl_val = got_bl or bl_val
+                        fsid_val = got_fsid or fsid_val
+                        setattr(job, "_force_google_token_refresh", False)
+                        _log(f"✅ [{prof_refresh}] Đã tự động làm mới cookie + SNlM0e thành công!")
+                        return True
+        except Exception as exc_rf:
+            _log(f"⚠️ [{prof_refresh}] Làm mới tự động thất bại: {exc_rf}")
+        return False
+
+    async with _GoogleApiClient(proxy_url=proxy_for_flow, timeout=60, impersonate="chrome131") as gclient:
+        at_token, bl_val, fsid_val, saw_login_redirect = await _fetch_wiz_data(gclient, auth_cookie)
+
+        if not at_token and saw_login_redirect:
+            await _try_inline_refresh_session(gclient, "Phiên Flow chuyển hướng đăng nhập")
+
+        if not at_token and not _disable_chrome:
+            _prof_boot = str(getattr(job, "google_profile_name", "") or "").strip()
+            try:
+                _creds = await asyncio.get_running_loop().run_in_executor(
+                    None,
+                    _get_flow_browser_actor().ensure_session_credentials,
+                    eff_project_id,
+                    auth_cookie,
+                    _prof_boot,
+                )
+                if isinstance(_creds, dict) and _creds.get("at"):
+                    at_token = _creds["at"]
+                    bl_val = _creds.get("bl") or bl_val
+                    fsid_val = _creds.get("fsid") or fsid_val
+                    if _creds.get("cookie_hdr"):
+                        auth_cookie = _creds["cookie_hdr"]
+            except Exception as exc_boot:
+                _log(f"⚠️ Phiên Chrome Flow chưa lấy được SNlM0e: {exc_boot}")
 
         if not at_token:
+            await _try_inline_refresh_session(gclient, "Thiếu SNlM0e từ Flow")
+
+        if not at_token:
+            setattr(job, "_force_google_token_refresh", True)
             job.error = "Phiên Google Flow (flow.google.com) đã hết hạn hoặc thiếu cookie. Hãy đăng nhập lại."
             _log(f"❌ {job.error}")
             return False
@@ -4726,17 +7481,57 @@ async def _run_veo_flow_batchexecute(
                 "X-Same-Domain": "1",
                 "Cookie": auth_cookie,
             }
-            r_rpc = await gclient.post(url, headers=rpc_headers, data=body, timeout=60)
-            if r_rpc.status_code != 200:
-                return False, None, f"HTTP {r_rpc.status_code}: {r_rpc.text[:200]}"
-            return _parse_batchexecute_wrb(r_rpc.text, rpcid)
+            last_http_err = ""
+            for net_try in range(2):
+                try:
+                    r_rpc = await gclient.post(url, headers=rpc_headers, data=body, timeout=60)
+                    if r_rpc.status_code == 200:
+                        return _parse_batchexecute_wrb(r_rpc.text, rpcid)
+                    last_http_err = f"HTTP {r_rpc.status_code}: {r_rpc.text[:200]}"
+                    if r_rpc.status_code in (500, 502, 503, 504) and net_try == 0:
+                        await asyncio.sleep(random.uniform(0.9, 1.8))
+                        continue
+                    return False, None, last_http_err
+                except Exception as exc_net:
+                    last_http_err = f"{type(exc_net).__name__}: {exc_net}"
+                    if net_try == 0:
+                        await asyncio.sleep(random.uniform(0.8, 1.6))
+                        continue
+            return False, None, last_http_err or "HTTP RPC transport error"
+
+        _tier1_skip_in_run = False
+
+        def _request_captcha_token(action_name: str, timeout_s: int = 25) -> Optional[str]:
+            if not captcha_bridge:
+                return None
+            if _acct_key and hasattr(captcha_bridge, "request_recaptcha_for_account"):
+                return captcha_bridge.request_recaptcha_for_account(action_name, timeout=timeout_s, account_key=_acct_key)
+            return captcha_bridge.request_recaptcha(action_name, timeout_s)
 
         async def _call_protected_rpc(rpcid: str, payload_builder_fn, recaptcha_action: str) -> tuple:
-            # Tier 1: Try CaptchaBridge Extension + Account Cookies over curl_cffi HTTP
-            if captcha_bridge and captcha_bridge.extension_liveness() == "connected":
+            nonlocal _tier1_skip_in_run
+            loop = asyncio.get_running_loop()
+            # Default to Extension Captcha Bridge (:4000) + pure HTTP requests so logging
+            # dozens of Flow accounts never spawns per-account hidden Chrome browsers.
+            # Set job.prefer_extension_captcha=False or USE_FLOW_EXTENSION_TIER1=0 to opt out.
+            _env_ext = os.environ.get("USE_FLOW_EXTENSION_TIER1", "").strip()
+            _ext_pref = getattr(job, "prefer_extension_captcha", None)
+            if _env_ext == "0":
+                use_extension_first = False
+            elif _env_ext == "1":
+                use_extension_first = True
+            else:
+                use_extension_first = (_ext_pref is not False)
+
+            if (
+                use_extension_first
+                and not _tier1_skip_in_run
+                and captcha_bridge
+                and captcha_bridge.extension_liveness() == "connected"
+            ):
                 _log(f"🔑 Đang lấy reCAPTCHA token ({recaptcha_action}) qua Extension Captcha Bridge...")
-                rcap_tok = await asyncio.get_running_loop().run_in_executor(
-                    None, captcha_bridge.request_recaptcha, recaptcha_action, 25
+                rcap_tok = await loop.run_in_executor(
+                    None, _request_captcha_token, recaptcha_action, 25
                 )
                 if rcap_tok:
                     ok_http, inner_http, err_http = await _call_rpc_http(rpcid, payload_builder_fn(rcap_tok))
@@ -4744,12 +7539,86 @@ async def _run_veo_flow_batchexecute(
                         if captcha_bridge:
                             captcha_bridge.notify_success()
                         return True, inner_http, ""
-                    _log(f"⚠️ Submit qua HTTP bị từ chối ({err_http[:120]}), tự động chuyển sang trình duyệt Chrome Flow...")
+                    err_up = str(err_http or "").upper()
+                    if (
+                        "HTTP 401" in err_up
+                        or "UNAUTHENTICATED" in err_up
+                        or ("HTTP 403" in err_up and "PUBLIC_ERROR_" not in err_up)
+                    ):
+                        if await _try_inline_refresh_session(gclient, f"{rpcid} gặp {err_up[:48]}"):
+                            rcap_auth = await loop.run_in_executor(
+                                None, _request_captcha_token, recaptcha_action, 25
+                            )
+                            if rcap_auth:
+                                ok_a, inner_a, err_a = await _call_rpc_http(rpcid, payload_builder_fn(rcap_auth))
+                                if ok_a:
+                                    captcha_bridge.notify_success()
+                                    return True, inner_a, ""
+                                ok_http, inner_http, err_http = ok_a, inner_a, err_a
+                                err_up = str(err_http or "").upper()
+                    if (
+                        rpcid == "eb1hJf"
+                        and "TOO_MUCH_TRAFFIC" not in err_up
+                        and any(tok in err_up for tok in ("PUBLIC_ERROR_UNUSUAL_ACTIVITY", "PERMISSION_DENIED", "INVALID_ARGUMENT", "UNSUPPORTED"))
+                    ):
+                        # Let caller rotate eb1hJf -> MZZa6b via HTTP + Extension without launching Chrome.
+                        return False, inner_http, err_http
+                    if "PUBLIC_ERROR_UNUSUAL_ACTIVITY" in err_up and "TOO_MUCH_TRAFFIC" not in err_up:
+                        _log(f"⚠️ [{_acct_key or 'Flow'}] HTTP {rpcid} gặp PUBLIC_ERROR_UNUSUAL_ACTIVITY — đang reset anchor Extension và thử lại qua HTTP...")
+                        captcha_bridge.notify_recaptcha_score_dead()
+                        rcap_retry = await loop.run_in_executor(
+                            None, _request_captcha_token, recaptcha_action, 25
+                        )
+                        if rcap_retry:
+                            ok_r, inner_r, err_r = await _call_rpc_http(rpcid, payload_builder_fn(rcap_retry))
+                            if ok_r:
+                                captcha_bridge.notify_success()
+                                return True, inner_r, ""
+                            ok_http, inner_http, err_http = ok_r, inner_r, err_r
+                            err_up = str(err_http or "").upper()
+                    err_kind_http = classify_flow_error(err_http)
+                    if captcha_bridge and err_kind_http not in (
+                        "content_policy",
+                        "account_quota",
+                        "account_auth",
+                        "rate_limit",
+                        "captcha_score",
+                    ):
+                        captcha_bridge.notify_failure()
+                    _rpc_business_err = err_kind_http in (
+                        "content_policy",
+                        "account_quota",
+                        "account_auth",
+                        "rate_limit",
+                        "captcha_score",
+                    ) or any(
+                        tok in err_up
+                        for tok in (
+                            "PUBLIC_ERROR_",
+                            "TOO_MUCH_TRAFFIC",
+                            "RESOURCE_EXHAUSTED",
+                            "PERMISSION_DENIED",
+                            "INVALID_ARGUMENT",
+                            "UNAUTHENTICATED",
+                            "HTTP 429",
+                            "GOOGLE.RPC.ERRORINFO",
+                        )
+                    ) or bool(re.search(r"(?:^|\s|:)\[(?:5|6|7|8)\](?:\s|:|$)", str(err_http or "")))
+                    if _disable_chrome or _rpc_business_err:
+                        return False, inner_http, err_http
+                    _log(f"⚠️ [{_acct_key or 'Flow'}] Submit qua HTTP bị từ chối ({err_http[:120]}), chuyển sang phiên Chrome Flow...")
+                else:
+                    detail = getattr(captcha_bridge, "_last_extension_error", None)
+                    _tier1_skip_in_run = True
+                    if _disable_chrome:
+                        return False, None, f"Extension Captcha Bridge lỗi ({detail or 'timeout'})"
+                    _log(f"⚠️ Extension Captcha Bridge chưa trả token ({detail or 'timeout'}), chuyển sang phiên Chrome Flow...")
 
-            # Tier 2: Guaranteed Chrome In-Page Executor (with tZa hijack bypass)
-            _log(f"🌐 Đang thực thi {rpcid} ({recaptcha_action}) trực tiếp trong phiên Chrome Flow...")
-            loop = asyncio.get_running_loop()
-            return await loop.run_in_executor(
+            if _disable_chrome:
+                return False, None, "Extension Captcha Bridge chưa kết nối (FLOW_DISABLE_CHROME_FALLBACK=1)"
+
+            _log(f"🌐 Đang thực thi {rpcid} ({recaptcha_action}) trong phiên Chrome Flow...")
+            ok_chr, inner_chr, err_chr = await loop.run_in_executor(
                 None,
                 _execute_flow_rpc_in_chrome,
                 eff_project_id,
@@ -4757,7 +7626,24 @@ async def _run_veo_flow_batchexecute(
                 rpcid,
                 payload_builder_fn,
                 recaptcha_action,
+                str(getattr(job, "google_profile_name", "") or "").strip(),
             )
+            if (
+                not ok_chr
+                and not use_extension_first
+                and not _tier1_skip_in_run
+                and captcha_bridge
+                and captcha_bridge.extension_liveness() == "connected"
+                and any(k in str(err_chr or "") for k in ("Executable doesn't exist", "No module named 'playwright'", "Failed to launch"))
+            ):
+                _log("⚠️ Chrome cục bộ không khởi chạy được, fallback sang Extension Captcha Bridge (:4000)...")
+                rcap_tok = await loop.run_in_executor(
+                    None, _request_captcha_token, recaptcha_action, 25
+                )
+                if rcap_tok:
+                    return await _call_rpc_http(rpcid, payload_builder_fn(rcap_tok))
+                _tier1_skip_in_run = True
+            return ok_chr, inner_chr, err_chr
 
         # Step 2: Upload reference / start images if any via maseQ
         ref_uuids = [r for r in (getattr(job, "ref_images", None) or []) if r and isinstance(r, str)]
@@ -4788,18 +7674,31 @@ async def _run_veo_flow_batchexecute(
             if not p_obj.is_file():
                 continue
             _log(f"📸 Đang tải ảnh lên Google Flow (maseQ): {p_obj.name}...")
-            raw_b64 = base64.b64encode(p_obj.read_bytes()).decode("utf-8")
+            img_raw_bytes = p_obj.read_bytes()
             mime_t = "image/jpeg" if p_obj.suffix.lower() in (".jpg", ".jpeg") else "image/png"
+            try:
+                import io as _io_maseq
+                from PIL import Image as _PilImgMaseq
+                with _PilImgMaseq.open(_io_maseq.BytesIO(img_raw_bytes)) as _im_up:
+                    _buf_up = _io_maseq.BytesIO()
+                    _im_up.convert("RGB").save(_buf_up, format="JPEG", quality=95)
+                    img_raw_bytes = _buf_up.getvalue()
+                    mime_t = "image/jpeg"
+            except Exception:
+                pass
+            raw_b64 = base64.b64encode(img_raw_bytes).decode("utf-8")
             fname_up = p_obj.name
 
             def _make_upload_builder(b64_val=raw_b64, mime_val=mime_t, fn_val=fname_up):
                 def _builder(rcap_tok):
                     wf_u = str(uuid.uuid4())
                     m_u = str(uuid.uuid4())
-                    k_u = [None, 22, None, None, None, eff_project_id, None, wf_u, None, None, [rcap_tok, 1]]
-                    return [k_u, b64_val, mime_val, 1, None, None, None, 0, fn_val, None, wf_u, m_u, None, None]
+                    k_u = [None, 22, None, None, None, eff_project_id, None, None, None, None, [rcap_tok, 1]]
+                    return [k_u, b64_val, mime_val, True, None, None, None, False, fn_val, None, wf_u, m_u, None, [1]]
                 return _builder
 
+            if ref_uuids:
+                await asyncio.sleep(random.uniform(0.9, 1.3))
             ok_up, inner_up, err_up = await _call_protected_rpc("maseQ", _make_upload_builder(), "UPLOAD_IMAGE")
             if ok_up and isinstance(inner_up, list) and inner_up and isinstance(inner_up[0], list) and inner_up[0]:
                 up_uuid = str(inner_up[0][0])
@@ -4809,6 +7708,28 @@ async def _run_veo_flow_batchexecute(
                 job.error = f"Lỗi tải ảnh lên Google Flow (maseQ): {err_up}"
                 _log(f"❌ {job.error}")
                 return False
+
+        async def _cdn_get_with_retry(dl_client, media_url: str, req_headers: dict, timeout_sec: float, validator_fn, label: str):
+            """Tải file từ Google Flow CDN với tối đa 3 lần thử lại nhanh khi gặp lỗi mạng/5xx."""
+            last_status = None
+            last_exc = None
+            last_bytes = b""
+            for dl_try in range(1, 4):
+                try:
+                    dl_r = await dl_client.get(media_url, headers=req_headers, timeout=timeout_sec, allow_redirects=True)
+                    last_status = getattr(dl_r, "status_code", None)
+                    content = getattr(dl_r, "content", b"") or b""
+                    last_bytes = content
+                    if last_status == 200 and validator_fn(content):
+                        return True, content, None
+                    last_exc = f"HTTP {last_status} ({len(content)} bytes)"
+                except Exception as exc_dl:
+                    last_exc = str(exc_dl)
+                if dl_try < 3:
+                    wait_s = (1.0 * dl_try) + random.uniform(0.05, 0.35)
+                    _log(f"⚠️ CDN tải {label} lỗi ({last_exc}) — thử lại lần {dl_try + 1}/3 sau {wait_s:.1f}s...")
+                    await asyncio.sleep(wait_s)
+            return False, last_bytes, (last_exc or f"HTTP {last_status}")
 
         # Step 3: Video or Image Generation
         if is_video:
@@ -4827,14 +7748,25 @@ async def _run_veo_flow_batchexecute(
                 voice_list = [[voice_id]] if voice_id else []
                 char_list = [[character_id]] if character_id else []
 
+                prof_pref_key = str(getattr(job, "google_profile_name", "") or "").strip() or "_default"
+                r2v_model = model_key.replace("_i2v_s_", "_r2v_").replace("_i2v_", "_r2v_").replace("_t2v_", "_r2v_")
+                used_fallback_mzza6b = False
+                mzza6b_preferred_profiles = globals().setdefault("_flow_mzza6b_preferred_profiles", set())
+
+                def _build_mzza6b_item():
+                    ref_list = [[None, r_id] for r_id in ref_uuids]
+                    return [h_prompt, ref_list, r2v_model, aspect_int, None, l_item, None, voice_list, None, char_list, []]
+
                 if voice_id or character_id or (ref_uuids and (job.mode == "reference-to-video" or getattr(job, "reference_image_urls", None))):
                     rpcid_vid = "MZZa6b"
-                    r2v_model = model_key.replace("_i2v_s_", "_r2v_").replace("_i2v_", "_r2v_").replace("_t2v_", "_r2v_")
-                    ref_list = [[None, r_id] for r_id in ref_uuids]
-                    item_g = [h_prompt, ref_list, r2v_model, aspect_int, None, l_item, None, voice_list, None, char_list, []]
+                    item_g = _build_mzza6b_item()
                 elif ref_uuids and (job.mode == "image-to-video" or getattr(job, "image_url", "")):
-                    rpcid_vid = "eb1hJf"
-                    item_g = [h_prompt, model_key, aspect_int, None, [None, ref_uuids[0]], l_item]
+                    if prof_pref_key in mzza6b_preferred_profiles:
+                        rpcid_vid = "MZZa6b"
+                        item_g = _build_mzza6b_item()
+                    else:
+                        rpcid_vid = "eb1hJf"
+                        item_g = [h_prompt, model_key, aspect_int, None, [None, ref_uuids[0]], l_item]
                 else:
                     rpcid_vid = "YhhmEf"
                     item_g = [h_prompt, model_key, aspect_int, None, l_item]
@@ -4845,8 +7777,29 @@ async def _run_veo_flow_batchexecute(
                         return [[ig], k_ctx, xb]
                     return _builder
 
-                _log(f"📤 Đang gửi yêu cầu tạo video ({rpcid_vid}, model={model_key}) — clone {ci+1}/{clone_num}...")
+                _log(f"📤 Đang gửi yêu cầu tạo video ({rpcid_vid}, model={r2v_model if rpcid_vid == 'MZZa6b' else model_key}) — clone {ci+1}/{clone_num}...")
                 ok_v, inner_v, err_v = await _call_protected_rpc(rpcid_vid, _make_vid_builder(), "VIDEO_GENERATION")
+
+                if (
+                    not ok_v
+                    and rpcid_vid == "eb1hJf"
+                    and ref_uuids
+                    and "TOO_MUCH_TRAFFIC" not in str(err_v or "").upper()
+                    and any(tok in str(err_v or "").upper() for tok in ("PUBLIC_ERROR_UNUSUAL_ACTIVITY", "PERMISSION_DENIED", "INVALID_ARGUMENT", "UNSUPPORTED"))
+                ):
+                    mzza6b_preferred_profiles.add(prof_pref_key)
+                    used_fallback_mzza6b = True
+                    _log(f"⚠️ eb1hJf bị từ chối ({str(err_v)[:90]}), tự động đồng bộ sang MZZa6b ({r2v_model})...")
+                    rpcid_vid = "MZZa6b"
+                    wf_uuid = str(uuid.uuid4())
+                    m_uuid = str(uuid.uuid4())
+                    b_uuid = str(uuid.uuid4())
+                    l_item = [None, None, None, None, m_uuid, wf_uuid]
+                    x_batch = [b_uuid, 1]
+                    item_g = _build_mzza6b_item()
+                    ok_v, inner_v, err_v = await _call_protected_rpc(
+                        "MZZa6b", _make_vid_builder(ig=item_g, xb=x_batch), "VIDEO_GENERATION"
+                    )
                 if ok_v and isinstance(inner_v, list):
                     ret_uuid = m_uuid
                     try:
@@ -4858,9 +7811,11 @@ async def _run_veo_flow_batchexecute(
                         pass
                     created_media_uuids.append(ret_uuid)
                     credits_left = inner_v[1] if len(inner_v) > 1 and isinstance(inner_v[1], int) else None
-                    _log(f"✅ Đã tạo job video trên Google Flow: {ret_uuid[:8]} (Credit còn lại: {credits_left})")
+                    if credits_left is not None and _acct_key:
+                        update_flow_account_credits_realtime(_acct_key, credits_left)
+                    _log(f"✅ [{_acct_key or 'Flow'}] Đã tạo job video trên Google Flow: {ret_uuid[:8]} (Credit còn lại: {credits_left})")
                 else:
-                    _log(f"❌ Clone {ci+1}/{clone_num} thất bại: {err_v}")
+                    _log(format_structured_flow_log("VeoFlow", str(getattr(job, "id", "") or ""), f"clone_{ci+1}", _acct_key, rpcid_vid, str(err_v)))
                     job.error = f"Google Flow từ chối tạo video: {err_v}"
 
             if not created_media_uuids:
@@ -4882,25 +7837,20 @@ async def _run_veo_flow_batchexecute(
                     ok_p, inner_p, err_p = await _call_rpc_http("as29s", [uid, None, [2]])
                     if not ok_p or not isinstance(inner_p, list):
                         continue
-                    v_urls = _find_signed_flow_urls(inner_p, "https://flow-content.google/video/")
+                    v_urls = _find_signed_flow_urls(
+                        inner_p,
+                        ("https://flow-content.google/video/", "https://storage.googleapis.com/"),
+                    )
                     if v_urls:
                         ready_urls[uid] = v_urls[0]
                         pending_uuids.remove(uid)
                         _log(f"✅ Video {uid[:8]} đã render xong ({elapsed}s)!")
                         continue
-                    status_code = None
-                    try:
-                        status_code = inner_p[5][7][0]
-                    except Exception:
-                        pass
-                    if status_code in (4, 5, 7):
+                    is_failed_vid, status_code, err_detail = extract_flow_as29s_error(inner_p)
+                    if is_failed_vid:
                         pending_uuids.remove(uid)
-                        err_detail = ""
-                        try:
-                            err_detail = json.dumps(inner_p[5][7], ensure_ascii=False)
-                        except Exception:
-                            pass
-                        job.error = f"Google Flow render FAILED (code={status_code}): {err_detail}"
+                        raw_fail = f"Google Flow render FAILED (code={status_code}): {err_detail}".strip()
+                        job.error = describe_flow_error_vi(raw_fail)
                         _log(f"❌ Video {uid[:8]} lỗi render ({elapsed}s): {job.error}")
                     else:
                         _log(f"⏳ Video {uid[:8]} đang render ({elapsed}s, status={status_code})...")
@@ -4910,7 +7860,7 @@ async def _run_veo_flow_batchexecute(
                     job.error = "Google Flow render video timeout"
                 return False
 
-            # Step 5: Download rendered MP4 files
+            # Step 5: Download rendered MP4 files (concurrent options + optional non-blocking background pool)
             job.video_options = []
             out_folder = out_file.parent
             fname = out_file.stem
@@ -4920,32 +7870,65 @@ async def _run_veo_flow_batchexecute(
                 "Referer": "https://flow.google.com/",
                 "User-Agent": wiz_headers["User-Agent"],
             }
-            for idx_opt, (uid, v_url) in enumerate(ready_urls.items()):
-                opt_file = out_file if len(ready_urls) == 1 else (out_folder / f"{fname}_option{idx_opt+1}{ext}")
-                try:
-                    dl_r = await gclient.get(v_url, headers=dl_headers, timeout=120, allow_redirects=True)
-                    if dl_r.status_code == 200 and len(dl_r.content) > 1000 and dl_r.content[4:8] == b"ftyp":
-                        opt_file.write_bytes(dl_r.content)
-                        job.video_options.append(str(opt_file))
-                        _log(f"📥 Đã tải thành công video: {opt_file.name} ({len(dl_r.content):,} bytes)")
-                    else:
-                        _log(f"⚠️ Tải video {uid[:8]} thất bại: HTTP {dl_r.status_code} ({len(dl_r.content)} bytes)")
-                except Exception as exc:
-                    _log(f"⚠️ Lỗi tải video {uid[:8]}: {exc}")
 
-            if job.video_options:
-                if len(job.video_options) > 1:
-                    import shutil
-                    shutil.copy2(job.video_options[0], out_file)
-                job.local_path = str(out_file)
-                if progress:
-                    progress(1.0)
+            async def _fetch_all_video_options(dl_client) -> bool:
+                items = list(ready_urls.items())
+
+                def _is_valid_mp4(raw: bytes) -> bool:
+                    return len(raw) > 1000 and raw[4:8] == b"ftyp"
+
+                async def _dl_one(idx_opt: int, uid: str, v_url: str):
+                    opt_file = out_file if len(items) == 1 else (out_folder / f"{fname}_option{idx_opt+1}{ext}")
+                    ok_dl, dl_bytes, dl_err = await _cdn_get_with_retry(
+                        dl_client, v_url, dl_headers, 120, _is_valid_mp4, f"video {uid[:8]}"
+                    )
+                    if ok_dl:
+                        opt_file.write_bytes(dl_bytes)
+                        _log(f"📥 Đã tải thành công video: {opt_file.name} ({len(dl_bytes):,} bytes)")
+                        return str(opt_file), None
+                    _log(f"⚠️ Tải video {uid[:8]} thất bại sau 3 lần thử: {dl_err}")
+                    return None, dl_err
+
+                dl_results = await asyncio.gather(*(_dl_one(i, u, vu) for i, (u, vu) in enumerate(items)))
+                job.video_options = [p for p, _ in dl_results if p]
+                if job.video_options:
+                    if len(job.video_options) > 1:
+                        import shutil
+                        shutil.copy2(job.video_options[0], out_file)
+                    job.local_path = str(out_file)
+                    if progress:
+                        progress(1.0)
+                    return True
+                first_err = next((e for _, e in dl_results if e), "HTTP error")
+                job.error = f"Không tải được file MP4 từ Google Flow CDN ({first_err})"
+                return False
+
+            if getattr(job, "async_media_finalize", False):
+                cb_ready = getattr(job, "on_cloud_ready", None)
+                if callable(cb_ready):
+                    try:
+                        cb_ready(job, list(ready_urls.keys()))
+                    except Exception:
+                        pass
+
+                def _bg_vid_dl():
+                    bg_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(bg_loop)
+                    try:
+                        async def _run_bg():
+                            async with _GoogleApiClient(proxy_url=proxy_for_flow, timeout=120, impersonate="chrome131") as bg_client:
+                                return await _fetch_all_video_options(bg_client)
+                        return bg_loop.run_until_complete(_run_bg())
+                    finally:
+                        bg_loop.close()
+
+                job.media_finalize_future = get_flow_media_download_pool().submit(_bg_vid_dl)
                 return True
-            job.error = "Không tải được file MP4 từ Google Flow CDN"
-            return False
+
+            return await _fetch_all_video_options(gclient)
 
         else:
-            # Image generation via Z9cAtf
+            # Image generation via ogiZ0b / Z9cAtf
             s_asp = str(job.aspect_ratio).lower()
             if "9:16" in s_asp or "portrait" in s_asp:
                 aspect_img = 2
@@ -4980,8 +7963,12 @@ async def _run_veo_flow_batchexecute(
             _log(f"📤 Đang gửi yêu cầu tạo ảnh (ogiZ0b, model={img_model}, aspect={aspect_img})...")
             ok_img, inner_img, err_img = await _call_protected_rpc("ogiZ0b", _build_img_payload_ogi, "IMAGE_GENERATION")
             if not ok_img:
-                _log(f"⚠️ ogiZ0b trả về {err_img}, đang thử Z9cAtf...")
-                ok_img, inner_img, err_img = await _call_protected_rpc("Z9cAtf", _build_img_payload_z9, "IMAGE_GENERATION")
+                _err_img_kind = classify_flow_error(err_img)
+                if _err_img_kind in ("content_policy", "account_quota", "account_auth", "rate_limit"):
+                    _log(f"⛔ ogiZ0b trả về {_err_img_kind} ({format_flow_error_short(err_img)}), không gọi Z9cAtf thừa.")
+                else:
+                    _log(f"⚠️ ogiZ0b trả về {err_img}, đang thử Z9cAtf...")
+                    ok_img, inner_img, err_img = await _call_protected_rpc("Z9cAtf", _build_img_payload_z9, "IMAGE_GENERATION")
             if not ok_img:
                 job.error = f"Google Flow từ chối tạo ảnh: {err_img}"
                 _log(f"❌ {job.error}")
@@ -4996,13 +7983,22 @@ async def _run_veo_flow_batchexecute(
             except Exception:
                 pass
 
-            img_urls = _find_signed_flow_urls(inner_img, "https://flow-content.google/image/")
+            img_prefixes = ("https://flow-content.google/image/", "https://lh3.googleusercontent.com/")
+            img_urls = _find_signed_flow_urls(inner_img, img_prefixes)
             start_img_poll = time.time()
             while not img_urls and (time.time() - start_img_poll < 90):
                 await asyncio.sleep(3)
                 ok_p, inner_p, _ = await _call_rpc_http("as29s", [ret_img_uuid, None, [2]])
-                if ok_p:
-                    img_urls = _find_signed_flow_urls(inner_p, "https://flow-content.google/image/")
+                if ok_p and isinstance(inner_p, list):
+                    img_urls = _find_signed_flow_urls(inner_p, img_prefixes)
+                    if img_urls:
+                        break
+                    is_failed_img, st_code, err_detail = extract_flow_as29s_error(inner_p)
+                    if is_failed_img:
+                        raw_img_fail = f"Google Flow từ chối render ảnh (code={st_code})" + (f": {err_detail}" if err_detail else "")
+                        job.error = describe_flow_error_vi(raw_img_fail)
+                        _log(f"❌ {job.error}")
+                        return False
 
             if not img_urls:
                 job.error = "Không tìm thấy URL ảnh từ Google Flow"
@@ -5014,16 +8010,141 @@ async def _run_veo_flow_batchexecute(
                 "Referer": "https://flow.google.com/",
                 "User-Agent": wiz_headers["User-Agent"],
             }
-            dl_r = await gclient.get(img_urls[0], headers=dl_headers, timeout=60, allow_redirects=True)
-            if dl_r.status_code == 200 and len(dl_r.content) > 500:
-                out_file.write_bytes(dl_r.content)
-                job.local_path = str(out_file)
-                if progress:
-                    progress(1.0)
-                _log(f"📥 Đã lưu ảnh thành công: {out_file.name} ({len(dl_r.content):,} bytes)")
+
+            async def _finalize_image_2k_and_dl(dl_client, call_rpc_fn=None, cap_fn=None, protected_rpc_fn=None) -> bool:
+                cur_urls = list(img_urls)
+                want_2k = bool(job.flow_request_only and str(getattr(job, "resolution", "") or "").upper() == "2K")
+                need_local_2k_fallback = False
+                if want_2k:
+                    if is_sprcad_circuit_open():
+                        ok_2k, result_2k, error_2k = False, None, "SPrCad cooldown"
+                        need_local_2k_fallback = True
+                    else:
+                        def upscale_payload(token):
+                            context = [None, 22, None, None, None, eff_project_id,
+                                       None, None, None, None, [token, 1]]
+                            return [ret_img_uuid, 1, context]
+
+                        if protected_rpc_fn is not None:
+                            ok_2k, result_2k, error_2k = await protected_rpc_fn(
+                                "SPrCad", upscale_payload, "IMAGE_GENERATION"
+                            )
+                        else:
+                            tok_2k = await asyncio.get_running_loop().run_in_executor(None, cap_fn, "IMAGE_GENERATION", 25)
+                            if tok_2k:
+                                ok_2k, result_2k, error_2k = await call_rpc_fn("SPrCad", upscale_payload(tok_2k))
+                            else:
+                                ok_2k, result_2k, error_2k = False, None, "Thiếu reCAPTCHA token cho SPrCad"
+
+                    if ok_2k:
+                        if isinstance(result_2k, list) and len(result_2k) >= 2 and isinstance(result_2k[1], str) and len(result_2k[1]) > 500:
+                            try:
+                                raw_2k = base64.b64decode(result_2k[1])
+                                if raw_2k[:4] in (b"\x89PNG", b"RIFF") or raw_2k[:2] == b"\xff\xd8":
+                                    out_file.write_bytes(raw_2k)
+                                    job.local_path = str(out_file)
+                                    record_sprcad_result(True)
+                                    if progress:
+                                        progress(1.0)
+                                    _log(f"📥 Đã lưu ảnh 2K thành công: {out_file.name} ({len(raw_2k):,} bytes)")
+                                    return True
+                            except Exception:
+                                pass
+                        upscale_urls = _find_signed_flow_urls(result_2k, img_prefixes)
+                        if upscale_urls:
+                            record_sprcad_result(True)
+                            cur_urls = upscale_urls
+                        else:
+                            record_sprcad_result(False, "invalid SPrCad payload")
+                            need_local_2k_fallback = True
+                            _log("⚠️ Upscale 2K (SPrCad) chưa trả dữ liệu ảnh hợp lệ, tự động tải ảnh gốc & nâng 2K...")
+                    else:
+                        if not is_sprcad_circuit_open():
+                            record_sprcad_result(False, str(error_2k or ""))
+                        need_local_2k_fallback = True
+                        _log(f"⚠️ Upscale 2K (SPrCad) không khả dụng ({error_2k}), tự động tải ảnh gốc & nâng 2K...")
+
+                def _is_valid_img_bytes(raw: bytes) -> bool:
+                    return len(raw) > 500 and (
+                        raw[:4] in (b"\x89PNG", b"RIFF") or raw[:2] == b"\xff\xd8"
+                    )
+
+                ok_dl, img_bytes, dl_err = await _cdn_get_with_retry(
+                    dl_client, cur_urls[0], dl_headers, 60, _is_valid_img_bytes, out_file.name
+                )
+                if ok_dl:
+                    out_file.write_bytes(img_bytes)
+                    if need_local_2k_fallback:
+                        upscale_image_local_2k(str(out_file))
+                    job.local_path = str(out_file)
+                    if progress:
+                        progress(1.0)
+                    _log(f"📥 Đã lưu ảnh thành công: {out_file.name} ({out_file.stat().st_size:,} bytes)")
+                    return True
+                job.error = f"Tải ảnh thất bại sau 3 lần thử: {dl_err}"
+                return False
+
+            if getattr(job, "async_media_finalize", False):
+                cb_ready = getattr(job, "on_cloud_ready", None)
+                if callable(cb_ready):
+                    try:
+                        cb_ready(job, [ret_img_uuid])
+                    except Exception:
+                        pass
+
+                def _bg_img_dl():
+                    bg_loop = asyncio.new_event_loop()
+                    asyncio.set_event_loop(bg_loop)
+                    try:
+                        async def _run_bg_img():
+                            async with _GoogleApiClient(proxy_url=proxy_for_flow, timeout=60, impersonate="chrome131") as bg_client:
+                                async def _bg_rpc(rpcid: str, payload_obj) -> tuple:
+                                    cur_ua, _ = _get_effective_ua_and_sec_ch_ua(captcha_bridge)
+                                    url = (
+                                        f"https://flow.google.com/_/AiSandboxAngularFrontend/data/batchexecute"
+                                        f"?rpcids={rpcid}&source-path=%2Fproject%2F{eff_project_id}"
+                                        f"&bl={urllib.parse.quote(bl_val)}&f.sid={urllib.parse.quote(str(fsid_val))}"
+                                        f"&hl=vi&_reqid={random.randint(100000, 999999)}&rt=c"
+                                    )
+                                    f_req = json.dumps([[[rpcid, json.dumps(payload_obj, separators=(",", ":")), None, "generic"]]], separators=(",", ":"))
+                                    body = f"f.req={urllib.parse.quote(f_req)}&at={urllib.parse.quote(at_token)}&"
+                                    rpc_headers = {
+                                        "Accept": "*/*",
+                                        "Accept-Language": "vi,en-US;q=0.9,en;q=0.8",
+                                        "Content-Type": "application/x-www-form-urlencoded;charset=UTF-8",
+                                        "Origin": "https://flow.google.com",
+                                        "Referer": f"https://flow.google.com/project/{eff_project_id}",
+                                        "User-Agent": cur_ua,
+                                        "X-Same-Domain": "1",
+                                        "Cookie": auth_cookie,
+                                    }
+                                    last_rpc_err = ""
+                                    for http_try in range(1, 3):
+                                        try:
+                                            r_rpc = await bg_client.post(url, headers=rpc_headers, data=body, timeout=60)
+                                        except Exception as exc_bg:
+                                            last_rpc_err = f"Transport {rpcid}: {exc_bg}"
+                                            if http_try < 2:
+                                                await asyncio.sleep(random.uniform(0.8, 1.6))
+                                                continue
+                                            return False, None, last_rpc_err
+                                        if r_rpc.status_code in (500, 502, 503, 504) and http_try < 2:
+                                            await asyncio.sleep(random.uniform(0.8, 1.6))
+                                            continue
+                                        if r_rpc.status_code != 200:
+                                            return False, None, f"HTTP {r_rpc.status_code}: {r_rpc.text[:200]}"
+                                        return _parse_batchexecute_wrb(r_rpc.text, rpcid)
+                                    return False, None, last_rpc_err
+
+                                return await _finalize_image_2k_and_dl(bg_client, call_rpc_fn=_bg_rpc, cap_fn=_request_captcha_token)
+                        return bg_loop.run_until_complete(_run_bg_img())
+                    finally:
+                        bg_loop.close()
+
+                job.media_finalize_future = get_flow_media_download_pool().submit(_bg_img_dl)
                 return True
-            job.error = f"Tải ảnh thất bại: HTTP {dl_r.status_code}"
-            return False
+
+            return await _finalize_image_2k_and_dl(gclient, protected_rpc_fn=_call_protected_rpc)
 
 def get_veo_aspect_ratio(aspect: str, is_video: bool) -> str:
     if is_video:
@@ -5113,6 +8234,13 @@ async def run_veo_flow(job: VideoJob, bearer_token: str, project_id: str, captch
     max_retries = getattr(job, "max_retries", 3)
     if max_retries < 1:
         max_retries = 1
+    acct_keys = []
+    for _ak in (
+        str(getattr(job, "account_name", "") or "").strip(),
+        str(getattr(job, "google_profile_name", "") or "").strip(),
+    ):
+        if _ak and _ak not in acct_keys:
+            acct_keys.append(_ak)
     try:
         for attempt in range(1, max_retries + 1):
             # Kiểm tra nếu đang tạm dừng thì chờ cho tới khi tiếp tục
@@ -5151,31 +8279,94 @@ async def run_veo_flow(job: VideoJob, bearer_token: str, project_id: str, captch
                         pass
             success = await _run_veo_flow_single_attempt(job, bearer_token, project_id, captcha_bridge, log, progress)
             if success:
+                for _ak in acct_keys:
+                    clear_flow_account_cooldown(_ak)
                 return True
-            # Change 10: Check for non-retryable error (content policy, access denied, daily quota, etc.)
-            if job.error and is_non_retryable_error(job.error):
-                _log(f"❌ Gặp lỗi nghiêm trọng không thể thử lại (Non-retryable): {job.error}")
+
+            err_str = str(job.error or "")
+            err_kind = classify_flow_error(err_str)
+            short_err = format_flow_error_short(err_str)
+
+            # Triage non-retryable errors:
+            # - content_policy -> thử làm dịu prompt an toàn tối đa 1 lần trên CÙNG tài khoản
+            #   (chỉ khi lỗi ở khâu tạo nội dung, KHÔNG tự sửa khi ảnh upload maseQ bị chặn hoặc HTTP 400 malformed)
+            # - account_quota / non-retryable access denied -> đưa account vào cooldown & dừng
+            if err_str and err_kind == "content_policy":
+                subtype = classify_content_rejection_subtype(err_str)
+                err_low = err_str.lower()
+                is_upload_reject = any(
+                    tok in err_low for tok in ("maseq", "uploadimage", "upload ảnh", "tải ảnh lên google flow")
+                )
+                if (
+                    not is_upload_reject
+                    and subtype != "invalid_input"
+                    and not getattr(job, "_policy_sanitized_retried", False)
+                ):
+                    safe_prompt, prompt_changed = sanitize_prompt_for_flow_policy(
+                        str(getattr(job, "prompt", "") or ""),
+                        rejection_subtype=subtype,
+                    )
+                    if prompt_changed and safe_prompt:
+                        job._policy_sanitized_retried = True
+                        job._orig_prompt_before_sanitize = getattr(job, "prompt", "")
+                        job.prompt = safe_prompt
+                        job.error = None
+                        _log(
+                            f"🛡️ Google Flow từ chối do bộ lọc nội dung ({subtype}: {short_err}) "
+                            "— tự động làm dịu prompt an toàn và thử lại 1 lần trên cùng tài khoản..."
+                        )
+                        ok_sanitized = await _run_veo_flow_single_attempt(
+                            job, bearer_token, project_id, captcha_bridge, log, progress
+                        )
+                        if ok_sanitized:
+                            for _ak in acct_keys:
+                                clear_flow_account_cooldown(_ak)
+                            return True
+                        if hasattr(job, "_orig_prompt_before_sanitize"):
+                            job.prompt = job._orig_prompt_before_sanitize
+                        err_str = str(job.error or "")
+                        err_kind = classify_flow_error(err_str)
+                        short_err = format_flow_error_short(err_str)
+                if err_str and err_kind == "content_policy":
+                    job.error = describe_flow_error_vi(err_str)
+                    _log(f"❌ {job.error}")
+                    break
+
+            if err_str and (err_kind == "account_quota" or is_non_retryable_error(err_str)):
+                job.error = describe_flow_error_vi(err_str)
+                for _ak in acct_keys:
+                    mark_flow_account_cooldown(_ak, err_kind, err_str)
+                _log(f"❌ {job.error}")
                 break
+
             if attempt < max_retries:
                 import random
-                if is_google_rate_limit_error(job.error):
-                    # A 429 is a Google quota/throttle response.  Retrying
-                    # after 5-7 seconds only creates another synchronized
-                    # burst and makes the bridge look unhealthy.
+                if err_kind == "rate_limit" or is_google_rate_limit_error(err_str):
                     delay_sec = random.uniform(45.0, 60.0)
-                    _log(f"⏳ Google đang giới hạn request (429); chờ {delay_sec:.1f} giây trước khi thử lại...")
+                    _log(f"⏳ Google đang giới hạn request ({short_err}); chờ {delay_sec:.1f} giây trước khi thử lại...")
                 else:
-                    delay_sec = random.uniform(5.0, 7.0)
-                    _log(f"⏳ Chờ {delay_sec:.1f} giây trước khi thử lại...")
+                    delay_sec = min(15.0, (2.0 ** attempt) + random.uniform(1.0, 3.0))
+                    _log(f"⏳ Lỗi {err_kind} ({short_err}); chờ {delay_sec:.1f} giây trước khi thử lại...")
                 await asyncio.sleep(delay_sec)
+            else:
+                if err_str:
+                    job.error = describe_flow_error_vi(err_str)
+                if err_kind in ("account_quota", "account_auth", "rate_limit", "captcha_score", "transient"):
+                    for _ak in acct_keys:
+                        mark_flow_account_cooldown(_ak, err_kind, err_str)
+        if getattr(job, "error", None):
+            job.error = describe_flow_error_vi(str(job.error))
         return False
     finally:
-        from proxy_manager import _global_proxy_manager
-        if _global_proxy_manager:
-            for p in _global_proxy_manager.get_enabled_proxies():
-                if p.type == "rotating" and getattr(p, "rotation_lock_count", 0) > 0:
-                    p.rotation_lock_count = 0
-                    _global_proxy_manager.log(f"🧹 Dọn dẹp: Đã reset khóa xoay proxy [{p.name}] về 0.")
+        # Individual _run_veo_flow_single_attempt releases its own active_rotating_proxies via release_locks();
+        # never reset p.rotation_lock_count = 0 globally across concurrent worker threads!
+        if hasattr(job, "_locked_rotating_proxies") and getattr(job, "_locked_rotating_proxies", None):
+            from proxy_manager import _global_proxy_manager
+            if _global_proxy_manager:
+                for p in list(job._locked_rotating_proxies):
+                    with _global_proxy_manager._lock:
+                        p.rotation_lock_count = max(0, int(getattr(p, "rotation_lock_count", 0)) - 1)
+            job._locked_rotating_proxies = []
 
 async def _run_veo_flow_single_attempt(job: VideoJob, bearer_token: str, project_id: str, captcha_bridge: 'CaptchaBridge', log, progress) -> bool:
     def _log(m):
@@ -5284,7 +8475,22 @@ async def _run_veo_flow_single_attempt(job: VideoJob, bearer_token: str, project
         if not profile_name and not target_account:
             profile_name = _default_google_profile_name(auth_root=auth_root) or None
             flow_profile_name = profile_name or ""
-                
+
+        if not is_valid and not force_token_refresh and profile_name and not job.prefer_bearer_request:
+            try:
+                disk_hdr = _load_flow_cookie_header(profile_name, auth_root=auth_root)
+                if disk_hdr:
+                    tok_disk = f"flow_cookie:{disk_hdr}"
+                    ok_d, info_d = GoogleTokenRefreshWorker._check_token(tok_disk)
+                    from google_flow_auth import identity_matches, expected_email
+                    if ok_d and identity_matches(expected_email(_auth_root_value(auth_root), profile_name), info_d):
+                        bearer_token = tok_disk
+                        auth_cookie = disk_hdr
+                        is_valid = True
+                        _log(f"🔑 [Token Check] Nạp cookie Flow mới từ cookies/{profile_name}.json ({info_d}).")
+            except Exception:
+                pass
+
         refresh_error = "Không xác định"
         if not is_valid and profile_name:
             _log(f"⏳ [Token Check] Đang thử tự động làm mới token cho cấu hình: {profile_name}...")
@@ -5359,10 +8565,15 @@ async def _run_veo_flow_single_attempt(job: VideoJob, bearer_token: str, project
 
     if str(bearer_token or "").strip().startswith("flow_cookie:"):
         auth_cookie = str(bearer_token).strip()[len("flow_cookie:"):].strip()
-    if not auth_cookie:
+    elif job.flow_request_only and "SID=" in bearer_token and "__Secure-" in bearer_token:
+        auth_cookie = bearer_token
+    if not auth_cookie and not job.prefer_bearer_request:
         _prof_for_cookie = flow_profile_name or _default_google_profile_name(auth_root=auth_root)
         if _prof_for_cookie:
             auth_cookie = _load_flow_cookie_header(_prof_for_cookie, auth_root=auth_root)
+    if auth_cookie and job.prefer_bearer_request:
+        job.error = "Phiên Flow chỉ trả cookie. Luồng request này cần bearer hợp lệ."
+        return False
     if auth_cookie:
         return await _run_veo_flow_batchexecute(
             job, project_id, auth_cookie, captcha_bridge, _log, progress, out_file
@@ -5433,18 +8644,25 @@ async def _run_veo_flow_single_attempt(job: VideoJob, bearer_token: str, project
                             job.error = "HTTP 401 khi tải ảnh: token Google cần được làm mới từ Chrome profile."
                             return False
 
+        expected_refs = len(job.reference_image_urls) + int(bool(job.image_url)) + len(job.ref_images or [])
+        if job.require_all_reference_uploads and len(ref_uuids) != expected_refs:
+            job.error = "Không tải được đầy đủ ảnh tham chiếu lên dự án Flow."
+            return False
+
         action = "VIDEO_GENERATION" if is_video else "IMAGE_GENERATION"
         
         # Self-healing: restart bridge server if it's not running but port 4000 is now free
-        if captcha_bridge and not getattr(captcha_bridge, "_server", None):
+        if captcha_bridge and not (getattr(captcha_bridge, "_server", None) or getattr(captcha_bridge, "_remote_bridge", False)):
             import socket
             with socket.socket(socket.AF_INET, socket.SOCK_STREAM) as s:
                 bridge_port = int(getattr(captcha_bridge, "port", 4000))
                 if s.connect_ex(("127.0.0.1", bridge_port)) != 0:
                     _log(f"🔄 Phát hiện Captcha Bridge Server chưa chạy trên port {bridge_port}, đang thử khởi động lại...")
                     captcha_bridge.start()
+                else:
+                    captcha_bridge.start(allow_remote=True)
                     
-        if not captcha_bridge or not getattr(captcha_bridge, "_server", None):
+        if not captcha_bridge or not (getattr(captcha_bridge, "_server", None) or getattr(captcha_bridge, "_remote_bridge", False)):
             _log("❌ Lỗi: Captcha Bridge Server chưa được khởi động!\n"
                  f"   → Captcha Bridge cần chạy trên cổng {getattr(captcha_bridge, 'port', 4000)} để giao tiếp với Extension.\n"
                  "   → Hãy đảm bảo chỉ có một instance của tool chiếm cổng này và Extension 'UpProject Captcha Bridge' được cấu hình đúng.")
@@ -5464,47 +8682,53 @@ async def _run_veo_flow_single_attempt(job: VideoJob, bearer_token: str, project
         from proxy_manager import _global_proxy_manager
         active_rotating_proxies = []
         if _global_proxy_manager and getattr(job, "use_proxy", False):
-            for p in _global_proxy_manager.get_enabled_proxies():
-                if p.type == "rotating":
-                    p.rotation_lock_count += 1
-                    active_rotating_proxies.append(p)
-                    _global_proxy_manager.log(f"🔒 Đã khóa xoay proxy [{p.name}] để chuẩn bị giải reCAPTCHA và Submit (lock count: {p.rotation_lock_count}).")
+            with _global_proxy_manager._lock:
+                for p in _global_proxy_manager.get_enabled_proxies():
+                    if p.type == "rotating":
+                        p.rotation_lock_count += 1
+                        active_rotating_proxies.append(p)
+                        _global_proxy_manager.log(f"🔒 Đã khóa xoay proxy [{p.name}] để chuẩn bị giải reCAPTCHA và Submit (lock count: {p.rotation_lock_count}).")
+            job._locked_rotating_proxies = list(active_rotating_proxies)
 
         def release_locks():
-            if _global_proxy_manager:
-                for p in active_rotating_proxies:
-                    p.rotation_lock_count = max(0, p.rotation_lock_count - 1)
-                    _global_proxy_manager.log(f"🔓 Đã mở khóa xoay proxy [{p.name}] (lock count: {p.rotation_lock_count}).")
+            if _global_proxy_manager and active_rotating_proxies:
+                with _global_proxy_manager._lock:
+                    for p in list(active_rotating_proxies):
+                        p.rotation_lock_count = max(0, p.rotation_lock_count - 1)
+                        _global_proxy_manager.log(f"🔓 Đã mở khóa xoay proxy [{p.name}] (lock count: {p.rotation_lock_count}).")
+                active_rotating_proxies.clear()
+                job._locked_rotating_proxies = []
 
-        # Serialize reCAPTCHA token requests: chỉ 1 cảnh được lấy token tại một thời điểm.
-        # Nếu nhiều cảnh chạy song song mà cùng lấy token đồng thời → Google thấy burst → 403.
-        global _rcap_serial_lock
-        
         # ── Change 1: Token-per-Request (N tokens cho N clones) ──────────────
         # Veo3Studio lấy N tokens riêng cho N requests. Token là single-use.
+        # Concurrent threads share the Extension solver pool via CaptchaBridge per-account cooldowns
+        # instead of serializing every account behind a single global lock.
         clone_num = getattr(job, "clone_count", 1)
         if clone_num < 1:
             clone_num = 1
-        
+
+        _acct_key_legacy = str(getattr(job, "google_profile_name", "") or getattr(job, "account_name", "") or "").strip()
         rcap_tokens = []
-        with _rcap_serial_lock:
-            max_retries_rcap = 3
-            for ci in range(clone_num):
-                token_ok = False
-                for attempt_rcap in range(1, max_retries_rcap + 1):
-                    _log(f"🔑 Đang lấy reCAPTCHA token ({action}) — clone {ci+1}/{clone_num}, lần {attempt_rcap}/{max_retries_rcap}...")
+        max_retries_rcap = 3
+        for ci in range(clone_num):
+            token_ok = False
+            for attempt_rcap in range(1, max_retries_rcap + 1):
+                _log(f"🔑 Đang lấy reCAPTCHA token ({action}) — clone {ci+1}/{clone_num}, lần {attempt_rcap}/{max_retries_rcap}...")
+                if _acct_key_legacy and hasattr(captcha_bridge, "request_recaptcha_for_account"):
+                    rcap_token = captcha_bridge.request_recaptcha_for_account(action, timeout=60, account_key=_acct_key_legacy)
+                else:
                     rcap_token = captcha_bridge.request_recaptcha(action, 60)
-                    if rcap_token:
-                        rcap_tokens.append(rcap_token)
-                        token_ok = True
-                        break
-                    if attempt_rcap < max_retries_rcap:
-                        _log(f"⚠️ Lần {attempt_rcap} thất bại, thử lại sau 5s... (Đảm bảo trang Google Flow đang mở trên trình duyệt)")
-                        import time as _time
-                        _time.sleep(5)
-                if not token_ok:
-                    _log(f"❌ Không lấy được token cho clone {ci+1}/{clone_num} sau {max_retries_rcap} lần thử.")
+                if rcap_token:
+                    rcap_tokens.append(rcap_token)
+                    token_ok = True
                     break
+                if attempt_rcap < max_retries_rcap:
+                    _log(f"⚠️ Lần {attempt_rcap} thất bại, thử lại sau 5s... (Đảm bảo trang Google Flow đang mở trên trình duyệt)")
+                    import time as _time
+                    _time.sleep(5)
+            if not token_ok:
+                _log(f"❌ Không lấy được token cho clone {ci+1}/{clone_num} sau {max_retries_rcap} lần thử.")
+                break
         
         if not rcap_tokens:
             _log("❌ Lỗi: Không lấy được reCAPTCHA token sau 3 lần thử!\n"
@@ -6671,43 +9895,35 @@ async def run_job(job: VideoJob, client: GrokClient,
 
             if is_image:
                 size = map_aspect_to_image_size(job.aspect_ratio)
-                
-                # Check for input reference image
-                has_ref_image = False
-                ref_path = ""
-                if job.image_url and Path(job.image_url).exists():
-                    has_ref_image = True
-                    ref_path = job.image_url
-                elif job.reference_image_urls and Path(job.reference_image_urls[0]).exists():
-                    has_ref_image = True
-                    ref_path = job.reference_image_urls[0]
+                ref_paths = _cliproxy_collect_unique_refs(job.image_url or "", getattr(job, "reference_image_urls", None))
 
-                if has_ref_image:
-                    _log(f"🎨 Đang sửa ảnh {job.id} qua Codex edits...")
+                if ref_paths:
+                    _log(f"🎨 Đang sửa ảnh {job.id} qua CLIProxy edits ({len(ref_paths)} ảnh ref)...")
                     img_type, img_val = await client.generate_image_edit(
                         prompt=job.prompt,
                         model=job.model,
                         size=size,
-                        image_path=ref_path,
+                        image_path=ref_paths,
                         use_proxy=getattr(job, "use_proxy", False)
                     )
                 else:
-                    _log(f"🎨 Đang tạo ảnh {job.id} qua Codex/Grok...")
+                    _log(f"🎨 Đang tạo ảnh {job.id} qua CLIProxy (Codex/Grok/Gemini)...")
                     img_type, img_val = await client.generate_image(
                         prompt=job.prompt,
                         model=job.model,
                         size=size,
                         use_proxy=getattr(job, "use_proxy", False)
                     )
-                
+
                 if img_type == "base64":
                     _log(f"📥 Đang lưu ảnh {job.id}...")
                     img_bytes = base64.b64decode(img_val)
-                    with open(out_file, "wb") as f:
-                        f.write(img_bytes)
+                    _save_image_payload_to_path(img_bytes, str(out_file))
                 else:
                     _log(f"📥 Đang tải ảnh {job.id}...")
                     await client.download(img_val, out_file, use_proxy=getattr(job, "use_proxy", False))
+                    if out_file.exists():
+                        _save_image_payload_to_path(out_file.read_bytes(), str(out_file))
                 
                 job.local_path = str(out_file)
                 job.status = "done"
@@ -8310,52 +11526,36 @@ class SBImageWorker(QThread):
             ticker.start()
 
             self._log(f"🎨 Đang vẽ ảnh với {model}...")
-
-            is_grok = "grok" in model.lower()
-            is_dalle = "gpt" in model.lower() or "dall" in model.lower()
-            if ref_img and not is_grok and Path(ref_img).exists():
-                self._log("  → /v1/images/edits (multipart)")
-                with open(ref_img, "rb") as f:
-                    img_bytes = f.read()
-                ext  = Path(ref_img).suffix.lower().lstrip(".") or "jpeg"
-                mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
-                files     = {"image": (Path(ref_img).name, img_bytes, mime)}
-                data_form = {"model": model, "prompt": prompt, "n": "1", "size": size}
-                url = f"{proxy}/v1/images/edits"
-                with make_httpx_client(timeout=300, target_url=url, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    resp = c.post(url, headers=auth, files=files, data=data_form)
-            else:
-                self._log("  → /v1/images/generations (JSON)")
-                url     = f"{proxy}/v1/images/generations"
-                payload = {"model": model, "prompt": prompt, "n": 1, "size": size}
-                # Dịch chất lượng 1K/2K sang standard/hd cho API DALL-E 3 / gpt-image-2
-                api_quality = "hd" if quality == "2K" else "standard"
-                if api_quality and api_quality != "standard":
-                    payload["quality"] = api_quality
-                hdr = {**auth, "Content-Type": "application/json"}
-                with make_httpx_client(timeout=300, target_url=url, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    resp = c.post(url, headers=hdr, json=payload)
+            ref_paths = _cliproxy_collect_unique_refs(ref_img or "", getattr(p, "reference_image_paths", None))
+            api_quality = "hd" if quality == "2K" else "standard"
+            img_type, img_val = _cliproxy_run_image_sync(
+                proxy=proxy,
+                api_key=api_key,
+                model=model,
+                prompt=prompt,
+                size=size,
+                aspect=getattr(p, "aspect", ""),
+                quality=api_quality,
+                ref_paths=ref_paths,
+                use_proxy=getattr(p, "use_proxy", False),
+                log_fn=self._log,
+            )
 
             self._stop_progress = True
-            if resp.status_code >= 400:
-                raise RuntimeError(f"Image API error {resp.status_code}: {resp.text[:400]}")
-
-            data = resp.json()
-            item = data["data"][0]
 
             # Save to project scene dir
             out_dir = p.scene_dir(idx + 1)
             out = str(out_dir / f"storyboard_{idx+1:02d}.png")
 
             import base64 as _b64
-            if item.get("url"):
-                with make_httpx_client(timeout=60, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    r = c.get(item["url"]); r.raise_for_status()
-                    Path(out).write_bytes(r.content)
-            elif item.get("b64_json"):
-                Path(out).write_bytes(_b64.b64decode(item["b64_json"]))
+            if img_type == "url":
+                with make_httpx_client(timeout=60, target_url=img_val, use_proxy=getattr(p, "use_proxy", False)) as c:
+                    r = c.get(img_val); r.raise_for_status()
+                    _save_image_payload_to_path(r.content, out)
+            elif img_type == "base64":
+                _save_image_payload_to_path(_b64.b64decode(img_val), out)
             else:
-                raise RuntimeError(f"Không tìm thấy ảnh trong response: {list(item.keys())}")
+                raise RuntimeError(f"Không tìm thấy ảnh trong response: {img_type}")
 
             elapsed = int(time.time() - start_time)
             self._log(f"  ✔ Ảnh đã lưu: {Path(out).name} ({elapsed}s)")
@@ -8550,7 +11750,7 @@ class SBVideoWorker(QThread):
             proxy    = self.account.proxy_url if self.account else ""
             if not proxy or not proxy.startswith("http"):
                 proxy = DEFAULT_PROXY_URL
-            api_key  = self.account.api_key if self.account else ""
+            api_key  = ((self.account.api_key if self.account else "") or "grok-video-key-001").strip()
 
             # Đọc ảnh storyboard → compress nhẹ + encode base64
             img_bytes = Path(storyboard_img).read_bytes()
@@ -8603,10 +11803,10 @@ class SBVideoWorker(QThread):
                 c_seed = random.randint(1, 2147483647)
                 payload["seed"] = c_seed
 
-                with make_httpx_client(timeout=120, use_proxy=getattr(p, "use_proxy", False)) as client:
+                with make_httpx_client(timeout=120, target_url=submit_url, use_proxy=getattr(p, "use_proxy", False)) as client:
                     resp = client.post(submit_url, headers=headers, json=payload)
                     if resp.status_code >= 400:
-                        raise RuntimeError(f"Video API submit error {resp.status_code}: {resp.text[:500]}")
+                        raise RuntimeError(_cliproxy_format_api_error(resp.status_code, resp.text, model=model, base_url=proxy))
                     data = resp.json()
                 req_id = data.get("id") or data.get("request_id", "")
                 if req_id:
@@ -8822,51 +12022,36 @@ class RSImageWorker(QThread):
             ticker.start()
 
             self._log(f"🎨 Đang vẽ ảnh với {model}...")
-
-            is_grok = "grok" in model.lower()
-            is_dalle_api = "gpt" in model.lower() or "dall" in model.lower()
-            if ref_img and not is_grok and Path(ref_img).exists():
-                self._log("  → /v1/images/edits (multipart)")
-                with open(ref_img, "rb") as f:
-                    img_bytes = f.read()
-                ext  = Path(ref_img).suffix.lower().lstrip(".") or "jpeg"
-                mime = f"image/{ext}" if ext != "jpg" else "image/jpeg"
-                files     = {"image": (Path(ref_img).name, img_bytes, mime)}
-                data_form = {"model": model, "prompt": prompt, "n": "1", "size": size}
-                url = f"{proxy}/v1/images/edits"
-                with make_httpx_client(timeout=300, target_url=url, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    resp = c.post(url, headers=auth, files=files, data=data_form)
-            else:
-                self._log("  → /v1/images/generations (JSON)")
-                url     = f"{proxy}/v1/images/generations"
-                payload = {"model": model, "prompt": prompt, "n": 1, "size": size}
-                api_quality = "hd" if quality == "2K" else "standard"
-                if api_quality and api_quality != "standard":
-                    payload["quality"] = api_quality
-                hdr = {**auth, "Content-Type": "application/json"}
-                with make_httpx_client(timeout=300, target_url=url, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    resp = c.post(url, headers=hdr, json=payload)
+            ref_paths = _cliproxy_collect_unique_refs(ref_img or "", getattr(p, "reference_image_paths", None))
+            api_quality = "hd" if quality == "2K" else "standard"
+            img_type, img_val = _cliproxy_run_image_sync(
+                proxy=proxy,
+                api_key=api_key,
+                model=model,
+                prompt=prompt,
+                size=size,
+                aspect=getattr(p, "aspect", ""),
+                quality=api_quality,
+                ref_paths=ref_paths,
+                use_proxy=getattr(p, "use_proxy", False),
+                log_fn=self._log,
+            )
 
             self._stop_progress = True
-            if resp.status_code >= 400:
-                raise RuntimeError(f"Image API error {resp.status_code}: {resp.text[:400]}")
-
-            data = resp.json()
-            item = data["data"][0]
 
             # Save to scene dir (ảnh đơn, không grid)
             out_dir = p.scene_dir(idx + 1)
             out = str(out_dir / f"scene_{idx+1:02d}.png")
 
             import base64 as _b64
-            if item.get("url"):
-                with make_httpx_client(timeout=60, use_proxy=getattr(p, "use_proxy", False)) as c:
-                    r = c.get(item["url"]); r.raise_for_status()
-                    Path(out).write_bytes(r.content)
-            elif item.get("b64_json"):
-                Path(out).write_bytes(_b64.b64decode(item["b64_json"]))
+            if img_type == "url":
+                with make_httpx_client(timeout=60, target_url=img_val, use_proxy=getattr(p, "use_proxy", False)) as c:
+                    r = c.get(img_val); r.raise_for_status()
+                    _save_image_payload_to_path(r.content, out)
+            elif img_type == "base64":
+                _save_image_payload_to_path(_b64.b64decode(img_val), out)
             else:
-                raise RuntimeError(f"Không tìm thấy ảnh trong response: {list(item.keys())}")
+                raise RuntimeError(f"Không tìm thấy ảnh trong response: {img_type}")
 
             elapsed = int(time.time() - start_time)
             self._log(f"  ✔ Ảnh đã lưu: {Path(out).name} ({elapsed}s)")
@@ -8982,7 +12167,7 @@ class RSVideoWorker(QThread):
             proxy    = self.account.proxy_url if self.account else ""
             if not proxy or not proxy.startswith("http"):
                 proxy = DEFAULT_PROXY_URL
-            api_key  = self.account.api_key if self.account else ""
+            api_key  = ((self.account.api_key if self.account else "") or "grok-video-key-001").strip()
 
             # Đọc ảnh storyboard → compress nhẹ + encode base64
             img_bytes = Path(source_img).read_bytes()
@@ -9033,10 +12218,10 @@ class RSVideoWorker(QThread):
                 if p.audio_val and p.audio_val != "silent":
                     payload["audio"] = {"type": p.audio_val}
 
-                with make_httpx_client(timeout=120, use_proxy=getattr(p, "use_proxy", False)) as client:
+                with make_httpx_client(timeout=120, target_url=submit_url, use_proxy=getattr(p, "use_proxy", False)) as client:
                     resp = client.post(submit_url, headers=headers, json=payload)
                     if resp.status_code >= 400:
-                        raise RuntimeError(f"Video API submit error {resp.status_code}: {resp.text[:500]}")
+                        raise RuntimeError(_cliproxy_format_api_error(resp.status_code, resp.text, model=model, base_url=proxy))
                     data = resp.json()
                 req_id = data.get("id") or data.get("request_id", "")
                 if req_id:
@@ -10779,11 +13964,7 @@ class SBProductCard(QFrame):
         model_lay = QHBoxLayout()
         model_lay.addWidget(QLabel("Model ảnh:"))
         img_combo = QComboBox()
-        img_combo.addItems([
-            "gpt-image-2", "gpt-image-1.5",
-            "grok-imagine-image", "grok-imagine-image-quality",
-            "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite",
-        ])
+        img_combo.addItems(get_ui_image_models())
         img_combo.setCurrentText(sp.img_model)
         model_lay.addWidget(img_combo)
         lay.addLayout(model_lay)
@@ -11521,10 +14702,10 @@ class AnimalVideoChainWorker(QThread):
                     submit_url = f"{_proxy}/v1/videos/generations"
                     self._log(f"[Cảnh {idx}]   → POST {submit_url}")
 
-                    with make_httpx_client(timeout=120, use_proxy=getattr(p, "use_proxy", False)) as client:
+                    with make_httpx_client(timeout=120, target_url=submit_url, use_proxy=getattr(p, "use_proxy", False)) as client:
                         resp = client.post(submit_url, headers=headers, json=payload)
                         if resp.status_code >= 400:
-                            raise RuntimeError(f"API error {resp.status_code}: {resp.text[:300]}")
+                            raise RuntimeError(_cliproxy_format_api_error(resp.status_code, resp.text, model=p.vid_model, base_url=_proxy))
                         data = resp.json()
 
                     request_id = data.get("id") or data.get("request_id", "")
@@ -16882,11 +20063,7 @@ class GrokVideoApp(QMainWindow):
 
         self.sb_img_model = QComboBox()
         self.sb_img_model.setStyleSheet(_combo_ss)
-        self.sb_img_model.addItems([
-            "gpt-image-2", "gpt-image-1.5",
-            "grok-imagine-image", "grok-imagine-image-quality",
-            "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"
-        ])
+        self.sb_img_model.addItems(get_ui_image_models())
         self.sb_img_model.setCurrentText("gpt-image-2")
         sec_model_lay.addWidget(self._make_form_item("🖼 Ảnh AI", self.sb_img_model))
 
@@ -21703,10 +24880,7 @@ class GrokVideoApp(QMainWindow):
         # Row 0: Model, Size, Quality
         # Model
         mod_combo = QComboBox()
-        mod_combo.addItems([
-            "gpt-image-2", "gpt-image-1.5", "grok-imagine-image", "grok-imagine-image-quality",
-            "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"
-        ])
+        mod_combo.addItems(get_ui_image_models())
         mod_combo.setCurrentText("gpt-image-2")
         g_lay.addWidget(QLabel("🤖 Mô hình (Model)", styleSheet="font-size: 11px; font-weight: bold;"), 0, 0)
         g_lay.addWidget(mod_combo, 1, 0)
@@ -22413,17 +25587,21 @@ class GrokVideoApp(QMainWindow):
     #   grok-imagine-video      → T2V ✓ I2V ✓ Ref(≤7) ✓ Edit ✓ Extend ✓
     #   grok-imagine-video-1.5  → T2V ✓ I2V ✓ Ref(≤7) ✓ Edit ✓ Extend ✓ (tốt hơn)
     # Model ảnh
-    #   gpt-image-1             → T2I ✓ I2I ✓ (Codex account) ref≤1
-    #   gpt-image-2             → T2I ✓ I2I ✓ (Codex account) ref≤1  [default]
-    #   grok-imagine-image      → T2I ✓ I2I ✓ (Grok account)  ref≤3
+    #   gpt-image-2             → T2I ✓ I2I ✓ (Codex account) ref≤4  [default]
+    #   gpt-image-2.5           → T2I ✓ I2I ✓ (Codex account) ref≤4
+    #   gpt-image-1.5           → T2I ✓ I2I ✓ (Codex account) ref≤4
+    #   gemini-3.1-flash-image  → T2I ✓ I2I ✓ (Antigravity/Gemini CLIProxy) ref≤4
+    #   grok-imagine-image      → T2I ✓ I2I ✓ (Grok xAI account) ref≤4
     # ────────────────────────────────────────────────────────────────
     _MODEL_INFO = {
         "grok-imagine-video":             "📌 T2V · I2V · Ref≤7 · Edit · Extend  |  Tài khoản: Grok",
         "grok-imagine-video-1.5-preview": "📌 T2V · I2V · Ref≤7 · Edit · Extend  |  Tài khoản: Grok (khuyến nghị)",
-        "gpt-image-1.5":                  "📌 T2I · I2I(ref≤1)  |  Tài khoản: Codex (ChatGPT Plus)",
-        "gpt-image-2":                    "📌 T2I · I2I(ref≤1)  |  Tài khoản: Codex (ChatGPT Plus) [mặc định]",
-        "grok-imagine-image":             "📌 T2I  |  Tài khoản: Grok",
-        "grok-imagine-image-quality":     "📌 T2I (High Quality)  |  Tài khoản: Grok",
+        "gpt-image-1.5":                  "📌 T2I · I2I(ref≤4)  |  Tài khoản: Codex (ChatGPT Plus)",
+        "gpt-image-2":                    "📌 T2I · I2I(ref≤4)  |  Tài khoản: Codex (ChatGPT Plus) [mặc định]",
+        "gpt-image-2.5":                  "📌 T2I · I2I(ref≤4)  |  Tài khoản: Codex (ChatGPT Plus)",
+        "gemini-3.1-flash-image":         "📌 T2I · I2I(ref≤4)  |  Tài khoản: Gemini (CLIProxy)",
+        "grok-imagine-image":             "📌 T2I · I2I(ref≤4)  |  Tài khoản: Grok (xAI)",
+        "grok-imagine-image-quality":     "📌 T2I · I2I(ref≤4) (High Quality)  |  Tài khoản: Grok (xAI)",
     }
 
     def on_batch_mode_changed(self, text):
@@ -22442,18 +25620,8 @@ class GrokVideoApp(QMainWindow):
         self.b_model_combo.blockSignals(True)
         if self.selected_mode in ("image-generation", "image-to-image"):
             self.b_model_combo.clear()
-            if self.selected_mode == "image-to-image":
-                # Only show image models that allow uploading reference images (OpenAI Codex)
-                self.b_model_combo.addItems(["gpt-image-2", "gpt-image-1.5"])
-                self.b_model_combo.setCurrentText("gpt-image-2")
-            else:
-                # Text-to-image can use all image models
-                self.b_model_combo.addItems([
-                    "gpt-image-2", "gpt-image-1.5", 
-                    "grok-imagine-image", "grok-imagine-image-quality",
-                    "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"
-                ])
-                self.b_model_combo.setCurrentText("gpt-image-2")
+            self.b_model_combo.addItems(get_ui_image_models())
+            self.b_model_combo.setCurrentText("gpt-image-2")
         else:
             self.b_model_combo.clear()
             self.b_model_combo.addItems([
@@ -24237,23 +27405,23 @@ class GrokVideoApp(QMainWindow):
             self.veo_jitter_min_ms = 2000
             self.veo_jitter_max_ms = 5000
 
-        # Load bridge secret from electron path
-        secret_path = os.path.join(os.environ.get("APPDATA", ""), "veo3studio", "captcha-bridge.secret")
+        # Unify bridge secret path with CaptchaBridge.BRIDGE_SECRET_PATH (<APP_DIR>/data/captcha-bridge.secret)
+        secret_path = CaptchaBridge.BRIDGE_SECRET_PATH
+        default_hex_secret = "ff065320a43b73b8959756fac4830553c1ee664bb7762467c46eb1de80d7e39d"
         if os.path.exists(secret_path):
             try:
                 with open(secret_path, "r", encoding="utf-8") as f:
-                    self.veo_secret = f.read().strip()
+                    self.veo_secret = f.read().strip() or default_hex_secret
             except Exception:
-                self.veo_secret = ""
+                self.veo_secret = default_hex_secret
         else:
             try:
                 os.makedirs(os.path.dirname(secret_path), exist_ok=True)
-                import uuid
-                self.veo_secret = uuid.uuid4().hex
+                self.veo_secret = default_hex_secret
                 with open(secret_path, "w", encoding="utf-8") as f:
                     f.write(self.veo_secret)
             except Exception:
-                self.veo_secret = ""
+                self.veo_secret = default_hex_secret
 
     def save_veo_config(self):
         config_path = GROK_CONFIG_FILE
@@ -24267,25 +27435,30 @@ class GrokVideoApp(QMainWindow):
                 "jitter_min_ms": getattr(self, "veo_jitter_min_ms", 2000),
                 "jitter_max_ms": getattr(self, "veo_jitter_max_ms", 5000)
             }
-            config_path.write_text(json.dumps(data, indent=2, ensure_ascii=False), encoding="utf-8")
+            atomic_write_json(config_path, data)
         except Exception:
             pass
 
-        # Save bridge secret back to the electron path if modified
-        secret_path = os.path.join(os.environ.get("APPDATA", ""), "veo3studio", "captcha-bridge.secret")
-        try:
-            os.makedirs(os.path.dirname(secret_path), exist_ok=True)
-            with open(secret_path, "w", encoding="utf-8") as f:
-                f.write(self.veo_secret)
-        except Exception:
-            pass
+        if getattr(self, "veo_secret", ""):
+            for sp in (
+                CaptchaBridge.BRIDGE_SECRET_PATH,
+                os.path.join(os.environ.get("APPDATA", ""), "veo3studio", "captcha-bridge.secret"),
+            ):
+                try:
+                    os.makedirs(os.path.dirname(sp), exist_ok=True)
+                    with open(sp, "w", encoding="utf-8") as f:
+                        f.write(self.veo_secret)
+                except Exception:
+                    pass
 
     def next_veo_account(self) -> Optional[Account]:
         """Lấy tài khoản Google Flow tiếp theo trong danh sách hoạt động, hoặc trả về tài khoản ảo chứa cấu hình Settings mặc định."""
         self.acc_mgr.load()
         veo_accs = [
             a for a in self.acc_mgr.active
-            if _is_google_flow_account(a) and (a.credits is None or a.credits > 0)
+            if _is_google_flow_account(a)
+            and (a.credits is None or a.credits < 0 or a.credits >= 10)
+            and getattr(a, "auth_state", "") not in ("logging_in", "login_required")
         ]
         if veo_accs:
             if not hasattr(self, "_veo_idx"):
@@ -24295,8 +27468,7 @@ class GrokVideoApp(QMainWindow):
             acc.jobs_done += 1
             self.acc_mgr.save()
             return acc
-        
-        # Fallback: Trả về tài khoản ảo dùng token mặc định trong settings
+
         if getattr(self, "veo_bearer", ""):
             return Account(
                 name="Settings (Mặc định)",
@@ -24309,10 +27481,10 @@ class GrokVideoApp(QMainWindow):
         return None
 
     def start_captcha_bridge_if_needed(self):
-        """Khởi động Captcha Bridge Server cục bộ cho Extension."""
-        port_val = getattr(self, "veo_bridge_port", 4000)
+        """Khởi động Captcha Bridge Server cục bộ cho Extension (hoặc dùng chung an toàn với Web Studio)."""
+        port_val = getattr(self, "veo_bridge_port", CAPTCHA_BRIDGE_PORT)
         self.captcha_bridge = CaptchaBridge(self.log_global, port=port_val)
-        self.captcha_bridge.start()
+        self.captcha_bridge.start(allow_remote=True)
 
     def auto_refresh_google_tokens(self):
         """Tự động kiểm tra token cho tất cả tài khoản Google khi mở tool."""
@@ -24853,11 +28025,7 @@ class GrokVideoApp(QMainWindow):
         self.an_img_model = QComboBox()
         self.an_img_model.setMinimumWidth(120)
         self.an_img_model.setStyleSheet(_combo_ss)
-        self.an_img_model.addItems([
-            "gpt-image-2", "gpt-image-1.5",
-            "grok-imagine-image", "grok-imagine-image-quality",
-            "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite"
-        ])
+        self.an_img_model.addItems(get_ui_image_models())
         ctrl.addWidget(_ctrl_group("🖼 Ảnh AI", self.an_img_model))
 
         self.an_vid_combo = QComboBox()
@@ -25967,11 +29135,7 @@ class GrokVideoApp(QMainWindow):
         img_lay = QHBoxLayout()
         img_lay.addWidget(QLabel("🖼 Model ảnh:"))
         img_combo = QComboBox()
-        img_combo.addItems([
-            "gpt-image-2", "gpt-image-1.5",
-            "grok-imagine-image", "grok-imagine-image-quality",
-            "Nano Banana Pro", "Nano Banana 2", "Nano Banana 2 Lite",
-        ])
+        img_combo.addItems(get_ui_image_models())
         img_combo.setCurrentText(ap.img_model)
         img_combo.setMinimumWidth(200)
         img_lay.addWidget(img_combo)
@@ -27334,4 +30498,3 @@ if __name__ == "__main__":
     window = GrokVideoApp()
     window.show()
     sys.exit(app.exec())
-

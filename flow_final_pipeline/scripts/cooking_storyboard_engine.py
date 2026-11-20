@@ -13,7 +13,9 @@ import hashlib
 import json
 import os
 from pathlib import Path
+import random
 import re
+import shutil
 import subprocess
 import sys
 import threading
@@ -1040,7 +1042,7 @@ def build_cooking_final_video(project_id, folder, manifest, save_cb=None):
     if save_cb:
         save_cb(f'🎞️ Đang ghép Final 1080p 60FPS ({audio_label})...')
 
-    subprocess.run(
+    ff_res = subprocess.run(
         [
             'ffmpeg', '-y', '-v', 'error',
             *inputs,
@@ -1052,9 +1054,13 @@ def build_cooking_final_video(project_id, folder, manifest, save_cb=None):
             str(temporary_final),
         ],
         cwd=str(folder),
-        check=True,
+        capture_output=True,
+        text=True,
         timeout=240,
     )
+    if ff_res.returncode != 0:
+        err_tail = '\n'.join((ff_res.stderr or '').strip().splitlines()[-6:]) or f'exit code {ff_res.returncode}'
+        raise RuntimeError(f'Lỗi FFmpeg ghép Video Nấu Ăn: {err_tail[:280]}')
     temporary_final.replace(final)
     final_dur, _ = _probe_media_info(final)
     manifest['status'] = 'done'
@@ -1115,7 +1121,18 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
         manifest['auto_mode'] = True
 
     need_flow_browser = (stage in ('storyboards', 'auto')) or (stage == 'video' and eff_provider == 'google_flow')
-    if stage == 'auto' and eff_provider == 'google_vids':
+    if stage == 'storyboards':
+        all_boards_uploaded = all(
+            c.get('native_2k')
+            and bool(c.get('uploaded_2k_uuid'))
+            and (folder / c['storyboard_file']).is_file()
+            and c.get('sha256')
+            and hashlib.sha256((folder / c['storyboard_file']).read_bytes()).hexdigest() == c.get('sha256')
+            for c in manifest['clips']
+        )
+        if all_boards_uploaded:
+            need_flow_browser = False
+    elif stage == 'auto' and eff_provider == 'google_vids':
         # Nếu toàn bộ Storyboard 2K đã có sẵn trên ổ đĩa, không cần mở Chrome/Flow ở bước Auto!
         all_boards_ready = all(
             c.get('native_2k')
@@ -1129,15 +1146,31 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
 
     try:
         if need_flow_browser:
+            # Gắn tự động CaptchaBridge :4000 cho tiến trình con để tận dụng đường truyền nhanh cffi + Extension
+            try:
+                if hasattr(mt.gvt, 'get_connected_extension_bridge'):
+                    _ck_br = mt.gvt.get_connected_extension_bridge()
+                    if _ck_br and _ck_br.extension_liveness() == 'connected':
+                        mt._EXT_BRIDGE_BOX[0] = _ck_br
+            except Exception:
+                pass
             save(f'🌐 Đang mở phiên Google Flow ({profile}) cho món "{manifest["dish"]}"...')
-            with sync_playwright() as pw:
+            _ck_headless = os.environ.get('FLOW_SHOW_BROWSER', '').strip() != '1'
+            with mt.gvt.flow_playwright_or_extension(sync_playwright, profile_name=profile, project_id=project_uuid) as pw:
                 browser = pw.chromium.launch(
                     channel='chrome',
-                    headless=False,
-                    args=['--disable-blink-features=AutomationControlled', '--window-position=-2000,-2000', '--window-size=1280,800'],
+                    headless=_ck_headless,
+                    args=['--disable-blink-features=AutomationControlled', '--window-position=-2000,-2000', '--window-size=1280,800', '--mute-audio'],
                 )
                 try:
-                    ctx = browser.new_context()
+                    ctx = browser.new_context(
+                        user_agent=(mt.gvt.sanitize_chrome_ua(browser=browser) if hasattr(mt.gvt, 'sanitize_chrome_ua') else None)
+                    )
+                    if hasattr(mt.gvt, 'inject_stealth_scripts'):
+                        try:
+                            mt.gvt.inject_stealth_scripts(ctx)
+                        except Exception:
+                            pass
                     ctx.add_init_script(mt.gvt._FLOW_HIJACK_BYPASS_JS)
                     ctx.add_cookies(cookies)
                     pg = ctx.new_page()
@@ -1149,6 +1182,42 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                     cookie_map = {c['name']: c['value'] for c in live_cookies if 'GRECAPTCHA' not in c['name'].upper()}
                     cookie_hdr = '; '.join(f'{name}={value}' for name, value in cookie_map.items())
                     headers = {'Cookie': cookie_hdr, 'Referer': 'https://flow.google.com/', 'User-Agent': wiz['ua']}
+
+                    def _refresh_wiz_in_page():
+                        nonlocal wiz
+                        try:
+                            new_w = pg.evaluate('() => ({at:window.WIZ_global_data?.SNlM0e,bl:window.WIZ_global_data?.cfb2h,fsid:window.WIZ_global_data?.FdrFJe,ua:navigator.userAgent})')
+                            if isinstance(new_w, dict) and new_w.get('at'):
+                                wiz = new_w
+                        except Exception:
+                            pass
+
+                    def _err_kind_ck(err_txt: str) -> str:
+                        if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'classify_flow_error'):
+                            return mt.gvt.classify_flow_error(str(err_txt or ''))
+                        return 'transient'
+
+                    def _call_with_micro_retry(fn, label: str, max_tries: int = 3):
+                        last_res = (False, None, 'Unknown error')
+                        for try_i in range(1, max_tries + 1):
+                            if try_i > 1:
+                                _refresh_wiz_in_page()
+                            ok_r, val_r, err_r = fn()
+                            if ok_r:
+                                return True, val_r, None
+                            last_res = (ok_r, val_r, err_r)
+                            kind = _err_kind_ck(err_r)
+                            if kind == 'content_policy':
+                                return last_res
+                            if kind in ('account_quota', 'account_auth'):
+                                if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'mark_flow_account_cooldown'):
+                                    mt.gvt.mark_flow_account_cooldown(profile, kind, str(err_r or ''))
+                                return last_res
+                            if try_i < max_tries:
+                                wait_s = (18.0 * try_i) if kind == 'rate_limit' else ((2.0 ** try_i) + random.uniform(0.5, 2.0))
+                                save(f"⚠️ {label} gặp lỗi [{kind}] ({str(err_r)[:90]}) — thử lại {try_i + 1}/{max_tries} sau {wait_s:.1f}s...")
+                                time.sleep(wait_s)
+                        return last_res
 
                     # Phase 1: Native 2K Storyboards + Re-upload (for both 'storyboards' and 'auto')
                     if stage in ('storyboards', 'auto'):
@@ -1173,9 +1242,14 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                                     'prompt_str': clip['image_prompt'],
                                     'out_file': str(board),
                                     'skip_reupload_2k': True,
-                                    'require_native_2k': True,
+                                    'require_native_2k': False,
+                                    'worker_profile': profile,
                                 }
-                                ok, generated, error = mt.generate_variant_ref_image_in_page(pg, wiz, cookie_hdr, headers, task)
+                                ok, generated, error = _call_with_micro_retry(
+                                    lambda: mt.generate_variant_ref_image_in_page(pg, wiz, cookie_hdr, headers, task),
+                                    f"Tạo Storyboard {clip['id']}",
+                                    max_tries=3,
+                                )
                                 if not ok:
                                     raise RuntimeError(error)
                                 with Image.open(board) as im:
@@ -1189,7 +1263,11 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                                 save(f"✅ [{idx}/{total_clips}] Đã tải Storyboard 2K gốc {clip['id']}: {clip['storyboard_dimensions']}")
 
                             if not clip.get('uploaded_2k_uuid'):
-                                ok, uploaded, error = mt.upload_single_product_ref_in_page(pg, wiz, project_uuid, str(board), quality=98)
+                                ok, uploaded, error = _call_with_micro_retry(
+                                    lambda: mt.upload_single_product_ref_in_page(pg, wiz, project_uuid, str(board), quality=98),
+                                    f"Upload 2K {clip['id']}",
+                                    max_tries=3,
+                                )
                                 if not ok:
                                     raise RuntimeError(f'2K re-upload required: {error}')
                                 clip['uploaded_2k_uuid'] = uploaded
@@ -1203,10 +1281,44 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                             else:
                                 save('🎬 Đã xong toàn bộ Storyboard 2K! Chuyển thẳng sang tạo Video 8s & Upscale 1080p...')
 
-                    # Phase 2A: Google Flow 8s Video Generation + 1080p Upsampling
+                    # Phase 2A: Google Flow 8s Video Generation + 1080p Upsampling (Song song đa luồng)
                     if stage in ('video', 'auto') and eff_provider == 'google_flow':
+                        import concurrent.futures as _cf_cook
+                        try:
+                            import engine_settings_manager as _esm_ck
+                            _ck_eff = _esm_ck.get_effective_flow_concurrency()
+                        except Exception:
+                            _ck_eff = {}
+                        _ck_delay = max(1.5, float(_ck_eff.get('submit_delay_sec') or 4.5))
+                        _ck_workers = max(2, min(16, int(_ck_eff.get('flow_api_workers') or 6)))
                         total_clips = len(manifest['clips'])
                         active_voice_id = resolved_voice_id
+                        pending_flow_tasks = []
+                        failed_clips = []
+                        clip_poll_retries = {}
+                        last_sub_ts = 0.0
+
+                        def _submit_clip_video(idx_c: int, c_item: dict, task_d: dict):
+                            nonlocal active_voice_id, last_sub_ts
+                            gap = (last_sub_ts + _ck_delay) - time.monotonic()
+                            if gap > 0.05 and last_sub_ts > 0:
+                                time.sleep(gap)
+
+                            def _do_sub():
+                                nonlocal active_voice_id, last_sub_ts
+                                ok_s, m_s, err_s = mt.submit_scene_in_page(pg, wiz, task_d)
+                                last_sub_ts = time.monotonic()
+                                if not ok_s and active_voice_id and voice_owner and profile.lower() != voice_owner.lower():
+                                    active_voice_id = ''
+                                    task_d['voice_id'] = ''
+                                    save(f"ℹ️ Tài khoản phụ {profile} chưa có bản sao Voice UUID riêng, chuyển sang đọc thoại trực tiếp theo kịch bản...")
+                                    ok_s, m_s, err_s = mt.submit_scene_in_page(pg, wiz, task_d)
+                                    last_sub_ts = time.monotonic()
+                                return ok_s, m_s, err_s
+
+                            return _call_with_micro_retry(_do_sub, f"Gửi tạo video cảnh {c_item['id']}", max_tries=3)
+
+                        # 1) Validate & submit tất cả các cảnh cần chạy theo nhịp an toàn trên main thread (Playwright-safe)
                         for idx, clip in enumerate(manifest['clips'], 1):
                             board = folder / clip['storyboard_file']
                             if not clip.get('native_2k') or not clip.get('uploaded_2k_uuid') or not board.is_file():
@@ -1227,63 +1339,168 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                                 'storyboard_only': True,
                                 'worker_profile': profile,
                                 'out_mp4': str(out),
+                                '_idx': idx,
                             }
-                            media = clip.get('video_uuid')
-                            if not media:
-                                save(f"🎬 [{idx}/{total_clips}] Đang gửi tạo video 8s cảnh {clip['id']} ({clip['title']})...")
-                                ok, media, error = mt.submit_scene_in_page(pg, wiz, task)
-                                if not ok and active_voice_id and voice_owner and profile.lower() != voice_owner.lower():
-                                    # Foreign custom voice UUID not cloned on secondary account -> fallback cleanly to prompt voiceover
-                                    active_voice_id = ''
-                                    task['voice_id'] = ''
-                                    save(f"ℹ️ Tài khoản phụ {profile} chưa có bản sao Voice UUID riêng, chuyển sang đọc thoại trực tiếp theo kịch bản...")
-                                    ok, media, error = mt.submit_scene_in_page(pg, wiz, task)
-                                if not ok:
-                                    raise RuntimeError(error)
-                                clip['video_uuid'] = media
-                                save(f"⏳ [{idx}/{total_clips}] Đã gửi cảnh {clip['id']} ({media[:8]}...), đang chờ render 720p...")
+                            if clip.get('upscale_uuid'):
+                                task.update(media_uuid=clip['upscale_uuid'], base_video_uuid=clip.get('video_uuid') or '', stage='upsample_1080p')
+                            else:
+                                media = clip.get('video_uuid')
+                                if not media:
+                                    save(f"🎬 [{idx}/{total_clips}] Đang gửi tạo video 8s cảnh {clip['id']} ({clip['title']})...")
+                                    ok, media, error = _submit_clip_video(idx, clip, task)
+                                    if not ok:
+                                        kind = _err_kind_ck(error)
+                                        if kind in ('content_policy', 'account_quota'):
+                                            raise RuntimeError(f"{clip['id']}: {error}")
+                                        save(f"⚠️ [{idx}/{total_clips}] Cảnh {clip['id']} tạm lỗi khi submit ({error}) — vẫn chạy các cảnh khác...")
+                                        failed_clips.append((clip['id'], str(error)))
+                                        continue
+                                    clip['video_uuid'] = media
+                                    save(f"⏳ [{idx}/{total_clips}] Đã gửi cảnh {clip['id']} ({media[:8]}...), tiếp tục gửi cảnh kế tiếp...")
+                                task.update(media_uuid=media, stage='base_720p')
+                            pending_flow_tasks.append((idx, clip, task))
 
-                            def poll(uid, stage_name):
-                                task.update(media_uuid=uid, stage=stage_name)
-                                deadline = time.monotonic() + 600
-                                while time.monotonic() < deadline:
-                                    status, size = mt.poll_and_download_one(cookie_hdr, wiz, headers, task)
-                                    if status in ('done', 'ready_for_1080p'):
-                                        return
-                                    if status in ('failed', 'error', 4) or str(status).startswith(('dl_err', 'failed_')):
-                                        raise RuntimeError(f'{clip["id"]}: {status}')
-                                    save(f"⏳ [{idx}/{total_clips}] Đang xử lý {clip['id']} ({stage_name}): {status}")
-                                    time.sleep(5)
-                                raise TimeoutError('Flow job still pending; resume uses saved UUID, no paid resubmit')
-
-                            poll(media, 'base_720p')
-                            upscale = clip.get('upscale_uuid')
-                            if not upscale:
-                                task['base_video_uuid'] = media
-                                ok, upscale, error = mt.submit_upsample_1080p_in_page(pg, wiz, task)
-                                if not ok:
-                                    raise RuntimeError(error)
-                                clip['upscale_uuid'] = upscale
-                                save(f"✨ [{idx}/{total_clips}] Đang nâng cấp cảnh {clip['id']} lên chuẩn 1080p...")
-                            poll(upscale, 'upsample_1080p')
-                            clip['video_done'] = True
-                            save(f"✅ [{idx}/{total_clips}] Đã tải xong video 1080p cảnh {clip['id']}!")
+                        # 2) Poll HTTP & tải song song toàn bộ cảnh + gửi Upsample 1080p ngay khi từng cảnh xong 720p
+                        if pending_flow_tasks:
+                            deadline = time.monotonic() + 720
+                            with _cf_cook.ThreadPoolExecutor(max_workers=max(2, min(_ck_workers, len(pending_flow_tasks)))) as _ck_pool:
+                                while pending_flow_tasks:
+                                    if time.monotonic() >= deadline:
+                                        raise TimeoutError('Flow job still pending; resume uses saved UUID, no paid resubmit')
+                                    fut_map = {
+                                        _ck_pool.submit(mt.poll_and_download_one, cookie_hdr, wiz, headers, t_item): (idx_c, c_item, t_item)
+                                        for idx_c, c_item, t_item in pending_flow_tasks
+                                    }
+                                    next_pending = []
+                                    for fut in _cf_cook.as_completed(fut_map):
+                                        idx_c, c_item, t_item = fut_map[fut]
+                                        status, _size = fut.result()
+                                        stg = t_item.get('stage')
+                                        out_mp4_path = str(t_item.get('out_mp4') or '')
+                                        tmp_720_path = out_mp4_path + '.720p.tmp'
+                                        if status == 'ready_for_1080p' and stg == 'base_720p':
+                                            upscale = c_item.get('upscale_uuid')
+                                            if not upscale:
+                                                t_item['base_video_uuid'] = t_item['media_uuid']
+                                                ok_u, upscale, error_u = _call_with_micro_retry(
+                                                    lambda: mt.submit_upsample_1080p_in_page(pg, wiz, t_item),
+                                                    f"Upscale 1080p {c_item['id']}",
+                                                    max_tries=2,
+                                                )
+                                                if not ok_u:
+                                                    if os.path.exists(tmp_720_path):
+                                                        shutil.move(tmp_720_path, out_mp4_path)
+                                                        c_item['video_done'] = True
+                                                        save(f"⚠️ [{idx_c}/{total_clips}] Upscale 1080p cảnh {c_item['id']} lỗi ({error_u}), giữ lại bản 720p hoàn chỉnh!")
+                                                        continue
+                                                    save(f"⚠️ [{idx_c}/{total_clips}] Upscale 1080p cảnh {c_item['id']} thất bại: {error_u}")
+                                                    failed_clips.append((c_item['id'], str(error_u)))
+                                                    continue
+                                                c_item['upscale_uuid'] = upscale
+                                            t_item.update(media_uuid=upscale, stage='upsample_1080p')
+                                            save(f"✨ [{idx_c}/{total_clips}] Cảnh {c_item['id']} xong 720p -> Đang nâng cấp 1080p song song...")
+                                            next_pending.append((idx_c, c_item, t_item))
+                                        elif status in ('done', 'ready_for_1080p'):
+                                            c_item['video_done'] = True
+                                            if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'clear_flow_account_cooldown'):
+                                                mt.gvt.clear_flow_account_cooldown(profile)
+                                            save(f"✅ [{idx_c}/{total_clips}] Đã tải xong video 1080p cảnh {c_item['id']}!")
+                                        elif status in ('failed', 'error', 4) or str(status).startswith(('dl_err', 'failed_')):
+                                            c_id = c_item['id']
+                                            err_st = str(status)
+                                            kind_st = _err_kind_ck(err_st)
+                                            if stg == 'upsample_1080p' and os.path.exists(tmp_720_path):
+                                                shutil.move(tmp_720_path, out_mp4_path)
+                                                c_item['video_done'] = True
+                                                save(f"⚠️ [{idx_c}/{total_clips}] Render 1080p cảnh {c_id} lỗi ({err_st}), tự động giữ bản 720p gốc!")
+                                                continue
+                                            if kind_st == 'content_policy':
+                                                _sub_ck = (
+                                                    mt.gvt.classify_content_rejection_subtype(err_st)
+                                                    if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'classify_content_rejection_subtype')
+                                                    else 'unsafe_generation'
+                                                )
+                                                if (
+                                                    _sub_ck != 'invalid_input'
+                                                    and not c_item.get('_policy_sanitized_retried')
+                                                    and hasattr(mt, 'gvt')
+                                                    and hasattr(mt.gvt, 'sanitize_prompt_for_flow_policy')
+                                                    and c_item.get('prompt')
+                                                ):
+                                                    _safe_ck, _chg_ck = mt.gvt.sanitize_prompt_for_flow_policy(str(c_item['prompt']), _sub_ck)
+                                                    if _chg_ck and _safe_ck:
+                                                        c_item['_policy_sanitized_retried'] = True
+                                                        c_item['prompt'] = _safe_ck
+                                                        if isinstance(t_item.get('sc'), dict) and t_item['sc'].get('prompt'):
+                                                            t_item['sc']['prompt'] = _safe_ck
+                                                        save(f"🛡️ [{idx_c}/{total_clips}] Cảnh {c_id} bị chặn nội dung ({_sub_ck}) — tự làm dịu prompt an toàn & thử lại 1 lần...")
+                                                        c_item.pop('video_uuid', None)
+                                                        c_item.pop('upscale_uuid', None)
+                                                        ok_re, new_m, err_re = _submit_clip_video(idx_c, c_item, t_item)
+                                                        if ok_re and new_m:
+                                                            c_item['video_uuid'] = new_m
+                                                            t_item.update(media_uuid=new_m, stage='base_720p')
+                                                            next_pending.append((idx_c, c_item, t_item))
+                                                            continue
+                                                        err_st = str(err_re or err_st)
+                                                vi_ck = (
+                                                    mt.gvt.describe_flow_error_vi(err_st)
+                                                    if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'describe_flow_error_vi')
+                                                    else err_st
+                                                )
+                                                raise RuntimeError(f'{c_id}: {vi_ck}')
+                                            tries = clip_poll_retries.get(c_id, 0) + 1
+                                            clip_poll_retries[c_id] = tries
+                                            if tries <= 2:
+                                                if err_st.startswith('dl_err'):
+                                                    save(f"⚠️ [{idx_c}/{total_clips}] Tải CDN cảnh {c_id} bị rớt ({err_st}) — thử tải lại ({tries}/2)...")
+                                                    next_pending.append((idx_c, c_item, t_item))
+                                                else:
+                                                    save(f"⚠️ [{idx_c}/{total_clips}] Render cảnh {c_id} lỗi ({err_st}) — gửi lại cảnh này ({tries}/2)...")
+                                                    c_item.pop('video_uuid', None)
+                                                    c_item.pop('upscale_uuid', None)
+                                                    ok_re, new_m, err_re = _submit_clip_video(idx_c, c_item, t_item)
+                                                    if ok_re and new_m:
+                                                        c_item['video_uuid'] = new_m
+                                                        t_item.update(media_uuid=new_m, stage='base_720p')
+                                                        next_pending.append((idx_c, c_item, t_item))
+                                                    else:
+                                                        failed_clips.append((c_id, str(err_re)))
+                                            else:
+                                                save(f"❌ [{idx_c}/{total_clips}] Cảnh {c_id} thất bại sau {tries} lần: {err_st}")
+                                                failed_clips.append((c_id, err_st))
+                                        else:
+                                            next_pending.append((idx_c, c_item, t_item))
+                                    pending_flow_tasks = next_pending
+                                    if pending_flow_tasks:
+                                        time.sleep(4)
+                        if failed_clips:
+                            summary = '; '.join(f'{cid}={msg}' for cid, msg in failed_clips)
+                            raise RuntimeError(f'Một số cảnh Flow chưa hoàn thành (các cảnh xong đã được lưu để resume): {summary}')
                 finally:
                     browser.close()
 
-        # Phase 2B: Google Vids Web Native 1080p Video Generation (Zero Browser, Zero reCAPTCHA)
+        # Phase 2B: Google Vids Web Native 1080p Video Generation (Zero Browser, Zero reCAPTCHA — Song song đa luồng)
         if stage in ('video', 'auto') and eff_provider == 'google_vids':
+            import concurrent.futures as _cf_vids
             import google_vids_client as gvc
 
             vids_model = 'omni'
+            _vids_workers = 4
+            _vids_stagger = 0.7
             try:
                 import engine_settings_manager as _esm
-                vids_model = str(_esm.load_engine_settings().get('google_vids_model') or 'omni').strip().lower()
+                _cfg_v = _esm.load_engine_settings()
+                vids_model = str(_cfg_v.get('google_vids_model') or 'omni').strip().lower()
+                _eff_v = _esm.get_effective_flow_concurrency(cfg=_cfg_v)
+                _vids_workers = max(2, min(16, int(_eff_v.get('flow_api_workers') or 6)))
+                _vids_stagger = max(0.3, float(_eff_v.get('global_submit_stagger_sec') or 0.7))
             except Exception:
                 pass
 
             client = gvc.get_google_vids_client()
             total_clips = len(manifest['clips'])
+            vids_jobs = []
             for idx, clip in enumerate(manifest['clips'], 1):
                 board = folder / clip['storyboard_file']
                 if not clip.get('native_2k') or not board.is_file():
@@ -1294,37 +1511,81 @@ def run(project_id, stage='storyboards', profile='', project_uuid='', video_prov
                 if out.is_file() and out.stat().st_size > 50000 and clip.get('video_done'):
                     save(f"✅ [{idx}/{total_clips}] Cảnh {clip['id']} đã có sẵn bản 1080p, bỏ qua.")
                     continue
+                vids_jobs.append((idx, clip, board, out))
 
-                save(
-                    f"🌐 [{idx}/{total_clips}] Đang tạo Video Native 1080p (8s) cho cảnh {clip['id']} ({clip['title']}) "
-                    f"qua Google Vids Web ({profile} • {vids_model.upper()} • Không reCAPTCHA)..."
-                )
-                res_v = client.generate_video(
-                    out_mp4=out,
-                    prompt=clip['prompt'],
-                    image_paths=[str(board)],
-                    profile_name=profile,
-                    model=vids_model,
-                    aspect_ratio='9:16',
-                    resolution='1080p',
-                    duration_sec=int(clip.get('duration_sec') or 8),
-                    ingredient_role='storyboard',
-                )
-                if not res_v.get('ok'):
-                    raise RuntimeError(res_v.get('error') or f'Google Vids lỗi ở cảnh {clip["id"]}')
-                clip['video_done'] = True
-                clip['video_provider'] = 'google_vids'
-                save(
-                    f"✅ [{idx}/{total_clips}] Đã tải xong video Native 1080p cảnh {clip['id']} qua Google Vids "
-                    f"({round(res_v['bytes']/1048576, 2)} MB trong {res_v['elapsed_sec']}s)!"
-                )
+            if vids_jobs:
+                save(f"🌐 Đang chạy song song {len(vids_jobs)} cảnh Native 1080p qua Google Vids Web ({_vids_workers} luồng)...")
 
+                def _run_vids_one(pos_idx: int, item):
+                    idx_c, c_obj, b_path, out_p = item
+                    if pos_idx > 0:
+                        time.sleep(min(3.0, pos_idx * _vids_stagger))
+                    save(
+                        f"🌐 [{idx_c}/{total_clips}] Đang tạo Video Native 1080p (8s) cho cảnh {c_obj['id']} ({c_obj['title']}) "
+                        f"qua Google Vids Web ({profile} • {vids_model.upper()} • Không reCAPTCHA)..."
+                    )
+                    last_err_v = ""
+                    for v_try in range(1, 3):
+                        res_v = client.generate_video(
+                            out_mp4=out_p,
+                            prompt=c_obj['prompt'],
+                            image_paths=[str(b_path)],
+                            profile_name=profile,
+                            model=vids_model,
+                            aspect_ratio='9:16',
+                            resolution='1080p',
+                            duration_sec=int(c_obj.get('duration_sec') or 8),
+                            ingredient_role='storyboard',
+                        )
+                        if res_v.get('ok'):
+                            c_obj['video_done'] = True
+                            c_obj['video_provider'] = 'google_vids'
+                            save(
+                                f"✅ [{idx_c}/{total_clips}] Đã tải xong video Native 1080p cảnh {c_obj['id']} qua Google Vids "
+                                f"({round(res_v['bytes']/1048576, 2)} MB trong {res_v['elapsed_sec']}s)!"
+                            )
+                            return
+                        last_err_v = str(res_v.get('error') or f'Google Vids lỗi ở cảnh {c_obj["id"]}')
+                        kind_v = mt.gvt.classify_flow_error(last_err_v) if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'classify_flow_error') else 'transient'
+                        if kind_v in ('content_policy', 'account_quota') or v_try == 2:
+                            break
+                        wait_s = random.uniform(2.5, 5.0)
+                        save(f"⚠️ [{idx_c}/{total_clips}] Google Vids tạm lỗi [{kind_v}] ({last_err_v[:80]}), thử lại lần 2/2 sau {wait_s:.1f}s...")
+                        time.sleep(wait_s)
+                    if hasattr(mt, 'gvt') and hasattr(mt.gvt, 'describe_flow_error_vi') and last_err_v:
+                        last_err_v = mt.gvt.describe_flow_error_vi(last_err_v)
+                    raise RuntimeError(last_err_v)
+
+                with _cf_vids.ThreadPoolExecutor(max_workers=max(1, min(_vids_workers, len(vids_jobs)))) as _vp:
+                    vfuts = [_vp.submit(_run_vids_one, p_i, j_it) for p_i, j_it in enumerate(vids_jobs)]
+                    for vf in _cf_vids.as_completed(vfuts):
+                        vf.result()
+
+        final = None
         if stage == 'storyboards':
             manifest['status'] = 'boards_ready'
             save('✅ Đã tải và upload lại toàn bộ Storyboard 2K gốc. Bạn có thể xem trước hoặc bấm Tạo Video.')
+            return manifest
         else:
             final = build_cooking_final_video(project_id, folder, manifest, save_cb=save)
             save(f'🎉 Hoàn tất Video Final 1080p 60FPS: {final}')
+        try:
+            import engine_settings_manager as _esm
+            th_res = _esm.ensure_project_variant_thumbnail_and_inject(
+                project_id,
+                vkey='pov',
+                final_video_path=str(final) if final else '',
+                log_cb=save,
+            )
+            t_path = str(th_res.get('thumbnail_path') or th_res.get('project_thumbnail_path') or '').strip()
+            if t_path:
+                manifest['thumbnail_path'] = t_path
+            if th_res.get('injected_01s'):
+                manifest['thumbnail_injected_01s'] = True
+                manifest['thumbnail_intro_duration_sec'] = round(float((th_res.get('inject_detail') or {}).get('duration_sec') or 0.1), 3)
+            save(f'🎉 Hoàn tất Video Final 1080p 60FPS & Thumbnail: {final}')
+        except Exception as _ex_th:
+            save(f'⚠️ Hoàn tất Video Final ({final}) — bỏ qua tự tạo thumbnail: {_ex_th}')
         return manifest
     except Exception as exc:
         manifest['status'] = 'error'

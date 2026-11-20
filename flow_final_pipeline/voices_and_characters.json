@@ -31,7 +31,11 @@
       "description": "Giọng nữ miền Bắc chuẩn Hà Nội (Nhân Vật 1 Affi Giọng Bắc), phát âm tròn vành rõ chữ, nhấn giá cực chuẩn khi giới thiệu hàng xuất xưởng, báo giá bậc thang và miễn phí ship.",
       "sample_vn_file": "voice_samples/nv1_flow.mp3",
       "sample_dialogue_vn": "30k miễn phí ship tới tận nhà cho nguyên một thắt lưng nam tặng thêm đồng hồ này. Ở đâu bán cái giá đó thì em cũng đến",
-      "flow_synced": true
+      "flow_synced": true,
+      "account_voice_ids": {
+        "flow_acc_4": "3ffcbdc1-1eba-495c-8aef-97b1ebb3fdfa",
+        "flow_acc_6": "a6309180-f5c9-4229-846e-012776c48e04"
+      }
     },
     "nv2": {
       "key": "nv2",
@@ -62,7 +66,11 @@
       "flow_synthesized_uuid": "4ec6bbcc-5c54-4953-b43c-cb355fa20dad",
       "sample_vn_file": "voice_samples/nv2_flow.mp3",
       "sample_dialogue_vn": "Mọi người ơi xả kho trực tiếp tại xưởng chỉ ba mươi cành miễn phí ship tới tận nhà! Săn ngay kẻo hết nhé!",
-      "flow_synced": true
+      "flow_synced": true,
+      "account_voice_ids": {
+        "flow_acc_4": "3dc4fb01-a389-4ff5-aa4b-2e880b39ce23",
+        "flow_acc_6": "d60ad0e8-7ad5-4048-961a-f21d503fe9a4"
+      }
     },
     "v5_nam_bac_chuyen_gia": {
       "key": "v5_nam_bac_chuyen_gia",
@@ -92,7 +100,11 @@
         "Công nghệ & Điện tử",
         "Ô tô - Xe máy"
       ],
-      "description": "Giọng nam miền Bắc trẻ trung, nam tính, năng lượng cao (Fenrir), nhấn nhá giá tiền và ưu đãi cực bốc như giọng Nữ Affi, chuyên chốt đơn đồ Nam & gia dụng."
+      "description": "Giọng nam miền Bắc trẻ trung, nam tính, năng lượng cao (Fenrir), nhấn nhá giá tiền và ưu đãi cực bốc như giọng Nữ Affi, chuyên chốt đơn đồ Nam & gia dụng.",
+      "account_voice_ids": {
+        "flow_acc_4": "92fea072-996f-418f-928c-65c6e41ae55b",
+        "flow_acc_6": "c31e7c50-77ce-4689-9e27-1845a835a85e"
+      }
     },
     "v6_nam_nam_reviewer": {
       "key": "v6_nam_nam_reviewer",
@@ -306,7 +318,7 @@
     "nv1": {
       "key": "nv1",
       "name": "Nữ Tư Vấn Xưởng",
-      "enabled": false,
+      "enabled": true,
       "videos_per_character": 1,
       "character_id": "208606a7-a345-48b2-af32-9fd3c37d0c9a",
       "project_id": "932bc2a1-07ea-4199-b147-80ab0018d41c",
@@ -390,7 +402,7 @@
     "nv5": {
       "key": "nv5",
       "name": "Nữ Mẫu Thời Trang Lookbook 2K (NV5)",
-      "enabled": false,
+      "enabled": true,
       "videos_per_character": 1,
       "character_id": "",
       "project_id": "bf4979d1-548a-44bd-a265-3927bba76dc1",

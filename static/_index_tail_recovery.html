@@ -1,0 +1,90 @@
+          if (rCook && rCook.ok) {
+            if (typeof toast === "function") toast("🚀 Đã tiếp tục chạy dự án Nấu Ăn POV ngầm!", "ok");
+            delete STATE.projectDetailsCache[projectId];
+            STATE.renderedProjectSig = "";
+            await refreshAll(false);
+            await loadProjectDetail(projectId, false);
+            return;
+          }
+        }
+        if (typeof window.openCookingStudio === "function") {
+          window.openCookingStudio((proj && proj.pipeline_kind === "cooking_storyboard") ? projectId : null);
+        }
+        return;
+      }
+      const vpc = (STATE.studioSelectedVpc && STATE.studioSelectedVpc[projectId])
+        || document.getElementById("selStudioCenterVpc")?.value
+        || document.getElementById("selStudioToolbarVpc")?.value
+        || (proj && proj.videos_per_character)
+        || 3;
+      const isNewOrChangedTpl = !proj || (proj.products || []).length === 0 || (proj.template_code && String(proj.template_code).replace(/^#/, "") !== tpl);
+      const res = await apiPost("/api/projects/run", {
+        project_id: projectId,
+        product_id: productId || "",
+        template_name: isNewOrChangedTpl ? tpl : "",
+        videos_per_character: parseInt(vpc, 10) || 3,
+        force_regenerate_prompts: isNewOrChangedTpl,
+        product_workers: 2,
+        scene_workers: 3,
+      });
+      if (res && res.ok) {
+        if (res.message) alert(res.message);
+        delete STATE.projectDetailsCache[projectId];
+        STATE.renderedProjectSig = "";
+        await refreshAll(false);
+        await loadProjectDetail(projectId, false);
+      } else if (res && res.error) {
+        alert("Lỗi: " + res.error);
+      }
+    }
+
+    async function deleteProject(projectId) {
+      if (!confirm("Bạn có chắc muốn xóa dự án này?")) return;
+      await apiPost("/api/projects/delete", { project_id: projectId });
+      STATE.currentProjectId = "";
+      await refreshAll();
+    }
+
+    async function openFolder(path) {
+      const target = path || "final_videos";
+      if (typeof toast === "function") toast(`📂 Đang mở thư mục: ${target}...`, "info");
+      const res = await apiPost("/api/open-folder", { path: target });
+      if (res && !res.ok && res.error) alert("Không thể mở thư mục: " + res.error);
+    }
+
+    async function pickFolderFromComputer(inputId) {
+      const el = document.getElementById(inputId || "inpFolderPath");
+      const currentVal = el ? (el.value || "").trim() : "";
+      if (typeof toast === "function") toast("📂 Đang mở cửa sổ chọn thư mục trên máy tính...", "info");
+      const res = await apiPost("/api/pick-folder", { initial_dir: currentVal || "data/tiktok_crawler/data/product_images" });
+      if (res && res.ok && res.path) {
+        if (el) el.value = res.path;
+        if (typeof toast === "function") toast(`✅ Đã chọn thư mục: ${res.path}`, "ok");
+      } else if (res && !res.cancelled && res.error) {
+        alert("Không thể mở hộp thoại chọn thư mục: " + res.error);
+      }
+    }
+
+    async function openFolderEncoded(encodedPath) {
+      const path = encodedPath ? decodeURIComponent(encodedPath) : "final_videos";
+      if (typeof toast === "function") toast(`📂 Đang mở trên máy tính: ${path.split(/[\\/]/).pop() || path}...`, "info");
+      const res = await apiPost("/api/open-folder", { path });
+      if (res && !res.ok && res.error) alert("Không thể mở thư mục: " + res.error);
+    }
+
+    async function openFileEncoded(encodedPath) {
+      const path = encodedPath ? decodeURIComponent(encodedPath) : "";
+      if (typeof toast === "function") toast(`🎬 Đang mở file: ${path.split(/[\\/]/).pop() || path}...`, "info");
+      const res = await apiPost("/api/open-file", { path });
+      if (res && !res.ok && res.error) alert("Không thể mở file: " + res.error);
+    }
+  </script>
+  <link rel="stylesheet" href="/static/workflow_studio.css?v=20261105_1800" />
+  <script src="/static/studio_app_part2.js?v=20261112_multitask_v6"></script>
+  <script src="/static/cooking_studio.js?v=20261115_2"></script>
+  <script src="/static/transform_studio.js?v=20261115_2"></script>
+  <link rel="stylesheet" href="/static/template_explorer.css?v=20261110_1" />
+  <script src="/static/template_explorer.js?v=20261112_v5"></script>
+  <script src="/static/workflow_studio.js?v=20261106_0906"></script>
+</body>
+</html>

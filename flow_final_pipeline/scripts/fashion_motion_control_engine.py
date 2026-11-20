@@ -58,6 +58,25 @@ for _p_dir in (SCRIPTS_DIR, WS_DIR):
     if _p_dir not in sys.path:
         sys.path.insert(0, _p_dir)
 PROJECTS_DIR = os.path.join(WS_DIR, "projects")
+
+_FASHION_ASSET_CACHE_LOCK = threading.RLock()
+_FASHION_STOP_LOCK = threading.Lock()
+_FASHION_STOP_FLAGS: set[str] = set()
+
+
+def request_stop_fashion_project(project_id_slug: str) -> None:
+    slug = str(project_id_slug or "").strip()
+    if slug:
+        with _FASHION_STOP_LOCK:
+            _FASHION_STOP_FLAGS.add(slug)
+
+
+def is_fashion_project_stopped(project_id_slug: str) -> bool:
+    slug = str(project_id_slug or "").strip()
+    if not slug:
+        return False
+    with _FASHION_STOP_LOCK:
+        return slug in _FASHION_STOP_FLAGS
 FINAL_VIDEOS_DIR = os.path.join(WS_DIR, "final_videos")
 FASHION_STUDIO_DIR = os.path.join(WS_DIR, "fashion_motion_projects")
 DEMO_ASSETS_DIR = os.path.join(WS_DIR, "ảnh mẫu thumbnail", "Tron_Bo_7_Anh_2K")
@@ -479,7 +498,8 @@ def analyze_and_split_reference_video(
 
     if cache_meta_path and os.path.isfile(cache_meta_path):
         try:
-            cached = json.load(open(cache_meta_path, "r", encoding="utf-8"))
+            with open(cache_meta_path, "r", encoding="utf-8") as _f_cm:
+                cached = json.load(_f_cm)
             c_probe = cached.get("video_probe") or {}
             c_plan = cached.get("split_plan") or {}
             c_gcuts = cached.get("global_cuts_info") or {}
@@ -1683,12 +1703,12 @@ def generate_fashion_2k_asset_on_flow(
             "Cookie": cookie_hdr or "",
         }
 
-        with sync_playwright() as pw:
+        with gvt.flow_playwright_or_extension(sync_playwright, profile_name=prof, cookie_hdr=cookie_hdr or "", project_id=flow_project_id) as pw:
             browser = _launch_flow_browser(pw)
             context = None
             _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
 
-            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            context = _open_stealth_flow_context(browser, gvt)
             if _bypass_js:
                 context.add_init_script(_bypass_js)
             if pw_cookies:
@@ -1806,6 +1826,10 @@ def generate_fashion_2k_asset_on_flow(
                     "profile_used": prof,
                 }
             finally:
+                try:
+                    http_sess.close()
+                except Exception:
+                    pass
                 try:
                     context.close()
                 except Exception:
@@ -2056,13 +2080,23 @@ def submit_fashion_motion_scene_in_page(page, wiz: dict, task: dict) -> tuple:
     except Exception:
         pass
 
+    if not hasattr(page, "bridge"):
+        try:
+            page.evaluate(
+                """async () => {
+                    const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                    try { await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'PAGE_VIEW'}); } catch (e) {}
+                    await new Promise(r => setTimeout(r, 200));
+                }"""
+            )
+        except Exception:
+            pass
     rcap = page.evaluate(
-        """async () => {
+        """async ({action}) => {
             const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
-            try { await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'PAGE_VIEW'}); } catch (e) {}
-            await new Promise(r => setTimeout(r, 250));
-            return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'VIDEO_GENERATION'});
-        }"""
+            return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action});
+        }""",
+        {"action": "VIDEO_GENERATION"},
     )
 
     wf_uuid = str(uuid.uuid4()).upper()
@@ -2149,6 +2183,11 @@ def submit_fashion_motion_scene_in_page(page, wiz: dict, task: dict) -> tuple:
     if not ok_sub or not isinstance(inner_sub, list):
         return False, None, f"jIps6 error: {err_sub}"
 
+    if len(inner_sub) > 1 and isinstance(inner_sub[1], int) and hasattr(gvt, "update_flow_account_credits_realtime"):
+        _wprof = str(task.get("worker_profile") or getattr(page, "profile_name", "") or "").strip()
+        if _wprof:
+            gvt.update_flow_account_credits_realtime(_wprof, inner_sub[1])
+
     try:
         job_uuid = inner_sub[3][0][0]
     except Exception:
@@ -2185,13 +2224,23 @@ def submit_fashion_chained_i2v_scene_in_page(page, wiz: dict, task: dict) -> tup
     except Exception:
         pass
 
+    if not hasattr(page, "bridge"):
+        try:
+            page.evaluate(
+                """async () => {
+                    const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
+                    try { await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'PAGE_VIEW'}); } catch (e) {}
+                    await new Promise(r => setTimeout(r, 180));
+                }"""
+            )
+        except Exception:
+            pass
     rcap = page.evaluate(
-        """async () => {
+        """async ({action}) => {
             const fn = window.__realGrecaptchaExecute || window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
-            try { await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'PAGE_VIEW'}); } catch (e) {}
-            await new Promise(r => setTimeout(r, 200));
-            return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action: 'VIDEO_GENERATION'});
-        }"""
+            return await fn('6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV', {action});
+        }""",
+        {"action": "VIDEO_GENERATION"},
     )
     wf_uuid = str(uuid.uuid4()).upper()
     m_uuid = str(uuid.uuid4()).upper()
@@ -2729,13 +2778,44 @@ def _launch_flow_browser(pw):
         return pw.chromium.launch(headless=headless_mode, args=launch_args)
 
 
+def _open_stealth_flow_context(browser, gvt_mod):
+    """Open an isolated Playwright context with a clean non-Headless Chrome User-Agent and stealth hooks."""
+    clean_ua = gvt_mod.sanitize_chrome_ua(browser=browser) if hasattr(gvt_mod, "sanitize_chrome_ua") else getattr(gvt_mod, "UA_CHROME_131_WIN", None)
+    kw = {"viewport": {"width": 1280, "height": 800}}
+    if clean_ua:
+        kw["user_agent"] = clean_ua
+    ctx = browser.new_context(**kw)
+    if hasattr(gvt_mod, "inject_stealth_scripts"):
+        try:
+            gvt_mod.inject_stealth_scripts(ctx)
+        except Exception:
+            pass
+    return ctx
+
+
 def _mark_flow_profile_unhealthy(prof: str, reason: str = "") -> None:
     key = str(prof or "").strip().lower()
     if not key:
         return
-    _UNHEALTHY_FLOW_PROFILES[key] = (time.time(), str(reason or "error"))
+    reason_s = str(reason or "error")
+    err_kind = "transient"
+    gvt_mod = None
+    try:
+        import grok_video_tool as gvt_mod  # local import because top-level avoids heavy init on import
+        err_kind = gvt_mod.classify_flow_error(reason_s)
+    except Exception:
+        pass
+    if err_kind == "content_policy":
+        # Content policy / invalid prompt rejects come from the scene input, not account health.
+        return
+    _UNHEALTHY_FLOW_PROFILES[key] = (time.time(), reason_s)
+    if gvt_mod is not None:
+        try:
+            gvt_mod.mark_flow_account_cooldown(prof, err_kind, reason_s)
+        except Exception:
+            pass
     print(
-        f"⚠️ [Auto-Switch Account] Tài khoản '{prof}' báo lỗi ({str(reason)[:95]}) -> Tự động chuyển sang tài khoản khác!",
+        f"⚠️ [Auto-Switch Account] Tài khoản '{prof}' báo lỗi ({err_kind}: {reason_s[:95]}) -> Tự động chuyển sang tài khoản khác!",
         flush=True,
     )
 
@@ -2744,11 +2824,24 @@ def _mark_flow_profile_healthy(prof: str) -> None:
     key = str(prof or "").strip().lower()
     if key:
         _UNHEALTHY_FLOW_PROFILES.pop(key, None)
+        try:
+            import grok_video_tool as gvt_mod
+            gvt_mod.clear_flow_account_cooldown(prof)
+        except Exception:
+            pass
 
 
 def _is_flow_profile_unhealthy(prof: str, cooldown_sec: float = 300.0) -> bool:
     key = str(prof or "").strip().lower()
-    if not key or key not in _UNHEALTHY_FLOW_PROFILES:
+    if not key:
+        return False
+    try:
+        import grok_video_tool as gvt_mod
+        if gvt_mod.get_flow_account_cooldown_remaining(prof) > 0:
+            return True
+    except Exception:
+        pass
+    if key not in _UNHEALTHY_FLOW_PROFILES:
         return False
     ts, _ = _UNHEALTHY_FLOW_PROFILES[key]
     if (time.time() - ts) > cooldown_sec:
@@ -3018,37 +3111,11 @@ def _poll_flow_scene_video_cffi(
             return "done", len(r_dl.content)
         return f"dl_err:{r_dl.status_code}", None
 
-    status_code = None
-    try:
-        status_code = inner_p[5][8][0]
-    except Exception:
-        pass
-    if status_code is None:
-        try:
-            status_code = inner_p[0][0][5][8][0]
-        except Exception:
-            pass
-    if status_code is None:
-        try:
-            status_code = inner_p[0][0][3]
-        except Exception:
-            pass
-    if status_code is None:
-        try:
-            status_code = inner_p[5][7][0]
-        except Exception:
-            pass
-    raw_s = json.dumps(inner_p, ensure_ascii=False)
-    raw_upper = raw_s.upper()
-    if (
-        status_code in (4, 5, 6, 7, 8, "FAILED", "CANCELED", "ERROR", "REJECTED")
-        or "PUBLIC_ERROR" in raw_upper
-        or "GENERATION_FAILED" in raw_upper
-        or "POLICY_VIOLATION" in raw_upper
-        or "SAFETY_ERROR" in raw_upper
-    ):
-        print(f"   [POLL-ERR {media_uuid[:8]}] {raw_s[:260]}", flush=True)
-        return f"failed:{status_code or 'error'}", None
+    is_failed, status_code, detail = gvt.extract_flow_as29s_error(inner_p)
+    if is_failed:
+        print(f"   [POLL-ERR {media_uuid[:8]}] code={status_code} | {detail[:240]}", flush=True)
+        code_lbl = status_code if status_code is not None else "error"
+        return f"failed:{code_lbl}:{detail[:220]}", None
     return f"rendering:{status_code}", None
 
 
@@ -3112,6 +3179,37 @@ def _build_fashion_local_asset_path_map(proj_dir: str, manifest: dict) -> dict:
         _reg(lf_fn, lf_p)
 
     return path_map
+
+
+def _auto_thumbnail_and_inject_fashion(
+    project_id_slug: str,
+    manifest: dict,
+    final_video_path: str,
+    save_cb=None,
+) -> None:
+    """Auto-generate project AI thumbnail and inject 0.1s intro into the completed fashion video."""
+    if callable(save_cb):
+        try:
+            save_cb()
+        except Exception:
+            pass
+    try:
+        import engine_settings_manager as _esm
+        th_res = _esm.ensure_project_variant_thumbnail_and_inject(
+            project_id_slug,
+            vkey="nv1_v1",
+            final_video_path=final_video_path,
+        )
+        t_path = str(th_res.get("thumbnail_path") or th_res.get("project_thumbnail_path") or "").strip()
+        if t_path:
+            manifest["thumbnail_path"] = t_path
+        if th_res.get("injected_01s"):
+            manifest["thumbnail_injected_01s"] = True
+            manifest["thumbnail_intro_duration_sec"] = round(
+                float((th_res.get("inject_detail") or {}).get("duration_sec") or 0.1), 3
+            )
+    except Exception as ex_th:
+        print(f"[Fashion Thumbnail Warn] {ex_th}", flush=True)
 
 
 def _run_fashion_motion_project_on_google_vids(
@@ -3337,6 +3435,7 @@ def _run_fashion_motion_project_on_google_vids(
             if post_res.get("ok"):
                 manifest["final_video_path"] = post_res["final_video_path"]
                 manifest["final_video_ready"] = True
+                _auto_thumbnail_and_inject_fashion(project_id_slug, manifest, post_res["final_video_path"], save_cb=_save_live)
     except Exception as exc:
         print(f"[GoogleVids PostProd Warn] {exc}", flush=True)
 
@@ -3423,16 +3522,36 @@ def run_fashion_motion_project_on_flow(
     )
 
     _last_flow_sync_ts = [0.0]
+    _FASHION_STOP_FLAGS.discard(project_id_slug)
+
+    def _is_fashion_stopped() -> bool:
+        if project_id_slug in _FASHION_STOP_FLAGS:
+            return True
+        try:
+            if os.path.isfile(manifest_path):
+                with open(manifest_path, "r", encoding="utf-8") as _rf:
+                    _disk_st = str((json.load(_rf) or {}).get("status") or "")
+                if _disk_st == "stopped":
+                    _FASHION_STOP_FLAGS.add(project_id_slug)
+                    return True
+        except Exception:
+            pass
+        return False
 
     def _save_manifest_live(proj_status: str = None, status_msg: str = None):
+        if project_id_slug in _FASHION_STOP_FLAGS and proj_status == "running_flow":
+            return
         if proj_status:
             manifest["status"] = proj_status
         if status_msg:
             manifest["status_message"] = status_msg
         manifest["updated_at"] = time.strftime("%H:%M:%S")
         try:
-            with open(manifest_path, "w", encoding="utf-8") as _mf:
-                json.dump(manifest, _mf, ensure_ascii=False, indent=2)
+            if hasattr(gvt, "atomic_write_json"):
+                gvt.atomic_write_json(manifest_path, manifest)
+            else:
+                with open(manifest_path, "w", encoding="utf-8") as _mf:
+                    json.dump(manifest, _mf, ensure_ascii=False, indent=2)
         except Exception:
             pass
         now_t = time.monotonic()
@@ -3527,49 +3646,42 @@ def run_fashion_motion_project_on_flow(
             return True
 
         global_cache_path = os.path.join(FASHION_STUDIO_DIR, "_global_flow_asset_cache.json")
+        cache_bucket_key = f"{prof}:{flow_project_id}"
         global_proj_cache = {}
-        try:
-            if os.path.exists(global_cache_path):
-                with open(global_cache_path, "r", encoding="utf-8") as _gcf:
-                    _all_gc = json.load(_gcf)
-                    if isinstance(_all_gc, dict):
-                        raw_gc = dict(_all_gc.get(flow_project_id) or {})
-                        global_proj_cache = {
-                            k: v for k, v in raw_gc.items()
-                            if v and _is_valid_global_img_key(k)
-                        }
-        except Exception:
-            global_proj_cache = {}
-
-        if not global_proj_cache:
-            for _seed_slug in ("fashion_tpl_fvt_001", "fashion_lookbook_chan_vay_6e19"):
-                _seed_p = os.path.join(FASHION_STUDIO_DIR, _seed_slug, "fashion_project.json")
-                if os.path.exists(_seed_p):
-                    try:
-                        _sd = json.load(open(_seed_p, "r", encoding="utf-8"))
-                        if _sd.get("flow_project_id") == flow_project_id and isinstance(_sd.get("asset_uuid_map"), dict):
-                            for _k, _v in _sd["asset_uuid_map"].items():
-                                if _v and _is_valid_global_img_key(_k):
-                                    global_proj_cache[_k] = _v
-                    except Exception:
-                        pass
+        with _FASHION_ASSET_CACHE_LOCK:
+            try:
+                if os.path.exists(global_cache_path):
+                    with open(global_cache_path, "r", encoding="utf-8") as _gcf:
+                        _all_gc = json.load(_gcf)
+                        if isinstance(_all_gc, dict):
+                            raw_gc = dict(_all_gc.get(cache_bucket_key) or _all_gc.get(flow_project_id) or {})
+                            global_proj_cache = {
+                                k: v for k, v in raw_gc.items()
+                                if v and _is_valid_global_img_key(k)
+                            }
+            except Exception:
+                global_proj_cache = {}
 
         def _save_global_asset_cache():
-            try:
-                _all_gc = {}
-                if os.path.exists(global_cache_path):
-                    try:
-                        _all_gc = json.load(open(global_cache_path, "r", encoding="utf-8"))
-                    except Exception:
-                        _all_gc = {}
-                _all_gc[flow_project_id] = {
-                    k: v for k, v in asset_uuid_map.items()
-                    if v and _is_valid_global_img_key(k)
-                }
-                with open(global_cache_path, "w", encoding="utf-8") as _gcf:
-                    json.dump(_all_gc, _gcf, ensure_ascii=False, indent=2)
-            except Exception:
-                pass
+            with _FASHION_ASSET_CACHE_LOCK:
+                try:
+                    _all_gc = {}
+                    if os.path.exists(global_cache_path):
+                        try:
+                            _all_gc = json.load(open(global_cache_path, "r", encoding="utf-8"))
+                        except Exception:
+                            _all_gc = {}
+                    _all_gc[cache_bucket_key] = {
+                        k: v for k, v in asset_uuid_map.items()
+                        if v and _is_valid_global_img_key(k)
+                    }
+                    if hasattr(gvt, "atomic_write_json"):
+                        gvt.atomic_write_json(global_cache_path, _all_gc)
+                    else:
+                        with open(global_cache_path, "w", encoding="utf-8") as _gcf:
+                            json.dump(_all_gc, _gcf, ensure_ascii=False, indent=2)
+                except Exception:
+                    pass
 
         if manifest.get("asset_uuid_project_id") != flow_project_id or manifest.get("flow_project_id") != flow_project_id:
             print(
@@ -3611,12 +3723,12 @@ def run_fashion_motion_project_on_flow(
             f"🚀 Đang khởi chạy tạo video trên Google Flow bằng tài khoản '{prof}' ({len(scenes_to_run)} phân cảnh)...",
         )
 
-        with sync_playwright() as pw:
+        with gvt.flow_playwright_or_extension(sync_playwright, profile_name=prof, cookie_hdr=cookie_hdr or "", project_id=flow_project_id) as pw:
             browser = _launch_flow_browser(pw)
             context = None
             _bypass_js = getattr(gvt, "_FLOW_HIJACK_BYPASS_JS", None) or getattr(gvt, "_RECAPTCHA_BYPASS_INIT_SCRIPT", None)
 
-            context = browser.new_context(viewport={"width": 1280, "height": 800})
+            context = _open_stealth_flow_context(browser, gvt)
             if _bypass_js:
                 context.add_init_script(_bypass_js)
 
@@ -4071,11 +4183,37 @@ def run_fashion_motion_project_on_flow(
                         if ok_sub and job_uuid:
                             break
                         print(f"⚠️ [Submit {sc_id} Try {sub_try}/3 Failed] {err_sub}", flush=True)
+                        _sub_kind = gvt.classify_flow_error(str(err_sub or ""))
+                        if _sub_kind in ("account_quota", "account_auth", "rate_limit"):
+                            print(f"⛔ [Submit {sc_id}] Lỗi tài khoản/rate ({_sub_kind}) -> dừng thử lại trên tài khoản hiện tại.", flush=True)
+                            break
+                        if _sub_kind == "content_policy":
+                            _sub_subtype = gvt.classify_content_rejection_subtype(str(err_sub or ""))
+                            _cur_disp = str(sc.get("prompt") or rebuilt_p.get("display_prompt") or "")
+                            if (
+                                _sub_subtype != "invalid_input"
+                                and not sc.get("_policy_sanitized_retried")
+                                and sub_try < 3
+                            ):
+                                _safe_disp, _chg = gvt.sanitize_prompt_for_flow_policy(_cur_disp, _sub_subtype)
+                                if _chg and _safe_disp:
+                                    sc["_policy_sanitized_retried"] = True
+                                    sc["prompt"] = _safe_disp
+                                    if isinstance(sc.get("segments_spec"), list):
+                                        for _seg in sc["segments_spec"]:
+                                            if isinstance(_seg, dict) and _seg.get("prompt"):
+                                                _sp_s, _ = gvt.sanitize_prompt_for_flow_policy(str(_seg["prompt"]), _sub_subtype)
+                                                _seg["prompt"] = _sp_s
+                                    print(f"🛡️ [Submit {sc_id}] Bộ lọc nội dung ({_sub_subtype}) -> tự làm dịu prompt an toàn và thử lại 1 lần.", flush=True)
+                                    continue
+                            err_sub = gvt.describe_flow_error_vi(str(err_sub or ""))
+                            break
 
                     if not ok_sub or not job_uuid:
+                        _vi_sub_err = gvt.describe_flow_error_vi(str(err_sub or ""))
                         sc["status"] = f"failed:submit_{str(err_sub)[:40]}"
-                        sc["last_error"] = str(err_sub)
-                        sc["status_detail"] = f"❌ Gửi lệnh tạo video Phân Cảnh {sc_id} thất bại sau 3 lần thử: {err_sub}"
+                        sc["last_error"] = _vi_sub_err
+                        sc["status_detail"] = f"❌ Cảnh {sc_idx_label}: {_vi_sub_err}"
                         _save_manifest_live("running_flow", sc["status_detail"])
                         return False
 
@@ -4119,9 +4257,14 @@ def run_fashion_motion_project_on_flow(
                 pending = [sc for sc in scenes_to_run if sc.get("job_uuid_720p")]
                 start_wait = time.time()
                 while (pending or waiting_chained_scenes) and (time.time() - start_wait) < 900:
+                    if _is_fashion_stopped():
+                        print(f"⏹️ [Fashion Stop] Dừng dự án '{project_id_slug}' theo yêu cầu người dùng.", flush=True)
+                        break
                     if not pending:
                         break
                     time.sleep(3.0)
+                    if _is_fashion_stopped():
+                        break
                     still_pending = []
 
                     def _poll_worker(sc_item):
@@ -4129,10 +4272,10 @@ def run_fashion_motion_project_on_flow(
                         _out_p = os.path.join(proj_dir, sc_item["output_video_file"])
                         _stg = "upsample_1080p" if sc_item.get("job_uuid_1080p") else "base_720p"
                         _p_uid = sc_item.get("job_uuid_1080p") or sc_item.get("job_uuid_720p")
-                        _t_sess = cffi_requests.Session(impersonate="chrome131")
-                        _st, _blen = _poll_flow_scene_video_cffi(
-                            _t_sess, cookie_hdr, wiz, dl_headers, flow_project_id, _p_uid, _out_p, stage=_stg, page=None
-                        )
+                        with cffi_requests.Session(impersonate="chrome131") as _t_sess:
+                            _st, _blen = _poll_flow_scene_video_cffi(
+                                _t_sess, cookie_hdr, wiz, dict(dl_headers), flow_project_id, _p_uid, _out_p, stage=_stg, page=None
+                            )
                         return _sid, _stg, _p_uid, _out_p, _st, _blen
 
                     poll_map = {}
@@ -4238,6 +4381,7 @@ def run_fashion_motion_project_on_flow(
                                     if _prepare_and_submit_scene(w_sc, is_retry=False, retry_idx=0):
                                         still_pending.append(w_sc)
                         elif str(st_res).startswith("failed"):
+                            _poll_err_kind = gvt.classify_flow_error(str(st_res))
                             if stage == "upsample_1080p" and os.path.exists(out_mp4) and os.path.getsize(out_mp4) > 50000:
                                 sc["output_video_path"] = out_mp4
                                 sc["is_ai_generated"] = True
@@ -4245,6 +4389,59 @@ def run_fashion_motion_project_on_flow(
                                 sc["last_error"] = ""
                                 sc["status"] = "done"
                                 sc["status_detail"] = f"✅ Đã tạo xong Video Phân Cảnh {sc_idx_label} (Bản chuẩn AI)!"
+                            elif _poll_err_kind == "content_policy":
+                                _p_sub = gvt.classify_content_rejection_subtype(str(st_res))
+                                _has_adult_clip = bool(gen_mode_norm == "video_ref" and sc.get("adult_safe_clip_path") and os.path.exists(sc.get("adult_safe_clip_path")) and not sc.get("_adult_safe_tried"))
+                                _can_sanitize_retry = bool(
+                                    stage == "base_720p"
+                                    and _p_sub != "invalid_input"
+                                    and (not sc.get("_policy_sanitized_retried") or _has_adult_clip)
+                                    and int(sc.get("_retries") or 0) < (MAX_SCENE_ATTEMPTS - 1)
+                                )
+                                _sanitized_applied = False
+                                if _can_sanitize_retry:
+                                    _cur_p_txt = str(sc.get("prompt") or "")
+                                    _safe_p_txt, _p_chg = gvt.sanitize_prompt_for_flow_policy(_cur_p_txt, _p_sub)
+                                    if _p_chg and _safe_p_txt:
+                                        sc["prompt"] = _safe_p_txt
+                                        _sanitized_applied = True
+                                    if isinstance(sc.get("segments_spec"), list):
+                                        for _seg in sc["segments_spec"]:
+                                            if isinstance(_seg, dict) and _seg.get("prompt"):
+                                                _sp_s, _sp_chg = gvt.sanitize_prompt_for_flow_policy(str(_seg["prompt"]), _p_sub)
+                                                if _sp_chg:
+                                                    _seg["prompt"] = _sp_s
+                                                    _sanitized_applied = True
+                                if _can_sanitize_retry and (_sanitized_applied or _has_adult_clip):
+                                    sc["_policy_sanitized_retried"] = True
+                                    sc["_retries"] = int(sc.get("_retries") or 0) + 1
+                                    retry_idx = sc["_retries"]
+                                    sc["attempt"] = retry_idx + 1
+                                    sc["last_error"] = str(st_res)
+                                    sc["status"] = f"retrying_{retry_idx}"
+                                    sc["status_detail"] = (
+                                        f"🛡️ Cảnh {sc_idx_label} bị bộ lọc nội dung ({_p_sub}) — tự làm dịu prompt an toàn"
+                                        f"{' + cắt khung Adult-Safe' if _has_adult_clip else ''} & thử lại 1 lần..."
+                                    )
+                                    _save_manifest_live("running_flow", sc["status_detail"])
+                                    wiz = _refresh_wiz_tokens_in_page(page, wiz)
+                                    if _has_adult_clip:
+                                        sc["_adult_safe_tried"] = True
+                                        re_clip_p = sc["adult_safe_clip_path"]
+                                        ok_rv2, rv2_uid, _, _ = upload_reference_video_in_page(page, wiz, flow_project_id, re_clip_p)
+                                        if ok_rv2 and rv2_uid:
+                                            sc["ref_video_uuid"] = rv2_uid
+                                            asset_uuid_map[f"ref_video_{sc_id}"] = rv2_uid
+                                            asset_uuid_map[sc["ref_clip_filename"]] = rv2_uid
+                                    time.sleep(2)
+                                    if _prepare_and_submit_scene(sc, is_retry=True, retry_idx=retry_idx):
+                                        still_pending.append(sc)
+                                    continue
+                                _vi_poll_err = gvt.describe_flow_error_vi(str(st_res))
+                                sc["status"] = st_res
+                                sc["last_error"] = _vi_poll_err
+                                sc["status_detail"] = f"❌ Cảnh {sc_idx_label}: {_vi_poll_err}"
+                                _save_manifest_live("running_flow", sc["status_detail"])
                             elif stage == "base_720p" and int(sc.get("_retries") or 0) < (MAX_SCENE_ATTEMPTS - 1):
                                 sc["_retries"] = int(sc.get("_retries") or 0) + 1
                                 retry_idx = sc["_retries"]
@@ -4273,9 +4470,10 @@ def run_fashion_motion_project_on_flow(
                                 if _prepare_and_submit_scene(sc, is_retry=True, retry_idx=retry_idx):
                                     still_pending.append(sc)
                             else:
+                                _vi_poll_err = gvt.describe_flow_error_vi(str(st_res))
                                 sc["status"] = st_res
-                                sc["last_error"] = st_res
-                                sc["status_detail"] = f"❌ Tạo video Cảnh {sc_idx_label} không thành công sau {MAX_SCENE_ATTEMPTS} lần thử ({st_res}). Bấm Retry để chạy lại!"
+                                sc["last_error"] = _vi_poll_err
+                                sc["status_detail"] = f"❌ Tạo video Cảnh {sc_idx_label} không thành công sau {MAX_SCENE_ATTEMPTS} lần thử: {_vi_poll_err}"
                         else:
                             sc["status"] = st_res
                             sc["status_detail"] = (
@@ -4318,6 +4516,10 @@ def run_fashion_motion_project_on_flow(
                     _save_manifest_live("failed_auth", last_account_error)
             finally:
                 try:
+                    http_sess.close()
+                except Exception:
+                    pass
+                try:
                     context.close()
                 except Exception:
                     pass
@@ -4326,6 +4528,9 @@ def run_fashion_motion_project_on_flow(
                         browser.close()
                     except Exception:
                         pass
+
+        if _is_fashion_stopped():
+            break
 
         remaining_unfinished = [
             sc
@@ -4347,6 +4552,15 @@ def run_fashion_motion_project_on_flow(
                 or remaining_unfinished[0].get("status_detail")
                 or f"Tài khoản '{prof}' chưa hoàn tất phân cảnh"
             )
+        _policy_blocked = any(
+            gvt.should_stop_all_accounts(str(sc.get("last_error") or sc.get("status_detail") or ""))
+            for sc in remaining_unfinished
+        )
+        if _policy_blocked:
+            _vi_msg = gvt.describe_flow_error_vi(str(last_account_error))
+            _save_manifest_live("failed_policy", _vi_msg)
+            print(f"⛔ [Policy Stop] {_vi_msg} — dừng ngay, không xoay tài khoản khác.", flush=True)
+            break
         _mark_flow_profile_unhealthy(prof, last_account_error)
         if acc_idx + 1 < len(candidate_profiles):
             next_prof = candidate_profiles[acc_idx + 1]
@@ -4368,29 +4582,57 @@ def run_fashion_motion_project_on_flow(
             and os.path.getsize(s.get("output_video_path", "")) > 50000
         )
     ]
+    if _is_fashion_stopped():
+        manifest["ok"] = False
+        manifest["status"] = "stopped"
+        manifest["status_message"] = "⏹️ Đã tạm dừng tiến trình tạo video thời trang theo yêu cầu người dùng."
+        manifest["message"] = manifest["status_message"]
+        _save_manifest_live()
+        manifest["project"] = dict(manifest)
+        return manifest
+
+    postprod_err = ""
     try:
-        if len(done_scenes) == len(manifest.get("scenes") or []):
+        if len(done_scenes) == len(manifest.get("scenes") or []) and len(done_scenes) > 0:
             post_res = fava.render_fashion_postprod_final_video(
                 project_id_slug, proj_dir, manifest, FINAL_VIDEOS_DIR
             )
             if post_res.get("ok"):
                 manifest["final_video_path"] = post_res["final_video_path"]
                 manifest["final_video_ready"] = True
+                _auto_thumbnail_and_inject_fashion(project_id_slug, manifest, post_res["final_video_path"], save_cb=_save_manifest_live)
+            else:
+                postprod_err = str(post_res.get("error") or "Lỗi FFmpeg khi ghép hậu kỳ Video Final.")
+                print(f"❌ [Fashion PostProd Error] {project_id_slug}: {postprod_err}", flush=True)
     except Exception as e:
-        print(f"[PostProd Warn] {e}", flush=True)
+        postprod_err = f"{type(e).__name__}: {e}"
+        print(f"❌ [Fashion PostProd Exception] {project_id_slug}: {postprod_err}", flush=True)
 
-    all_target_ok = len(failed_scenes) == 0
+    all_target_ok = (len(failed_scenes) == 0) and (not postprod_err)
     manifest["ok"] = all_target_ok
     if all_target_ok:
         manifest.pop("error", None)
         manifest["status"] = "completed_flow"
         manifest["status_message"] = f"🎉 Đã hoàn tất Video Final Thời Trang 1080p ({len(done_scenes)} phân cảnh • Chế độ {gen_mode_norm})!"
         manifest["message"] = manifest["status_message"]
+    elif postprod_err:
+        manifest["status"] = "failed_scenes"
+        manifest["status_message"] = f"❌ Lỗi hậu kỳ FFmpeg ghép Video Final: {postprod_err[:240]}"
+        manifest["error"] = manifest["status_message"]
+        if hasattr(gvt, "record_diagnostic_error"):
+            gvt.record_diagnostic_error("FashionPostProd", target=project_id_slug, error_text=postprod_err)
     else:
         failed_ids = ", ".join(str(s.get("id", "")).upper() for s in failed_scenes)
+        first_sc_err = next((str(s.get("last_error") or s.get("status_detail") or "") for s in failed_scenes if s.get("last_error") or s.get("status_detail")), "")
         manifest["status"] = "failed_scenes"
-        manifest["status_message"] = f"⚠️ Phân cảnh {failed_ids} lỗi sau {MAX_SCENE_ATTEMPTS} lần thử tự động."
+        manifest["status_message"] = (
+            f"⚠️ Phân cảnh {failed_ids} lỗi sau {MAX_SCENE_ATTEMPTS} lần thử: {first_sc_err[:220]}"
+            if first_sc_err
+            else f"⚠️ Phân cảnh {failed_ids} lỗi sau {MAX_SCENE_ATTEMPTS} lần thử tự động."
+        )
         manifest["error"] = manifest["status_message"]
+        if hasattr(gvt, "record_diagnostic_error"):
+            gvt.record_diagnostic_error("FashionFlow", target=project_id_slug, scene=failed_ids, error_text=manifest["status_message"])
 
     _save_manifest_live()
     try:
@@ -4922,6 +5164,7 @@ def deconstruct_user_product_to_white_bg_sheet_2k(
     provider_norm = str(model_provider or "nano_banana").strip().lower()
     analyzed_en_desc = ""
     analyzed_vn_desc = ""
+    analyzed_acc_en = ""
 
     # Bước 1: Nếu chọn ChatGPT (hoặc auto), gọi CLIProxy Vision (:8317) để trích xuất mô tả chuẩn xác từng món đồ trong ảnh
     if "chatgpt" in provider_norm or "gpt" in provider_norm or "auto" in provider_norm:
@@ -4943,10 +5186,11 @@ def deconstruct_user_product_to_white_bg_sheet_2k(
                                     {
                                         "type": "text",
                                         "text": (
-                                            "Analyze this clothing/fashion image and return ONLY a JSON object with 3 keys: "
+                                            "Analyze this fashion image and return ONLY a JSON object with 4 keys: "
                                             "\"name_vn\" (short Vietnamese outfit title), "
-                                            "\"desc_vn\" (detailed Vietnamese description of top, bottom/skirt/dress, color, fabric, and matching accessories), "
-                                            "\"desc_en\" (detailed English description of the exact garments, cut, pleats, fabric texture, colors, and 4 matching accessories for an e-commerce flat-lay product sheet on pure white background)."
+                                            "\"desc_vn\" (detailed Vietnamese description of garments & accessories), "
+                                            "\"desc_en\" (concise English description of the exact main garments: cut, neckline, sleeves, true mini/midi/long skirt length, pleats, fabric texture, micro-prints, and colors), "
+                                            "\"accessories_en\" (exact English list of every visible accessory, hair bow/clip, bag, socks, and footwear seen in the photo; never invent unseen props — write 'clean studio separation of only visible items' if none)."
                                         ),
                                     },
                                     {"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64_img}"}},
@@ -4971,16 +5215,18 @@ def deconstruct_user_product_to_white_bg_sheet_2k(
                                 outfit_name = parsed_j["name_vn"]
                             analyzed_vn_desc = parsed_j.get("desc_vn") or ""
                             analyzed_en_desc = parsed_j.get("desc_en") or ""
+                            analyzed_acc_en = parsed_j.get("accessories_en") or ""
                             break
                 except Exception:
                     continue
         except Exception as _chat_err:
             print(f"[ChatGPT Vision Info] {_chat_err}", flush=True)
 
-    # Bước 2: Tạo Prompt tách nền trắng chỉ lấy sản phẩm (giống hệt 03_Product_Sheet_Quan_Xanh_2K.png)
-    custom_vars = {}
-    if analyzed_en_desc:
-        custom_vars["outfit_desc"] = analyzed_en_desc
+    # Bước 2: Tạo Prompt tách nền trắng lấy trọn outfit + phụ kiện đúng theo ảnh gốc
+    custom_vars = {
+        "outfit_desc": analyzed_en_desc or "the exact main clothing garments shown in the reference photo preserving true skirt/dress length, neckline, sleeves, prints, and texture",
+        "accessories_desc": analyzed_acc_en or "every coordinated handbag, footwear, socks, hair accessory, eyewear, and jewelry visibly present in the reference photo without inventing unrelated props",
+    }
     prompts_map = get_standard_fashion_prompts(custom_vars)
     flatlay_prompt = prompts_map["deconstructed_outfit_flatlay_2k"]["rendered_prompt"]
 
@@ -5386,10 +5632,15 @@ def prepare_simple_fashion_inputs(project_id, manifest, profile_name=''):
             max_w = min(len(raw_outfits), max(1, len(cand_accs)), 3)
             indexed_results = {}
             with concurrent.futures.ThreadPoolExecutor(max_workers=max_w) as _opool:
-                futs = {_opool.submit(_prep_one_outfit, (i, it)): i for i, it in enumerate(raw_outfits, 1)}
+                futs = {_opool.submit(_prep_one_outfit, (i, it)): (i, it) for i, it in enumerate(raw_outfits, 1)}
                 for fut in concurrent.futures.as_completed(futs):
-                    r_idx, r_item = fut.result()
-                    indexed_results[r_idx] = r_item
+                    orig_i, orig_it = futs[fut]
+                    try:
+                        r_idx, r_item = fut.result()
+                        indexed_results[r_idx] = r_item
+                    except Exception as exc_of:
+                        print(f"⚠️ [SimpleFashion Outfit#{orig_i} Fallback] {exc_of} -> dùng trực tiếp ảnh gốc!", flush=True)
+                        indexed_results[orig_i] = dict(orig_it)
             for i in range(1, len(raw_outfits) + 1):
                 outfits.append(indexed_results[i])
         result=apply_fashion_video_template_to_project(

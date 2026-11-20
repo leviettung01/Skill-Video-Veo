@@ -1,0 +1,39 @@
+{
+  "id": "fashion_transformation",
+  "code": "006",
+  "folder_name": "Bien Hinh Thoi Trang",
+  "name": "Biến hình thời trang",
+  "badge": "2 KỊCH BẢN • NHẠC TÙY CHỌN",
+  "category": "Thời trang",
+  "description": "Chọn Làm nông hoặc Bán cá, chọn nhân vật tham chiếu (thư viện hoặc tải lên) và ảnh quần áo rồi bấm Tạo video. Tool tách nền trắng, tạo ảnh tham chiếu 2K, dựng cảnh 1 che kín đen khung cuối → chuyển cảnh bùng sáng khớp drop nhạc demo.",
+  "pipeline_kind": "fashion_transformation",
+  "has_subtitles": false,
+  "default_videos_per_character": 1,
+  "scenes_per_video": 2,
+  "scene_duration_sec": 8,
+  "video_aspect": "9:16",
+  "image_resolution": "2K",
+  "video_resolution": "1080×1920 • 30 FPS",
+  "image_model": "Nano Banana 2.1 hoặc ChatGPT Image",
+  "video_model": "Google Flow (Omni 1.1 Flash)",
+  "tags": [
+    "Làm nông",
+    "Bán cá",
+    "Nhân vật tham chiếu",
+    "Che đen chuyển cảnh",
+    "2 cảnh × 8 giây"
+  ],
+  "demo_video_caption": "Video tham khảo gốc (Làm nông / Bán cá) — dùng đồng bộ chuyển cảnh và nhạc nền",
+  "scene_breakdown": [
+    {
+      "title": "Trước biến hình (0–8s)",
+      "purpose": "Tốc độ thực tế 1.0x (không slow-motion). Làm nông: cuốc đất → lau mồ hôi & nhìn thẳng → đưa lưỡi cuốc dính đất che kín 100% camera. Bán cá: đánh vảy cá ngoài chợ & cặp đôi bước tới (0–3.0s) → cắt cận đôi nam nữ cũ, CHỈ nam nói thoại 'Tháng sau bọn anh cưới...' & nữ mới khoanh tay khinh khỉnh im lặng (3.0–5.4s) → cận nữ bán cá im lặng mím môi rưng rưng (5.4–7.0s) rồi lao găng hồng áp sát che kín 100% 4 góc ống kính tới tối đen (7.0–8.0s). Hậu kỳ tự động căn chuẩn khớp cut với thoại mẫu.",
+      "camera": "9:16 tốc độ thật, cắt góc cận người nói rõ vai trò thoại/im lặng rồi đẩy cận macro vật che phủ kín khung ở 8.0s."
+    },
+    {
+      "title": "Biến hình VIP quý phái (8–16s)",
+      "purpose": "Làm nông: sải bước dứt khoát từ cửa biệt thự gỗ gụ nắng vàng. Bán cá: bên ngoài xe sedan hạng sang Maybach cỡ lớn tỷ lệ thật đỗ trên làn đường phẳng cạnh lối đi đá hoa cương rộng, vệ sĩ vest đen giữ cửa mở, nhân vật bước hẳn ra phía trước sải bước tự tin với nụ cười quyền lực, 4 vệ sĩ vest tối màu đeo kính râm từ hai bên cột tiến vào đội hình hộ tống phía sau (tuyệt đối không xuyên xe) & đèn flash phóng viên khớp nhịp drop nhạc.",
+      "camera": "9:16 8K Steadicam lùi mượt trước bước sải quyền lực, chuyển động tự nhiên dứt khoát không slow-motion lê thê, bảo toàn 100% trang phục & phụ kiện."
+    }
+  ]
+}

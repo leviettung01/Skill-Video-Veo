@@ -301,6 +301,12 @@
       display: grid; grid-template-columns: 1fr 1fr; gap: 7px;
       padding: 9px 12px; background: var(--surface); border-top: 1px solid var(--border);
     }
+    .actions .btn-full {
+      grid-column: 1 / -1;
+      background: rgba(239, 68, 68, 0.12);
+      border-color: rgba(239, 68, 68, 0.35);
+      color: #fca5a5;
+    }
     .btn {
       display: inline-flex; align-items: center; justify-content: center; gap: 5px;
       padding: 7px 10px; border-radius: 6px; font-size: 11px; font-weight: 700;
@@ -440,10 +446,11 @@
   <div class="actions">
     <button class="btn btn-primary" id="btn-flow">🌐 Mở Tab Google Flow</button>
     <button class="btn" id="btn-token">🔄 Đồng Bộ Phiên Flow</button>
+    <button class="btn btn-full" id="btn-clean-tabs">🧹 Đóng Tab Thừa &amp; Xóa Cache Ngay</button>
   </div>
 
   <footer>
-    <span>⚡ LeVietTung_autoveo v2.1</span>
+    <span>⚡ LeVietTung_autoveo v2.3.0</span>
     <span style="color:#fbbf24;">Zalo: 0915967790</span>
   </footer>
 

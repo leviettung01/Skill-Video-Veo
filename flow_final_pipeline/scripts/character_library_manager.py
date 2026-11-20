@@ -8,6 +8,7 @@ Quản lý Thư Viện Nhân Vật & Character Sheet Templates (`character_libra
       2. Model `chatgpt` (ChatGPT Image `gpt-image-1` / `dall-e-3` qua CLIProxy `:8317` hoặc OpenAI API)
 """
 import os
+import re
 import sys
 import json
 import time
@@ -674,20 +675,24 @@ def delete_voice_profile(voice_key: str) -> dict:
     return get_character_library_state()
 
 
+_FLOW_UUID_RE = re.compile(r"^[0-9a-fA-F]{8}-[0-9a-fA-F-]{24,36}$")
+
+
 def resolve_voice_id_for_account(voice_id_or_key: str, profile_name: str = "") -> str:
     """
     Khi chạy Đa Tài Khoản Google Flow (Round-Robin):
     Mỗi tài khoản có thể có mã UUID Custom Voice riêng trong `account_voice_ids[profile_name]`.
     - Nếu tài khoản `profile_name` đã có UUID riêng trong `account_voice_ids[profile_name]` -> trả về UUID đó.
-    - Nếu `profile_name` là tài khoản gốc (`owner_profile`, mặc định `leviettung04`) -> trả về `voice_id` gốc.
-    - Nếu `profile_name` là tài khoản phụ chưa đồng bộ/nhân bản UUID Custom Voice -> trả về `account_voice_ids.get(profile_name)` hoặc `voice_id` / `flow_slug`.
+    - Nếu `profile_name` là tài khoản gốc (`owner_profile`) -> trả về `voice_id` gốc.
+    - Nếu `profile_name` là tài khoản khác chưa nhân bản Custom Voice -> trả về `""` để Veo 3.1 / Omni tự tạo giọng tự nhiên từ Prompt,
+      TUYỆT ĐỐI KHÔNG trả về UUID riêng của `owner_profile` hay chuỗi slug không phải UUID để tránh lỗi [3]/[5]/[7] trên tài khoản mới!
     """
     raw = str(voice_id_or_key or "").strip()
     if not raw:
         return ""
     prof = str(profile_name or "").strip()
     if not os.path.isfile(VOICES_CHARS_PATH):
-        return raw
+        return raw if (not prof and _FLOW_UUID_RE.match(raw)) else ""
     try:
         with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
             cfg = json.load(f)
@@ -697,16 +702,80 @@ def resolve_voice_id_for_account(voice_id_or_key: str, profile_name: str = "") -
             vid = str(v.get("voice_id") or "").strip()
             if raw.lower() in (vk.lower(), vid.lower(), str(v.get("name") or "").strip().lower()):
                 acc_map = v.get("account_voice_ids") or {}
-                if prof and prof in acc_map and acc_map[prof]:
-                    return str(acc_map[prof]).strip()
+                if prof:
+                    for k_acc, val_acc in acc_map.items():
+                        cand_v = str(val_acc or "").strip()
+                        if str(k_acc).strip().lower() == prof.lower() and _FLOW_UUID_RE.match(cand_v):
+                            return cand_v
                 owner = str(v.get("owner_profile") or _default_owner_profile()).strip()
-                if not prof or prof.lower() == owner.lower():
-                    return vid or raw
-                # Nếu tài khoản phụ chưa nhân bản UUID riêng, kiểm tra bất kỳ UUID nào đã map hoặc trả về vid
-                return str(acc_map.get(prof) or vid or v.get("flow_slug") or raw).strip()
+                if not prof or (owner and prof.lower() == owner.lower()):
+                    return vid if _FLOW_UUID_RE.match(vid) else (raw if _FLOW_UUID_RE.match(raw) else "")
+                return ""
     except Exception:
         pass
-    return raw
+    if not prof and _FLOW_UUID_RE.match(raw):
+        return raw
+    return ""
+
+
+def resolve_character_id_for_account(char_id_or_key: str, profile_name: str = "") -> str:
+    """Chỉ trả về Flow character_id UUID khi đúng tài khoản sở hữu hoặc đã map trong account_character_ids."""
+    raw = str(char_id_or_key or "").strip()
+    if not raw or not os.path.isfile(VOICES_CHARS_PATH):
+        return ""
+    prof = str(profile_name or "").strip()
+    try:
+        with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f)
+        for ck, c in (cfg.get("characters") or {}).items():
+            if not isinstance(c, dict):
+                continue
+            cid = str(c.get("character_id") or "").strip()
+            if raw.lower() in (ck.lower(), cid.lower()):
+                acc_map = c.get("account_character_ids") or {}
+                if prof:
+                    for k_acc, val_acc in acc_map.items():
+                        cand_c = str(val_acc or "").strip()
+                        if str(k_acc).strip().lower() == prof.lower() and _FLOW_UUID_RE.match(cand_c):
+                            return cand_c
+                owner = str(c.get("owner_profile") or _default_owner_profile()).strip()
+                if not prof or (owner and prof.lower() == owner.lower()):
+                    return cid if _FLOW_UUID_RE.match(cid) else ""
+                return ""
+    except Exception:
+        pass
+    return ""
+
+
+def resolve_character_sheet_path(char_key: str, fallback_assets_dir: str = "") -> str:
+    """Tìm đúng đường dẫn ảnh tham chiếu cho mọi nhân vật (nv1..nv5 và nhân vật tự thêm nv6+)."""
+    ck = str(char_key or "nv1").strip().lower()
+    assets_dir = fallback_assets_dir or os.path.join(PIPELINE_DIR, "assets")
+    if os.path.isfile(VOICES_CHARS_PATH):
+        try:
+            with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+                cfg = json.load(f)
+            c_obj = (cfg.get("characters") or {}).get(ck) or (cfg.get("characters") or {}).get(char_key)
+            if isinstance(c_obj, dict):
+                for p_field in ("image_path", "sheet_path", "ref_image", "avatar_path"):
+                    cand = str(c_obj.get(p_field) or "").strip()
+                    if not cand:
+                        continue
+                    if not os.path.isabs(cand):
+                        for base_d in (WORKSPACE_DIR, PIPELINE_DIR, CHARS_DIR, assets_dir):
+                            abs_c = os.path.join(base_d, cand)
+                            if os.path.isfile(abs_c):
+                                return abs_c
+                    elif os.path.isfile(cand):
+                        return cand
+        except Exception:
+            pass
+    for ext in (".jpg", ".png", ".jpeg", ".webp"):
+        for d_search in (CHARS_DIR, assets_dir):
+            cand_f = os.path.join(d_search, f"{ck}_ref{ext}")
+            if os.path.isfile(cand_f):
+                return cand_f
+    return os.path.join(assets_dir, "nv1_ref.jpg")
 
 
 def _list_flow_accounts_with_cookies(target_profile: str = "") -> list:
@@ -760,6 +829,29 @@ def _list_flow_accounts_with_cookies(target_profile: str = "") -> list:
                     "cookies": ck,
                 })
     return results
+
+
+def _open_flow_voice_picker(pg) -> None:
+    """Open Google Flow's Voice picker overlay across both the updated composer menu and legacy MUSE UI."""
+    comp_btn = pg.locator(
+        "button[aria-label='Thêm thành phần vào ô nhập câu lệnh'], button[aria-label*='prompt' i]"
+    ).first
+    if comp_btn.count() > 0:
+        comp_btn.click(force=True, timeout=8000)
+        pg.wait_for_timeout(800)
+        voice_tab = pg.locator(
+            ".cdk-overlay-container mat-list-item:has-text('Giọng nói'), .cdk-overlay-container mat-list-item:has-text('Voice')"
+        ).first
+        if voice_tab.count() > 0:
+            voice_tab.click(force=True, timeout=8000)
+            pg.wait_for_timeout(1400)
+            return
+    pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật'), button:has-text('Character')").first.click(force=True, timeout=6000)
+    pg.wait_for_timeout(1200)
+    pg.locator("text=MUSE").first.click(force=True, timeout=6000)
+    pg.wait_for_timeout(1200)
+    pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
+    pg.wait_for_timeout(1600)
 
 
 def scan_and_sync_flow_voices(payload: dict = None) -> dict:
@@ -851,12 +943,7 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                                     timeout=25000,
                                 )
                                 pg.wait_for_timeout(1500)
-                                pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
-                                pg.wait_for_timeout(1200)
-                                pg.locator("text=MUSE").first.click(force=True, timeout=6000)
-                                pg.wait_for_timeout(1200)
-                                pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
-                                pg.wait_for_timeout(1600)
+                                _open_flow_voice_picker(pg)
 
                                 # Thu thập danh sách tất cả Custom Voice (có icon settings_2) ở đầu danh sách Giọng nói
                                 custom_titles_seen = []
@@ -1042,12 +1129,7 @@ def scan_and_sync_flow_voices(payload: dict = None) -> dict:
                                     pg2.evaluate(gvt._FLOW_HIJACK_BYPASS_JS)
                                     pg2.wait_for_function("() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e", timeout=25000)
                                     pg2.wait_for_timeout(1500)
-                                    pg2.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật')").first.click(force=True, timeout=6000)
-                                    pg2.wait_for_timeout(1200)
-                                    pg2.locator("text=MUSE").first.click(force=True, timeout=6000)
-                                    pg2.wait_for_timeout(1200)
-                                    pg2.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
-                                    pg2.wait_for_timeout(1600)
+                                    _open_flow_voice_picker(pg2)
 
                                     for vk_c, v_c in voices_map.items():
                                         if not isinstance(v_c, dict):
@@ -1504,13 +1586,7 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
                 timeout=35000,
             )
             pg.wait_for_timeout(1800)
-
-            pg.locator("button:has-text('Nhân vật'), [role='button']:has-text('Nhân vật'), button:has-text('Character'), [role='button']:has-text('Character')").first.click(force=True, timeout=6000)
-            pg.wait_for_timeout(1400)
-            pg.locator("text=MUSE").first.click(force=True, timeout=6000)
-            pg.wait_for_timeout(1400)
-            pg.locator(".voice-card-start-btn").first.click(force=True, timeout=6000)
-            pg.wait_for_timeout(1800)
+            _open_flow_voice_picker(pg)
 
             # Cuộn danh sách giọng đọc trong `.cdk-overlay-container` để chọn đúng Giọng Gốc (`Fenrir`, `Puck`, `Alnilam`, `Zephyr`...)
             for step in range(16):
@@ -1548,8 +1624,9 @@ def create_custom_voice_on_flow(payload: dict) -> dict:
                     break
 
             if got_vid:
-                if pg.locator(".cdk-overlay-container input.voice-name-input").count() > 0:
-                    pg.locator(".cdk-overlay-container input.voice-name-input").first.fill(v_name, force=True)
+                name_loc = pg.locator(".cdk-overlay-container input.voice-name-input, .cdk-overlay-container input[placeholder='Nhập tên giọng nói']").first
+                if name_loc.count() > 0:
+                    name_loc.fill(v_name, force=True)
                     pg.wait_for_timeout(300)
                 save_btn = pg.locator(".cdk-overlay-container button:has-text('Lưu giọng nói mới'), .cdk-overlay-container button:has-text('Save new voice')").first
                 if save_btn.count() > 0 and not save_btn.is_disabled():
@@ -1872,44 +1949,74 @@ def generate_character_or_product_image(payload: dict) -> dict:
     )
     out_abs = os.path.join(out_dir, out_filename)
 
-    # 1. Nếu chọn model ChatGPT (`chatgpt`), thử gọi CLIProxy (:8317) hoặc OpenAI Images API trước
-    if model_choice == "chatgpt":
-        import engine_settings_manager as _esm_clm
-        _cp_cfg = _esm_clm.get_cliproxy_config()
-        api_url = os.environ.get("OPENAI_IMAGE_API_URL", f"{_cp_cfg['url']}/v1/images/generations")
-        api_key = os.environ.get("OPENAI_API_KEY") or _cp_cfg["api_key"]
-        req_body = json.dumps({
-            "model": "gpt-image-1",
-            "prompt": final_prompt,
-            "n": 1,
-            "size": "1024x1536" if mode == "product_ref" else "1536x1024",
-            "response_format": "b64_json",
-        }).encode("utf-8")
-        try:
-            req = urllib.request.Request(
-                api_url,
-                data=req_body,
-                headers={
-                    "Content-Type": "application/json",
-                    "Authorization": f"Bearer {api_key}",
-                },
-                method="POST",
+    state_cfg = get_character_library_state()
+    char_entry = next((c for c in state_cfg["characters"] if c["key"] == char_key), None)
+
+    def _gather_char_and_prod_ref_paths():
+        refs = []
+        for rp in (payload.get("reference_images") or []):
+            if rp and os.path.isfile(str(rp)) and str(rp) not in refs:
+                refs.append(str(rp))
+        if char_entry:
+            char_ref_rel = char_entry.get("ref_image_path") or ""
+            char_ref_abs = (
+                char_ref_rel
+                if os.path.isabs(char_ref_rel)
+                else os.path.join(WS_DIR, char_ref_rel.replace("/", os.sep))
             )
-            with urllib.request.urlopen(req, timeout=60) as resp:
-                resp_data = json.loads(resp.read().decode("utf-8"))
-                img_item = (resp_data.get("data") or [{}])[0]
-                if img_item.get("b64_json"):
-                    raw_bytes = base64.b64decode(img_item["b64_json"])
-                    with open(out_abs, "wb") as f:
-                        f.write(raw_bytes)
-                    return {
-                        "ok": True,
-                        "model_used": "ChatGPT Image (gpt-image-1)",
-                        "image_path": out_abs,
-                        "prompt": final_prompt,
-                    }
-        except Exception as e_gpt:
-            print(f"[CHAR-GEN] ChatGPT endpoint returned {e_gpt}, falling back to Google Flow Nano Banana 2.1...", flush=True)
+            if char_ref_rel and os.path.isfile(char_ref_abs) and char_ref_abs not in refs:
+                refs.append(char_ref_abs)
+        if mode == "product_ref":
+            cand_prod_imgs = []
+            if payload.get("product_image_path"):
+                cand_prod_imgs.append(str(payload["product_image_path"]).strip())
+            if pid:
+                for p_dir in (
+                    os.path.join(PROJECTS_DIR, pid, "product_images"),
+                    os.path.join(WS_DIR, "data", "tiktok_crawler", "data", "product_images", pid),
+                ):
+                    if os.path.isdir(p_dir):
+                        cand_prod_imgs.append(os.path.join(p_dir, "prod_1.jpg"))
+                        for fn in sorted(os.listdir(p_dir)):
+                            if fn.lower().endswith((".jpg", ".jpeg", ".png", ".webp")) and fn != "prod_clean.jpg":
+                                cand_prod_imgs.append(os.path.join(p_dir, fn))
+            chosen_prod_jpg = next((p for p in cand_prod_imgs if p and os.path.isfile(p)), "")
+            if chosen_prod_jpg and chosen_prod_jpg not in refs:
+                refs.append(chosen_prod_jpg)
+        return refs
+
+    # 1. Nếu chọn model CLIProxy (`chatgpt`, `cliproxy_gemini`, `grok`), dùng helper thống nhất (hỗ trợ đa ảnh tham chiếu)
+    if model_choice in ("chatgpt", "openai", "gpt", "cliproxy_gpt", "cliproxy_gemini", "gemini", "grok", "xai"):
+        import engine_settings_manager as _esm_clm
+        ref_imgs = _gather_char_and_prod_ref_paths()
+        img_model_req = (
+            "gemini-3.1-flash-image"
+            if model_choice in ("cliproxy_gemini", "gemini")
+            else ("grok-imagine-image" if model_choice in ("grok", "xai") else "gpt-image-2")
+        )
+        ok_cli, eng_cli, err_cli = _esm_clm.generate_image_via_cliproxy(
+            {
+                "prompt": final_prompt,
+                "image_model": img_model_req,
+                "image_size": "1024x1536" if mode == "product_ref" else "1536x1024",
+                "aspect_ratio": "9:16" if mode == "product_ref" else "16:9",
+                "reference_images": ref_imgs,
+            },
+            out_abs,
+        )
+        if ok_cli and os.path.isfile(out_abs):
+            return {
+                "ok": True,
+                "model_used": eng_cli or f"CLIProxy ({img_model_req})",
+                "image_path": out_abs,
+                "prompt": final_prompt,
+                "reference_images": ref_imgs,
+            }
+        return {
+            "ok": False,
+            "error": err_cli or f"Không tạo được ảnh qua CLIProxy ({img_model_req})",
+            "prompt": final_prompt,
+        }
 
     # 2. Tạo ảnh qua Google Flow Nano Banana 2.1 (`BELUGA` / `ogiZ0b` + Upsample 2K `SPrCad`)
     try:
@@ -1919,8 +2026,6 @@ def generate_character_or_product_image(payload: dict) -> dict:
         import run_all_7_videos_mt as mt
         from playwright.sync_api import sync_playwright
 
-        state_cfg = get_character_library_state()
-        char_entry = next((c for c in state_cfg["characters"] if c["key"] == char_key), None)
         project_id = (char_entry or {}).get("project_id") or _default_flow_project_id()
         char_uuid = (char_entry or {}).get("character_id") or ""
 

@@ -122,6 +122,121 @@ def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
             "true-to-life 20x20cm palm-sized flexible mesh dishcloth held naturally between both hands",
         ),
         (
+            ["cưa xích", "máy cưa"],
+            "compact orange handheld gardening pruning power tool unit held safely by the rear handle",
+            "true-to-life garden power tool scale (~40cm housing + guide bar) held cleanly on a wooden workbench",
+        ),
+        (
+            ["cắt góc", "tạo lỗ", "dụng cụ sửa điện", "bộ dụng cụ", "tua vít"],
+            "compact workshop hardware tool kit in a sturdy storage case",
+            "true-to-life hand-held hardware tool kit box scale relative to the hands and body",
+        ),
+        (
+            ["dao lam", "lưỡi cạo", "croma"],
+            "sealed retail 5-pack cardboard dispenser boxes of grooming replacement foil refills",
+            "true-to-life palm-sized closed retail cardboard box pack held neatly in one hand",
+        ),
+        (
+            ["dao cạo râu", "5 lưỡi", "máy cạo râu", "tông đơ", "máy sấy", "bàn chải"],
+            "compact personal grooming handle and attachment kit in a retail pack",
+            "true-to-life compact hand-held personal care device and kit relative to the hands and body",
+        ),
+        (
+            ["sạc dự phòng", "pin dự phòng", "50.000mah", "50000mah"],
+            "high-capacity digital display portable power bank with built-in charging cables",
+            "true-to-life hand-held power bank brick (~15cm tall) held comfortably in one hand",
+        ),
+        (
+            ["bộ sạc", "củ sạc", "cáp sạc", "sạc nhanh"],
+            "120W fast charging adapter block with foldable dual-function phone stand and cable",
+            "true-to-life palm-sized charger adapter and retail box relative to the hands and body",
+        ),
+        (
+            ["kính cường lực"],
+            "crystal-clear tempered glass screen protector kit inside an alignment applicator frame box",
+            "true-to-life smartphone-sized screen protector alignment tray box held naturally in both hands",
+        ),
+        (
+            ["pin maxel", "pin 3a", "pin aaa", "pin tiểu"],
+            "blister pack of AAA alkaline dry-cell household remote batteries",
+            "true-to-life palm-sized retail battery blister card held naturally in one hand",
+        ),
+        (
+            ["tranh đồng hồ", "tráng gương"],
+            "glossy 30x60cm crystal-porcelain decorative wall clock artwork panel",
+            "true-to-life 30x60cm framed decorative wall clock artwork resting visibly against the display counter",
+        ),
+        (
+            ["đồng hồ treo tường", "dạ quang"],
+            "luminous silent-sweep round decorative wall clock",
+            "true-to-life ~30cm diameter wall clock held comfortably with both hands",
+        ),
+        (
+            ["bóng sưởi", "đèn sưởi"],
+            "gold-tinted 275W infrared bathroom heat lamp bulb in retail box",
+            "true-to-life ~17x12cm infrared heat lamp bulb held carefully by its base next to its retail box",
+        ),
+        (
+            ["túi rác", "túi đựng rác"],
+            "heavy-duty 1kg roll pack of black industrial and household trash bags",
+            "true-to-life sturdy 1kg plastic bag roll bundle held neatly on the counter and in hand",
+        ),
+        (
+            ["lõi chống hôi", "thoát sàn", "ngăn mùi"],
+            "compact silicone & ABS one-way floor drain anti-odor valve core in retail box",
+            "true-to-life palm-sized plumbing floor drain valve accessory held in one hand",
+        ),
+        (
+            ["cần câu", "fishing"],
+            "telescopic fishing rod combo kit with spinning reel and tackle accessory case",
+            "true-to-life collapsed travel fishing rod and compact tackle kit held naturally across both hands",
+        ),
+        (
+            ["chân chống xe đạp"],
+            "adjustable aluminum-steel alloy bicycle side kickstand bracket",
+            "true-to-life ~35cm matte black bicycle kickstand bracket held horizontally in hand",
+        ),
+        (
+            ["bếp nướng", "lẩu điện", "nồi", "chảo", "bếp từ", "bếp điện", "bếp ga", "máy xay", "ấm siêu tốc"],
+            "dual-zone 3L electric tabletop hotpot & non-stick grill cooker",
+            "true-to-life tabletop household electric cooker resting cleanly on the foreground counter with hands beside it",
+        ),
+        (
+            ["bình giữ nhiệt", "inox 316", "cốc", "ly"],
+            "1000ml 316 stainless-steel vacuum insulated thermos bottle with tea infuser",
+            "true-to-life tall hand-held thermos bottle (~26cm height) relative to the hands and body",
+        ),
+        (
+            ["xịt mối", "diệt mối", "chai xịt"],
+            "500ml household wood-care trigger spray bottle",
+            "true-to-life hand-held 500ml trigger spray bottle held securely in one hand",
+        ),
+        (
+            ["tất cổ cao", "vớ lửng", "tất dành", "tất thể thao", "đôi vớ", "đôi tất"],
+            "neatly bundled 10-pair / 15-pair cotton crew socks multipack",
+            "true-to-life neat retail multi-pair sock bundle held clearly in both hands",
+        ),
+        (
+            ["găng tay", "bao tay"],
+            "pair of thick fleece-lined winter windproof gloves",
+            "true-to-life natural adult glove pair size held clearly toward the camera",
+        ),
+        (
+            ["mũ", "nón", "khăn ống"],
+            "plush fleece-lined winter warm hat / knit beanie set",
+            "true-to-life winter knit/fleece hat held cleanly at chest level to show plush lining",
+        ),
+        (
+            ["áo choàng", "lông cừu"],
+            "plush fleece hooded winter lounge robe neatly folded",
+            "true-to-life plush folded winter lounge robe held over forearms/on hanger",
+        ),
+        (
+            ["dép bông", "dép nam", "giày lười", "giày nữ", "giày", "dép", "sandal"],
+            "pair of cushioned non-slip footwear items",
+            "true-to-life natural shoe / slipper proportion relative to the hands and body",
+        ),
+        (
             ["khăn tắm", "khăn mặt", "khăn lau"],
             "soft folded fabric towel",
             "true-to-life hand-held folded towel size relative to the hands and body",
@@ -133,7 +248,7 @@ def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
         ),
         (
             ["thắt lưng", "dây nịt", "belt"],
-            "men's belt with metal buckle",
+            "men's sleek automatic ratchet leather belt with metallic buckle",
             "true-to-life palm-sized coiled belt and gift box scale relative to the hands and body",
         ),
         (
@@ -152,24 +267,14 @@ def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
             "true-to-life natural bag proportion relative to the hands and body",
         ),
         (
+            ["tai nghe", "loa", "bluetooth"],
+            "compact wireless Bluetooth earbuds charging case and retail box",
+            "true-to-life palm-sized audio earbuds case held neatly toward camera",
+        ),
+        (
             ["đồng hồ", "watch"],
             "wristwatch",
             "true-to-life compact wristwatch scale relative to the hands and body",
-        ),
-        (
-            ["tai nghe", "loa", "bluetooth"],
-            "compact audio device",
-            "true-to-life palm-sized gadget scale relative to the hands and body",
-        ),
-        (
-            ["bình giữ nhiệt", "cốc", "ly"],
-            "insulated tumbler cup",
-            "true-to-life hand-held tumbler size relative to the hands and body",
-        ),
-        (
-            ["máy cạo râu", "tông đơ", "máy sấy", "bàn chải"],
-            "compact personal care appliance",
-            "true-to-life compact hand-held device relative to the hands and body",
         ),
         (
             ["bộ vẽ", "dụng cụ vẽ", "bút màu", "màu vẽ"],
@@ -177,9 +282,14 @@ def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
             "true-to-life hand-held stationery case proportion relative to the hands and body",
         ),
         (
-            ["tinh dầu", "nước hoa", "kem", "serum", "sữa rửa mặt", "son", "mỹ phẩm"],
-            "cosmetic / fragrance bottle set",
-            "true-to-life palm-sized cosmetic bottle / gift box relative to the hands and body",
+            ["fish oil", "men vi sinh", "vitality", "viên nang", "bổ sung dinh dưỡng"],
+            "sealed dietary wellness supplement bottle (120 softgels / capsules)",
+            "true-to-life hand-held supplement bottle (~12cm tall) held cleanly with label facing camera",
+        ),
+        (
+            ["tinh dầu", "nước hoa", "bọt rửa mặt", "kem nâng tông", "chống nắng", "trắng da", "kem", "serum", "sữa rửa mặt", "son", "mỹ phẩm"],
+            "sealed cosmetic / fragrance bottle or pump cleanser container",
+            "true-to-life palm-sized skincare / fragrance bottle & retail box relative to the hands and body",
         ),
         (
             ["kho quẹt", "bánh pía", "bánh", "kẹo", "hạt sen", "hạt", "khô gà", "khô bò", "trà"],
@@ -190,16 +300,6 @@ def _infer_product_en_and_scale(title: str, desc: str) -> tuple:
             ["áo", "quần", "váy", "đầm"],
             "neatly folded garment item",
             "true-to-life natural clothing item proportion relative to the hands and body",
-        ),
-        (
-            ["giày", "dép", "sandal"],
-            "single footwear item",
-            "true-to-life natural shoe size relative to the hands and body",
-        ),
-        (
-            ["nồi", "chảo", "bếp từ", "bếp điện", "bếp ga", "máy xay", "ấm siêu tốc"],
-            "kitchen appliance / cookware item",
-            "true-to-life realistic household cookware size relative to the hands and body",
         ),
     ]
     for keywords, prod_en, scale_en in mapping:
@@ -615,11 +715,17 @@ def generate_project_from_template(
         voice_prompt_en = cval.get("voice_prompt_en") or v_obj.get("voice_prompt_en", "")
         char_id = cval.get("character_id", "")
         proj_id = cval.get("project_id", "")
-        appearance_en = cval.get("appearance_en") or (
+        raw_app_en = cval.get("appearance_en") or (
             "beautiful 23-year-old Vietnamese/East Asian woman with refined symmetrical facial features, fair rosy dewy Douyin glass-skin with visible natural pores, expressive dark-brown eyes, thin black-framed anti-reflective glasses, voluminous shoulder-length layered glossy black hair with airy see-through bangs"
             if "nv1" in ck.lower()
             else "gorgeous 23-year-old Vietnamese/East Asian woman with refined symmetrical V-line face, radiant fair rosy dewy Douyin glass-skin with visible natural pores, wavy dark-brown hair in a high ponytail with pastel hair clips, no glasses"
         )
+        appearance_en = re.sub(
+            r",?\s*\bwearing\s+(?:a|an)\s+(?:crisp|fitted|tailored|chic|smart|modern|elegant|casual)\b.*$",
+            "",
+            raw_app_en,
+            flags=re.I,
+        ).strip(" ,.")
 
         presets = char_presets_map.get(ck) or char_presets_map.get("nv1" if char_idx % 2 == 0 else "nv2", [])
 
@@ -677,7 +783,7 @@ def generate_project_from_template(
                     scene_actions,
                     voice_prompt_en=voice_prompt_en,
                     prod_type_en=prod_type_en,
-                    style_label=style_label,
+                    style_label=setting_en or style_label,
                 )
                 scenes_list.append({
                     "id": sc_id,

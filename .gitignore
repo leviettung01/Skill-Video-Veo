@@ -59,6 +59,8 @@ Thumbs.db
 *.log
 *.tmp
 *.zip
+logs/
+flow_final_pipeline/active_mt_runner.json
 
 # Local runtime fashion custom library, QA leftover images & scratch scripts
 data/fashion_templates_cache/custom_fashion_library.json

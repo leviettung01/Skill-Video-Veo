@@ -12,13 +12,15 @@ from PIL import Image
 
 sys.stdout.reconfigure(encoding="utf-8", errors="replace")
 
-GROK_DIR = r"C:\Users\ADMIN\Desktop\Python\Veo 3 Tool\AutoVeo3Pro_v6\Auto_Veo_3_Pro\Grok"
-WS_DIR = r"c:\Users\ADMIN\Desktop\Python\Veo 3 Tool\AutoVeo3Pro_v6\Auto_Veo_3_Pro\Grok\Skill Video Veo"
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+WS_DIR = os.path.dirname(os.path.dirname(SCRIPTS_DIR))
+GROK_DIR = os.path.dirname(WS_DIR)
 PROJECTS_DIR = os.path.join(WS_DIR, "projects")
-SCRATCH_DIR = r"C:\Users\ADMIN\.gemini\antigravity\brain\d671407a-7a92-4e69-88ae-fef70956018d\scratch"
 
-sys.path.insert(0, GROK_DIR)
-sys.path.insert(0, SCRATCH_DIR)
+for _p_inc in (WS_DIR, SCRIPTS_DIR, GROK_DIR):
+    if _p_inc not in sys.path:
+        sys.path.insert(0, _p_inc)
+
 import grok_video_tool as gvt
 from google_flow_auth import profile_paths
 from playwright.sync_api import sync_playwright
@@ -35,9 +37,23 @@ ALL_PIDS = [
     "1737909342761027082",
 ]
 
-PROF_NAME = "leviettung04"
-shared_dir = gvt._resolve_flow_shared_dir(PROF_NAME)
-profile_dir, _ = profile_paths(shared_dir, PROF_NAME)
+
+def _resolve_active_prof_name() -> str:
+    try:
+        import engine_settings_manager as _esm_ref
+        cfg = _esm_ref.load_engine_settings()
+        sel = str(cfg.get("selected_flow_profile") or "").strip()
+        accs = [a for a in _esm_ref.list_available_flow_accounts() if a.get("active", True)]
+        if sel and any(str(a.get("profile_name") or "").lower() == sel.lower() for a in accs):
+            return sel
+        if accs:
+            return str(accs[0].get("profile_name") or "").strip() or "default_flow"
+    except Exception:
+        pass
+    return gvt._default_google_profile_name() or "default_flow"
+
+
+PROF_NAME = _resolve_active_prof_name()
 
 
 def call_flow_rpc_cffi(http_session, cookie_hdr, wiz, project_id, rpcid, payload_obj):
@@ -198,27 +214,37 @@ def generate_one_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id,
     # Step 2: Upsample & download 2K (1536x2752) via SPrCad (0 credits)
     saved_2k = False
     nbytes_2k = 0
-    for _try_2k in range(1, 5):
-        try:
-            rcap_2k = get_rcap_token(page, "IMAGE_GENERATION")
-            S_2k = [None, 22, None, None, None, flow_project_id, None, None, None, None, [rcap_2k, 1]]
-            ok_s, inner_s, _ = call_flow_rpc_cffi(http_session, cookie_hdr, wiz, flow_project_id, "SPrCad", [gen_uuid, 1, S_2k])
-            if ok_s and isinstance(inner_s, list) and len(inner_s) >= 2 and isinstance(inner_s[1], str):
-                raw_2k = base64.b64decode(inner_s[1])
-                if len(raw_2k) > 50000:
-                    with open(out_file, "wb") as f:
-                        f.write(raw_2k)
-                    saved_2k = True
-                    nbytes_2k = len(raw_2k)
+    if not (hasattr(gvt, "is_sprcad_circuit_open") and gvt.is_sprcad_circuit_open()):
+        for _try_2k in range(1, 3):
+            try:
+                rcap_2k = get_rcap_token(page, "IMAGE_GENERATION")
+                S_2k = [None, 22, None, None, None, flow_project_id, None, None, None, None, [rcap_2k, 1]]
+                ok_s, inner_s, err_s = call_flow_rpc_cffi(http_session, cookie_hdr, wiz, flow_project_id, "SPrCad", [gen_uuid, 1, S_2k])
+                if ok_s and isinstance(inner_s, list) and len(inner_s) >= 2 and isinstance(inner_s[1], str):
+                    raw_2k = base64.b64decode(inner_s[1])
+                    if len(raw_2k) > 50000:
+                        with open(out_file, "wb") as f:
+                            f.write(raw_2k)
+                        saved_2k = True
+                        nbytes_2k = len(raw_2k)
+                        if hasattr(gvt, "record_sprcad_result"):
+                            gvt.record_sprcad_result(True)
+                        break
+                err_s_str = str(err_s or "")
+                if hasattr(gvt, "record_sprcad_result"):
+                    gvt.record_sprcad_result(False, err_s_str)
+                if "TOO_MUCH_TRAFFIC" in err_s_str.upper() or "[8]" in err_s_str:
                     break
-        except Exception:
-            pass
-        time.sleep(3.0)
+            except Exception:
+                if hasattr(gvt, "record_sprcad_result"):
+                    gvt.record_sprcad_result(False, "exception")
+            time.sleep(2.0)
 
     if not saved_2k:
+        clean_ua = gvt.sanitize_chrome_ua(wiz.get("ua", "")) if hasattr(gvt, "sanitize_chrome_ua") else wiz.get("ua", "")
         r_img = http_session.get(
             img_url,
-            headers={"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": wiz["ua"]},
+            headers={"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": clean_ua},
             timeout=60,
             allow_redirects=True,
         )
@@ -226,14 +252,9 @@ def generate_one_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id,
             raise RuntimeError(f"Failed to download image: HTTP {r_img.status_code}")
         with open(out_file, "wb") as f:
             f.write(r_img.content)
-        try:
-            from PIL import ImageFilter
-            with Image.open(out_file) as im_fb:
-                im_2k = im_fb.convert("RGB").resize((1536, 2752), Image.Resampling.LANCZOS)
-                im_2k = im_2k.filter(ImageFilter.UnsharpMask(radius=1.1, percent=115, threshold=2))
-                im_2k.save(out_file, format="JPEG", quality=98, subsampling=0)
-            nbytes_2k = os.path.getsize(out_file)
-        except Exception:
+        if hasattr(gvt, "upscale_image_local_2k"):
+            _, nbytes_2k = gvt.upscale_image_local_2k(out_file)
+        else:
             nbytes_2k = len(r_img.content)
 
     # Re-upload the downloaded 2K image back to Google Flow via maseQ so video scenes use the 2K asset!
@@ -248,14 +269,23 @@ def generate_one_ref_image(page, http_session, cookie_hdr, wiz, flow_project_id,
 
 
 def main():
-    only_pids = sys.argv[1:] if len(sys.argv) > 1 else ALL_PIDS
-    force_regen = "--force" in only_pids
-    if force_regen:
-        only_pids = [p for p in only_pids if p != "--force"]
+    raw_args = sys.argv[1:] if len(sys.argv) > 1 else []
+    force_regen = "--force" in raw_args
+    only_pids = [p for p in raw_args if not p.startswith("--")]
+    if not only_pids:
+        if os.path.isdir(PROJECTS_DIR):
+            only_pids = [
+                d for d in sorted(os.listdir(PROJECTS_DIR))
+                if os.path.isfile(os.path.join(PROJECTS_DIR, d, "prompts.json"))
+            ]
         if not only_pids:
-            only_pids = ALL_PIDS
+            only_pids = list(ALL_PIDS)
 
-    with sync_playwright() as pw:
+    prof_run = _resolve_active_prof_name()
+    shared_dir = gvt._resolve_flow_shared_dir(prof_run)
+    profile_dir, _ = profile_paths(shared_dir, prof_run)
+
+    with gvt.flow_playwright_or_extension(sync_playwright, profile_name=prof_run) as pw:
         print("Launching Chrome context for Google Flow...", flush=True)
         _headless_mode = os.environ.get("FLOW_SHOW_BROWSER", "").strip() != "1"
         _p_args = ["--disable-blink-features=AutomationControlled", "--window-size=1280,800", "--mute-audio"]
@@ -263,8 +293,14 @@ def main():
             str(profile_dir),
             channel="chrome",
             headless=_headless_mode,
+            user_agent=(gvt.sanitize_chrome_ua() if hasattr(gvt, "sanitize_chrome_ua") else None),
             args=_p_args,
         )
+        if hasattr(gvt, "inject_stealth_scripts"):
+            try:
+                gvt.inject_stealth_scripts(context)
+            except Exception:
+                pass
         context.add_init_script(gvt._FLOW_HIJACK_BYPASS_JS)
         page = context.pages[0] if context.pages else context.new_page()
         first_proj = ""

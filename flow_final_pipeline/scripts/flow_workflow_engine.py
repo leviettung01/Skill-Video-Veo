@@ -50,6 +50,29 @@ os.makedirs(FINAL_VIDEOS_DIR, exist_ok=True)
 
 # Trạng thái thực thi trực tiếp (live runtime status) của các workflow đang chạy
 _WORKFLOW_RUN_STATE = {}
+_WORKFLOW_STATE_LOCK = __import__("threading").RLock()
+_WORKFLOW_STOP_FLAGS = set()
+
+
+def request_stop_workflow(wf_id: str) -> dict:
+    wid = str(wf_id or "").strip()
+    if not wid:
+        return {"ok": False, "error": "Thiếu wf_id"}
+    with _WORKFLOW_STATE_LOCK:
+        _WORKFLOW_STOP_FLAGS.add(wid)
+        st = _WORKFLOW_RUN_STATE.get(wid)
+        if isinstance(st, dict) and st.get("status") == "running":
+            st["status"] = "stopped"
+            st["ok"] = False
+            st["current_message"] = "⏹️ Đã dừng Workflow theo yêu cầu người dùng."
+    return {"ok": True, "wf_id": wid, "stopped": True}
+
+
+def is_workflow_stopped(wf_id: str) -> bool:
+    wid = str(wf_id or "").strip()
+    base_wid = wid.split("__batch_", 1)[0] if "__batch_" in wid else wid
+    with _WORKFLOW_STATE_LOCK:
+        return (wid in _WORKFLOW_STOP_FLAGS) or (base_wid in _WORKFLOW_STOP_FLAGS)
 
 
 # ==============================================================================
@@ -1134,8 +1157,26 @@ def save_workflow_document(raw_obj: dict, wf_id: str = "", wf_id_slug: str = "")
     hint = wf_id or wf_id_slug or ""
     doc = normalize_workflow_document(raw_obj, wf_id_hint=hint)
     fp = os.path.join(SAVED_WORKFLOWS_DIR, f"{doc['id']}.json")
-    with open(fp, "w", encoding="utf-8") as f:
-        json.dump(doc, f, ensure_ascii=False, indent=2)
+    with _WORKFLOW_STATE_LOCK:
+        tmp_fp = f"{fp}.tmp.{os.getpid()}.{__import__('threading').get_ident()}"
+        try:
+            with open(tmp_fp, "w", encoding="utf-8") as f:
+                json.dump(doc, f, ensure_ascii=False, indent=2)
+            for _att in range(6):
+                try:
+                    os.replace(tmp_fp, fp)
+                    break
+                except OSError:
+                    time.sleep(0.02 * (_att + 1))
+            else:
+                with open(fp, "w", encoding="utf-8") as f2:
+                    json.dump(doc, f2, ensure_ascii=False, indent=2)
+        finally:
+            if os.path.exists(tmp_fp):
+                try:
+                    os.remove(tmp_fp)
+                except OSError:
+                    pass
     doc["run_state"] = _WORKFLOW_RUN_STATE.get(doc["id"], {"status": "idle", "node_states": {}})
     doc["ok"] = True
     doc["file_path"] = fp
@@ -1206,16 +1247,17 @@ def _resolve_node_reference_media_path(ref_entry, wf_out_dir: str, node_id: str,
                     with open(cached_file, "wb") as f:
                         f.write(raw)
                     return cached_file
-        except Exception:
-            pass
+        except Exception as dl_exc:
+            print(f"[Workflow][WARN] Không tải được ảnh tham chiếu node '{node_id}' ({url_val}): {dl_exc}", flush=True)
 
-    # Fallback thông minh: Nếu URL ngoài (như labs.toby.vn) không truy cập được và node là Image/Outfit
-    fallback_char = os.path.join(CHARS_DIR, "nv5_bedroom_2k.png")
-    fallback_outfit = os.path.join(DEMO_2K_DIR, "05_Product_Sheet_Quan_Sooc_Trang_2K.png")
-    if "outfit" in str(node_id).lower() and os.path.exists(fallback_outfit):
-        return fallback_outfit
-    if os.path.exists(fallback_char):
-        return fallback_char
+    # Chỉ dùng ảnh demo dự phòng cho URL mẫu của template mặc định (`labs.toby.vn`), không tự tráo ảnh khi file người dùng bị thiếu!
+    if "labs.toby.vn" in url_val.lower():
+        fallback_char = os.path.join(CHARS_DIR, "nv5_bedroom_2k.png")
+        fallback_outfit = os.path.join(DEMO_2K_DIR, "05_Product_Sheet_Quan_Sooc_Trang_2K.png")
+        if "outfit" in str(node_id).lower() and os.path.exists(fallback_outfit):
+            return fallback_outfit
+        if os.path.exists(fallback_char):
+            return fallback_char
     return ""
 
 
@@ -1242,9 +1284,8 @@ def call_cliproxy_chat_or_vision(
     for ip in (image_paths or [])[:4]:
         if ip and os.path.exists(ip):
             try:
-                raw = open(ip, "rb").read()
+                raw, _, mime = _esm._prepare_cliproxy_ref_image(ip)
                 b64 = base64.b64encode(raw).decode("ascii")
-                mime = "image/png" if ip.lower().endswith(".png") else "image/jpeg"
                 user_content.append({"type": "image_url", "image_url": {"url": f"data:{mime};base64,{b64}"}})
             except Exception:
                 pass
@@ -1252,6 +1293,7 @@ def call_cliproxy_chat_or_vision(
     messages.append({"role": "user", "content": user_content if len(user_content) > 1 else prompt_text})
 
     candidates = _esm.resolve_cliproxy_chat_models([model_name] if model_name else ())
+    opener = _esm._cliproxy_no_proxy_opener() if ("127.0.0.1" in url or "localhost" in url) else urllib.request.build_opener()
     last_err = ""
     for cand_model in candidates[:4]:
         payload = json.dumps(
@@ -1272,7 +1314,7 @@ def call_cliproxy_chat_or_vision(
             method="POST",
         )
         try:
-            with urllib.request.urlopen(req, timeout=max(15, int(timeout_sec or 60))) as resp:
+            with opener.open(req, timeout=max(15, int(timeout_sec or 60))) as resp:
                 data = json.loads(resp.read().decode("utf-8", errors="replace"))
                 choices = data.get("choices") or []
                 if choices:
@@ -1285,54 +1327,37 @@ def call_cliproxy_chat_or_vision(
     return False, "", last_err or "CLIProxy offline hoặc không có model khả dụng"
 
 
-def call_cliproxy_image_generation(prompt_text: str, out_file: str, model_name: str = "gpt-image-1", ratio: str = "9:16") -> tuple:
+def call_cliproxy_image_generation(
+    prompt_text: str,
+    out_file: str,
+    model_name: str = "gpt-image-2",
+    ratio: str = "9:16",
+    reference_images: list = None,
+) -> tuple:
     """
-    Thử gọi tạo ảnh qua CLIProxy (`/v1/images/generations`) cho các node `GPT Image 2` / `Grok Image`.
-    Nếu CLIProxy không bật endpoint tạo ảnh trực tiếp, trả về `(False, ...)` để Engine tự động chuyển sang Google Flow Nano Banana 2.1 2K!
+    Gọi tạo/chỉnh sửa ảnh qua CLIProxy `:8317` (hỗ trợ cả `/v1/images/generations`,
+    `/v1/images/edits` với đa ảnh tham chiếu, và `gemini-3.1-flash-image` qua `/v1/chat/completions`).
     """
     import engine_settings_manager as _esm
-    _cp_cfg = _esm.get_cliproxy_config()
-    url = f"{_cp_cfg['url']}/v1/images/generations"
-    size_str = "1024x1792" if ratio in ("9:16", "4:5", "3:4") else ("1792x1024" if ratio == "16:9" else "1024x1024")
-    payload = json.dumps(
+    m_req = str(model_name or "gpt-image-2").strip()
+    if m_req.lower() in ("gpt-image-1", "dall-e-3"):
+        m_req = "gpt-image-2"
+    elif m_req.lower() == "grok-2-image":
+        m_req = "grok-imagine-image"
+    size_str = _esm._normalize_cliproxy_image_size("", ratio)
+    ok, eng, err = _esm.generate_image_via_cliproxy(
         {
-            "model": model_name or "gpt-image-1",
             "prompt": prompt_text,
-            "n": 1,
-            "size": size_str,
-            "response_format": "b64_json",
-        }
-    ).encode("utf-8")
-    req = urllib.request.Request(
-        url,
-        data=payload,
-        headers={
-            "Content-Type": "application/json",
-            "Authorization": f"Bearer {_cp_cfg['api_key']}",
+            "image_model": m_req,
+            "image_size": size_str,
+            "aspect_ratio": ratio or "9:16",
+            "reference_images": [p for p in (reference_images or []) if p and os.path.exists(p)],
         },
-        method="POST",
+        out_file,
     )
-    try:
-        with urllib.request.urlopen(req, timeout=60) as resp:
-            data = json.loads(resp.read().decode("utf-8", errors="replace"))
-            arr = data.get("data") or []
-            if arr:
-                b64 = arr[0].get("b64_json")
-                img_url = arr[0].get("url")
-                if b64:
-                    os.makedirs(os.path.dirname(os.path.abspath(out_file)), exist_ok=True)
-                    with open(out_file, "wb") as f:
-                        f.write(base64.b64decode(b64))
-                    return True, out_file, None
-                if img_url:
-                    with urllib.request.urlopen(img_url, timeout=30) as r_img:
-                        os.makedirs(os.path.dirname(os.path.abspath(out_file)), exist_ok=True)
-                        with open(out_file, "wb") as f:
-                            f.write(r_img.read())
-                    return True, out_file, None
-    except Exception as e:
-        return False, "", str(e)
-    return False, "", "CLIProxy image endpoint returned no image"
+    if ok and os.path.isfile(out_file):
+        return True, out_file, None
+    return False, "", err or "CLIProxy image endpoint returned no image"
 
 
 # ==============================================================================
@@ -1345,7 +1370,13 @@ _PROFILE_LOCKS = {}
 _PROFILE_LOCK_GUARD = threading.Lock()
 
 
-def _get_profile_lock(prof_key: str) -> threading.Lock:
+def _get_profile_lock(prof_key: str):
+    try:
+        import grok_video_tool as _gvt_plk
+        if hasattr(_gvt_plk, "_get_google_refresh_lock") and prof_key:
+            return _gvt_plk._get_google_refresh_lock(prof_key)
+    except Exception:
+        pass
     with _PROFILE_LOCK_GUARD:
         if prof_key not in _PROFILE_LOCKS:
             _PROFILE_LOCKS[prof_key] = threading.Lock()
@@ -1410,9 +1441,19 @@ def _resolve_account_and_project_id(requested_prof: str, gvt_mod) -> tuple:
 
 
 def _is_flow_account_error_wf(err_msg: str) -> bool:
-    low = str(err_msg or "").lower()
-    if not low:
+    raw = str(err_msg or "").strip()
+    if not raw:
         return False
+    try:
+        import grok_video_tool as _gvt_cls
+        kind = _gvt_cls.classify_flow_error(raw)
+        if kind == "content_policy":
+            return False
+        if kind in ("account_quota", "account_auth", "rate_limit", "captcha_score"):
+            return True
+    except Exception:
+        pass
+    low = raw.lower()
     return any(
         k in low
         for k in (
@@ -1421,8 +1462,15 @@ def _is_flow_account_error_wf(err_msg: str) -> bool:
             "cookie",
             "401",
             "403",
+            "429",
             "unauthenticated",
             "unusual_activity",
+            "user_quota_reached",
+            "resource_exhausted",
+            "too_much_traffic",
+            "[8]",
+            "high_traffic",
+            "throttled",
             "recaptcha",
             "cookiemismatch",
             "accounts.google.com",
@@ -1439,6 +1487,13 @@ def _mark_flow_profile_unhealthy_wf(prof: str, reason: str = "") -> None:
     if not prof:
         return
     try:
+        import grok_video_tool as _gvt_cd
+        kind = _gvt_cd.classify_flow_error(reason)
+        if kind != "content_policy":
+            _gvt_cd.mark_flow_account_cooldown(prof, kind, reason)
+    except Exception:
+        pass
+    try:
         import fashion_motion_control_engine as _fmce
         _fmce._mark_flow_profile_unhealthy(prof, reason or "workflow_failover")
     except Exception:
@@ -1446,10 +1501,23 @@ def _mark_flow_profile_unhealthy_wf(prof: str, reason: str = "") -> None:
 
 
 def _apply_flow_init_script_wf(page_obj, gvt_mod) -> None:
-    """Nạp script bypass hijack reCAPTCHA của Google Flow nếu grok_video_tool cung cấp."""
+    """Nạp script bypass hijack reCAPTCHA và stealth script của Google Flow nếu grok_video_tool cung cấp."""
+    if hasattr(gvt_mod, "inject_stealth_scripts"):
+        try:
+            ctx = getattr(page_obj, "context", None)
+            if ctx is not None:
+                gvt_mod.inject_stealth_scripts(ctx)
+        except Exception:
+            pass
     bypass_js = getattr(gvt_mod, "_FLOW_HIJACK_BYPASS_JS", "") or ""
     if bypass_js:
         page_obj.add_init_script(bypass_js)
+
+
+def _wf_clean_chrome_ua(gvt_mod) -> str:
+    return gvt_mod.sanitize_chrome_ua() if hasattr(gvt_mod, "sanitize_chrome_ua") else getattr(
+        gvt_mod, "UA_CHROME_131_WIN", "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/131.0.0.0 Safari/537.36"
+    )
 
 
 def _get_ordered_flow_account_candidates_wf(requested_prof: str, gvt_mod) -> list:
@@ -1514,6 +1582,8 @@ def _get_ordered_flow_account_candidates_wf(requested_prof: str, gvt_mod) -> lis
         else:
             unlocked.append(pair)
     out = unlocked + locked
+    if hasattr(gvt_mod, "sort_flow_candidates_by_health"):
+        out = gvt_mod.sort_flow_candidates_by_health(out, lambda pair: pair[0])
     if not out:
         p0, pid0 = _resolve_account_and_project_id(req, gvt_mod)
         if p0:
@@ -1592,11 +1662,12 @@ def execute_flow_generation_node(
             err_gen = None
             try:
                 with prof_lock:
-                    with sync_playwright() as pw:
+                    with gvt.flow_playwright_or_extension(sync_playwright, profile_name=prof, cookie_hdr=cookie_hdr, project_id=flow_project_id) as pw:
                         browser = pw.chromium.launch_persistent_context(
                             user_data_dir=str(profile_dir),
                             channel="chrome",
                             headless=True,
+                            user_agent=_wf_clean_chrome_ua(gvt),
                             args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
                         )
                         try:
@@ -1617,6 +1688,8 @@ def execute_flow_generation_node(
                                     };
                                 }"""
                             )
+                            if wiz:
+                                wiz["ua"] = gvt.sanitize_chrome_ua(wiz.get("ua")) if hasattr(gvt, "sanitize_chrome_ua") else _wf_clean_chrome_ua(gvt)
                             if not wiz.get("at"):
                                 last_img_err = f"Phiên đăng nhập Google Flow của '{prof}' đã hết hạn (thiếu SNlM0e)."
                                 _mark_flow_profile_unhealthy_wf(prof, last_img_err)
@@ -1646,7 +1719,8 @@ def execute_flow_generation_node(
                                 if _is_flow_account_error_wf(err_gen):
                                     _mark_flow_profile_unhealthy_wf(prof, last_img_err)
                                     continue
-                                return {"ok": False, "error": last_img_err}
+                                vi_img_err = gvt.describe_flow_error_vi(last_img_err) if hasattr(gvt, "describe_flow_error_vi") else last_img_err
+                                return {"ok": False, "error": vi_img_err}
                         finally:
                             browser.close()
             except Exception as ex_img:
@@ -1657,6 +1731,10 @@ def execute_flow_generation_node(
                 return {"ok": False, "error": last_img_err}
 
             if ok_gen:
+                try:
+                    gvt.clear_flow_account_cooldown(prof)
+                except Exception:
+                    pass
                 try:
                     import fashion_motion_control_engine as _fmce
                     _fmce._mark_flow_profile_healthy(prof)
@@ -1720,11 +1798,12 @@ def execute_flow_generation_node(
         c_wiz = None
         try:
             with c_lock:
-                with sync_playwright() as pw:
+                with gvt.flow_playwright_or_extension(sync_playwright, profile_name=cand_prof, cookie_hdr=c_cookie_hdr, project_id=cand_pid) as pw:
                     browser = pw.chromium.launch_persistent_context(
                         user_data_dir=str(c_profile_dir),
                         channel="chrome",
                         headless=True,
+                        user_agent=_wf_clean_chrome_ua(gvt),
                         args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
                     )
                     try:
@@ -1745,6 +1824,8 @@ def execute_flow_generation_node(
                                 };
                             }"""
                         )
+                        if c_wiz:
+                            c_wiz["ua"] = gvt.sanitize_chrome_ua(c_wiz.get("ua")) if hasattr(gvt, "sanitize_chrome_ua") else _wf_clean_chrome_ua(gvt)
                         if not c_wiz.get("at"):
                             c_err_sub = f"Phiên đăng nhập Google Flow của '{cand_prof}' đã hết hạn (thiếu SNlM0e)."
                             _mark_flow_profile_unhealthy_wf(cand_prof, c_err_sub)
@@ -1757,7 +1838,9 @@ def execute_flow_generation_node(
                             if ok_u and u_id:
                                 uploaded_img_uuids.append(u_id)
 
+                        jips6_attempted = False
                         if valid_vid_refs:
+                            jips6_attempted = True
                             from fashion_motion_control_engine import (
                                 upload_reference_video_in_page,
                                 submit_fashion_motion_scene_in_page,
@@ -1769,6 +1852,7 @@ def execute_flow_generation_node(
                                     c_wiz,
                                     {
                                         "project_id": cand_pid,
+                                        "worker_profile": cand_prof,
                                         "ref_video_uuid": vr_uuid,
                                         "duration": vid_dur,
                                         "fps": 24,
@@ -1781,8 +1865,12 @@ def execute_flow_generation_node(
                                         "model_key": "macaron_cookie_edit" if ("1.2" in str(node.get("model") or "").lower() or "macaron" in str(node.get("model") or "").lower()) else "abra_edit",
                                     },
                                 )
+                            else:
+                                c_ok_sub, c_err_sub = False, f"Upload video ref ({cand_prof}): {err_vr}"
 
-                        if not c_ok_sub:
+                        # Chỉ chạy MZZa6b khi KHÔNG có video ref (jips6_attempted == False),
+                        # tuyệt đối không bắn kép MZZa6b đè lên tài khoản vừa lỗi jIps6 [8]!
+                        if not c_ok_sub and not jips6_attempted:
                             # Gửi lệnh tạo video Ingredients (IMAGE 01, IMAGE 02, ...) qua RPC `MZZa6b` (`abra_r2v_10s` / `8s` / `6s`)
                             dur_clamped = 10 if vid_dur >= 9 else (6 if vid_dur <= 6 else 8)
                             flow_vid_model = f"abra_r2v_{dur_clamped}s"
@@ -1860,6 +1948,8 @@ def execute_flow_generation_node(
                                             c_job_uuid = cand_u
                                 except Exception:
                                     pass
+                                if len(inner_v) > 1 and isinstance(inner_v[1], int) and hasattr(gvt, "update_flow_account_credits_realtime"):
+                                    gvt.update_flow_account_credits_realtime(cand_prof, inner_v[1])
                                 c_ok_sub, c_err_sub = True, None
                             else:
                                 c_ok_sub, c_err_sub = False, f"MZZa6b ({cand_prof}): {err_v}"
@@ -1879,6 +1969,10 @@ def execute_flow_generation_node(
             ok_sub = True
             job_uuid = c_job_uuid
             try:
+                gvt.clear_flow_account_cooldown(prof)
+            except Exception:
+                pass
+            try:
                 import fashion_motion_control_engine as _fmce
                 _fmce._mark_flow_profile_healthy(prof)
             except Exception:
@@ -1892,7 +1986,8 @@ def execute_flow_generation_node(
         break
 
     if not ok_sub or not job_uuid:
-        return {"ok": False, "error": f"Gửi lệnh tạo video thất bại: {err_sub}"}
+        vi_sub = gvt.describe_flow_error_vi(str(err_sub or "")) if hasattr(gvt, "describe_flow_error_vi") else str(err_sub or "")
+        return {"ok": False, "error": vi_sub}
 
     # Poll kết quả tạo video (không giữ khóa trình duyệt trong lúc chờ render!) & Upscale 1080p nếu được chọn
     stage = "base_720p"
@@ -1920,31 +2015,47 @@ def execute_flow_generation_node(
                 ok_up, up_uid = False, None
                 try:
                     with prof_lock:
-                        with sync_playwright() as pw_up:
+                        with gvt.flow_playwright_or_extension(sync_playwright, profile_name=prof, cookie_hdr=cookie_hdr or "", project_id=flow_project_id) as pw_up:
                             br_up = pw_up.chromium.launch_persistent_context(
                                 user_data_dir=str(profile_dir),
                                 channel="chrome",
                                 headless=True,
+                                user_agent=_wf_clean_chrome_ua(gvt),
                                 args=["--disable-blink-features=AutomationControlled", "--mute-audio"],
                             )
                             try:
                                 pg_up = br_up.pages[0] if br_up.pages else br_up.new_page()
                                 _apply_flow_init_script_wf(pg_up, gvt)
                                 pg_up.goto(f"https://flow.google.com/project/{flow_project_id}", wait_until="domcontentloaded", timeout=60000)
-                                pg_up.wait_for_timeout(3000)
-                                ok_up, up_uid, _ = submit_upsample_1080p_in_page(
+                                pg_up.wait_for_timeout(2000)
+                                fresh_up_wiz = wiz
+                                try:
+                                    w_eval = pg_up.evaluate(
+                                        "() => ({at: window.WIZ_global_data?.SNlM0e || '', bl: window.WIZ_global_data?.cfb2h || '', fsid: window.WIZ_global_data?.FdrFJe || '', ua: navigator.userAgent || ''})"
+                                    )
+                                    if isinstance(w_eval, dict) and w_eval.get("at"):
+                                        w_eval["ua"] = _wf_clean_chrome_ua(gvt, w_eval.get("ua") or "")
+                                        fresh_up_wiz = w_eval
+                                except Exception:
+                                    pass
+                                ok_up, up_uid, err_up_wf = submit_upsample_1080p_in_page(
                                     pg_up,
-                                    wiz,
+                                    fresh_up_wiz,
                                     {
                                         "pid": "workflow",
                                         "sc": {"id": node_id},
                                         "project_id": flow_project_id,
                                         "base_video_uuid": job_uuid,
+                                        "cookie_hdr": cookie_hdr or "",
+                                        "worker_profile": prof,
                                     },
                                 )
+                                if not ok_up:
+                                    print(f"[Workflow][WARN] 1080p upsample ({node_id} | {prof}): {err_up_wf}", flush=True)
                             finally:
                                 br_up.close()
-                except Exception:
+                except Exception as exc_up_wf:
+                    print(f"[Workflow][WARN] 1080p upsample exception ({node_id}): {exc_up_wf}", flush=True)
                     ok_up = False
                 if ok_up and up_uid:
                     poll_uid = up_uid
@@ -1956,7 +2067,11 @@ def execute_flow_generation_node(
         elif st_res == "done":
             break
         elif str(st_res).startswith("failed"):
-            return {"ok": False, "error": f"Google Flow báo lỗi khi render video: {st_res}"}
+            if stage == "upsample_1080p" and os.path.exists(out_vid_path + ".720p.tmp"):
+                shutil.move(out_vid_path + ".720p.tmp", out_vid_path)
+                break
+            vi_poll = gvt.describe_flow_error_vi(str(st_res)) if hasattr(gvt, "describe_flow_error_vi") else f"Google Flow báo lỗi khi render video: {st_res}"
+            return {"ok": False, "error": vi_poll}
 
     if not os.path.exists(out_vid_path) and os.path.exists(out_vid_path + ".720p.tmp"):
         shutil.move(out_vid_path + ".720p.tmp", out_vid_path)
@@ -2179,15 +2294,23 @@ def execute_single_node_in_context(
     provider = str(node.get("provider") or "flow").strip().lower()
     media_type = str(node.get("media_type") or "Image").strip().capitalize()
 
-    # Nếu là `gpt_image` hoặc `grok_generate` (chế độ tạo Ảnh) -> thử qua CLIProxy `:8317` trước, nếu không có thì chạy qua Google Flow 2K
-    if media_type != "Video" and (ntype == "gpt_image" or provider in ("cliproxy_gpt", "grok", "cliproxy_gemini")):
+    # Nếu là node `gpt_image` / `grok_generate` / `gemini_generate` (chế độ tạo Ảnh) -> thử qua CLIProxy `:8317` (kèm ảnh tham chiếu) trước
+    err_ci = ""
+    if media_type != "Video" and (ntype in ("gpt_image", "grok_generate", "gemini_generate") or provider in ("cliproxy_gpt", "grok", "cliproxy_gemini")):
         out_clip_img = os.path.join(wf_out_dir, f"{nid}_{int(time.time())}_cliproxy.png")
-        m_name = "grok-2-image" if (ntype == "grok_generate" or provider == "grok") else "gpt-image-1"
-        ok_ci, path_ci, _ = call_cliproxy_image_generation(
+        raw_node_model = str(node.get("model") or "").strip()
+        if ntype == "gemini_generate" or provider == "cliproxy_gemini" or "gemini" in raw_node_model.lower():
+            m_name = raw_node_model if "gemini" in raw_node_model.lower() else "gemini-3.1-flash-image"
+        elif ntype == "grok_generate" or provider == "grok" or "grok" in raw_node_model.lower():
+            m_name = "grok-imagine-image" if (not raw_node_model or "grok-2" in raw_node_model.lower()) else raw_node_model
+        else:
+            m_name = "gpt-image-2" if raw_node_model in ("", "gpt-image-1", "dall-e-3") else raw_node_model
+        ok_ci, path_ci, err_ci = call_cliproxy_image_generation(
             prompt_text=resolved_prompt,
             out_file=out_clip_img,
             model_name=m_name,
             ratio=str(node.get("ratio") or "9:16"),
+            reference_images=all_ref_media,
         )
         if ok_ci and path_ci and os.path.exists(path_ci):
             return {
@@ -2215,6 +2338,9 @@ def execute_single_node_in_context(
         res_flow["media_url"] = f"/api/media?path={urllib.parse.quote(p_path)}" if p_path else ""
     else:
         res_flow["status"] = "error"
+        if err_ci:
+            res_flow["cliproxy_error"] = err_ci
+            res_flow["error"] = f"{res_flow.get('error') or 'Google Flow lỗi'} | CLIProxy: {err_ci}"
     return res_flow
 
 
@@ -2254,14 +2380,18 @@ def run_workflow_execution_pipeline(
     target_node_id: str = None,
     profile_name: str = "",
     selected_node_ids: list = None,
+    state_key: str = "",
+    persist_doc: bool = True,
+    out_subdir: str = "",
 ) -> dict:
     """
     Thực thi toàn bộ Workflow theo thứ tự sóng DAG (`compute_dag_waves`) hoặc chỉ chạy 1 node cụ thể (`target_node_id`)
     hoặc danh sách các node được chọn từ bảng Xác nhận thứ tự chạy (`selected_node_ids`).
-    Cập nhật trạng thái trực tiếp vào `_WORKFLOW_RUN_STATE[wf_id]` để giao diện Web đồng bộ thời gian thực.
+    Cập nhật trạng thái trực tiếp vào `_WORKFLOW_RUN_STATE[state_key or wf_id]` để giao diện Web đồng bộ thời gian thực.
     """
     doc = normalize_workflow_document(raw_doc)
     wf_id = doc["id"]
+    run_state_id = str(state_key or wf_id)
     wf = doc["workflow"]
     nodes = wf["nodes"]
     edges = wf["edges"]
@@ -2278,10 +2408,10 @@ def run_workflow_execution_pipeline(
             selected_node_ids=selected_node_ids,
         )
 
-    wf_out_dir = os.path.join(WORKFLOW_OUTPUTS_DIR, wf_id)
+    wf_out_dir = os.path.join(WORKFLOW_OUTPUTS_DIR, out_subdir or wf_id)
     os.makedirs(wf_out_dir, exist_ok=True)
 
-    prev_state = _WORKFLOW_RUN_STATE.get(wf_id) or {}
+    prev_state = _WORKFLOW_RUN_STATE.get(run_state_id) or {}
     node_outputs = dict(prev_state.get("node_outputs") or {})
     node_states = dict(prev_state.get("node_states") or {})
 
@@ -2291,7 +2421,7 @@ def run_workflow_execution_pipeline(
         if n.get("last_output") and nid not in node_outputs:
             node_outputs[nid] = n["last_output"]
 
-    _WORKFLOW_RUN_STATE[wf_id] = {
+    _WORKFLOW_RUN_STATE[run_state_id] = {
         "status": "running",
         "started_at": time.strftime("%H:%M:%S"),
         "node_states": node_states,
@@ -2299,34 +2429,74 @@ def run_workflow_execution_pipeline(
         "current_message": f"🚀 Đang khởi chạy Workflow: {wf.get('name')}...",
     }
 
+    _stop_set = globals().get("_WORKFLOW_STOP_FLAGS")
+    _st_lock = globals().get("_WORKFLOW_STATE_LOCK")
+    if isinstance(_stop_set, set) and run_state_id == wf_id:
+        _stop_set.discard(wf_id)
+
+    def _wf_is_stopped() -> bool:
+        if not isinstance(_stop_set, set):
+            return False
+        base_id = run_state_id.split("__batch_", 1)[0] if "__batch_" in run_state_id else run_state_id
+        return (run_state_id in _stop_set) or (base_id in _stop_set)
+
     waves = compute_dag_waves(nodes, edges)
     delay_sec = max(0, int(settings.get("delay_between_nodes") or 0))
+    retry_cnt = max(0, min(5, int(settings.get("retry_on_error") or 0)))
     stop_on_err = bool(settings.get("stop_on_error", True))
     is_parallel = bool(settings.get("parallel", True))
     selected_set = set(selected_node_ids) if isinstance(selected_node_ids, list) and selected_node_ids else None
+
+    def _exec_node_with_retry(nd_item: dict):
+        last_r = {"ok": False, "error": "Chưa thực thi"}
+        max_att = 1 if stop_on_err else (1 + retry_cnt)
+        for att in range(max_att):
+            if _wf_is_stopped():
+                return {"ok": False, "status": "stopped", "error": "Đã dừng theo yêu cầu người dùng."}
+            last_r = execute_single_node_in_context(
+                nd_item, nodes_by_id, edges, node_outputs, wf_out_dir, profile_name
+            )
+            if last_r.get("ok"):
+                return last_r
+            if att + 1 < max_att:
+                time.sleep(min(8.0, 1.5 * (att + 1)))
+        return last_r
 
     def _apply_node_result(nd_obj: dict, res_obj: dict):
         nid_k = nd_obj["node_id"]
         st_str = "done" if res_obj.get("ok") else "error"
         p_path = res_obj.get("primary_path") or ""
-        node_outputs[nid_k] = res_obj
-        node_states[nid_k] = {
-            "status": st_str,
-            "error": res_obj.get("error"),
-            "media_url": res_obj.get("media_url") or "",
-            "primary_path": p_path,
-            "text": res_obj.get("text") or "",
-            "updated_at": time.strftime("%H:%M:%S"),
-        }
-        nd_obj["last_output"] = res_obj
-        cfg_obj = nd_obj.get("config") or {}
-        cfg_obj["status"] = st_str
-        if p_path:
-            cfg_obj["result_path"] = p_path
-        nd_obj["config"] = cfg_obj
+        err_txt = str(res_obj.get("error") or "").strip()
+        if _st_lock is not None:
+            _st_lock.acquire()
+        try:
+            node_outputs[nid_k] = res_obj
+            node_states[nid_k] = {
+                "status": st_str,
+                "error": err_txt or None,
+                "media_url": res_obj.get("media_url") or "",
+                "primary_path": p_path,
+                "text": res_obj.get("text") or "",
+                "updated_at": time.strftime("%H:%M:%S"),
+            }
+            nd_obj["last_output"] = res_obj
+            cfg_obj = dict(nd_obj.get("config") or {})
+            cfg_obj["status"] = st_str
+            cfg_obj["error"] = "" if res_obj.get("ok") else err_txt
+            if p_path:
+                cfg_obj["result_path"] = p_path
+            nd_obj["config"] = cfg_obj
+        finally:
+            if _st_lock is not None:
+                _st_lock.release()
 
     try:
         for w_idx, wave_nodes in enumerate(waves):
+            if _wf_is_stopped():
+                _WORKFLOW_RUN_STATE[run_state_id]["status"] = "stopped"
+                _WORKFLOW_RUN_STATE[run_state_id]["ok"] = False
+                _WORKFLOW_RUN_STATE[run_state_id]["current_message"] = "⏹️ Đã dừng Workflow theo yêu cầu người dùng."
+                return _WORKFLOW_RUN_STATE[run_state_id]
             # Nếu chỉ chạy 1 node cụ thể (`target_node_id`) hoặc danh sách chọn (`selected_set`)
             run_batch = []
             for nd in wave_nodes:
@@ -2349,23 +2519,21 @@ def run_workflow_execution_pipeline(
 
             for nd in run_batch:
                 node_states[nd["node_id"]] = {"status": "running", "updated_at": time.strftime("%H:%M:%S")}
-            _WORKFLOW_RUN_STATE[wf_id]["current_message"] = (
+            _WORKFLOW_RUN_STATE[run_state_id]["current_message"] = (
                 f"⚡ Đang chạy Lớp {w_idx+1}/{len(waves)}: " + ", ".join(n.get("node_name", n["node_id"]) for n in run_batch)
             )
 
             if is_parallel and len(run_batch) > 1:
                 parallel_errors = []
-                with ThreadPoolExecutor(max_workers=min(3, len(run_batch))) as pool:
+                try:
+                    import engine_settings_manager as _esm_wf
+                    _wf_api_workers = int(_esm_wf.get_effective_flow_concurrency().get("flow_api_workers") or 6)
+                except Exception:
+                    _wf_api_workers = 6
+                wave_workers = max(1, min(max(3, _wf_api_workers), len(run_batch)))
+                with ThreadPoolExecutor(max_workers=wave_workers) as pool:
                     fut_map = {
-                        pool.submit(
-                            execute_single_node_in_context,
-                            nd,
-                            nodes_by_id,
-                            edges,
-                            node_outputs,
-                            wf_out_dir,
-                            profile_name,
-                        ): nd
+                        pool.submit(_exec_node_with_retry, nd): nd
                         for nd in run_batch
                     }
                     for fut in as_completed(fut_map):
@@ -2381,9 +2549,9 @@ def run_workflow_execution_pipeline(
                     raise RuntimeError(parallel_errors[0])
             else:
                 for nd in run_batch:
-                    res = execute_single_node_in_context(
-                        nd, nodes_by_id, edges, node_outputs, wf_out_dir, profile_name
-                    )
+                    if _wf_is_stopped():
+                        break
+                    res = _exec_node_with_retry(nd)
                     _apply_node_result(nd, res)
                     if not res.get("ok") and stop_on_err:
                         raise RuntimeError(f"Node '{nd.get('node_name')}' báo lỗi: {res.get('error')}")
@@ -2413,23 +2581,24 @@ def run_workflow_execution_pipeline(
 
         err_nodes = [nid for nid, st_n in node_states.items() if isinstance(st_n, dict) and st_n.get("status") == "error"]
         if err_nodes:
-            _WORKFLOW_RUN_STATE[wf_id]["status"] = "error" if len(err_nodes) >= len(node_states) else "partial"
-            _WORKFLOW_RUN_STATE[wf_id]["ok"] = False
-            _WORKFLOW_RUN_STATE[wf_id]["error"] = f"{len(err_nodes)} node gặp lỗi thực thi ({', '.join(err_nodes)})"
-            _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"⚠️ Workflow '{wf.get('name')}' hoàn tất một phần ({len(err_nodes)} node lỗi)."
+            _WORKFLOW_RUN_STATE[run_state_id]["status"] = "error" if len(err_nodes) >= len(node_states) else "partial"
+            _WORKFLOW_RUN_STATE[run_state_id]["ok"] = False
+            _WORKFLOW_RUN_STATE[run_state_id]["error"] = f"{len(err_nodes)} node gặp lỗi thực thi ({', '.join(err_nodes)})"
+            _WORKFLOW_RUN_STATE[run_state_id]["current_message"] = f"⚠️ Workflow '{wf.get('name')}' hoàn tất một phần ({len(err_nodes)} node lỗi)."
         else:
-            _WORKFLOW_RUN_STATE[wf_id]["status"] = "done"
-            _WORKFLOW_RUN_STATE[wf_id]["ok"] = True
-            _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"✅ Đã hoàn thành chạy Workflow '{wf.get('name')}'!"
+            _WORKFLOW_RUN_STATE[run_state_id]["status"] = "done"
+            _WORKFLOW_RUN_STATE[run_state_id]["ok"] = True
+            _WORKFLOW_RUN_STATE[run_state_id]["current_message"] = f"✅ Đã hoàn thành toàn bộ Workflow: {wf.get('name')}!"
     except Exception as e:
-        _WORKFLOW_RUN_STATE[wf_id]["status"] = "error"
-        _WORKFLOW_RUN_STATE[wf_id]["ok"] = False
-        _WORKFLOW_RUN_STATE[wf_id]["error"] = str(e)
-        _WORKFLOW_RUN_STATE[wf_id]["current_message"] = f"❌ Lỗi thực thi Workflow: {e}"
+        _WORKFLOW_RUN_STATE[run_state_id]["status"] = "error"
+        _WORKFLOW_RUN_STATE[run_state_id]["ok"] = False
+        _WORKFLOW_RUN_STATE[run_state_id]["error"] = str(e)
+        _WORKFLOW_RUN_STATE[run_state_id]["current_message"] = f"❌ Lỗi thực thi Workflow: {e}"
 
     # Lưu lại `last_output` và `timeline` vào file JSON của workflow
-    save_workflow_document(doc, wf_id=wf_id)
-    return _WORKFLOW_RUN_STATE[wf_id]
+    if persist_doc:
+        save_workflow_document(doc, wf_id=wf_id)
+    return _WORKFLOW_RUN_STATE[run_state_id]
 
 
 def run_workflow_batch_pipeline(
@@ -2447,23 +2616,38 @@ def run_workflow_batch_pipeline(
                               vào Node Prompt/Generate đích (`target_prompt_node_id`), chạy sơ đồ cho từng kịch bản.
     """
     import copy
+    import threading
     wf_id = doc["id"]
     wf = doc["workflow"]
     mode = str(batch_config.get("mode") or "variations").strip()
-    max_workers = max(1, min(6, int(batch_config.get("max_workers") or 2)))
-    auto_export_mp4 = bool(batch_config.get("auto_export_mp4", True))
+    try:
+        import engine_settings_manager as _esm_wb
+        _eff_wb = _esm_wb.get_effective_flow_concurrency()
+        _def_mw = int(_eff_wb.get("parallel_products") or 4)
+        _stagger_wb = float(_eff_wb.get("global_submit_stagger_sec") or 0.7)
+    except Exception:
+        _def_mw = 4
+        _stagger_wb = 0.7
+    raw_mw = batch_config.get("max_workers")
+    max_workers = max(1, min(24, int(raw_mw) if (raw_mw is not None and int(raw_mw) > 0) else _def_mw))
+    with _WORKFLOW_STATE_LOCK:
+        _WORKFLOW_STOP_FLAGS.discard(wf_id)
+    if "auto_export_timeline" in batch_config:
+        auto_export_mp4 = bool(batch_config.get("auto_export_timeline"))
+    else:
+        auto_export_mp4 = bool(batch_config.get("auto_export_mp4", True))
     target_img_nid = str(batch_config.get("target_image_node_id") or "").strip()
     target_txt_nid = str(batch_config.get("target_prompt_node_id") or "").strip()
 
     jobs = []
     if mode == "product_swap":
-        raw_items = batch_config.get("items") or []
+        raw_items = batch_config.get("items") or batch_config.get("file_paths") or []
         for idx, it in enumerate(raw_items):
             if isinstance(it, str):
                 p_val = it.strip()
                 lbl = os.path.splitext(os.path.basename(p_val))[0] or f"Sản phẩm #{idx+1}"
             elif isinstance(it, dict):
-                p_val = str(it.get("path") or it.get("image_path") or "").strip()
+                p_val = str(it.get("path") or it.get("image_path") or it.get("file_path") or "").strip()
                 lbl = str(it.get("label") or it.get("name") or f"Sản phẩm #{idx+1}").strip()
             else:
                 continue
@@ -2478,7 +2662,18 @@ def run_workflow_batch_pipeline(
             if pr_s:
                 jobs.append({"index": idx + 1, "label": f"Kịch bản #{idx+1}: {pr_s[:36]}...", "image_path": "", "prompt_text": pr_s})
     else:
-        count = max(1, min(50, int(batch_config.get("batch_count") or batch_config.get("count") or 3)))
+        count = max(
+            1,
+            min(
+                50,
+                int(
+                    batch_config.get("repeat_count")
+                    or batch_config.get("batch_count")
+                    or batch_config.get("count")
+                    or 3
+                ),
+            ),
+        )
         for idx in range(count):
             jobs.append({"index": idx + 1, "label": f"Lượt chạy Batch #{idx+1}/{count}", "image_path": "", "prompt_text": ""})
 
@@ -2499,16 +2694,22 @@ def run_workflow_batch_pipeline(
         "current_message": f"🚀 Đang chạy Tạo Số Lượng Lớn ({total_jobs} lô — Chế độ: {mode}, {max_workers} luồng)...",
     }
 
-    for j_idx, job in enumerate(jobs):
-        _WORKFLOW_RUN_STATE[wf_id]["current_message"] = (
-            f"⚡ [Batch {j_idx+1}/{total_jobs}] Đang xử lý: {job['label']}..."
-        )
-        # Tạo bản sao doc cho lượt chạy này, áp dụng override ảnh hoặc prompt nếu có
+    batch_lock = threading.Lock()
+
+    def _run_batch_one(j_idx: int, job: dict):
+        if is_workflow_stopped(wf_id):
+            return
+        if j_idx > 0 and max_workers > 1:
+            time.sleep(min(3.0, (j_idx % max_workers) * max(0.25, _stagger_wb)))
+        if is_workflow_stopped(wf_id):
+            return
         job_doc = copy.deepcopy(doc)
         job_doc["workflow"]["settings"].pop("_batch_run_config", None)
+        eff_img_nid = target_img_nid
+        eff_txt_nid = target_txt_nid
         for nd in job_doc["workflow"]["nodes"]:
             nid = nd["node_id"]
-            if job.get("image_path") and (nid == target_img_nid or (not target_img_nid and nd.get("node_type") == "image")):
+            if job.get("image_path") and (nid == eff_img_nid or (not eff_img_nid and nd.get("node_type") == "image")):
                 img_p = job["image_path"]
                 nd["local_path"] = img_p
                 nd["ref_images"] = [{"local_path": img_p, "path": img_p}]
@@ -2517,25 +2718,27 @@ def run_workflow_batch_pipeline(
                 cfg["result_path"] = img_p
                 cfg["reference_images"] = [img_p]
                 nd["config"] = cfg
-                if not target_img_nid:
-                    target_img_nid = nid
-            if job.get("prompt_text") and (nid == target_txt_nid or (not target_txt_nid and nd.get("node_type") in ("prompt", "text"))):
+                if not eff_img_nid:
+                    eff_img_nid = nid
+            if job.get("prompt_text") and (nid == eff_txt_nid or (not eff_txt_nid and nd.get("node_type") in ("prompt", "text"))):
                 pr_t = job["prompt_text"]
                 nd["prompt"] = pr_t
                 nd["text"] = pr_t
                 cfg = nd.get("config") or {}
                 cfg["prompt"] = pr_t
                 nd["config"] = cfg
-                if not target_txt_nid:
-                    target_txt_nid = nid
+                if not eff_txt_nid:
+                    eff_txt_nid = nid
 
         st_one = run_workflow_execution_pipeline(
             job_doc,
             target_node_id=None,
             profile_name=profile_name,
             selected_node_ids=selected_node_ids,
+            state_key=f"{wf_id}__batch_{j_idx+1}",
+            persist_doc=False,
+            out_subdir=os.path.join(wf_id, f"batch_{j_idx+1}"),
         )
-        # Thu thập kết quả của lượt chạy này
         outputs_one = st_one.get("node_outputs") or {}
         media_items = []
         for n_obj in job_doc["workflow"]["nodes"]:
@@ -2570,25 +2773,50 @@ def run_workflow_batch_pipeline(
             "exported_mp4": exported_mp4,
             "exported_mp4_url": f"/api/media?path={urllib.parse.quote(exported_mp4)}" if exported_mp4 else "",
         }
-        batch_results.append(batch_entry)
-        # Đồng bộ ngược node_outputs mới nhất vào doc gốc
-        doc["workflow"]["nodes"] = job_doc["workflow"]["nodes"]
-        doc["workflow"]["timeline"] = job_doc["workflow"].get("timeline") or []
-        hist = list(doc["workflow"].get("batch_history") or [])
-        hist.insert(0, batch_entry)
-        doc["workflow"]["batch_history"] = hist[:50]
-        save_workflow_document(doc, wf_id=wf_id)
+        with batch_lock:
+            batch_results.append(batch_entry)
+            batch_results.sort(key=lambda x: x["batch_index"])
+            doc["workflow"]["nodes"] = job_doc["workflow"]["nodes"]
+            doc["workflow"]["timeline"] = job_doc["workflow"].get("timeline") or []
+            hist = list(doc["workflow"].get("batch_history") or [])
+            hist.insert(0, batch_entry)
+            doc["workflow"]["batch_history"] = hist[:50]
+            save_workflow_document(doc, wf_id=wf_id)
+            done_now = len(batch_results)
+            _WORKFLOW_RUN_STATE[wf_id].update({
+                "status": "running" if done_now < total_jobs else "done",
+                "batch_completed": done_now,
+                "batch_results": list(batch_results),
+                "current_message": (
+                    f"✅ Đã hoàn thành Tạo Số Lượng Lớn ({total_jobs}/{total_jobs} lô)!"
+                    if done_now >= total_jobs
+                    else f"⚡ Đang chạy {max_workers} luồng — Đã xong {done_now}/{total_jobs} lô..."
+                ),
+            })
 
+    with ThreadPoolExecutor(max_workers=min(max_workers, len(jobs))) as batch_pool:
+        b_futs = [batch_pool.submit(_run_batch_one, j_idx, job) for j_idx, job in enumerate(jobs)]
+        for bf in as_completed(b_futs):
+            bf.result()
+
+    if is_workflow_stopped(wf_id):
         _WORKFLOW_RUN_STATE[wf_id].update({
-            "status": "running" if (j_idx + 1) < total_jobs else "done",
-            "batch_completed": j_idx + 1,
-            "batch_results": batch_results,
-            "current_message": (
-                f"✅ Đã hoàn thành Tạo Số Lượng Lớn ({total_jobs}/{total_jobs} lô)!"
-                if (j_idx + 1) >= total_jobs
-                else f"⚡ Đã xong {j_idx+1}/{total_jobs} lô — Đang chuyển sang lô tiếp theo..."
-            ),
+            "status": "stopped",
+            "ok": False,
+            "current_message": f"⏹️ Đã dừng chạy hàng loạt Workflow ({len(batch_results)}/{total_jobs} lô hoàn tất).",
         })
+    else:
+        err_batches = [b for b in batch_results if b.get("status") != "done"]
+        if err_batches:
+            st_b = "error" if len(err_batches) >= len(batch_results) else "partial"
+            _WORKFLOW_RUN_STATE[wf_id].update({
+                "status": st_b,
+                "ok": False,
+                "error": f"{len(err_batches)}/{total_jobs} lô hàng loạt gặp lỗi thực thi.",
+                "current_message": f"⚠️ Hoàn tất chạy hàng loạt ({total_jobs - len(err_batches)}/{total_jobs} lô thành công, {len(err_batches)} lô lỗi).",
+            })
+        else:
+            _WORKFLOW_RUN_STATE[wf_id]["ok"] = True
 
     return _WORKFLOW_RUN_STATE[wf_id]
 
@@ -2679,8 +2907,9 @@ def export_workflow_timeline_mp4_ffmpeg(clips: list, wf_name: str = "Workflow_Ti
         "ffmpeg", "-y", "-f", "concat", "-safe", "0",
         "-i", list_txt, "-c", "copy", "-movflags", "+faststart", out_mp4
     ]
+    err_ff_tail = ""
     try:
-        r = subprocess.run(cmd_fast, capture_output=True, timeout=90)
+        r = subprocess.run(cmd_fast, capture_output=True, text=True, timeout=90)
         if r.returncode != 0 or not os.path.exists(out_mp4) or os.path.getsize(out_mp4) < 1000:
             cmd_reencode = [
                 "ffmpeg", "-y", "-f", "concat", "-safe", "0",
@@ -2688,7 +2917,9 @@ def export_workflow_timeline_mp4_ffmpeg(clips: list, wf_name: str = "Workflow_Ti
                 "-c:v", "libx264", "-preset", "fast", "-crf", "20", "-pix_fmt", "yuv420p",
                 "-c:a", "aac", "-b:a", "192k", "-movflags", "+faststart", out_mp4
             ]
-            subprocess.run(cmd_reencode, capture_output=True, timeout=180)
+            r2 = subprocess.run(cmd_reencode, capture_output=True, text=True, timeout=180)
+            if r2.returncode != 0:
+                err_ff_tail = "\n".join((r2.stderr or "").strip().splitlines()[-5:])
     finally:
         try:
             os.remove(list_txt)
@@ -2703,7 +2934,7 @@ def export_workflow_timeline_mp4_ffmpeg(clips: list, wf_name: str = "Workflow_Ti
             "media_url": f"/api/media?path={urllib.parse.quote(out_mp4)}",
             "message": f"✅ Đã ghép {len(valid_clips)} cảnh thành Video Final: {os.path.basename(out_mp4)}",
         }
-    return {"ok": False, "error": "FFmpeg không thể ghép các clip video."}
+    return {"ok": False, "error": f"FFmpeg không thể ghép các clip video: {err_ff_tail[:220]}" if err_ff_tail else "FFmpeg không thể ghép các clip video."}
 
 
 if __name__ == "__main__":

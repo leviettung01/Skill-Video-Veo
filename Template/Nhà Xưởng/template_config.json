@@ -213,6 +213,35 @@
         "outfit_en": "wearing an open dark-navy smart-casual jacket over a fitted white crew-neck tee and silver wristwatch",
         "setting_en": "standing behind a presentation counter in a bright official factory sample showroom and flagship store with illuminated display shelves clearly visible in the background"
       }
+    ],
+    "nv5": [
+      {
+        "variant_index": 1,
+        "legacy_vkey": "nv5_v1",
+        "char_v": "nv5_v1",
+        "hook_title": "NV5 - Kịch bản 1: Xả Kho Trực Tiếp Tại Xưởng",
+        "style": "Kho Hàng Đóng Gói Xuất Khẩu",
+        "outfit_en": "wearing a chic open soft-cream tailored blazer over a fitted white ribbed knit top with delicate pearl stud earrings",
+        "setting_en": "standing behind a clean packing counter in a bright modern warehouse fulfillment center with neatly stacked shipping cartons and organized storage racks clearly visible in the background"
+      },
+      {
+        "variant_index": 2,
+        "legacy_vkey": "nv5_v2",
+        "char_v": "nv5_v2",
+        "hook_title": "NV5 - Kịch bản 2: Kiểm Định Chất Lượng QC",
+        "style": "Phòng Kiểm Định Chất Lượng QC",
+        "outfit_en": "wearing a tailored light-beige cropped blazer over a fitted pastel-blush crew-neck top and a thin gold bracelet",
+        "setting_en": "standing behind a bright white quality-inspection worktable in a modern glass-walled Quality Control (QC) laboratory with soft daylight lamps and neatly arranged sample shelves clearly visible across the background"
+      },
+      {
+        "variant_index": 3,
+        "legacy_vkey": "nv5_v3",
+        "char_v": "nv5_v3",
+        "hook_title": "NV5 - Kịch bản 3: Giá Gốc Showroom Chính Hãng",
+        "style": "Showroom & Phòng Mẫu Chính Hãng",
+        "outfit_en": "wearing a smart open charcoal-taupe blazer over a fitted silk ivory camisole blouse with a minimal dainty gold pendant",
+        "setting_en": "standing behind a clean marble-and-wood display counter in a bright modern brand flagship showroom with illuminated product shelves clearly visible in the background"
+      }
     ]
   },
   "scene_actions": {

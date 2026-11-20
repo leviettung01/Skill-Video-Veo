@@ -3,6 +3,18 @@
 'use strict';
 
 (function () {
+  // Ensure reCAPTCHA Enterprise (and its child recaptcha__*.js loads) passes
+  // Trusted Types on flow.google.com/about when no default policy exists yet.
+  try {
+    if (window.trustedTypes && typeof window.trustedTypes.createPolicy === 'function' && !window.trustedTypes.defaultPolicy) {
+      window.trustedTypes.createPolicy('default', {
+        createScriptURL: (u) => u,
+        createScript: (s) => s,
+        createHTML: (h) => h,
+      });
+    }
+  } catch (_) {}
+
   if (!window.__upprojectHijackBypassInstalled) {
     window.__upprojectHijackBypassInstalled = true;
     try {
@@ -37,13 +49,98 @@
 
   const SITE_KEY = '6LdsFiUsAAAAAIjVDZcuLhaHiDn5nnHVXVRQGeMV';
 
+  function findPageCspNonce() {
+    try {
+      for (const el of document.querySelectorAll('script')) {
+        const n = el.nonce || el.getAttribute('nonce') || '';
+        if (n) return n;
+      }
+    } catch (_) {}
+    return '';
+  }
+
+  function toTrustedScriptUrl(rawUrl) {
+    try {
+      const tt = window.trustedTypes;
+      if (tt && typeof tt.createPolicy === 'function') {
+        if (!window.__upprojectTtPolicy) {
+          try {
+            window.__upprojectTtPolicy = tt.createPolicy('upproject-recaptcha', {
+              createScriptURL: (u) => u,
+            });
+          } catch (_) {
+            window.__upprojectTtPolicy = tt.defaultPolicy || null;
+          }
+        }
+        if (window.__upprojectTtPolicy && typeof window.__upprojectTtPolicy.createScriptURL === 'function') {
+          return window.__upprojectTtPolicy.createScriptURL(rawUrl);
+        }
+      }
+    } catch (_) {}
+    return rawUrl;
+  }
+
+  function ensureGrecaptchaEnterpriseScript() {
+    try {
+      if (window.grecaptcha?.enterprise?.execute) return;
+      const existing = document.getElementById('__upproject_recaptcha_enterprise_js');
+      if (existing) {
+        if (existing.dataset && existing.dataset.loadError === '1') {
+          existing.remove();
+        } else {
+          return;
+        }
+      }
+      if (document.querySelector('script[src*="recaptcha/enterprise.js"]')) return;
+      const nonceVal = findPageCspNonce();
+      // Wait for <head> scripts carrying the page CSP nonce if DOM is still starting up.
+      if (!nonceVal && document.readyState === 'loading') return;
+      const target = document.head || document.documentElement;
+      if (!target) return;
+      const s = document.createElement('script');
+      s.id = '__upproject_recaptcha_enterprise_js';
+      s.async = true;
+      s.defer = true;
+      if (nonceVal) {
+        s.setAttribute('nonce', nonceVal);
+        s.nonce = nonceVal;
+      }
+      s.onerror = () => {
+        try { s.dataset.loadError = '1'; } catch (_) {}
+      };
+      s.src = toTrustedScriptUrl(`https://www.google.com/recaptcha/enterprise.js?render=${SITE_KEY}`);
+      target.appendChild(s);
+    } catch (err) {
+      try { window.__upprojectRecaptchaInjectErr = err?.message || String(err); } catch (_) {}
+    }
+  }
+
+  if (document.readyState === 'loading') {
+    document.addEventListener('DOMContentLoaded', ensureGrecaptchaEnterpriseScript, { once: true });
+  } else {
+    ensureGrecaptchaEnterpriseScript();
+  }
+
   function waitForGrecaptcha(timeoutMs = 12_000) {
+    ensureGrecaptchaEnterpriseScript();
     return new Promise((resolve, reject) => {
       const start = Date.now();
       const check = () => {
-        if (window.grecaptcha?.enterprise?.execute) return resolve();
+        if (window.grecaptcha?.enterprise?.execute) {
+          if (typeof window.grecaptcha.enterprise.ready === 'function') {
+            try {
+              window.grecaptcha.enterprise.ready(() => resolve());
+              return;
+            } catch (_) {}
+          }
+          return resolve();
+        }
+        ensureGrecaptchaEnterpriseScript();
         if (Date.now() - start > timeoutMs) {
-          return reject(new Error('grecaptcha not available'));
+          const tag = document.getElementById('__upproject_recaptcha_enterprise_js');
+          const hint = window.__upprojectRecaptchaInjectErr
+            || (tag?.dataset?.loadError === '1' ? 'grecaptcha script blocked or failed to load' : 'grecaptcha not available');
+          return reject(new Error(hint));
         }
         setTimeout(check, 200);
       };
@@ -52,24 +149,114 @@
   }
 
   function clearGrecaptchaCache() {
+    const isRcKey = (k) => {
+      const s = String(k || '');
+      return s.startsWith('_grecaptcha') || s.startsWith('grecaptcha') || s.startsWith('rc::');
+    };
     try {
-      Object.keys(localStorage)
-        .filter((k) => k.startsWith('_grecaptcha'))
-        .forEach((k) => localStorage.removeItem(k));
+      Object.keys(localStorage).filter(isRcKey).forEach((k) => localStorage.removeItem(k));
     } catch (_) {}
+    try {
+      Object.keys(sessionStorage).filter(isRcKey).forEach((k) => sessionStorage.removeItem(k));
+    } catch (_) {}
+  }
+
+  function _randBetween(min, max) {
+    return min + Math.random() * (max - min);
+  }
+
+  async function simulateHumanPresence() {
+    try {
+      const vw = Math.max(window.innerWidth || 1024, 480);
+      const vh = Math.max(window.innerHeight || 720, 420);
+      const docHeight = Math.max(
+        document.documentElement?.scrollHeight || 0,
+        document.body?.scrollHeight || 0,
+        vh,
+      );
+      const maxScroll = Math.max(0, Math.min(docHeight - vh, 1000));
+      const targetScrollY = maxScroll > 20 ? Math.floor(_randBetween(0, maxScroll)) : 0;
+      try {
+        window.scrollTo({ top: targetScrollY, behavior: 'auto' });
+      } catch (_) {}
+
+      let curX = _randBetween(vw * 0.15, vw * 0.85);
+      let curY = _randBetween(vh * 0.15, vh * 0.8);
+      const steps = 3;
+      for (let i = 0; i < steps; i++) {
+        curX = Math.max(12, Math.min(vw - 12, curX + _randBetween(-180, 180)));
+        curY = Math.max(12, Math.min(vh - 12, curY + _randBetween(-140, 140)));
+        const targetEl = document.elementFromPoint(curX, curY) || document.body || document.documentElement;
+        if (targetEl) {
+          const evInit = {
+            bubbles: true,
+            cancelable: true,
+            view: window,
+            clientX: Math.round(curX),
+            clientY: Math.round(curY),
+            screenX: Math.round((window.screenX || 0) + curX),
+            screenY: Math.round((window.screenY || 0) + curY),
+          };
+          try {
+            if (typeof PointerEvent === 'function') {
+              targetEl.dispatchEvent(new PointerEvent('pointermove', { ...evInit, pointerType: 'mouse', isPrimary: true }));
+            }
+            targetEl.dispatchEvent(new MouseEvent('mousemove', evInit));
+            if (i === steps - 1) {
+              targetEl.dispatchEvent(new MouseEvent('mouseover', evInit));
+            }
+          } catch (_) {}
+        }
+        await new Promise((r) => setTimeout(r, Math.round(_randBetween(30, 85))));
+      }
+      await new Promise((r) => setTimeout(r, Math.round(_randBetween(50, 140))));
+    } catch (_) {}
+  }
+
+  function _rememberToken(tok) {
+    if (!tok || typeof tok !== 'string') return;
+    if (!(window.__upprojectRecentTokens instanceof Set)) {
+      window.__upprojectRecentTokens = new Set();
+    }
+    window.__upprojectRecentTokens.add(tok);
+    while (window.__upprojectRecentTokens.size > 60) {
+      const oldest = window.__upprojectRecentTokens.values().next().value;
+      if (oldest === undefined) break;
+      window.__upprojectRecentTokens.delete(oldest);
+    }
   }
 
   async function mintRecaptchaToken(action) {
     await waitForGrecaptcha();
-    clearGrecaptchaCache();
+    const recent =
+      window.__upprojectRecentTokens instanceof Set
+        ? window.__upprojectRecentTokens
+        : (window.__upprojectRecentTokens = new Set());
     const execFn =
       typeof window.__realGrecaptchaExecute === 'function'
         ? window.__realGrecaptchaExecute
         : window.grecaptcha.enterprise.execute.bind(window.grecaptcha.enterprise);
-    const token = await execFn(SITE_KEY, { action });
-    clearGrecaptchaCache();
-    return token;
+
+    let lastToken = '';
+    for (let attempt = 0; attempt < 2; attempt++) {
+      clearGrecaptchaCache();
+      await simulateHumanPresence();
+      const token = await execFn(SITE_KEY, { action });
+      clearGrecaptchaCache();
+      if (token && typeof token === 'string' && token.length >= 80 && !recent.has(token)) {
+        _rememberToken(token);
+        return token;
+      }
+      lastToken = token || '';
+      await new Promise((r) => setTimeout(r, Math.round(_randBetween(180, 320))));
+    }
+    if (lastToken && lastToken.length >= 40) {
+      _rememberToken(lastToken);
+    }
+    return lastToken;
   }
+
+  window.__upprojectMintRecaptchaToken = mintRecaptchaToken;
 
   if (window.__upprojectCaptchaListener) {
     window.removeEventListener('UPPROJECT_GET_CAPTCHA', window.__upprojectCaptchaListener);
@@ -117,7 +304,7 @@
           new CustomEvent('UPPROJECT_CAPTCHA_RESULT', {
             detail: {
               requestId,
-              token: JSON.stringify({ ok: resp.ok, status: resp.status, text, email: wiz.oPEP7c || '' }),
+              token: JSON.stringify({ status: resp.status, text, atPresent: Boolean(at) }),
             },
           }),
         );
@@ -138,5 +325,4 @@
   };
 
   window.addEventListener('UPPROJECT_GET_CAPTCHA', window.__upprojectCaptchaListener);
-  window.__upprojectInstalled = true;
 })();

@@ -117,7 +117,7 @@
               </div>
               <div style="font-size:11px; color:var(--muted); margin-top:2px;">
                 Endpoint: <code>${a.proxy_url || 'http://127.0.0.1:8317/v1'}</code> |
-                Models: <span style="color:#a5f3fc">${(a.available_video_models || []).join(", ")}, gpt-image-1</span>
+                Models: <span style="color:#a5f3fc">${(a.available_video_models || []).join(", ")}</span>
               </div>
             </div>
             <div style="display:flex; align-items:center; gap:6px;">
@@ -532,7 +532,11 @@
           return;
         }
         const firstPid = (res.pids && res.pids[0]) || selectedIds[0];
-        showProdBanner(`🎉 Đã đẩy <b>${res.count || selectedIds.length} dự án</b> sang chạy Đa Luồng chung & hiển thị tiến trình tại <b>Studio Dự Án</b>!`);
+        if (res.failed_count && res.failed_count > 0) {
+          showProdBanner(`⚠️ Đã đẩy <b>${res.count || 0}/${selectedIds.length} dự án</b> sang chạy Đa Luồng (${res.failed_count} SP lỗi chuẩn bị: <code>${String(res.error || "").slice(0, 140)}</code>).`, true);
+        } else {
+          showProdBanner(`🎉 Đã đẩy <b>${res.count || selectedIds.length} dự án</b> sang chạy Đa Luồng chung & hiển thị tiến trình tại <b>Studio Dự Án</b>!`);
+        }
         await loadProductsStore(false);
         await refreshAll(false);
         STATE.currentProjectId = firstPid;
@@ -994,6 +998,11 @@
     async function quickCreateVideoFromInput() {
       const inp = document.getElementById("inpQuickProdUrl").value.trim();
       const tpl = document.getElementById("selQuickTemplate")?.value || "Nhà Xưởng";
+      if (typeof isTransformStudioTemplate === "function" && isTransformStudioTemplate(tpl)) {
+        const meta = typeof findMarketplaceTemplate === "function" ? findMarketplaceTemplate(tpl) : null;
+        await window.openTransformStudio("", meta?.code || String(tpl).replace(/^#/, ""));
+        return;
+      }
       if (String(tpl) === "005" || String(tpl).includes("Nấu Ăn")) {
         const dishArg = (inp && !inp.startsWith("http") && !/^\d{15,22}$/.test(inp)) ? inp : "";
         await window.openCookingStudio("", dishArg);
@@ -1032,7 +1041,12 @@
       });
       if (res && res.ok) {
         document.getElementById("inpBulkProdUrls").value = "";
-        showProdBanner(`✅ Đã thêm <b>${res.added_count}</b> sản phẩm vào hàng đợi tải tự động!`);
+        const errArr = Array.isArray(res.errors) ? res.errors : [];
+        if (errArr.length > 0) {
+          showProdBanner(`⚠️ Đã thêm <b>${res.added_count}</b> sản phẩm (có ${errArr.length} dòng lỗi: <code>${String(errArr[0]).slice(0, 120)}</code>).`, res.added_count === 0);
+        } else {
+          showProdBanner(`✅ Đã thêm <b>${res.added_count}</b> sản phẩm vào hàng đợi tải tự động!`);
+        }
         await loadProductsStore(false);
       }
     }
@@ -2675,7 +2689,7 @@
       const appearance = document.getElementById("inpGenAppearance").value.trim();
       const customPrompt = document.getElementById("inpGenFinalPrompt").value.trim();
 
-      document.getElementById("genImgStatusText").textContent = `⏳ Đang tạo ảnh bằng model ${model === 'chatgpt' ? 'ChatGPT Image' : 'Nano Banana 2.1 (2K)'}...`;
+      document.getElementById("genImgStatusText").textContent = `⏳ Đang tạo ảnh bằng model ${model === 'chatgpt' ? 'ChatGPT Image (gpt-image-2)' : model === 'cliproxy_gemini' ? 'Gemini Image (CLIProxy)' : 'Nano Banana 2.1 (2K)'}...`;
       const res = await apiPost("/api/characters/generate-image", {
         mode,
         model,
@@ -2721,22 +2735,162 @@
       el.innerHTML = msg;
     }
 
+    function findMarketplaceTemplate(tplOrCode) {
+      const q = String(tplOrCode || "").replace(/^#/, "").trim().toLowerCase();
+      if (!q) return null;
+      return (STATE.videoTemplates || []).find(t =>
+        String(t.code || "").replace(/^#/, "").toLowerCase() === q ||
+        String(t.folder_name || "").toLowerCase() === q ||
+        String(t.id || "").toLowerCase() === q ||
+        String(t.name || "").toLowerCase() === q
+      ) || null;
+    }
+
+    function isTransformStudioTemplate(tplOrCode, proj = null) {
+      if (proj && ["fashion_transformation", "transform_studio", "character_product_studio"].includes(String(proj.pipeline_kind || "").toLowerCase())) {
+        return true;
+      }
+      const q = String(tplOrCode || "").replace(/^#/, "").trim();
+      if (["006", "Bien Hinh Thoi Trang"].includes(q)) return true;
+      const meta = findMarketplaceTemplate(q);
+      if (!meta) return false;
+      return meta.ui_studio === "transform"
+        || ["fashion_transformation", "transform_studio", "character_product_studio"].includes(String(meta.pipeline_kind || "").toLowerCase())
+        || Number(meta.presets_count || 0) > 0;
+    }
+
+    async function reloadTransformStudioScript() {
+      return new Promise((resolve) => {
+        const s = document.createElement("script");
+        s.src = "/static/transform_studio.js?v=" + Date.now();
+        s.onload = () => resolve(true);
+        s.onerror = () => resolve(false);
+        document.body.appendChild(s);
+      });
+    }
+
+    async function syncTemplatesFromServer() {
+      const btn = document.getElementById("btnSyncTemplateUpdates");
+      const oldText = btn ? btn.textContent : "";
+      if (btn) { btn.disabled = true; btn.textContent = "⏳ Đang kiểm tra..."; }
+      try {
+        showMarketBanner("⏳ Đang kiểm tra phiên bản mới từ máy chủ cập nhật...");
+        const chk = await apiGet("/api/templates/check-updates");
+        if (!chk || !chk.ok) {
+          showMarketBanner(`❌ Không kiểm tra được bản cập nhật: ${(chk && chk.error) || "Lỗi kết nối"}`, true);
+          return;
+        }
+        if (!chk.git_available) {
+          showMarketBanner(`📦 ${chk.message || "Bản cài đặt thủ công: hãy dùng nút 'Cài Gói Template (.ZIP)' ngay bên cạnh để nạp template mới tức thì!"}`);
+          return;
+        }
+        if (chk.network_error) {
+          showMarketBanner(`⚠️ ${chk.message}`, true);
+          return;
+        }
+        if (!chk.has_updates) {
+          await loadTemplatesMarketplace(false);
+          showMarketBanner(`✅ Hệ thống và Chợ Template đang ở bản mới nhất (${chk.head || "HEAD"}, ${(STATE.videoTemplates || []).length} template).`);
+          return;
+        }
+        const tplListStr = (chk.incoming_templates || []).length
+          ? ` (Template ảnh hưởng: ${chk.incoming_templates.join(", ")})`
+          : "";
+        if (!confirm(`Tìm thấy ${chk.behind_count} bản cập nhật mới${tplListStr}.\n\nHệ thống sẽ giữ nguyên toàn bộ dự án, ảnh sản phẩm và tài khoản của bạn.\nTiếp tục tải bản cập nhật ngay?`)) {
+          showMarketBanner("Đã huỷ cập nhật.");
+          return;
+        }
+        if (btn) btn.textContent = "⏳ Đang tải code & template mới...";
+        const res = await apiPost("/api/templates/sync-updates", {});
+        if (!res || !res.ok) {
+          showMarketBanner(`❌ Cập nhật thất bại: ${(res && res.error) || "Không rõ nguyên nhân"}`, true);
+          return;
+        }
+        if (Array.isArray(res.templates)) {
+          STATE.videoTemplates = res.templates;
+          populateTemplateDropdowns(STATE.videoTemplates);
+          renderTemplatesMarketplace();
+        } else {
+          await loadTemplatesMarketplace(false);
+        }
+        if (res.reload_ui_scripts) {
+          await reloadTransformStudioScript();
+        }
+        const needRestart = (res.updated_files || []).some(f => ["server.py", "static/index.html", "static/studio_app_part2.js"].includes(f));
+        showMarketBanner(`🎉 ${res.message}${needRestart ? " (Bấm F5 hoặc khởi động lại web nếu có thay đổi giao diện tổng.)" : " Sẵn sàng dùng ngay!"}`);
+      } catch (err) {
+        showMarketBanner(`❌ Lỗi kiểm tra cập nhật: ${err.message}`, true);
+      } finally {
+        if (btn) { btn.disabled = false; btn.textContent = oldText || "⬇️ Cập Nhật Code & Template Mới"; }
+      }
+    }
+
+    async function handleImportTemplateZip(inputEl) {
+      const file = inputEl?.files?.[0];
+      if (!file) return;
+      try {
+        if (!file.name.toLowerCase().endsWith(".zip")) {
+          throw new Error("Chỉ hỗ trợ gói template định dạng .ZIP");
+        }
+        if (file.size > 150 * 1024 * 1024) {
+          throw new Error("File .ZIP tối đa 150 MB.");
+        }
+        showMarketBanner(`📦 Đang giải nén và cài đặt gói template <b>${file.name}</b>...`);
+        const zipBase64 = await new Promise((resolve, reject) => {
+          const reader = new FileReader();
+          reader.onload = () => resolve(reader.result);
+          reader.onerror = () => reject(new Error("Không đọc được file .ZIP"));
+          reader.readAsDataURL(file);
+        });
+        const res = await apiPost("/api/templates/import-zip", {
+          filename: file.name,
+          zip_base64: zipBase64,
+          overwrite: true,
+        });
+        if (!res || !res.ok) {
+          throw new Error((res && res.error) || "Cài gói template thất bại.");
+        }
+        if (Array.isArray(res.templates)) {
+          STATE.videoTemplates = res.templates;
+          populateTemplateDropdowns(STATE.videoTemplates);
+          renderTemplatesMarketplace();
+        } else {
+          await loadTemplatesMarketplace(false);
+        }
+        showMarketBanner(`🎉 ${res.message}`);
+        if (res.installed && isTransformStudioTemplate(res.installed.code)) {
+          await reloadTransformStudioScript();
+          window.openTransformStudio("", res.installed.code).catch(() => {});
+        }
+      } catch (err) {
+        showMarketBanner(`❌ Cài gói template lỗi: ${err.message}`, true);
+      } finally {
+        if (inputEl) inputEl.value = "";
+      }
+    }
+
     function updateMarketAiCommandPreview() {
       const inpEl = document.getElementById("inpMarketQuickUrl");
       const rawInp = (inpEl?.value || "").trim();
       const urlVal = rawInp || "<Link_hoặc_ID_Sản_Phẩm>";
       const codeVal = (document.getElementById("selMarketQuickCode")?.value || "001").trim();
+      const isTs = isTransformStudioTemplate(codeVal);
+      const tsMeta = isTs ? findMarketplaceTemplate(codeVal) : null;
       if (inpEl) {
-        inpEl.placeholder = codeVal === "005"
-          ? "Nhập tên món ăn cho Template #005 (VD: Sườn xào chua ngọt, Thịt kho tàu...)"
-          : "Dán Link sản phẩm hoặc ID (VD: 1731391379899778653 hoặc https://shop.tiktok.com/vn/pdp/...)";
+        inpEl.placeholder = isTs
+          ? `Chọn ảnh nhân vật & sản phẩm ngay trong Studio Template #${codeVal}`
+          : codeVal === "005"
+            ? "Nhập tên món ăn cho Template #005 (VD: Sườn xào chua ngọt, Thịt kho tàu...)"
+            : "Dán Link sản phẩm hoặc ID (VD: 1731391379899778653 hoặc https://shop.tiktok.com/vn/pdp/...)";
       }
       const prevEl = document.getElementById("txtMarketAiCmdPreview");
       if (prevEl) {
         const dishSample = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "Sườn xào chua ngọt";
-        prevEl.textContent = codeVal === "005"
-          ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
-          : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
+        prevEl.textContent = isTs
+          ? `Mở Studio Template #${codeVal} (${tsMeta?.name || "Biến hình"}), chọn ảnh nhân vật + sản phẩm để tạo video.`
+          : codeVal === "005"
+            ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
+            : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
       }
     }
 
@@ -2744,16 +2898,25 @@
       const rawInp = (document.getElementById("inpMarketQuickUrl")?.value || "").trim();
       const urlVal = rawInp || "<Link_hoặc_ID_Sản_Phẩm>";
       const codeVal = customCode || (document.getElementById("selMarketQuickCode")?.value || "001").trim();
+      const isTs = isTransformStudioTemplate(codeVal);
+      const tsMeta = isTs ? findMarketplaceTemplate(codeVal) : null;
       const dishSample = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "Sườn xào chua ngọt";
-      const cmd = codeVal === "005"
-        ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
-        : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
+      const cmd = isTs
+        ? `Tạo video theo Template ${codeVal} (${tsMeta?.name || "Biến hình"}), chọn kịch bản, ảnh nhân vật và ảnh sản phẩm.`
+        : codeVal === "005"
+          ? `Tạo video nấu ăn POV món "${dishSample}" theo Template 005: tự sinh kịch bản + chọn giọng đọc trong thư viện + xuất Final 1080p.`
+          : `Tạo các sản phẩm cho ID ${urlVal} theo template ${codeVal}`;
       navigator.clipboard.writeText(cmd);
       showMarketBanner(`📋 Đã copy lệnh gửi AI Agent: <code>${cmd}</code>`);
     }
 
     async function runQuickFromMarketplace(overrideCode = "") {
       const cookingCode = String(overrideCode || document.getElementById("selMarketQuickCode")?.value || "");
+      if (isTransformStudioTemplate(cookingCode)) {
+        const meta = findMarketplaceTemplate(cookingCode);
+        await window.openTransformStudio("", meta?.code || String(cookingCode).replace(/^#/, ""));
+        return;
+      }
       if (cookingCode === "005") {
         const rawInp = (document.getElementById("inpMarketQuickUrl")?.value || "").trim();
         const dishArg = (rawInp && !rawInp.startsWith("http") && !/^\d{15,22}$/.test(rawInp)) ? rawInp : "";
@@ -2826,6 +2989,11 @@
     }
 
     function useTemplateFromMarketplace(codeOrFolder) {
+      if (isTransformStudioTemplate(codeOrFolder)) {
+        const meta = findMarketplaceTemplate(codeOrFolder);
+        window.openTransformStudio("", meta?.code || String(codeOrFolder).replace(/^#/, "")).catch(error => alert(error.message));
+        return;
+      }
       if (String(codeOrFolder) === "005") {
         window.openCookingStudio().catch(error => alert(error.message));
         return;
@@ -2854,10 +3022,26 @@
       const box = document.getElementById("templatesMarketGrid");
       if (!box) return;
       const allTpls = STATE.videoTemplates || [];
+      const flt = (STATE.templateMarketFilter || "all").toLowerCase();
+      const filterBar = document.getElementById("tplCategoryFilterBar");
+      if (filterBar) {
+        const barButtons = [
+          `<button class="btn-filter ${flt === 'all' ? 'active' : ''}" onclick="setTemplateMarketFilter('all', this)">🔥 Tất cả (<span id="cntTplAll">${allTpls.length}</span>)</button>`,
+          ...allTpls.map(t => {
+            const c = String(t.code || "").trim();
+            const isTs = isTransformStudioTemplate(c);
+            const activeCls = flt === c.toLowerCase() ? " active" : "";
+            const styleAttr = isTs
+              ? ` style="border-color:rgba(6,182,212,0.55); color:#67e8f9;"`
+              : (c === "004" ? ` style="border-color:rgba(236,72,153,0.5); color:#f9a8d4;"` : "");
+            return `<button class="btn-filter${activeCls}"${styleAttr} onclick="setTemplateMarketFilter('${c}', this)">#${c} • ${t.name || t.folder_name}</button>`;
+          })
+        ];
+        filterBar.innerHTML = barButtons.join("");
+      }
       const cntEl = document.getElementById("cntTplAll");
       if (cntEl) cntEl.textContent = allTpls.length;
 
-      const flt = (STATE.templateMarketFilter || "all").toLowerCase();
       const filtered = allTpls.filter(t => {
         if (flt === "all") return true;
         return (
@@ -2917,7 +3101,7 @@
               <div style="display:flex; gap:5px; flex-wrap:wrap; margin-top:7px;">
                 <span class="badge badge-run" style="font-size:9.8px;">📐 ${t.scenes_per_video} Cảnh × ${t.scene_duration_sec}s (${t.video_aspect || '9:16'})</span>
                 <span class="badge" style="background:rgba(16,185,129,0.16); color:#34d399; border:1px solid rgba(16,185,129,0.4); font-size:9.8px;">🎬 ${t.video_resolution || '1080p • 60 FPS'}</span>
-                <span class="badge" style="background:rgba(245,158,11,0.16); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); font-size:9.8px;">${code === '005' ? '🎙️ Có Voice / 🎧 ASMR · Tự sinh KB' : (t.has_subtitles === false ? (code === '004' ? '🎵 Nhạc gốc · Không sub' : '🎧 ASMR · Không voice/sub') : '🔤 Có Sub Karaoke')}</span>
+                <span class="badge" style="background:rgba(245,158,11,0.16); color:#fcd34d; border:1px solid rgba(245,158,11,0.4); font-size:9.8px;">${isTransformStudioTemplate(code) ? `🎭 Studio NV + SP · ${t.presets_count || 2} kịch bản` : code === '005' ? '🎙️ Có Voice / 🎧 ASMR · Tự sinh KB' : (t.has_subtitles === false ? (code === '004' ? '🎵 Nhạc gốc · Không sub' : '🎧 ASMR · Không voice/sub') : '🔤 Có Sub Karaoke')}</span>
                 <span class="badge" style="background:rgba(6,182,212,0.16); color:#67e8f9; border:1px solid rgba(6,182,212,0.4); font-size:9.8px;">🧠 Kèm Role Skill (.MD)</span>
               </div>
 
