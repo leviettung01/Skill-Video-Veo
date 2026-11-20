@@ -1564,7 +1564,9 @@
       if (cGrid) {
         cGrid.innerHTML = chars.map(c => {
           const ck = c.key;
-          const imgSrc = c.ref_image_abs ? `/api/media?path=${encodeURIComponent(c.ref_image_abs)}` : "";
+          const imgVer = c.ref_image_mtime || Date.now();
+          const imgSrc = c.ref_image_abs ? `/api/media?path=${encodeURIComponent(c.ref_image_abs)}&v=${imgVer}` : "";
+          const isCharGenerating = !!(STATE.charGenBusy && STATE.charGenBusy[ck]);
           const tplOpts = templates.map(t =>
             `<option value="${t.id}" ${t.id === c.sheet_template_id ? 'selected' : ''}>${t.name}</option>`
           ).join("");
@@ -1609,6 +1611,7 @@
                 <div style="display:flex; align-items:center; gap:5px; flex-shrink:0;">
                   <span class="badge" style="background:rgba(16,185,129,0.14); color:#34d399; border:1px solid rgba(16,185,129,0.32); font-size:10.5px;">${genShort} • ${regShort}</span>
                   <span class="badge ${c.enabled ? 'badge-done' : 'badge-fail'}" style="font-size:10.5px;">${c.enabled ? '● Bật' : '○ Tắt'}</span>
+                  ${isCharGenerating ? `<span class="badge badge-run" style="font-size:10px;">⏳ Đang tạo ảnh AI...</span>` : ''}
                   <button class="btn btn-xs btn-outline" style="padding:3px 7px;" onclick="openEditCharacterModal('${ck}')" title="Chỉnh sửa chi tiết nhân vật">✏️ Sửa</button>
                   <button class="btn btn-xs btn-danger" style="padding:3px 6px;" onclick="deleteSingleCharacter('${ck}')" title="Xoá nhân vật">🗑️</button>
                 </div>
@@ -1622,6 +1625,7 @@
                   <div style="display:flex; flex-direction:column; gap:5px; margin-top:6px;">
                     <button class="btn btn-xs btn-amber" style="width:100%;" onclick="openCharImageGenModal('${ck}', 'character_sheet')">✨ Tạo Character Sheet AI</button>
                     <button class="btn btn-xs btn-primary" style="width:100%;" onclick="openCharImageGenModal('${ck}', 'product_ref')">🛍️ Tạo Ảnh Cầm SP (AI)</button>
+                    <button class="btn btn-xs btn-outline" style="width:100%; border-color:rgba(56,189,248,0.45); color:#7dd3fc;" onclick="syncSingleCharToGoogleFlow('${ck}')" title="Tự động upload ảnh nhân vật này lên các tài khoản Google Flow (không cần tự tạo thủ công)">☁️ Đồng Bộ Flow (${Object.keys(c.account_character_ids || {}).length || 0})</button>
                   </div>
                 </div>
 
@@ -2524,6 +2528,14 @@
       document.getElementById("selEditCharVpc").value = "3";
       document.getElementById("inpEditCharAppearance").value = "young Vietnamese woman, friendly confident smile, identical face";
       document.getElementById("inpEditCharFile").value = "";
+      const srcInp = document.getElementById("inpEditCharSourceFile");
+      if (srcInp) srcInp.value = "";
+      const aiSt = document.getElementById("editCharAiGenStatus");
+      if (aiSt) aiSt.textContent = "";
+      const flowSt = document.getElementById("editCharFlowStatus");
+      if (flowSt) flowSt.textContent = "☁️ Không cần tự tạo trên Google Flow — tool tự động upload ảnh nhân vật khi render (hoặc bấm Đồng bộ ngay).";
+      const prevBox = document.getElementById("editCharPreviewBox");
+      if (prevBox) prevBox.innerHTML = "";
       openModal("modalEditChar");
     }
 
@@ -2542,7 +2554,136 @@
       document.getElementById("selEditCharVpc").value = String(c.videos_per_character || 3);
       document.getElementById("inpEditCharAppearance").value = c.appearance_en || "";
       document.getElementById("inpEditCharFile").value = "";
+      const srcInp = document.getElementById("inpEditCharSourceFile");
+      if (srcInp) srcInp.value = "";
+      const aiSt = document.getElementById("editCharAiGenStatus");
+      if (aiSt) aiSt.textContent = "";
+      const flowSt = document.getElementById("editCharFlowStatus");
+      const syncedCnt = Object.keys(c.account_character_ids || {}).length;
+      if (flowSt) {
+        flowSt.textContent = syncedCnt > 0
+          ? `✅ Đã đồng bộ sẵn ảnh nhân vật lên ${syncedCnt} tài khoản Google Flow.`
+          : "☁️ Không cần tự tạo trên Google Flow — tool tự động upload ảnh nhân vật khi render (hoặc bấm Đồng bộ ngay).";
+      }
+      const prevBox = document.getElementById("editCharPreviewBox");
+      const previewAbs = c.ref_image_abs || c.ref_image_path || "";
+      if (prevBox) {
+        prevBox.innerHTML = previewAbs
+          ? `<img src="/api/media?path=${encodeURIComponent(previewAbs)}&t=${Date.now()}" style="max-height:110px; border-radius:8px; border:1px solid #38bdf8;" />`
+          : "";
+      }
       openModal("modalEditChar");
+    }
+
+    async function syncSingleCharToGoogleFlow(ck) {
+      if (!ck) return;
+      showCharVoiceBanner(`⏳ Đang tự động upload ảnh nhân vật <b>${ck.toUpperCase()}</b> lên các tài khoản Google Flow...`);
+      const res = await apiPost("/api/characters/sync-flow", { char_key: ck, target_profile: "all" });
+      if (!res || !res.ok) {
+        showCharVoiceBanner(`⚠️ ${(res && res.error) || "Chưa đồng bộ được lên Google Flow (tool vẫn tự đính kèm ảnh cục bộ khi tạo video)."}`, true);
+        return;
+      }
+      if (res.library) {
+        STATE.charLib = res.library;
+        renderCharactersTab();
+      }
+      showCharVoiceBanner(res.message || `✅ Đã đồng bộ nhân vật <b>${ck.toUpperCase()}</b> lên Google Flow thành công!`);
+    }
+
+    function onEditCharLocalFileSelected(inputEl, labelText) {
+      const f = inputEl?.files?.[0];
+      const prevBox = document.getElementById("editCharPreviewBox");
+      if (!f || !prevBox) return;
+      const url = URL.createObjectURL(f);
+      prevBox.innerHTML = `<div style="display:flex; align-items:center; gap:8px;"><img src="${url}" style="max-height:105px; border-radius:8px; border:1px solid #f59e0b;" /><span style="font-size:11px; color:#fde68a;">${labelText}: <b>${f.name}</b></span></div>`;
+    }
+
+    async function generateCharSheetFromEditModal(useUploadedSource = true) {
+      const ck = (document.getElementById("inpEditCharKey")?.value || "").trim().toLowerCase() || `nv${((STATE.charLib?.characters || []).length) + 1}`;
+      const cname = (document.getElementById("inpEditCharName")?.value || "").trim() || `Nhân Vật ${ck.toUpperCase()}`;
+      const appearance = (document.getElementById("inpEditCharAppearance")?.value || "").trim();
+      const model = document.getElementById("selEditCharAiModel")?.value || "nano_banana";
+      const srcInp = document.getElementById("inpEditCharSourceFile");
+      const statusEl = document.getElementById("editCharAiGenStatus");
+
+      let srcB64 = "";
+      if (useUploadedSource) {
+        const f = srcInp?.files?.[0] || document.getElementById("inpEditCharFile")?.files?.[0];
+        if (!f) {
+          if (statusEl) statusEl.textContent = "⚠️ Vui lòng chọn 1 ảnh nhân vật gốc từ máy tính trước khi bấm Tạo Character Sheet từ ảnh gốc!";
+          return;
+        }
+        srcB64 = await fileToBase64(f);
+      }
+
+      STATE.charGenBusy = STATE.charGenBusy || {};
+      STATE.charGenBusy[ck] = true;
+      renderCharactersTab();
+
+      if (statusEl) {
+        statusEl.textContent = useUploadedSource
+          ? `⏳ Đang giữ đúng khuôn mặt ảnh gốc để tạo Character Sheet 6 góc bằng ${model}... (Có thể đóng cửa sổ này đi làm việc khác, xong sẽ tự đổi ảnh & báo Toast!)`
+          : `⏳ Đang tạo mới Character Sheet 6 góc bằng AI (${model})... (Có thể đóng cửa sổ này đi làm việc khác!)`;
+      }
+      if (typeof toast === "function") {
+        toast(`⏳ Đang tạo Character Sheet cho ${ck.toUpperCase()} chạy ngầm — bạn có thể đóng popup làm việc khác!`, "info");
+      }
+      try {
+        const res = await apiPost("/api/characters/generate-image", {
+          mode: "character_sheet",
+          model,
+          char_key: ck,
+          char_name: cname,
+          appearance_en: appearance || "young Vietnamese woman, friendly confident smile, identical face",
+          source_image_base64: srcB64 || undefined,
+          auto_apply_to_char: true,
+        });
+        if (!res || !res.ok) {
+          const errTxt = (res && res.error) || "Không tạo được Character Sheet";
+          if (statusEl) statusEl.textContent = `❌ Lỗi: ${errTxt}`;
+          if (typeof toast === "function") toast(`❌ Tạo Character Sheet ${ck.toUpperCase()} thất bại: ${errTxt}`, "err");
+          return;
+        }
+        if (statusEl) statusEl.textContent = `✅ Đã tạo & tự gắn Character Sheet 6 góc thành công bằng ${res.model_used}!`;
+        const prevBox = document.getElementById("editCharPreviewBox");
+        if (prevBox && res.image_path) {
+          prevBox.innerHTML = `<div style="display:flex; align-items:center; gap:10px;"><img src="/api/media?path=${encodeURIComponent(res.image_path)}&t=${Date.now()}" style="max-height:130px; border-radius:8px; border:2px solid #10b981;" /><div style="font-size:11px; color:#6ee7b7;"><b>🎉 Character Sheet 6 góc mới</b><br/>Đã tự gắn cho <code>${ck.toUpperCase()}</code></div></div>`;
+        }
+        if (typeof toast === "function") {
+          toast(`✅ Đã tạo & tự đổi Character Sheet 6 góc cho ${ck.toUpperCase()} (${res.model_used})!`, "ok");
+        }
+      } finally {
+        if (STATE.charGenBusy) delete STATE.charGenBusy[ck];
+        await loadCharacterLibrary();
+      }
+    }
+
+    async function syncEditCharToGoogleFlow() {
+      const ck = (document.getElementById("inpEditCharKey")?.value || "").trim().toLowerCase();
+      const flowSt = document.getElementById("editCharFlowStatus");
+      if (!ck) {
+        if (flowSt) flowSt.textContent = "⚠️ Nhập mã nhân vật trước khi đồng bộ lên Google Flow.";
+        return;
+      }
+      if (flowSt) flowSt.textContent = `⏳ Đang tự động lưu & upload ảnh nhân vật ${ck.toUpperCase()} lên các tài khoản Google Flow...`;
+      // Lưu trước nếu người dùng vừa chọn ảnh từ máy tính
+      const fileInp = document.getElementById("inpEditCharFile");
+      const srcInp = document.getElementById("inpEditCharSourceFile");
+      if ((fileInp && fileInp.files && fileInp.files[0]) || (srcInp && srcInp.files && srcInp.files[0])) {
+        await submitSaveCharacterModal(true);
+      }
+      const res = await apiPost("/api/characters/sync-flow", { char_key: ck, target_profile: "all" });
+      if (!res || !res.ok) {
+        if (flowSt) flowSt.textContent = `⚠️ ${(res && res.error) || "Chưa đồng bộ được (tool vẫn tự đính kèm ảnh cục bộ khi chạy video)."}`;
+        return;
+      }
+      if (res.character_id) document.getElementById("inpEditCharUuid").value = res.character_id;
+      if (res.project_id) document.getElementById("inpEditCharProjId").value = res.project_id;
+      if (res.library) {
+        STATE.charLib = res.library;
+        renderCharactersTab();
+      }
+      if (flowSt) flowSt.textContent = res.message || `✅ Đã đồng bộ lên ${res.synced_count || 1} tài khoản Google Flow!`;
     }
 
     function fileToBase64(file) {
@@ -2554,12 +2695,17 @@
       });
     }
 
-    async function submitSaveCharacterModal() {
+    async function submitSaveCharacterModal(keepOpen = false) {
       const ck = document.getElementById("inpEditCharKey").value.trim().toLowerCase();
       const fileInp = document.getElementById("inpEditCharFile");
+      const srcInp = document.getElementById("inpEditCharSourceFile");
       let b64 = "";
+      let srcB64 = "";
       if (fileInp && fileInp.files && fileInp.files[0]) {
         b64 = await fileToBase64(fileInp.files[0]);
+      }
+      if (srcInp && srcInp.files && srcInp.files[0]) {
+        srcB64 = await fileToBase64(srcInp.files[0]);
       }
       const res = await apiPost("/api/characters/save", {
         character: {
@@ -2574,11 +2720,12 @@
           videos_per_character: parseInt(document.getElementById("selEditCharVpc").value || "3", 10),
           appearance_en: document.getElementById("inpEditCharAppearance").value.trim(),
           uploaded_image_base64: b64 || undefined,
+          uploaded_source_image_base64: srcB64 || undefined,
         }
       });
       if (res && res.ok) {
         STATE.charLib = res;
-        closeModal("modalEditChar");
+        if (!keepOpen) closeModal("modalEditChar");
         renderCharactersTab();
         showCharVoiceBanner(`✅ Đã lưu nhân vật <b>${ck.toUpperCase()}</b> và gắn cố định giọng đọc!`);
       }
@@ -2649,8 +2796,31 @@
         : (curChar.appearance_en || "young Vietnamese woman, shoulder-length layered black hair, friendly smile");
       document.getElementById("genImgStatusText").textContent = "";
       document.getElementById("genImgResultBox").innerHTML = "";
+      const srcGen = document.getElementById("inpGenSourceImage");
+      if (srcGen) srcGen.value = "";
+      const srcPrev = document.getElementById("genSourcePreviewWrap");
+      if (srcPrev) srcPrev.innerHTML = "";
+      const newKeyInp = document.getElementById("inpGenNewCharKey");
+      if (newKeyInp) newKeyInp.value = "";
+      const autoApp = document.getElementById("chkGenAutoApply");
+      if (autoApp) autoApp.checked = (mode || "character_sheet") === "character_sheet";
       onGenModeOrTplChange();
       openModal("modalCharGenerator");
+    }
+
+    function onGenSourceImageChange(inp) {
+      const f = inp?.files?.[0];
+      const wrap = document.getElementById("genSourcePreviewWrap");
+      if (!wrap) return;
+      if (!f) { wrap.innerHTML = ""; return; }
+      const url = URL.createObjectURL(f);
+      wrap.innerHTML = `
+        <div style="display:flex; align-items:center; gap:8px; margin-top:6px; background:#090d16; padding:6px 8px; border-radius:8px; border:1px solid rgba(56,189,248,0.45);">
+          <img src="${url}" style="width:46px; height:46px; object-fit:cover; border-radius:6px;" />
+          <div style="font-size:11px; color:#bae6fd; flex:1;">✅ Đã chọn ảnh gốc: <b>${f.name}</b> — AI sẽ giữ đúng khuôn mặt này cho Character Sheet 6 góc!</div>
+          <button type="button" class="btn btn-xs btn-outline" onclick="document.getElementById('inpGenSourceImage').value=''; document.getElementById('genSourcePreviewWrap').innerHTML='';">✕ Xoá</button>
+        </div>
+      `;
     }
 
     function onGenModeOrTplChange() {
@@ -2684,39 +2854,63 @@
       const mode = document.getElementById("selGenMode").value;
       const model = document.getElementById("selGenModel").value;
       const tplId = document.getElementById("selGenSheetTemplate").value;
-      const charKey = document.getElementById("selGenCharKey").value;
+      const newKeyVal = (document.getElementById("inpGenNewCharKey")?.value || "").trim().toLowerCase();
+      const charKey = newKeyVal || document.getElementById("selGenCharKey").value;
       const pid = document.getElementById("inpGenPid").value.trim();
       const appearance = document.getElementById("inpGenAppearance").value.trim();
       const customPrompt = document.getElementById("inpGenFinalPrompt").value.trim();
-
-      document.getElementById("genImgStatusText").textContent = `⏳ Đang tạo ảnh bằng model ${model === 'chatgpt' ? 'ChatGPT Image (gpt-image-2)' : model === 'cliproxy_gemini' ? 'Gemini Image (CLIProxy)' : 'Nano Banana 2.1 (2K)'}...`;
-      const res = await apiPost("/api/characters/generate-image", {
-        mode,
-        model,
-        sheet_template_id: tplId,
-        char_key: charKey,
-        pid,
-        appearance_en: appearance,
-        custom_prompt: customPrompt,
-      });
-      if (!res || !res.ok) {
-        document.getElementById("genImgStatusText").textContent = `❌ Lỗi: ${(res && res.error) || 'Không tạo được ảnh'}`;
-        return;
+      const autoApply = document.getElementById("chkGenAutoApply") ? !!document.getElementById("chkGenAutoApply").checked : (mode === "character_sheet");
+      const srcInp = document.getElementById("inpGenSourceImage");
+      let sourceB64 = "";
+      if (srcInp && srcInp.files && srcInp.files[0]) {
+        sourceB64 = await fileToBase64(srcInp.files[0]);
       }
-      document.getElementById("genImgStatusText").textContent = `✅ Đã tạo thành công bằng ${res.model_used}!`;
-      document.getElementById("genImgResultBox").innerHTML = `
-        <div style="background:#090d16; border:1px solid #10b981; border-radius:8px; padding:10px; display:flex; gap:12px; align-items:center;">
-          <img src="/api/media?path=${encodeURIComponent(res.image_path)}" style="width:180px; max-height:220px; object-fit:contain; border-radius:6px; background:#000;" />
-          <div style="display:flex; flex-direction:column; gap:6px;">
-            <div style="font-weight:700; color:#34d399;">🎉 Ảnh mới đã được lưu!</div>
-            <div style="font-size:11px; color:var(--muted);">Đường dẫn: <code>${res.image_path}</code></div>
-            <div style="display:flex; gap:8px;">
-              <button class="btn btn-xs btn-success" onclick="openFolderEncoded('${encodeURIComponent(res.image_path)}')">📂 Mở File Trong Explorer</button>
+
+      STATE.charGenBusy = STATE.charGenBusy || {};
+      if (charKey) STATE.charGenBusy[charKey] = true;
+      renderCharactersTab();
+      document.getElementById("genImgStatusText").textContent = `⏳ Đang tạo ảnh${sourceB64 ? ' từ ảnh gốc' : ''} bằng model ${model === 'chatgpt' ? 'ChatGPT Image (gpt-image-2)' : model === 'cliproxy_gemini' ? 'Gemini Image (CLIProxy)' : 'Nano Banana 2.1 (2K)'}... (Có thể đóng popup làm việc khác!)`;
+      if (typeof toast === "function") {
+        toast(`⏳ Đang tạo ảnh AI cho ${(charKey || "nhân vật").toUpperCase()} chạy ngầm...`, "info");
+      }
+      try {
+        const res = await apiPost("/api/characters/generate-image", {
+          mode,
+          model,
+          sheet_template_id: tplId,
+          char_key: charKey,
+          pid,
+          appearance_en: appearance,
+          custom_prompt: customPrompt,
+          source_image_base64: sourceB64 || undefined,
+          auto_apply_to_char: autoApply,
+        });
+        if (!res || !res.ok) {
+          const errTxt = (res && res.error) || "Không tạo được ảnh";
+          document.getElementById("genImgStatusText").textContent = `❌ Lỗi: ${errTxt}`;
+          if (typeof toast === "function") toast(`❌ Tạo ảnh AI thất bại: ${errTxt}`, "err");
+          return;
+        }
+        document.getElementById("genImgStatusText").textContent = `✅ Đã tạo thành công bằng ${res.model_used}!`;
+        document.getElementById("genImgResultBox").innerHTML = `
+          <div style="background:#090d16; border:1px solid #10b981; border-radius:8px; padding:10px; display:flex; gap:12px; align-items:center;">
+            <img src="/api/media?path=${encodeURIComponent(res.image_path)}&t=${Date.now()}" style="width:180px; max-height:220px; object-fit:contain; border-radius:6px; background:#000;" />
+            <div style="display:flex; flex-direction:column; gap:6px;">
+              <div style="font-weight:700; color:#34d399;">🎉 Ảnh mới đã được lưu!</div>
+              <div style="font-size:11px; color:var(--muted);">Đường dẫn: <code>${res.image_path}</code></div>
+              <div style="display:flex; gap:8px;">
+                <button class="btn btn-xs btn-success" onclick="openFolderEncoded('${encodeURIComponent(res.image_path)}')">📂 Mở File Trong Explorer</button>
+              </div>
             </div>
           </div>
-        </div>
-      `;
-      await loadCharacterLibrary();
+        `;
+        if (typeof toast === "function") {
+          toast(`✅ Đã tạo & tự cập nhật ảnh AI cho ${(charKey || "nhân vật").toUpperCase()} (${res.model_used})!`, "ok");
+        }
+      } finally {
+        if (charKey && STATE.charGenBusy) delete STATE.charGenBusy[charKey];
+        await loadCharacterLibrary();
+      }
     }
 
     // ═══════════════════════════════════════════════════════════════════════

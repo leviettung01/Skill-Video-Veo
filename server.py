@@ -52,6 +52,7 @@ FINAL_VIDEOS_DIR = _sws.FINAL_VIDEOS_DIR
 _SWS_MTIME = 0.0
 _TM_MTIME = 0.0
 _PCB_MTIME = 0.0
+_CLM_MTIME = 0.0
 _FWE_MTIME = 0.0
 _FWE_MOD = None
 _TE_MTIME = 0.0
@@ -91,7 +92,7 @@ def _get_fwe():
 
 
 def _ensure_latest_sws():
-    global _SWS_MTIME, _TM_MTIME, _PCB_MTIME
+    global _SWS_MTIME, _TM_MTIME, _PCB_MTIME, _CLM_MTIME
     try:
         m = (PIPELINE_SCRIPTS_DIR / "sync_web_ui_state.py").stat().st_mtime
         if m != _SWS_MTIME:
@@ -111,6 +112,13 @@ def _ensure_latest_sws():
         if mp != _PCB_MTIME:
             importlib.reload(_pcb)
             _PCB_MTIME = mp
+    except Exception:
+        pass
+    try:
+        mc = (PIPELINE_SCRIPTS_DIR / "character_library_manager.py").stat().st_mtime
+        if mc != _CLM_MTIME:
+            importlib.reload(_clm)
+            _CLM_MTIME = mc
     except Exception:
         pass
     return _sws
@@ -148,6 +156,310 @@ def delete_final_video(pid: str, vkey: str = "", final_video_path: str = ""):
 
 def clean_product_rendered_cache(pid: str, also_delete_finals: bool = False):
     return _ensure_latest_sws().clean_product_rendered_cache(pid=pid, also_delete_finals=also_delete_finals)
+
+
+def delete_unfinished_variant(
+    pid: str,
+    vkey: str = "",
+    remove_variant: bool = False,
+    delete_project_if_single: bool = False,
+):
+    return _ensure_latest_sws().delete_unfinished_variant(
+        pid=pid,
+        vkey=vkey,
+        remove_variant=remove_variant,
+        delete_project_if_single=delete_project_if_single,
+    )
+
+
+def delete_project_safe(project_id: str) -> dict:
+    project_id = str(project_id or "").strip()
+    if not project_id or Path(project_id).name != project_id or project_id in (".", ".."):
+        return {"ok": False, "error": "Mã dự án không hợp lệ."}
+    try:
+        _esm.stop_running_pipeline(project_id)
+    except Exception:
+        pass
+    idx = core._load_projects_index()
+    extra_dirs = [
+        Path(str(p.get("project_dir") or ""))
+        for p in idx
+        if p.get("id") == project_id and str(p.get("project_dir") or "").strip()
+    ]
+    idx = [p for p in idx if p.get("id") != project_id]
+    core._save_projects_index(idx)
+    allowed_bases = [core.PROJECTS_DIR.resolve(), (SKILL_DIR / "fashion_motion_projects").resolve()]
+    cand_dirs = list(extra_dirs)
+    for base_dir in allowed_bases:
+        cand_dirs.append(base_dir / project_id)
+    for cand in cand_dirs:
+        try:
+            pdir = cand.resolve()
+            if any(pdir != b and pdir.is_relative_to(b) for b in allowed_bases) and pdir.is_dir():
+                shutil.rmtree(pdir, ignore_errors=True)
+        except Exception:
+            pass
+    try:
+        sync_web_ui(force=True)
+    except Exception:
+        pass
+    return {"ok": True, "project_id": project_id, "message": f"Đã xoá dự án {project_id}."}
+
+
+def retry_project_scene(body: dict) -> dict:
+    """
+    Chạy lại (Retry) 1 phân cảnh bị lỗi, 1 biến thể bị lỗi hoặc toàn bộ các cảnh lỗi của 1 dự án
+    trên mọi pipeline (#001-#003 Basic, proj_* Custom, #004 Fashion, #005 Cooking, #006+ Transform).
+    """
+    pid = str(body.get("project_id") or body.get("id") or "").strip()
+    vkey_in = str(body.get("vkey") or "").strip().lower()
+    scene_num = int(body.get("scene_number") or 0)
+    scene_id = str(body.get("scene_id") or "").strip()
+    retry_all_failed = bool(body.get("retry_all_failed", False))
+    if not pid or Path(pid).name != pid or pid in (".", ".."):
+        return {"ok": False, "error": "Mã dự án không hợp lệ."}
+
+    pdir = core.PROJECTS_DIR / pid
+    fashion_dir = SKILL_DIR / "fashion_motion_projects" / pid
+    ensure_captcha_solver_window_if_needed()
+
+    # 1. Transform #006+
+    if (pdir / "transform.json").is_file():
+        transform = _get_transform_engine()
+        if scene_num in (1, 2):
+            for fn in (f"scene_{scene_num}.mp4", "video_final.mp4"):
+                fp = pdir / fn
+                if fp.is_file():
+                    try:
+                        fp.unlink()
+                    except OSError:
+                        pass
+        else:
+            # Nếu retry toàn bộ lỗi -> xoá clip bị hỏng kích thước quá nhỏ và video_final cũ nếu chưa xong
+            for sn in (1, 2):
+                fp = pdir / f"scene_{sn}.mp4"
+                if fp.is_file() and fp.stat().st_size < 100_000:
+                    try:
+                        fp.unlink()
+                    except OSError:
+                        pass
+        res = transform.resume(pid, _RUNNER)
+        sync_web_ui(force=True)
+        return {
+            "ok": bool(res.get("ok")),
+            "project_id": pid,
+            "message": f"🔄 Đã xếp hàng chạy lại {'Cảnh ' + str(scene_num) if scene_num else 'các cảnh lỗi'} cho dự án Biến Hình {pid}!",
+            **res,
+        }
+
+    # 2. Fashion Motion #004
+    if (fashion_dir / "fashion_project.json").is_file():
+        import fashion_motion_control_engine as _fmce
+        with _FASHION_RUN_GUARD:
+            if pid in _FASHION_RUNNING:
+                return {"ok": False, "error": f"Dự án '{pid}' đang chạy; hãy bấm Dừng trước khi retry."}
+            _FASHION_RUNNING.add(pid)
+        target_sid = scene_id
+        if not target_sid and scene_num > 0:
+            try:
+                fproj = json.loads((fashion_dir / "fashion_project.json").read_text(encoding="utf-8"))
+                scs = fproj.get("scenes") or []
+                if 1 <= scene_num <= len(scs):
+                    target_sid = str(scs[scene_num - 1].get("id") or f"s{scene_num}")
+            except Exception:
+                target_sid = f"s{scene_num}"
+
+        def _bg_fashion_retry():
+            try:
+                if target_sid and not retry_all_failed:
+                    _fmce.run_single_fashion_motion_scene_on_flow(pid, target_sid)
+                else:
+                    _fmce.retry_failed_fashion_scenes_on_flow(pid)
+            except Exception as exc:
+                print(f"[RETRY-FASHION-ERR] {pid}: {exc}", flush=True)
+            finally:
+                with _FASHION_RUN_GUARD:
+                    _FASHION_RUNNING.discard(pid)
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_bg_fashion_retry, daemon=True).start()
+        sync_web_ui(force=True)
+        return {
+            "ok": True,
+            "async": True,
+            "project_id": pid,
+            "message": f"🔄 Đang chạy lại {'Cảnh ' + str(target_sid) if target_sid else 'toàn bộ cảnh lỗi'} dự án Thời Trang {pid}!",
+        }
+
+    # 3. Cooking POV #005
+    if (pdir / "cooking_manifest.json").is_file():
+        import cooking_storyboard_engine as cooking
+        if scene_num > 0:
+            for pat in (f"cooking_s{scene_num}.mp4", f"cooking_s{scene_num}_*.mp4"):
+                for fp in pdir.glob(pat):
+                    try:
+                        fp.unlink()
+                    except OSError:
+                        pass
+            for fp in (pdir / "video_final.mp4", FINAL_VIDEOS_DIR / f"{pid}_pov.mp4", FINAL_VIDEOS_DIR / f"{pid}_final.mp4"):
+                if fp.is_file():
+                    try:
+                        fp.unlink()
+                    except OSError:
+                        pass
+        res = cooking.launch_stage(pid, "auto")
+        sync_web_ui(force=True)
+        return {
+            "ok": True,
+            "project_id": pid,
+            "message": f"🔄 Đã khởi chạy lại {'Cảnh ' + str(scene_num) if scene_num else 'các cảnh lỗi'} cho dự án Nấu Ăn POV {pid}!",
+            **(res if isinstance(res, dict) else {}),
+        }
+
+    # 4. Basic #001-#003 (`prompts.json`)
+    if (pdir / "prompts.json").is_file():
+        sws_mod = _ensure_latest_sws()
+        vk_short = sws_mod.CHAR_V_TO_VKEY.get(vkey_in, vkey_in) if vkey_in else ""
+        char_v = sws_mod.get_char_v_code(vk_short) if vk_short else ""
+        keys_match = {k for k in (vkey_in, vk_short, char_v) if k}
+
+        # Xoá đánh dấu huỷ trước đó (nếu người dùng từng bấm dừng)
+        try:
+            cancel_file = SKILL_DIR / "flow_final_pipeline" / "cancelled_batch_pids.json"
+            if cancel_file.is_file():
+                c_list = json.loads(cancel_file.read_text(encoding="utf-8"))
+                if isinstance(c_list, list) and pid in c_list:
+                    cancel_file.write_text(json.dumps([x for x in c_list if x != pid], ensure_ascii=False, indent=2), encoding="utf-8")
+        except Exception:
+            pass
+        if (pdir / ".cleaned_new").is_file():
+            try:
+                (pdir / ".cleaned_new").unlink()
+            except OSError:
+                pass
+
+        # Dọn file clip lỗi/cảnh cần retry + xoá scene_errors & trạng thái submitted cũ của cảnh đó
+        st_path = pdir / "flow_state.json"
+        st_data = {}
+        if st_path.is_file():
+            try:
+                st_data = json.loads(st_path.read_text(encoding="utf-8"))
+            except Exception:
+                st_data = {}
+
+        removed_clips = []
+        if keys_match and scene_num > 0:
+            for k_it in keys_match:
+                for fp in pdir.glob(f"{k_it}_s{scene_num}.mp4*"):
+                    try:
+                        fp.unlink()
+                        removed_clips.append(fp.name)
+                    except OSError:
+                        pass
+            for fp in (FINAL_VIDEOS_DIR / f"{pid}_{char_v}.mp4", pdir / f"{pid}_{char_v}.mp4"):
+                if fp.is_file():
+                    try:
+                        fp.unlink()
+                    except OSError:
+                        pass
+            for sec in ("scene_errors", "submitted", "scene_jobs"):
+                if isinstance(st_data.get(sec), dict):
+                    for k_del in list(st_data[sec].keys()):
+                        kl = str(k_del).lower()
+                        if any(kl.startswith(f"{km}_s{scene_num}") or kl == f"{km}_ffmpeg" for km in keys_match):
+                            st_data[sec].pop(k_del, None)
+            if isinstance(st_data.get("built_finals"), list):
+                st_data["built_finals"] = [x for x in st_data["built_finals"] if str(x).lower() not in keys_match]
+        elif keys_match:
+            # Retry toàn bộ các cảnh chưa xong/lỗi của biến thể vkey
+            for sec in ("scene_errors", "submitted", "scene_jobs"):
+                if isinstance(st_data.get(sec), dict):
+                    for k_del in list(st_data[sec].keys()):
+                        kl = str(k_del).lower()
+                        if any(kl.startswith(km + "_") or kl == km for km in keys_match):
+                            st_data[sec].pop(k_del, None)
+            for k_it in keys_match:
+                for fp in pdir.glob(f"{k_it}_s*.mp4*"):
+                    if fp.stat().st_size < 50_000 or fp.name.endswith(".tmp"):
+                        try:
+                            fp.unlink()
+                            removed_clips.append(fp.name)
+                        except OSError:
+                            pass
+            if isinstance(st_data.get("built_finals"), list):
+                st_data["built_finals"] = [x for x in st_data["built_finals"] if str(x).lower() not in keys_match]
+        else:
+            # Retry toàn bộ cảnh lỗi của cả dự án
+            if isinstance(st_data.get("scene_errors"), dict):
+                st_data["scene_errors"].clear()
+            for fp in pdir.glob("*.mp4.720p.tmp"):
+                try:
+                    fp.unlink()
+                except OSError:
+                    pass
+
+        if st_data:
+            try:
+                st_path.write_text(json.dumps(st_data, ensure_ascii=False, indent=2), encoding="utf-8")
+            except Exception:
+                pass
+
+        spawn_res = _pcb.enqueue_or_spawn_mt_pipeline([pid])
+        sync_web_ui(force=True)
+        pid_os = int(spawn_res[0] or 0) if isinstance(spawn_res, tuple) else int((spawn_res or {}).get("pid_os") or 0)
+        return {
+            "ok": True,
+            "project_id": pid,
+            "vkey": vk_short,
+            "scene_number": scene_num,
+            "removed_clips": removed_clips,
+            "pid_os": pid_os,
+            "message": f"🔄 Đã kích hoạt chạy lại {'Cảnh ' + str(scene_num) + ' (' + char_v.upper() + ')' if (scene_num and char_v) else (char_v.upper() if char_v else 'các cảnh lỗi')} cho dự án {pid}!",
+        }
+
+    # 5. Custom project (`proj_*` / `project.json`)
+    if (pdir / "project.json").is_file():
+        pj_path = pdir / "project.json"
+        pj = json.loads(pj_path.read_text(encoding="utf-8"))
+        only_prod_ids = []
+        for pr in pj.get("products") or []:
+            p_vk = str(pr.get("vkey") or pr.get("id") or "").lower()
+            if vkey_in and vkey_in not in (p_vk, str(pr.get("id") or "").lower()):
+                continue
+            changed = False
+            for sc in pr.get("scenes") or []:
+                s_num = int(sc.get("scene_number") or 0)
+                if (scene_num > 0 and s_num == scene_num) or (scene_num == 0 and sc.get("status") != "done"):
+                    sc["status"] = "pending"
+                    sc["error_msg"] = ""
+                    sc["video_path"] = ""
+                    changed = True
+            if changed or pr.get("status") in ("failed", "stopped"):
+                pr["status"] = "queued"
+                pr["error_msg"] = ""
+                pr["final_video_path"] = ""
+                only_prod_ids.append(pr.get("id"))
+        pj_path.write_text(json.dumps(pj, ensure_ascii=False, indent=2), encoding="utf-8")
+
+        def _bg_custom_retry():
+            try:
+                _RUNNER.run_project_batch(project_id=pid, only_products=only_prod_ids or None)
+            except Exception as exc:
+                print(f"[RETRY-CUSTOM-ERR] {pid}: {exc}", flush=True)
+            finally:
+                try:
+                    sync_web_ui(force=True)
+                except Exception:
+                    pass
+
+        threading.Thread(target=_bg_custom_retry, daemon=True).start()
+        sync_web_ui(force=True)
+        return {"ok": True, "project_id": pid, "message": f"🔄 Đang chạy lại các cảnh lỗi của dự án {pid}!"}
+
+    return {"ok": False, "error": f"Không tìm thấy dữ liệu dự án '{pid}' để chạy lại."}
 
 PORT = 8456
 STATIC_DIR = SKILL_DIR / "static"
@@ -1686,6 +1998,16 @@ class SkillWebHandler(BaseHTTPRequestHandler):
                 self._send_json({"ok": False, "error": str(e)})
             return
 
+        if path == "/api/mcp/status":
+            import mcp_bridge_service as _mcp
+            cur_port = getattr(self.server, "server_port", PORT)
+            self._send_json(_mcp.get_mcp_ui_status(port=cur_port))
+            return
+
+        if path == "/mcp":
+            self._send_json({"ok": False, "error": "Use HTTP POST /mcp with JSON-RPC 2.0 and Authorization: Bearer <token>."}, 405)
+            return
+
         if path == "/api/studio/overview":
             char_st = _clm.get_character_library_state() if _clm else {"characters": [], "voices_list": []}
             prods_st = _pcb.list_all_products_store() if _pcb else {"products": []}
@@ -1717,7 +2039,50 @@ class SkillWebHandler(BaseHTTPRequestHandler):
     def _do_POST_inner(self):
         parsed = urllib.parse.urlparse(self.path)
         path = parsed.path
+
+        if path == "/mcp":
+            import mcp_bridge_service as _mcp
+            n_len = int(self.headers.get("Content-Length") or 0)
+            raw_mcp = self.rfile.read(n_len) if n_len > 0 else b""
+            client_ip = (self.client_address[0] if self.client_address else "127.0.0.1")
+            code, resp_obj = _mcp.handle_mcp_http_request(
+                raw_mcp,
+                dict(self.headers.items()),
+                client_host=client_ip,
+                ctx={
+                    "runner": _RUNNER,
+                    "retry_scene_fn": retry_project_scene,
+                    "delete_project_fn": delete_project_safe,
+                    "get_transform_fn": _get_transform_engine,
+                },
+            )
+            if code == 202 and not resp_obj:
+                self.send_response(202)
+                self.send_header("Content-Length", "0")
+                self.end_headers()
+                return
+            self._send_json(resp_obj, code)
+            return
+
         body = self._read_json_body()
+
+        if path == "/api/mcp/toggle":
+            import mcp_bridge_service as _mcp
+            res = _mcp.set_mcp_enabled(bool(body.get("enabled")))
+            self._send_json(res, 200 if res.get("ok") else 403)
+            return
+
+        if path == "/api/mcp/rotate-token":
+            import mcp_bridge_service as _mcp
+            res = _mcp.rotate_mcp_token()
+            self._send_json(res, 200 if res.get("ok") else 403)
+            return
+
+        if path == "/api/mcp/install-grant":
+            import mcp_bridge_service as _mcp
+            res = _mcp.install_mcp_grant_key(str(body.get("grant_key") or ""))
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
 
         if path == "/api/transform/start":
             transform = _get_transform_engine()
@@ -2046,6 +2411,11 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             res = _esm.stop_running_pipeline(pid)
             sync_web_ui(force=True)
             self._send_json(res)
+            return
+
+        if path == "/api/projects/retry-scene":
+            res = retry_project_scene(body)
+            self._send_json(res, 200 if res.get("ok") else 400)
             return
 
         if path == "/api/settings/save":
@@ -2987,6 +3357,20 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             self._send_json(res)
             return
 
+        if path == "/api/videos/delete-variant":
+            pid = (body.get("project_id") or "").strip()
+            vkey = (body.get("vkey") or "").strip()
+            remove_var = bool(body.get("remove_variant", False))
+            del_single = bool(body.get("delete_project_if_single", False))
+            res = delete_unfinished_variant(
+                pid=pid,
+                vkey=vkey,
+                remove_variant=remove_var,
+                delete_project_if_single=del_single,
+            )
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
         if path == "/api/projects/clean-render":
             pid = (body.get("project_id") or "").strip()
             also_del_finals = bool(body.get("also_delete_finals", False))
@@ -3021,27 +3405,8 @@ class SkillWebHandler(BaseHTTPRequestHandler):
 
         if path == "/api/projects/delete":
             project_id = str(body.get("project_id") or "").strip()
-            idx = core._load_projects_index()
-            extra_dirs = [
-                Path(str(p.get("project_dir") or ""))
-                for p in idx
-                if p.get("id") == project_id and str(p.get("project_dir") or "").strip()
-            ]
-            idx = [p for p in idx if p.get("id") != project_id]
-            core._save_projects_index(idx)
-            allowed_bases = [core.PROJECTS_DIR.resolve(), (SKILL_DIR / "fashion_motion_projects").resolve()]
-            cand_dirs = list(extra_dirs)
-            if project_id and Path(project_id).name == project_id and project_id not in (".", ".."):
-                for base_dir in allowed_bases:
-                    cand_dirs.append(base_dir / project_id)
-            for cand in cand_dirs:
-                try:
-                    pdir = cand.resolve()
-                    if any(pdir != b and pdir.is_relative_to(b) for b in allowed_bases) and pdir.is_dir():
-                        shutil.rmtree(pdir, ignore_errors=True)
-                except Exception:
-                    pass
-            self._send_json({"ok": True})
+            res = delete_project_safe(project_id)
+            self._send_json(res, 200 if res.get("ok") else 400)
             return
 
         if path == "/api/open-folder":
@@ -3756,7 +4121,19 @@ class SkillWebHandler(BaseHTTPRequestHandler):
             return
 
         if path == "/api/characters/generate-image":
+            _ensure_latest_sws()
+            if str(body.get("model") or "nano_banana").lower() == "nano_banana":
+                ensure_captcha_solver_window_if_needed()
             res = _clm.generate_character_or_product_image(body)
+            self._send_json(res, 200 if res.get("ok") else 400)
+            return
+
+        if path == "/api/characters/sync-flow":
+            _ensure_latest_sws()
+            ensure_captcha_solver_window_if_needed()
+            ck = str(body.get("char_key") or "").strip()
+            tp = str(body.get("target_profile") or "").strip()
+            res = _clm.sync_character_to_google_flow(ck, tp)
             self._send_json(res, 200 if res.get("ok") else 400)
             return
 
@@ -3797,8 +4174,13 @@ def main():
     parser.add_argument("--port", type=int, default=PORT)
     parser.add_argument("--no-browser", action="store_true", help="Không tự mở cửa sổ Microsoft Edge App")
     parser.add_argument("--restart", action="store_true", help="Tắt server cũ trên port này và khởi động lại")
+    parser.add_argument("--mcp-stdio", action="store_true", help="Chạy cầu nối MCP Stdio cho AI Agent (Claude/Codex/Gemini)")
     parser.add_argument("--on-default-desktop", action="store_true", help=argparse.SUPPRESS)
     args = parser.parse_args()
+
+    if args.mcp_stdio:
+        import mcp_stdio_proxy
+        raise SystemExit(mcp_stdio_proxy.run_stdio_proxy(url=f"http://127.0.0.1:{args.port}/mcp"))
 
     try:
         gfa.cleanup_hidden_desktop_windows()

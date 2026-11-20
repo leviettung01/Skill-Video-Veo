@@ -273,18 +273,47 @@ def main():
         print("WARN copying to final_videos:", e)
 
     # Auto-generate AI Thumbnail & inject 0.1s intro frame into Final Video
-    if _esm is not None and auto_gen_thumb and not skip_auto_thumb:
+    if _esm is not None and (inject_existing_thumb_only or (auto_gen_thumb and not skip_auto_thumb)):
         try:
             pid_dir = os.path.basename(base)
             spec_bname = os.path.basename(spec_path)
             m_vk = re.match(r"^spec_(.+)\.json$", spec_bname, re.I)
             vkey_str = m_vk.group(1) if m_vk else "v1"
+            char_v_sp = str(spec.get("char_v") or "").strip()
+            if not char_v_sp:
+                out_stem = os.path.splitext(out_rel)[0]
+                if out_stem.startswith(f"{pid_dir}_"):
+                    char_v_sp = out_stem[len(pid_dir) + 1:]
+            if not char_v_sp:
+                try:
+                    import sync_web_ui_state as _sws_bf
+                    char_v_sp = _sws_bf.get_char_v_code(vkey_str, str(spec.get("character") or "nv1"))
+                except Exception:
+                    char_key_sp = str(spec.get("character") or "nv1")
+                    char_v_sp = vkey_str if re.match(r"^nv\d+_v\d+$", vkey_str.lower()) else f"{char_key_sp}_{vkey_str}"
             if inject_existing_thumb_only:
-                char_key_sp = str(spec.get("character") or "nv1")
-                char_v_sp = vkey_str if re.match(r"^nv\d+_v\d+$", vkey_str.lower()) else f"{char_key_sp}_{vkey_str}"
                 ex_th = _esm.get_variant_thumbnail_path(pid_dir, char_v_sp)
-                if ex_th and auto_inject_01s and os.path.isfile(dst_central):
-                    _esm.inject_thumbnail_01s_into_video(dst_central, ex_th)
+                if (not ex_th or not os.path.isfile(ex_th)) and auto_gen_thumb:
+                    res_fb = _esm.generate_thumbnail_for_variant(
+                        pid=pid_dir,
+                        vkey=vkey_str,
+                        inject_01s=False,
+                        prefer_existing_ref=True,
+                    )
+                    if res_fb.get("ok"):
+                        ex_th = str(res_fb.get("thumbnail_path") or res_fb.get("project_thumbnail_path") or "").strip()
+                if ex_th and os.path.isfile(ex_th) and os.path.isfile(dst_central):
+                    if auto_inject_01s:
+                        dur_01s_bf = float((_esm.load_engine_settings() or {}).get("thumbnail_duration_sec") or 0.1)
+                        inj_bf = _esm.inject_thumbnail_01s_into_video(dst_central, ex_th, duration_sec=dur_01s_bf)
+                        if inj_bf and inj_bf.get("ok"):
+                            print(f"THUMB_INJECT_OK: {ex_th} (duration={dur_01s_bf}s)")
+                    try:
+                        sidecar_th = os.path.splitext(dst_central)[0] + "_thumb.jpg"
+                        if os.path.abspath(sidecar_th) != os.path.abspath(ex_th):
+                            shutil.copy2(ex_th, sidecar_th)
+                    except Exception:
+                        pass
             else:
                 res_th = _esm.generate_thumbnail_for_variant(
                     pid=pid_dir,
@@ -293,7 +322,15 @@ def main():
                     prefer_existing_ref=True,
                 )
                 if res_th.get("ok"):
-                    print(f"THUMB_OK: {res_th.get('thumbnail_path')} (injected_01s={res_th.get('injected_01s')})")
+                    th_p = str(res_th.get("thumbnail_path") or res_th.get("project_thumbnail_path") or "").strip()
+                    if th_p and os.path.isfile(th_p) and os.path.isfile(dst_central):
+                        try:
+                            sidecar_th = os.path.splitext(dst_central)[0] + "_thumb.jpg"
+                            if os.path.abspath(sidecar_th) != os.path.abspath(th_p):
+                                shutil.copy2(th_p, sidecar_th)
+                        except Exception:
+                            pass
+                    print(f"THUMB_OK: {th_p} (injected_01s={res_th.get('injected_01s')})")
         except Exception as th_err:
             print("WARN generating/injecting thumbnail:", th_err)
 

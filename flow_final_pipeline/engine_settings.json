@@ -1,10 +1,7 @@
 {
   "multi_account_enabled": true,
-  "selected_flow_profile": "flow_acc_4",
-  "selected_flow_profiles": [
-    "flow_acc_4",
-    "flow_acc_6"
-  ],
+  "selected_flow_profile": "",
+  "selected_flow_profiles": [],
   "flow_concurrency_mode": "max",
   "auto_flow_concurrency": true,
   "flow_video_model": "Omni 1.2 Flash",

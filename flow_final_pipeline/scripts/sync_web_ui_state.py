@@ -109,6 +109,18 @@ def _hotpatch_live_modules():
             except Exception:
                 pass
 
+    for mod_name in ("character_library_manager", "flow_final_pipeline.scripts.character_library_manager"):
+        clm_mod = sys.modules.get(mod_name)
+        clm_file = here.parent / "character_library_manager.py"
+        if clm_mod is not None and clm_file.is_file():
+            try:
+                mtime = clm_file.stat().st_mtime
+                if cache.get(f"clm:{mod_name}") != mtime:
+                    importlib.reload(clm_mod)
+                    cache[f"clm:{mod_name}"] = mtime
+            except Exception:
+                pass
+
     gvt_mod = sys.modules.get("grok_video_tool")
     gvt_file = root_dir / "grok_video_tool.py"
     if gvt_mod is not None and gvt_file.is_file():
@@ -508,6 +520,209 @@ def clean_product_rendered_cache(pid: str, also_delete_finals: bool = False) -> 
     }
 
 
+def delete_unfinished_variant(
+    pid: str,
+    vkey: str = "",
+    remove_variant: bool = False,
+    delete_project_if_single: bool = False,
+) -> dict:
+    """
+    Xoá sạch 1 video/biến thể đang làm dở hoặc bị lỗi (hỗ trợ cả Basic #001-#003, Custom proj_*, Fashion #004, Cooking #005, Biến hình #006+).
+    - Với dự án 1 video (#004/#005/#006+): dừng tiến trình nếu đang chạy; nếu `delete_project_if_single=True` sẽ xoá hẳn dự án dở dang,
+      ngược lại dọn sạch file render dở để tạo lại sạch sẽ.
+    - Với dự án nhiều biến thể (#001-#003 / proj_*): chỉ xoá file dở của đúng biến thể `vkey` (và xoá khỏi `prompts.json` nếu `remove_variant=True`).
+    """
+    pid = str(pid or "").strip()
+    if not pid or os.path.basename(pid) != pid or pid in (".", ".."):
+        return {"ok": False, "error": "Mã dự án không hợp lệ."}
+    pdir = os.path.join(PROJECTS_DIR, pid)
+    fashion_dir = os.path.join(WORKSPACE, "fashion_motion_projects", pid)
+    if not os.path.isdir(pdir) and not os.path.isdir(fashion_dir):
+        return {"ok": False, "error": f"Không tìm thấy dự án: {pid}"}
+
+    is_transform = os.path.isfile(os.path.join(pdir, "transform.json"))
+    is_cooking = os.path.isfile(os.path.join(pdir, "cooking_manifest.json"))
+    is_fashion = os.path.isfile(os.path.join(fashion_dir, "fashion_project.json"))
+
+    if is_transform or is_cooking or is_fashion:
+        if _esm is not None and hasattr(_esm, "stop_running_pipeline"):
+            try:
+                _esm.stop_running_pipeline(pid)
+            except Exception:
+                pass
+        if delete_project_if_single:
+            for d_rm in (pdir, fashion_dir):
+                if os.path.isdir(d_rm):
+                    shutil.rmtree(d_rm, ignore_errors=True)
+            for pat in (f"{pid}_*.mp4", f"{pid}_*_thumb.jpg", f"{pid}-*.mp4"):
+                for fp in glob.glob(os.path.join(FINAL_VIDEOS_DIR, pat)):
+                    try:
+                        os.remove(fp)
+                    except OSError:
+                        pass
+            sync_web_ui(force=True)
+            return {"ok": True, "pid": pid, "deleted_project": True, "message": f"Đã xoá hẳn dự án dở dang {pid}."}
+
+        if is_transform:
+            removed = 0
+            for fn in ("product_2k.jpg", "before_2k.jpg", "reveal_2k.jpg", "scene_1.mp4", "scene_2.mp4", "video_final.mp4"):
+                fp = os.path.join(pdir, fn)
+                if os.path.isfile(fp):
+                    try:
+                        os.remove(fp)
+                        removed += 1
+                    except OSError:
+                        pass
+            for fp in glob.glob(os.path.join(pdir, "thumbnails", "*")):
+                try:
+                    os.remove(fp)
+                    removed += 1
+                except OSError:
+                    pass
+            tj = os.path.join(pdir, "transform.json")
+            try:
+                st = json.load(open(tj, "r", encoding="utf-8"))
+                st["status"] = "stopped"
+                st["message"] = "Đã xoá file render dở. Bấm Chạy Đa Luồng để tạo lại từ đầu."
+                st["final"] = ""
+                st["thumbnail"] = ""
+                st["thumbnail_path"] = ""
+                char_in = os.path.join(pdir, "character_input.jpg")
+                st["refs"] = {"character": st["refs"]["character"]} if (os.path.isfile(char_in) and isinstance(st.get("refs"), dict) and "character" in st["refs"]) else {}
+                for sc in st.get("scenes") or []:
+                    sc.pop("video_path", None)
+                with open(tj, "w", encoding="utf-8") as wf:
+                    json.dump(st, wf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+            sync_web_ui(force=True)
+            return {"ok": True, "pid": pid, "removed_count": removed, "message": f"Đã xoá {removed} file render dở của dự án {pid}."}
+
+        return clean_product_rendered_cache(pid, also_delete_finals=True)
+
+    # Multi-variant Basic (#001-#003) hoặc Custom (proj_*)
+    vk_raw = str(vkey or "").strip().lower()
+    if not vk_raw:
+        return clean_product_rendered_cache(pid, also_delete_finals=True)
+
+    vk_short = CHAR_V_TO_VKEY.get(vk_raw, vk_raw)
+    char_v = get_char_v_code(vk_short)
+    keys_match = {vk_raw, vk_short, char_v}
+    removed_files = []
+
+    patterns_pdir = []
+    for k_it in keys_match:
+        patterns_pdir.extend([
+            f"{k_it}-refimg.*",
+            f"ref_{k_it}.*",
+            f"{k_it}_s*.mp4",
+            f"{k_it}_s*.mp4.*",
+            f"{k_it}-s*.mp4",
+            f"{k_it}-final-30s.mp4",
+            f"spec_{k_it}.json",
+            f"_tmp_*{k_it}*",
+            f"_norm_*{k_it}*",
+            f"{pid}_{k_it}.mp4",
+            f"{pid}_{k_it}_thumb.jpg",
+        ])
+    for pat in patterns_pdir:
+        for fp in glob.glob(os.path.join(pdir, pat)):
+            if os.path.isfile(fp):
+                try:
+                    os.remove(fp)
+                    removed_files.append(fp)
+                except OSError:
+                    pass
+    for tdir in (os.path.join(pdir, "thumbnails"), os.path.join(WORKSPACE, "thumbnails"), FINAL_VIDEOS_DIR):
+        if os.path.isdir(tdir):
+            for k_it in keys_match:
+                for pat in (f"{pid}_{k_it}.mp4", f"{pid}_{k_it}_thumb*.jpg", f"{pid}-{k_it}-final-30s.mp4"):
+                    for fp in glob.glob(os.path.join(tdir, pat)):
+                        if os.path.isfile(fp):
+                            try:
+                                os.remove(fp)
+                                removed_files.append(fp)
+                            except OSError:
+                                pass
+
+    # Dọn trạng thái lỗi / submitted cũ trong flow_state.json và flow_refs_state.json
+    st_path = os.path.join(pdir, "flow_state.json")
+    if os.path.isfile(st_path):
+        try:
+            with open(st_path, "r", encoding="utf-8") as rf:
+                st_data = json.load(rf)
+            for sec in ("scene_errors", "submitted", "scene_jobs", "uploaded_refs"):
+                if isinstance(st_data.get(sec), dict):
+                    for k_del in list(st_data[sec].keys()):
+                        kl = str(k_del).lower()
+                        if any(kl.startswith(km + "_") or kl.startswith(km + "-") or kl == km for km in keys_match):
+                            st_data[sec].pop(k_del, None)
+            if isinstance(st_data.get("built_finals"), list):
+                st_data["built_finals"] = [x for x in st_data["built_finals"] if str(x).lower() not in keys_match]
+            with open(st_path, "w", encoding="utf-8") as wf:
+                json.dump(st_data, wf, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    refs_st_path = os.path.join(pdir, "flow_refs_state.json")
+    if os.path.isfile(refs_st_path):
+        try:
+            rs_data = json.load(open(refs_st_path, "r", encoding="utf-8"))
+            if isinstance(rs_data.get("variants"), dict):
+                for km in keys_match:
+                    rs_data["variants"].pop(km, None)
+            with open(refs_st_path, "w", encoding="utf-8") as wf:
+                json.dump(rs_data, wf, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    if remove_variant:
+        prompts_path = os.path.join(pdir, "prompts.json")
+        if os.path.isfile(prompts_path):
+            try:
+                pdata = json.load(open(prompts_path, "r", encoding="utf-8"))
+                vids = pdata.get("videos") or {}
+                for km in keys_match:
+                    vids.pop(km, None)
+                with open(prompts_path, "w", encoding="utf-8") as wf:
+                    json.dump(pdata, wf, ensure_ascii=False, indent=2)
+            except Exception:
+                pass
+
+    proj_json = os.path.join(pdir, "project.json")
+    if str(pid).startswith("proj_") and os.path.isfile(proj_json):
+        try:
+            pj = json.load(open(proj_json, "r", encoding="utf-8"))
+            prods = pj.get("products") or []
+            if remove_variant:
+                pj["products"] = [p for p in prods if str(p.get("vkey") or p.get("id") or "").lower() not in keys_match]
+            else:
+                for p in prods:
+                    if str(p.get("vkey") or p.get("id") or "").lower() in keys_match:
+                        p["status"] = "queued"
+                        p["error_msg"] = ""
+                        p["final_video_path"] = ""
+                        for sc in p.get("scenes") or []:
+                            sc["status"] = "pending"
+                            sc["error_msg"] = ""
+                            sc["video_path"] = ""
+            with open(proj_json, "w", encoding="utf-8") as wf:
+                json.dump(pj, wf, ensure_ascii=False, indent=2)
+        except Exception:
+            pass
+
+    sync_web_ui(force=True)
+    return {
+        "ok": True,
+        "pid": pid,
+        "vkey": vk_short,
+        "char_v": char_v,
+        "removed_count": len(removed_files),
+        "removed_variant": bool(remove_variant),
+        "message": f"Đã xoá {len(removed_files)} file dở dang của biến thể {char_v.upper()}.",
+    }
+
+
 def _parse_ts_value(val, default: float = 0.0) -> float:
     if isinstance(val, (int, float)):
         return float(val) if val > 0 else default
@@ -900,6 +1115,8 @@ def _sync_web_ui_locked(force: bool = True):
                         "character_sheet_path": char_sheet_abs if os.path.exists(char_sheet_abs) else "",
                         "status": sc_ui_status,
                         "error_msg": "" if s_done else s_err_msg,
+                        "is_retrying": bool((not s_done) and s_err_msg and not s_is_terminal_fail),
+                        "is_terminal_error": bool((not s_done) and s_is_terminal_fail),
                     })
 
                 if final_exists:

@@ -22,6 +22,9 @@ browser_settings/
 locks/
 data/google_flow_grok/
 data/captcha-bridge.secret
+data/mcp_state.json
+data/mcp_license.json
+data/mcp_audit.jsonl
 data/projects/
 data/tiktok_crawler/profiles/
 data/tiktok_crawler/tiktok_chrome_profile/
@@ -61,6 +64,8 @@ Thumbs.db
 *.zip
 logs/
 flow_final_pipeline/active_mt_runner.json
+flow_final_pipeline/cancelled_batch_pids.json
+flow_final_pipeline/pending_batch_pids.json
 
 # Local runtime fashion custom library, QA leftover images & scratch scripts
 data/fashion_templates_cache/custom_fashion_library.json

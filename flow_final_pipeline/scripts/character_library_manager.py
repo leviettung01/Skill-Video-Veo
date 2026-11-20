@@ -18,7 +18,8 @@ import shutil
 import random
 import urllib.request
 
-WS_DIR = os.path.abspath(os.path.join(os.path.dirname(__file__), "..", ".."))
+SCRIPTS_DIR = os.path.dirname(os.path.abspath(__file__))
+WS_DIR = os.path.abspath(os.path.join(SCRIPTS_DIR, "..", ".."))
 WORKSPACE_DIR = WS_DIR
 PIPELINE_DIR = os.path.join(WS_DIR, "flow_final_pipeline")
 CHARS_DIR = os.path.join(PIPELINE_DIR, "characters")
@@ -322,6 +323,7 @@ def get_character_library_state() -> dict:
         item = dict(cval)
         item["key"] = ck
         item["ref_image_abs"] = abs_img
+        item["ref_image_mtime"] = int(os.path.getmtime(abs_img)) if (abs_img and os.path.isfile(abs_img)) else 0
 
         rel_bed = cval.get("bedroom_ref_file", "")
         abs_bed = os.path.join(PIPELINE_DIR, rel_bed.replace("/", os.sep)) if rel_bed else ""
@@ -403,6 +405,27 @@ def build_voice_prompt_en(gender: str, region: str, tone_style: str, speed_wpm: 
         f"Keep the same female voice, pitch, accent, loudness, speaking speed and emotional style across every clip. "
         f"No announcer voice, no radio voice, no singing, no whispering, no shouting, no male resonance, no English accent, no robotic delivery."
     )
+
+
+def _save_base64_image_to_jpg(b64_img: str, out_abs: str) -> str:
+    """Decode base64 data URI (JPG/PNG/WebP) and save as clean RGB JPEG."""
+    raw_b64 = str(b64_img or "").strip()
+    if not raw_b64:
+        return ""
+    if "," in raw_b64:
+        raw_b64 = raw_b64.split(",", 1)[1]
+    raw_bytes = base64.b64decode(raw_b64)
+    os.makedirs(os.path.dirname(os.path.abspath(out_abs)), exist_ok=True)
+    try:
+        import io as _io
+        from PIL import Image as _PILImage, ImageOps as _PILImageOps
+        with _PILImage.open(_io.BytesIO(raw_bytes)) as im:
+            im = _PILImageOps.exif_transpose(im).convert("RGB")
+            im.save(out_abs, format="JPEG", quality=95)
+    except Exception:
+        with open(out_abs, "wb") as f:
+            f.write(raw_bytes)
+    return out_abs
 
 
 def save_character_library_settings(payload: dict) -> dict:
@@ -499,14 +522,21 @@ def save_character_library_settings(payload: dict) -> dict:
 
         b64_img = char_obj.get("uploaded_image_base64")
         if b64_img:
-            if "," in b64_img:
-                b64_img = b64_img.split(",", 1)[1]
-            raw_bytes = base64.b64decode(b64_img)
             out_fn = f"{ck}_ref.jpg"
             out_abs = os.path.join(CHARS_DIR, out_fn)
-            with open(out_abs, "wb") as f:
-                f.write(raw_bytes)
+            _save_base64_image_to_jpg(b64_img, out_abs)
             cur["ref_image_file"] = f"characters/{out_fn}"
+
+        b64_src = char_obj.get("uploaded_source_image_base64")
+        if b64_src:
+            src_fn = f"{ck}_source.jpg"
+            src_abs = os.path.join(CHARS_DIR, src_fn)
+            _save_base64_image_to_jpg(b64_src, src_abs)
+            cur["source_image_file"] = f"characters/{src_fn}"
+            if not cur.get("ref_image_file"):
+                out_fn = f"{ck}_ref.jpg"
+                shutil.copy2(src_abs, os.path.join(CHARS_DIR, out_fn))
+                cur["ref_image_file"] = f"characters/{out_fn}"
 
         cfg["characters"][ck] = cur
 
@@ -757,7 +787,7 @@ def resolve_character_sheet_path(char_key: str, fallback_assets_dir: str = "") -
                 cfg = json.load(f)
             c_obj = (cfg.get("characters") or {}).get(ck) or (cfg.get("characters") or {}).get(char_key)
             if isinstance(c_obj, dict):
-                for p_field in ("image_path", "sheet_path", "ref_image", "avatar_path"):
+                for p_field in ("ref_image_file", "ref_image_path", "image_path", "sheet_path", "ref_image", "avatar_path", "source_image_file"):
                     cand = str(c_obj.get(p_field) or "").strip()
                     if not cand:
                         continue
@@ -1905,19 +1935,222 @@ def save_character_sheet_template(payload: dict) -> dict:
     return get_character_library_state()
 
 
+def _apply_generated_sheet_to_character(char_key: str, out_abs: str, source_abs: str = "", appearance_en: str = "", char_name: str = "") -> None:
+    """Attach a freshly generated Character Sheet image onto `voices_and_characters.json`."""
+    ck = str(char_key or "").strip().lower()
+    if not ck or not os.path.isfile(out_abs):
+        return
+    try:
+        ensure_dirs_and_default_sheet()
+        cfg = {}
+        if os.path.isfile(VOICES_CHARS_PATH):
+            with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+                cfg = json.load(f) or {}
+        chars = cfg.setdefault("characters", {})
+        cur = chars.get(ck) if isinstance(chars.get(ck), dict) else {}
+        cur["key"] = ck
+        if char_name and not cur.get("name"):
+            cur["name"] = char_name
+        elif not cur.get("name"):
+            cur["name"] = f"Nhân Vật {ck.upper()}"
+        if appearance_en:
+            cur["appearance_en"] = appearance_en
+        ref_fn = f"{ck}_ref.jpg"
+        ref_dst = os.path.join(CHARS_DIR, ref_fn)
+        if os.path.abspath(out_abs) != os.path.abspath(ref_dst):
+            shutil.copy2(out_abs, ref_dst)
+        cur["ref_image_file"] = f"characters/{ref_fn}"
+        if source_abs and os.path.isfile(source_abs):
+            src_fn = f"{ck}_source.jpg"
+            src_dst = os.path.join(CHARS_DIR, src_fn)
+            if os.path.abspath(source_abs) != os.path.abspath(src_dst):
+                shutil.copy2(source_abs, src_dst)
+            cur["source_image_file"] = f"characters/{src_fn}"
+        cur.setdefault("enabled", True)
+        cur.setdefault("videos_per_character", int(cfg.get("default_videos_per_character") or 3))
+        chars[ck] = cur
+        with open(VOICES_CHARS_PATH, "w", encoding="utf-8") as f:
+            json.dump(cfg, f, ensure_ascii=False, indent=2)
+    except Exception:
+        pass
+
+
+def sync_character_to_google_flow(char_key: str, target_profile: str = "") -> dict:
+    """
+    Tự động upload ảnh Character Sheet / chân dung của nhân vật lên các tài khoản Google Flow đang sẵn sàng,
+    nhận về Media/Character UUID riêng cho từng tài khoản và lưu vào `voices_and_characters.json`.
+    Người dùng KHÔNG cần phải tự mở Google Flow tạo nhân vật hay copy UUID thủ công!
+    """
+    ck = str(char_key or "").strip().lower()
+    if not ck:
+        return {"ok": False, "error": "Thiếu mã nhân vật (char_key)."}
+    sheet_path = resolve_character_sheet_path(ck)
+    if not sheet_path or not os.path.isfile(sheet_path):
+        return {"ok": False, "error": f"Nhân vật '{ck}' chưa có ảnh tham chiếu/Character Sheet trên máy. Hãy upload ảnh hoặc tạo ảnh bằng AI trước!"}
+
+    if SCRIPTS_DIR not in sys.path:
+        sys.path.insert(0, SCRIPTS_DIR)
+    if WS_DIR not in sys.path:
+        sys.path.insert(0, WS_DIR)
+
+    import asyncio
+    import engine_settings_manager as _esm_sc
+    import grok_video_tool as gvt
+
+    target_clean = str(target_profile or "").strip().lower()
+    flow_accs = [a for a in (_esm_sc.list_available_flow_accounts() or []) if a.get("active", True)]
+    if target_clean and target_clean != "all":
+        flow_accs = [
+            a for a in flow_accs
+            if str(a.get("profile_name") or a.get("name") or "").strip().lower() == target_clean
+        ]
+    if not flow_accs:
+        return {"ok": False, "error": "Chưa có tài khoản Google Flow nào sẵn sàng. Vui lòng đăng nhập ít nhất 1 tài khoản ở tab Tài Khoản!"}
+
+    bridge = None
+    try:
+        b_port = getattr(gvt, "CAPTCHA_BRIDGE_PORT", 4000)
+        if hasattr(gvt, "get_connected_extension_bridge"):
+            bridge = gvt.get_connected_extension_bridge(b_port)
+        if bridge is None:
+            bridge = gvt.CaptchaBridge(print, port=b_port)
+            try:
+                bridge.start(allow_remote=True)
+            except TypeError:
+                bridge.start()
+    except Exception:
+        bridge = None
+
+    synced_map = {}
+    first_proj = ""
+    errors = []
+
+    for acc in flow_accs:
+        prof = str(acc.get("profile_name") or "").strip() or str(acc.get("name") or "").strip()
+        proj_id = str(acc.get("project_id") or acc.get("proxy_url") or acc.get("flow_project_id") or "").strip()
+        if not proj_id or proj_id.startswith("http") or len(proj_id) < 20:
+            proj_id = str(_esm_sc.get_default_flow_project_id(prof) or "").strip()
+        if not proj_id:
+            errors.append(f"{prof}: chưa có Flow Project ID")
+            continue
+
+        bearer = str(acc.get("api_key") or "").strip()
+        disk_ck_sc = ""
+        if prof and hasattr(gvt, "_load_flow_cookie_header"):
+            try:
+                disk_ck_sc = gvt._load_flow_cookie_header(prof) or ""
+            except Exception:
+                disk_ck_sc = ""
+        if disk_ck_sc:
+            cookie_hdr = disk_ck_sc
+            bearer_tok = ""
+        elif bearer.startswith("flow_cookie:") or ("SID=" in bearer and "__Secure-" in bearer):
+            cookie_hdr = bearer.replace("flow_cookie:", "", 1).strip()
+            bearer_tok = ""
+        else:
+            bearer_tok = bearer
+            cookie_hdr = ""
+        if not bearer_tok and not cookie_hdr and prof and hasattr(gvt, "_refresh_google_profile"):
+            try:
+                ok_r, new_tok, new_pid, _ = gvt._refresh_google_profile(prof, prefer_profile=True)
+                if ok_r and new_tok:
+                    if new_tok.startswith("flow_cookie:"):
+                        cookie_hdr = new_tok.replace("flow_cookie:", "", 1).strip()
+                    else:
+                        bearer_tok = new_tok
+                    if new_pid and len(str(new_pid)) > 20 and not proj_id:
+                        proj_id = str(new_pid).strip()
+            except Exception:
+                pass
+        if not bearer_tok and not cookie_hdr:
+            errors.append(f"{prof}: chưa có phiên đăng nhập (cookie/token)")
+            continue
+
+        logs_acc = []
+        status_out = {}
+        try:
+            media_uuid = _esm_sc._run_async_sync(
+                gvt.upload_veo_image(
+                    None,
+                    sheet_path,
+                    bearer_tok,
+                    proj_id,
+                    lambda m: logs_acc.append(str(m)),
+                    captcha_bridge=bridge,
+                    auth_cookie=cookie_hdr,
+                    status_out=status_out,
+                )
+            )
+        except Exception as exc_up:
+            media_uuid = None
+            errors.append(f"{prof}: {exc_up}")
+
+        if media_uuid and str(media_uuid).strip():
+            uid_clean = str(media_uuid).strip()
+            synced_map[prof] = uid_clean
+            if not first_proj:
+                first_proj = proj_id
+        else:
+            err_st = status_out.get("error") or (f"HTTP {status_out.get('status_code')}" if status_out.get("status_code") else "Không tải được ảnh lên Google Flow")
+            errors.append(f"{prof}: {err_st}")
+
+    if not synced_map:
+        return {
+            "ok": False,
+            "char_key": ck,
+            "error": "Không đồng bộ được ảnh nhân vật lên Google Flow (" + "; ".join(errors[:3]) + "). Lưu ý: Bạn vẫn có thể chạy video bình thường vì tool sẽ tự động đính kèm ảnh cục bộ khi render!",
+            "errors": errors,
+        }
+
+    # Persist synced per-account UUIDs cleanly into voices_and_characters.json
+    ensure_dirs_and_default_sheet()
+    cfg = {}
+    if os.path.isfile(VOICES_CHARS_PATH):
+        with open(VOICES_CHARS_PATH, "r", encoding="utf-8") as f:
+            cfg = json.load(f) or {}
+    chars = cfg.setdefault("characters", {})
+    cur = chars.get(ck) if isinstance(chars.get(ck), dict) else {"key": ck, "name": f"Nhân Vật {ck.upper()}"}
+    acc_map = cur.get("account_character_ids") if isinstance(cur.get("account_character_ids"), dict) else {}
+    acc_map.update(synced_map)
+    cur["account_character_ids"] = acc_map
+    first_prof, first_uid = next(iter(synced_map.items()))
+    cur["character_id"] = first_uid
+    cur["owner_profile"] = first_prof
+    if first_proj and not cur.get("project_id"):
+        cur["project_id"] = first_proj
+    chars[ck] = cur
+    with open(VOICES_CHARS_PATH, "w", encoding="utf-8") as f:
+        json.dump(cfg, f, ensure_ascii=False, indent=2)
+
+    return {
+        "ok": True,
+        "char_key": ck,
+        "character_id": first_uid,
+        "project_id": cur.get("project_id") or first_proj,
+        "synced_accounts": synced_map,
+        "synced_count": len(synced_map),
+        "errors": errors,
+        "message": f"✅ Đã tự động đồng bộ ảnh nhân vật {ck.upper()} lên {len(synced_map)} tài khoản Google Flow!",
+        "library": get_character_library_state(),
+    }
+
+
 def generate_character_or_product_image(payload: dict) -> dict:
     """
     Tạo ảnh Character Sheet hoặc ảnh Nhân vật cầm sản phẩm bằng:
       - `model = "nano_banana"` (Google Flow Nano Banana 2.1 - BELUGA 2K)
-      - `model = "chatgpt"` (ChatGPT Image API `gpt-image-1` / `dall-e-3` qua CLIProxy `:8317` hoặc OpenAI API)
+      - `model = "chatgpt"` / `"cliproxy_gemini"` / `"grok"` (qua CLIProxy `:8317`)
+    Hỗ trợ upload ảnh chân dung gốc (`source_image_base64`) để AI giữ đúng khuôn mặt nhân vật khi tạo Character Sheet 6 góc!
     """
     mode = payload.get("mode", "character_sheet")  # "character_sheet" | "product_ref"
     model_choice = (payload.get("model") or "nano_banana").lower()
     sheet_template_id = payload.get("sheet_template_id") or "sheet_6panel_studio"
-    char_key = (payload.get("char_key") or "nv1").lower()
+    char_key = (payload.get("char_key") or "nv1").strip().lower()
+    char_name = (payload.get("char_name") or "").strip()
     char_desc = (payload.get("appearance_en") or "young Vietnamese woman, shoulder-length black hair, friendly smile").strip()
     custom_prompt = (payload.get("custom_prompt") or "").strip()
     pid = (payload.get("pid") or "").strip()
+    auto_apply_to_char = bool(payload.get("auto_apply_to_char", mode == "character_sheet"))
 
     templates = load_sheet_templates()
     tpl = next((t for t in templates if t.get("id") == sheet_template_id), templates[0] if templates else {})
@@ -1949,15 +2182,29 @@ def generate_character_or_product_image(payload: dict) -> dict:
     )
     out_abs = os.path.join(out_dir, out_filename)
 
+    # Lưu ảnh chân dung nhân vật gốc (nếu người dùng upload để AI dựng Character Sheet theo đúng khuôn mặt gốc)
+    uploaded_source_abs = ""
+    src_b64 = payload.get("source_image_base64") or payload.get("uploaded_source_image_base64") or ""
+    if src_b64:
+        uploaded_source_abs = os.path.join(CHARS_DIR, f"{char_key}_source.jpg")
+        _save_base64_image_to_jpg(src_b64, uploaded_source_abs)
+        if "exact face" not in final_prompt.lower() and "uploaded reference portrait" not in final_prompt.lower():
+            final_prompt = (
+                final_prompt.rstrip()
+                + " Strictly preserve the exact face, facial features, hairstyle, skin tone, and likeness of the person in the uploaded reference portrait across every panel and angle."
+            )
+
     state_cfg = get_character_library_state()
     char_entry = next((c for c in state_cfg["characters"] if c["key"] == char_key), None)
 
     def _gather_char_and_prod_ref_paths():
         refs = []
+        if uploaded_source_abs and os.path.isfile(uploaded_source_abs):
+            refs.append(uploaded_source_abs)
         for rp in (payload.get("reference_images") or []):
             if rp and os.path.isfile(str(rp)) and str(rp) not in refs:
                 refs.append(str(rp))
-        if char_entry:
+        if char_entry and not uploaded_source_abs:
             char_ref_rel = char_entry.get("ref_image_path") or ""
             char_ref_abs = (
                 char_ref_rel
@@ -2005,10 +2252,14 @@ def generate_character_or_product_image(payload: dict) -> dict:
             out_abs,
         )
         if ok_cli and os.path.isfile(out_abs):
+            if mode == "character_sheet" and auto_apply_to_char:
+                _apply_generated_sheet_to_character(char_key, out_abs, uploaded_source_abs, char_desc, char_name)
             return {
                 "ok": True,
                 "model_used": eng_cli or f"CLIProxy ({img_model_req})",
                 "image_path": out_abs,
+                "source_image_path": uploaded_source_abs,
+                "applied_to_char": bool(mode == "character_sheet" and auto_apply_to_char),
                 "prompt": final_prompt,
                 "reference_images": ref_imgs,
             }
@@ -2018,108 +2269,117 @@ def generate_character_or_product_image(payload: dict) -> dict:
             "prompt": final_prompt,
         }
 
-    # 2. Tạo ảnh qua Google Flow Nano Banana 2.1 (`BELUGA` / `ogiZ0b` + Upsample 2K `SPrCad`)
+    # 2. Tạo ảnh qua Google Flow Nano Banana 2.1 (dùng engine thống nhất grok_video_tool.run_veo_flow đa tài khoản failover!)
     try:
-        scripts_dir = os.path.join(PIPELINE_DIR, "scripts")
-        if scripts_dir not in sys.path:
-            sys.path.insert(0, scripts_dir)
-        import run_all_7_videos_mt as mt
-        from playwright.sync_api import sync_playwright
+        if SCRIPTS_DIR not in sys.path:
+            sys.path.insert(0, SCRIPTS_DIR)
+        if WS_DIR not in sys.path:
+            sys.path.insert(0, WS_DIR)
+        import engine_settings_manager as _esm_fl
+        import grok_video_tool as gvt
 
-        project_id = (char_entry or {}).get("project_id") or _default_flow_project_id()
-        char_uuid = (char_entry or {}).get("character_id") or ""
+        ref_imgs = _gather_char_and_prod_ref_paths()
+        flow_accs = [a for a in (_esm_fl.list_available_flow_accounts() or []) if a.get("active", True)]
+        if not flow_accs:
+            return {"ok": False, "error": "Chưa có tài khoản Google Flow nào đang hoạt động. Hãy mở tab Tài Khoản để đăng nhập hoặc chọn model ChatGPT / Gemini!", "prompt": final_prompt}
 
-        clean_cookies = _load_clean_flow_cookies()
-        if not clean_cookies:
-            return {"ok": False, "error": "Chưa tìm thấy Cookie phiên đăng nhập Google Flow. Hãy mở tab Tài Khoản & Flow để đăng nhập hoặc lấy Cookie!", "prompt": final_prompt}
-        cookie_map = {c["name"]: c["value"] for c in clean_cookies}
-        cookie_hdr = "; ".join(f"{k}={v}" for k, v in cookie_map.items())
+        bridge = None
+        try:
+            b_port = getattr(gvt, "CAPTCHA_BRIDGE_PORT", 4000)
+            if hasattr(gvt, "get_connected_extension_bridge"):
+                bridge = gvt.get_connected_extension_bridge(b_port)
+            if bridge is None:
+                bridge = gvt.CaptchaBridge(print, port=b_port)
+                try:
+                    bridge.start(allow_remote=True)
+                except TypeError:
+                    bridge.start()
+        except Exception:
+            bridge = None
 
-        with sync_playwright() as pw:
-            browser = pw.chromium.launch(
-                channel="chrome",
-                headless=False,
-                args=["--disable-blink-features=AutomationControlled", "--window-position=-2000,-2000", "--window-size=1280,800"],
+        errors_fl = []
+        raw_char_uuid = (char_entry or {}).get("character_id") or ""
+        for acc in flow_accs:
+            acc_name = str(acc.get("name") or "").strip()
+            prof_name = str(acc.get("profile_name") or "").strip() or acc_name
+            acc_proj_id = str(acc.get("project_id") or acc.get("proxy_url") or acc.get("flow_project_id") or "").strip()
+            if not acc_proj_id or acc_proj_id.startswith("http") or len(acc_proj_id) < 20:
+                acc_proj_id = str(_esm_fl.get_default_flow_project_id(prof_name) or "").strip()
+            if not acc_proj_id:
+                errors_fl.append(f"{prof_name}: thiếu Flow Project ID")
+                continue
+
+            tok = str(acc.get("api_key") or "").strip()
+            disk_ck = ""
+            if prof_name and hasattr(gvt, "_load_flow_cookie_header"):
+                try:
+                    disk_ck = gvt._load_flow_cookie_header(prof_name) or ""
+                except Exception:
+                    disk_ck = ""
+            if disk_ck:
+                tok = f"flow_cookie:{disk_ck}"
+            if not tok and prof_name and hasattr(gvt, "_refresh_google_profile"):
+                try:
+                    ok_r, new_tok, new_pid, err_r = gvt._refresh_google_profile(prof_name, prefer_profile=True)
+                    if ok_r and new_tok:
+                        tok = new_tok
+                        if new_pid and len(str(new_pid)) > 20 and not acc_proj_id:
+                            acc_proj_id = str(new_pid).strip()
+                    elif err_r:
+                        errors_fl.append(f"{prof_name}: {err_r}")
+                except Exception as ex_r:
+                    errors_fl.append(f"{prof_name}: {ex_r}")
+            if not tok:
+                errors_fl.append(f"{prof_name}: chưa có cookie/token")
+                continue
+
+            job = gvt.VideoJob(
+                id=f"charsheet_{char_key}_{int(time.time())}",
+                mode="text-to-video",
+                prompt=final_prompt,
+                output_name=os.path.splitext(out_filename)[0],
+                model="Nano Banana 2",
+                resolution="2K",
+                aspect_ratio="9:16" if mode == "product_ref" else "16:9",
+                reference_image_urls=ref_imgs,
+                account_name=acc_name,
+                google_profile_name=prof_name,
+                local_path=out_abs,
+                max_retries=2,
+                prefer_bearer_request=False,
+                flow_request_only=True,
+                require_all_reference_uploads=bool(ref_imgs),
             )
-            ctx = browser.new_context()
-            ctx.add_init_script(mt.gvt._FLOW_HIJACK_BYPASS_JS)
-            ctx.add_cookies(clean_cookies)
-            pg = ctx.new_page()
-            pg.goto(f"https://flow.google.com/project/{project_id}", wait_until="domcontentloaded", timeout=45000)
-            pg.evaluate(mt.gvt._FLOW_HIJACK_BYPASS_JS)
-            pg.wait_for_function(
-                "() => window.WIZ_global_data && window.WIZ_global_data.SNlM0e && window.grecaptcha && window.grecaptcha.enterprise",
-                timeout=35000,
-            )
-            pg.wait_for_timeout(1200)
-            wz = pg.evaluate(
-                """() => {
-                    const w = window.WIZ_global_data || {};
-                    return {
-                        at: w.SNlM0e || '',
-                        bl: w.cfb2h || 'boq_labs-ai-sandbox-frontend_20261030.00_p2',
-                        fsid: w.FdrFJe || '',
-                        ua: navigator.userAgent,
-                    };
-                }"""
-            )
-            dl_headers = {"Cookie": cookie_hdr, "Referer": "https://flow.google.com/", "User-Agent": wz["ua"]}
-            prod_uuids = []
-            allow_multi_refs = False
-            if not char_uuid and char_entry:
-                char_ref_rel = char_entry.get("ref_image_path") or ""
-                char_ref_abs = char_ref_rel if os.path.isabs(char_ref_rel) else os.path.join(WS_DIR, char_ref_rel.replace("/", os.sep))
-                if char_ref_rel and os.path.isfile(char_ref_abs):
-                    ok_cr, cr_uid, _ = mt.upload_single_product_ref_in_page(pg, wz, project_id, char_ref_abs)
-                    if ok_cr and cr_uid:
-                        prod_uuids.append(cr_uid)
-                        allow_multi_refs = True
+            if raw_char_uuid and not uploaded_source_abs:
+                eff_cid = resolve_character_id_for_account(raw_char_uuid, prof_name)
+                if eff_cid:
+                    job.character_id = eff_cid
 
-            if mode == "product_ref":
-                cand_prod_imgs = []
-                if payload.get("product_image_path"):
-                    cand_prod_imgs.append(str(payload["product_image_path"]).strip())
-                if pid:
-                    for p_dir in (
-                        os.path.join(PROJECTS_DIR, pid, "product_images"),
-                        os.path.join(WS_DIR, "data", "tiktok_crawler", "data", "product_images", pid),
-                    ):
-                        if os.path.isdir(p_dir):
-                            cand_prod_imgs.append(os.path.join(p_dir, "prod_1.jpg"))
-                            for fn in sorted(os.listdir(p_dir)):
-                                if fn.lower().endswith((".jpg", ".jpeg", ".png", ".webp")) and fn != "prod_clean.jpg":
-                                    cand_prod_imgs.append(os.path.join(p_dir, fn))
-                chosen_prod_jpg = next((p for p in cand_prod_imgs if p and os.path.isfile(p)), "")
-                if chosen_prod_jpg:
-                    ok_u, u_id, _ = mt.upload_single_product_ref_in_page(pg, wz, project_id, chosen_prod_jpg)
-                    if ok_u and u_id:
-                        prod_uuids.append(u_id)
-                        if len(prod_uuids) > 1:
-                            allow_multi_refs = True
+            try:
+                ok_fl = bool(_esm_fl._run_async_sync(gvt.run_veo_flow(job, tok, acc_proj_id, bridge, None, None)))
+            except Exception as ex_fl:
+                ok_fl = False
+                job.error = str(ex_fl)
 
-            task = {
-                "pid": pid or char_key,
-                "v_key": char_key,
-                "project_id": project_id,
-                "char_id": char_uuid,
-                "prod_uuids": prod_uuids,
-                "allow_multi_refs": allow_multi_refs,
-                "prompt_str": final_prompt,
-                "out_file": out_abs,
-            }
-            ok, gen_uuid, err = mt.generate_variant_ref_image_in_page(pg, wz, cookie_hdr, dl_headers, task)
-            ctx.close()
-            browser.close()
+            if ok_fl and os.path.isfile(out_abs) and os.path.getsize(out_abs) > 5000:
+                try:
+                    _esm_fl._normalize_saved_image_to_jpg(out_abs)
+                except Exception:
+                    pass
+                if mode == "character_sheet" and auto_apply_to_char:
+                    _apply_generated_sheet_to_character(char_key, out_abs, uploaded_source_abs, char_desc, char_name)
+                return {
+                    "ok": True,
+                    "model_used": f"Nano Banana 2.1 (Google Flow 2K • {prof_name})",
+                    "image_path": out_abs,
+                    "source_image_path": uploaded_source_abs,
+                    "applied_to_char": bool(mode == "character_sheet" and auto_apply_to_char),
+                    "prompt": final_prompt,
+                    "reference_images": ref_imgs,
+                }
+            errors_fl.append(f"{prof_name}: {getattr(job, 'error', '') or 'Flow không trả ảnh'}")
 
-        if ok and os.path.exists(out_abs):
-            return {
-                "ok": True,
-                "model_used": "Nano Banana 2.1 (BELUGA 2K)",
-                "image_path": out_abs,
-                "media_uuid": gen_uuid,
-                "prompt": final_prompt,
-            }
-        return {"ok": False, "error": err or "Không tạo được ảnh qua Nano Banana 2.1", "prompt": final_prompt}
+        return {"ok": False, "error": " | ".join(errors_fl) or "Không tạo được ảnh qua Nano Banana 2.1", "prompt": final_prompt}
     except Exception as e:
         return {"ok": False, "error": str(e), "prompt": final_prompt}
 

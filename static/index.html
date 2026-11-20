@@ -4226,6 +4226,9 @@
           </div>
         </div>
       </div>
+
+      <!-- KẾT NỐI AI AGENT QUA MCP (BẢO MẬT, PHÂN QUYỀN TÀI KHOẢN) -->
+      <div id="mcpSettingsMount"></div>
     </section>
 
     <!-- ═══════════════════════════════════════════════════════════════════════
@@ -4852,12 +4855,28 @@
             <select id="selGenSheetTemplate" onchange="onGenModeOrTplChange()"></select>
           </div>
           <div>
-            <label>👩‍💼 Nhân Vật Áp Dụng (Hoặc ID Sản Phẩm nếu tạo ảnh cầm SP)</label>
+            <label>👩‍💼 Nhân Vật Áp Dụng (Chọn sẵn hoặc nhập mã NV mới)</label>
             <div style="display:flex; gap:6px;">
               <select id="selGenCharKey" style="flex:1;" onchange="onGenModeOrTplChange()"></select>
-              <input id="inpGenPid" style="flex:1;" placeholder="ID SP (VD: 1738086213622335480)" />
+              <input id="inpGenNewCharKey" style="width:115px;" placeholder="Mã mới (nv6)" title="Nhập mã mới nếu muốn tạo nhân vật mới hoàn toàn" />
+              <input id="inpGenPid" style="flex:1;" placeholder="ID SP (nếu ảnh cầm SP)" />
             </div>
           </div>
+        </div>
+
+        <div style="background:#090d16; border:1px solid rgba(56,189,248,0.4); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap; margin-bottom:6px;">
+            <label style="margin:0; color:#7dd3fc; font-weight:800;">📸 Upload Ảnh Nhân Vật Gốc (Tuỳ chọn — Giữ Đúng Khuôn Mặt Để Tạo Character Sheet 6 Góc)</label>
+            <label style="margin:0; display:flex; align-items:center; gap:5px; font-size:11.5px; color:#6ee7b7; cursor:pointer;">
+              <input type="checkbox" id="chkGenAutoApply" style="width:auto;" checked />
+              ✅ Tự gắn ảnh vừa tạo làm Character Sheet cho nhân vật
+            </label>
+          </div>
+          <input type="file" id="inpGenSourceImage" accept="image/*" onchange="onGenSourceImageChange(this)" />
+          <div style="font-size:11px; color:#94a3b8; margin-top:4px;">
+            Tải lên 1 ảnh chân dung hoặc ảnh toàn thân nhân vật thật → AI (Nano Banana / ChatGPT / Gemini) sẽ giữ nguyên gương mặt &amp; nét đặc trưng để dựng bộ Character Sheet 6 góc đồng nhất. Bỏ trống nếu muốn AI tự sáng tạo gương mặt mới.
+          </div>
+          <div id="genSourcePreviewWrap"></div>
         </div>
 
         <div style="margin-bottom:10px;">
@@ -4902,16 +4921,35 @@
             <input id="inpEditCharName" placeholder="VD: Nhân Vật 3 (Nữ Tư Vấn Showroom Sài Gòn)" />
           </div>
         </div>
-        <div class="grid-2" style="margin-bottom:10px;">
-          <div>
-            <label>Character UUID (Trên Google Flow)</label>
-            <input id="inpEditCharUuid" placeholder="VD: 208606a7-a345-48b2-af32-9fd3c37d0c9a" />
+
+        <!-- ẢNH NHÂN VẬT GỐC + CHARACTER SHEET + TẠO AI TRỰC TIẾP -->
+        <div style="background:#090d16; border:1px solid rgba(56,189,248,0.4); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; flex-wrap:wrap; gap:8px; margin-bottom:8px;">
+            <label style="margin:0; color:#7dd3fc; font-weight:800;">🖼️ Ảnh Nhân Vật &amp; Tạo Character Sheet Bằng AI (Giữ Mặt Từ Ảnh Gốc)</label>
+            <select id="selEditCharAiModel" style="width:auto; padding:4px 8px; font-size:11px;">
+              <option value="nano_banana">🍌 Nano Banana 2.1 (Google Flow 2K)</option>
+              <option value="chatgpt">🤖 ChatGPT Image (CLIProxy :8317)</option>
+              <option value="cliproxy_gemini">💎 Gemini 3.1 Flash Image (CLIProxy :8317)</option>
+            </select>
           </div>
-          <div>
-            <label>Project ID (Dự án chứa Nhân vật trên Flow)</label>
-            <input id="inpEditCharProjId" placeholder="VD: UUID Project Google Flow (tự động nếu để trống)" />
+          <div id="editCharPreviewBox" style="margin-bottom:8px;"></div>
+          <div class="grid-2" style="margin-bottom:8px;">
+            <div>
+              <label style="font-size:11.5px; color:#fde68a;">📸 Upload Ảnh Nhân Vật Gốc (Để Tạo Character Sheet 6 Góc)</label>
+              <input type="file" id="inpEditCharSourceFile" accept="image/*" onchange="onEditCharLocalFileSelected(this, 'Ảnh nhân vật gốc')" />
+            </div>
+            <div>
+              <label style="font-size:11.5px; color:#cbd5e1;">🧩 Hoặc Upload Sẵn Ảnh Character Sheet (Tuỳ chọn)</label>
+              <input type="file" id="inpEditCharFile" accept="image/*" onchange="onEditCharLocalFileSelected(this, 'Ảnh Character Sheet')" />
+            </div>
+          </div>
+          <div style="display:flex; gap:8px; flex-wrap:wrap; align-items:center;">
+            <button type="button" class="btn btn-xs btn-primary" style="padding:6px 12px; font-weight:800;" onclick="generateCharSheetFromEditModal(true)">✨ Tạo Character Sheet 6 Góc Từ Ảnh Gốc</button>
+            <button type="button" class="btn btn-xs btn-amber" style="padding:6px 12px; font-weight:800;" onclick="generateCharSheetFromEditModal(false)">🎨 Tạo Ảnh Nhân Vật Mới Bằng AI</button>
+            <span id="editCharAiGenStatus" style="font-size:11px; color:#a5f3fc; flex:1;"></span>
           </div>
         </div>
+
         <div
           style="background:#090d16; border:1px solid rgba(16,185,129,0.35); border-radius:10px; padding:10px 12px; margin-bottom:10px;">
           <div
@@ -4947,6 +4985,7 @@
             </div>
           </div>
         </div>
+
         <div class="grid-2" style="margin-bottom:10px;">
           <div>
             <label>Số Lượng Video / Sản Phẩm</label>
@@ -4959,15 +4998,38 @@
             </select>
           </div>
           <div>
-            <label>Upload Ảnh Character Sheet Từ Máy Tính (Tuỳ chọn)</label>
-            <input type="file" id="inpEditCharFile" accept="image/*" />
+            <label>Mô Tả Ngoại Hình Tiếng Anh (Appearance Prompt)</label>
+            <textarea id="inpEditCharAppearance" rows="2"
+              placeholder="shoulder-length layered black hair, black-framed glasses, identical face"></textarea>
           </div>
         </div>
-        <div style="margin-bottom:12px;">
-          <label>Mô Tả Ngoại Hình Tiếng Anh (Appearance Prompt)</label>
-          <textarea id="inpEditCharAppearance" rows="2"
-            placeholder="shoulder-length layered black hair, black-framed glasses, identical face"></textarea>
+
+        <!-- ĐỒNG BỘ TỰ ĐỘNG LÊN GOOGLE FLOW (KHÔNG CẦN TỰ TẠO THỦ CÔNG) -->
+        <div style="background:rgba(15,23,42,0.85); border:1px solid rgba(148,163,184,0.28); border-radius:10px; padding:9px 12px; margin-bottom:12px;">
+          <div style="display:flex; justify-content:space-between; align-items:center; gap:10px; flex-wrap:wrap;">
+            <div style="flex:1; min-width:240px;">
+              <div style="font-size:12px; font-weight:700; color:#e2e8f0;">☁️ Đồng Bộ Nhân Vật Lên Google Flow (Tự Động)</div>
+              <div id="editCharFlowStatus" style="font-size:11px; color:#94a3b8; margin-top:2px;">
+                ☁️ Không cần tự tạo trên Google Flow — tool tự động upload ảnh nhân vật khi render (hoặc bấm Đồng bộ ngay).
+              </div>
+            </div>
+            <button type="button" class="btn btn-xs btn-outline" style="border-color:rgba(56,189,248,0.5); color:#7dd3fc; padding:6px 10px; font-weight:700;" onclick="syncEditCharToGoogleFlow()">☁️ Đồng Bộ Lên Google Flow Ngay</button>
+          </div>
+          <details style="margin-top:8px;">
+            <summary style="cursor:pointer; font-size:11px; color:#94a3b8;">⚙️ Tuỳ chọn nâng cao: Character UUID / Project ID thủ công (Không bắt buộc)</summary>
+            <div class="grid-2" style="margin-top:8px;">
+              <div>
+                <label>Character UUID (Tự động tạo bởi tool khi đồng bộ)</label>
+                <input id="inpEditCharUuid" placeholder="Để trống — tool tự tạo & đính kèm ảnh" />
+              </div>
+              <div>
+                <label>Project ID (Tự động theo tài khoản Flow)</label>
+                <input id="inpEditCharProjId" placeholder="Để trống — tool tự lấy theo tài khoản" />
+              </div>
+            </div>
+          </details>
         </div>
+
         <div style="display:flex; justify-content:flex-end; gap:8px;">
           <button class="btn btn-outline" onclick="closeModal('modalEditChar')">Huỷ</button>
           <button class="btn btn-success" onclick="submitSaveCharacterModal()">💾 Lưu Nhân Vật & Giọng Cố Định</button>
@@ -6974,8 +7036,14 @@
                   <div style="display:flex; gap:5px; margin-top:6px; flex-wrap:wrap;">
                     <button class="btn btn-xs btn-primary" style="flex:1;" onclick="openVerticalVideoModal('${encodeURIComponent(sceneVidPath || finalVidPath)}', '${encodeURIComponent(refImgPath)}', '${encodeURIComponent(origProdPath)}', '${vInfo.vNum} • ${vInfo.charKey} — Cảnh ${sc.scene_number}', '${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}')">📱 Phóng To Dọc 9:16</button>
                     <button class="btn btn-xs btn-success" style="flex:1;" onclick="openFolderEncoded('${encodeURIComponent(sceneVidPath || finalVidPath)}')">📂 Mở Ở Thư Mục Gốc</button>
+                    <button class="btn btn-xs btn-amber" style="width:100%; justify-content:center;" onclick="closeModal('modalScene'); retryProjectScene('${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}', ${Number(sc.scene_number) || 0}, '${String(sc.scene_id || sc.id || '').replace(/'/g, '')}', false)">🔄 Chạy Lại Cảnh ${sc.scene_number}</button>
                   </div>
-                ` : `<div style="aspect-ratio:9/16; display:flex; align-items:center; justify-content:center; color:var(--muted); font-size:11px; background:#000; border-radius:6px;">Đang tạo video...</div>`}
+                ` : `
+                  <div style="aspect-ratio:9/16; display:flex; flex-direction:column; gap:10px; align-items:center; justify-content:center; color:var(--muted); font-size:11px; background:#000; border-radius:6px; padding:10px; text-align:center;">
+                    <span>${sc.error_msg || sc.error ? '❌ Cảnh này đang báo lỗi' : '⏳ Chưa có video cảnh này'}</span>
+                    <button class="btn btn-xs btn-amber" onclick="closeModal('modalScene'); retryProjectScene('${STATE.currentProject.id}', '${prod.vkey || vInfo.vNum.toLowerCase()}', ${Number(sc.scene_number) || 0}, '${String(sc.scene_id || sc.id || '').replace(/'/g, '')}', false)">🔄 Chạy Lại (Retry) Cảnh ${sc.scene_number}</button>
+                  </div>
+                `}
               </div>
 
               <!-- Cột 2: Ảnh Tham Chiếu AI 9:16 -->
@@ -7175,6 +7243,12 @@
         `<option value="${p.val}" ${p.val === curCardZoom ? 'selected' : ''} style="background:#0f172a; color:#e2e8f0;">${p.label}</option>`
       ).join("");
 
+      const isProjRunning = !!(proj.live_status && proj.live_status.is_running) || (STATE.runningPipelines || []).some(r => r.pid === proj.id);
+      const hasFailedAny = allProds.some(p =>
+        p.status === "failed" || p.status === "error" || !!(p.error_msg && String(p.error_msg).trim()) ||
+        (p.scenes || []).some(s => !(s.status === "done" && s.video_path) && (s.status === "failed" || s.status === "error" || !!(s.error_msg || s.error)))
+      );
+
       document.getElementById("curProjActions").innerHTML = `
         <div style="display:flex; align-items:center; gap:5px; flex-wrap:wrap;">
           <button class="btn-filter ${STATE.charFilter === 'all' ? 'active' : ''}" onclick="setCharFilter('all')">Tất cả (${allProds.length})</button>
@@ -7204,7 +7278,13 @@
           ${proj.has_rendered_cache ? `
             <button class="btn btn-danger" onclick="cleanProjectRender('${proj.id}', ${doneCount > 0})" title="Xoá toàn bộ ảnh ref AI & video phân cảnh đã render của dự án này để làm lại như mới">🧹 Xoá Render (${proj.rendered_size_mb || 0} MB)</button>
           ` : ''}
-          <button class="btn btn-primary" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng</button>
+          ${isProjRunning ? `
+            <button class="btn btn-danger" style="font-weight:800;" onclick="stopRunningProject('${proj.id}')" title="Huỷ / Dừng ngay tiến trình đang chạy của dự án này">⏹️ Huỷ / Dừng Chạy</button>
+          ` : `
+            ${hasFailedAny ? `<button class="btn btn-amber" style="font-weight:800;" onclick="retryProjectScene('${proj.id}', '', 0, '', true)" title="Chạy lại toàn bộ các phân cảnh đang bị lỗi">🔄 Retry Cảnh Lỗi</button>` : ''}
+            <button class="btn btn-primary" onclick="runProjectBatch('${proj.id}', '')">▶ Chạy Đa Luồng</button>
+          `}
+          <button class="btn btn-outline" style="border-color:rgba(239,68,68,0.45); color:#fca5a5;" onclick="deleteProject('${proj.id}')" title="Xoá dự án này khỏi Studio (nếu tạo nhầm hoặc không dùng nữa)">🗑️ Xoá Dự Án</button>
         </div>
       `;
 
@@ -7219,6 +7299,8 @@
         STATE.charFilter,
         activeTplCode,
         activeVpc,
+        isProjRunning,
+        hasFailedAny,
         proj.has_rendered_cache,
         proj.rendered_files_count,
         proj.is_clean_new,
@@ -7390,20 +7472,29 @@
           const spoken = extractSpokenDialogue(sc.video_prompt, sc.scene_description, sc.dialogue_vn);
           const scDone = sc.status === "done" && sc.video_path;
           const scErrTxt = String(sc.error_msg || sc.error || "").trim();
-          const scFailed = !scDone && (sc.status === "failed" || sc.status === "error" || !!scErrTxt);
-          const scStatusColor = scDone ? "#34d399" : (scFailed ? "#f87171" : "#fbbf24");
-          const scStatusLabel = scDone ? "● Xong MP4" : (scFailed ? "✕ Báo lỗi" : "○ Đang xử lý");
+          const scRetrying = !scDone && isProjRunning && !!sc.is_retrying && !sc.is_terminal_error && sc.status !== "failed";
+          const scFailed = !scDone && !scRetrying && (sc.status === "failed" || sc.status === "error" || !!scErrTxt);
+          const scHasWork = scFailed || (!scDone && !isProjRunning && (prod.status === "stopped" || prod.status === "failed" || prod.status === "partial" || !!prod.product_image_path || (prod.scenes || []).some(x => x.status === "done" && x.video_path)));
+          const scStatusColor = scDone ? "#34d399" : (scFailed ? "#f87171" : (scRetrying ? "#f59e0b" : "#fbbf24"));
+          const scStatusLabel = scDone ? "● Xong MP4" : (scFailed ? "✕ Báo lỗi" : (scRetrying ? "🔄 Đang tự thử lại" : "○ Đang xử lý"));
           const thumbSrc = sc.image_path ? `/api/media?path=${encodeURIComponent(sc.image_path)}` : (prod.product_image_path ? `/api/media?path=${refImgEnc}` : "");
+          const scIdSafe = String(sc.scene_id || sc.id || "").replace(/'/g, "");
+          const rowBorderStyle = scFailed
+            ? 'border-color:rgba(248,113,113,0.45); background:rgba(127,29,29,0.16);'
+            : (scRetrying ? 'border-color:rgba(245,158,11,0.45); background:rgba(120,53,15,0.14);' : '');
           return `
-            <div class="sc-row" onclick="openSceneInspectModal(${idx}, ${sIdx})" title="${scFailed ? escErr(scErrTxt) : 'Bấm để kiểm tra Ảnh Sản Phẩm Mẫu vs Ảnh Ref AI vs Video 9:16'}" style="${scFailed ? 'border-color:rgba(248,113,113,0.45); background:rgba(127,29,29,0.16);' : ''}">
+            <div class="sc-row" onclick="openSceneInspectModal(${idx}, ${sIdx})" title="${(scFailed || scRetrying) ? escErr(scErrTxt) : 'Bấm để kiểm tra Ảnh Sản Phẩm Mẫu vs Ảnh Ref AI vs Video 9:16'}" style="${rowBorderStyle}">
               ${thumbSrc ? `<img class="sc-thumb" loading="lazy" src="${thumbSrc}" />` : ''}
               <div class="sc-info">
-                <div class="sc-top">
+                <div class="sc-top" style="gap:6px;">
                   <span>Cảnh ${sc.scene_number} (${sc.duration_sec || prod.seconds_per_scene || 10}s)</span>
-                  <span style="color:${scStatusColor}; font-size:9.5px; font-weight:${scFailed ? '800' : '600'};">${scStatusLabel}</span>
+                  <div style="display:inline-flex; align-items:center; gap:5px;">
+                    <span style="color:${scStatusColor}; font-size:9.5px; font-weight:${(scFailed || scRetrying) ? '800' : '600'};">${scStatusLabel}</span>
+                    ${scHasWork ? `<button type="button" class="btn btn-xs btn-amber" style="padding:1px 6px; font-size:9.5px; font-weight:800;" title="Chạy lại riêng Cảnh ${sc.scene_number}" onclick="event.stopPropagation(); retryProjectScene('${proj.id}', '${vkeyStr}', ${Number(sc.scene_number) || 0}, '${scIdSafe}', false)">🔄 Retry</button>` : ''}
+                  </div>
                 </div>
                 <div class="sc-voice">${spoken}</div>
-                ${scFailed && scErrTxt ? `<div style="margin-top:3px; font-size:9.5px; color:#fca5a5; line-height:1.3; word-break:break-word;">⚠️ ${escErr(scErrTxt.slice(0, 180))}</div>` : ''}
+                ${(scFailed || scRetrying) && scErrTxt ? `<div style="margin-top:3px; font-size:9.5px; color:${scFailed ? '#fca5a5' : '#fde68a'}; line-height:1.3; word-break:break-word;">${scFailed ? '⚠️' : '🔄'} ${escErr(scErrTxt.slice(0, 180))}</div>` : ''}
               </div>
             </div>
           `;
@@ -7427,8 +7518,12 @@
                   <button class="btn btn-icon btn-success" title="Mở và chọn đúng file ${proj.id}_${vInfo.vNum}.mp4 trong folder final_videos" onclick="openFolderEncoded('${finalVidEnc}')">📂</button>
                   <button class="btn btn-icon btn-danger" title="Xoá Video Final ${proj.id}_${vInfo.vNum}.mp4" onclick="deleteFinalVideo('${proj.id}', '${vkeyStr}', '${finalVidEnc}', '${proj.id}_${vInfo.vNum}.mp4')">🗑️</button>
                 ` : `
+                  ${isProjRunning || prod.status === "running"
+                    ? `<button class="btn btn-xs btn-danger" style="padding:2px 6px; font-weight:800;" title="Huỷ / Dừng tiến trình đang chạy" onclick="stopRunningProject('${proj.id}')">⏹️ Huỷ</button>`
+                    : `<button class="btn btn-xs btn-amber" style="padding:2px 6px; font-weight:800;" title="Chạy lại các phân cảnh lỗi hoặc chưa xong của ${vInfo.vNum}" onclick="retryProjectScene('${proj.id}', '${vkeyStr}', 0, '', false)">🔄 Retry</button>`}
                   ${prod.product_image_path ? `<button class="btn btn-xs btn-outline" title="So sánh Ảnh Sản Phẩm Mẫu & Ảnh Ref AI" onclick="openVerticalVideoModal('', '${refImgEnc}', '${origProdEnc}', '${vInfo.vNum} — Ảnh Tham Chiếu 9:16')">🔍 SP</button>` : ''}
                   <button class="btn btn-icon btn-outline" title="Mở thư mục" onclick="openFolderEncoded('${prodOutEnc}')">📂</button>
+                  <button class="btn btn-icon btn-danger" title="Xoá video đang làm dở / bị lỗi (${vInfo.vNum})" onclick="deleteUnfinishedVariant('${proj.id}', '${vkeyStr}', ${isSingleFinalPipeline ? 'true' : 'false'}, '${vInfo.vNum}')">🗑️</button>
                 `}
               </div>
             </div>
@@ -7460,11 +7555,15 @@
 
               <div class="vc-scenes" style="display:flex; flex-direction:column; justify-content:space-between;">
                 <div>
-                  ${prodErrMsg && !prod.final_video_path ? `
-                    <div style="margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(127,29,29,0.28); border:1px solid rgba(248,113,113,0.45); font-size:10px; color:#fecaca; line-height:1.35; word-break:break-word;">
-                      <b style="color:#f87171;">⚠️ Chi tiết lỗi:</b> ${escErr(prodErrMsg.slice(0, 220))}
-                    </div>
-                  ` : ''}
+                  ${prodErrMsg && !prod.final_video_path ? (
+                    (isProjRunning && prod.status !== 'failed')
+                      ? `<div style="margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(120,53,15,0.22); border:1px solid rgba(245,158,11,0.45); font-size:10px; color:#fde68a; line-height:1.35; word-break:break-word;">
+                          <b style="color:#fbbf24;">🔄 Đang tự thử lại ngầm:</b> ${escErr(prodErrMsg.slice(0, 220))}
+                        </div>`
+                      : `<div style="margin-bottom:6px; padding:5px 8px; border-radius:7px; background:rgba(127,29,29,0.28); border:1px solid rgba(248,113,113,0.45); font-size:10px; color:#fecaca; line-height:1.35; word-break:break-word;">
+                          <b style="color:#f87171;">⚠️ Chi tiết lỗi:</b> ${escErr(prodErrMsg.slice(0, 220))}
+                        </div>`
+                  ) : ''}
                   ${scenesRowsHtml || '<div style="color:var(--muted); font-size:11px;">Chưa có phân cảnh.</div>'}
                   ${charRefEnc && proj.pipeline_kind === 'fashion_transformation' ? `
                     <div style="margin-top:6px; padding:4px 7px; border-radius:7px; background:rgba(14,116,144,0.14); border:1px solid rgba(56,189,248,0.3); display:flex; align-items:center; justify-content:space-between; gap:6px; cursor:pointer;" onclick="event.stopPropagation(); openVerticalVideoModal('', '${charRefEnc}', '${origProdEnc}', 'Nhân vật tham chiếu — ${proj.id}')" title="Bấm để đối chiếu Ảnh Nhân Vật Tham Chiếu & Ảnh Quần Áo">
@@ -7536,6 +7635,10 @@
       const stepMsg = live.current_step || live.current_step_text || (doneFinals > 0 && doneFinals < totalVars ? `Đã hoàn thành ${doneFinals}/${totalVars} Video Final (${pct}%) — Bấm "Tiếp Tục Chạy Nốt" để hoàn tất các video còn lại` : "");
 
       const hasPartial = totalVars > 0 && (doneRefs > 0 || doneScenes > 0 || doneFinals > 0) && doneFinals < totalVars;
+      const hasFailedAny = allProds.some(p =>
+        p.status === "failed" || p.status === "error" || !!(p.error_msg && String(p.error_msg).trim()) ||
+        (p.scenes || []).some(s => !(s.status === "done" && s.video_path) && (s.status === "failed" || s.status === "error" || !!(s.error_msg || s.error)))
+      );
       if (!isRunning && totalVars === 0 && runningAll.length === 0) {
         bannerEl.style.display = "none";
         return;
@@ -7598,10 +7701,11 @@
               📜 Xem Nhật Ký Live
             </button>
             ${isRunning ? `
-              <button class="btn btn-xs btn-danger" onclick="stopRunningProject('${proj.id}')">⏹️ Dừng Tiến Trình</button>
-            ` : (hasPartial ? `
-              <button class="btn btn-xs btn-success" onclick="runProjectBatch('${proj.id}', '')">▶️ Tiếp Tục Chạy Nốt (${totalVars - doneFinals} Video)</button>
-            ` : '')}
+              <button class="btn btn-xs btn-danger" onclick="stopRunningProject('${proj.id}')">⏹️ Huỷ / Dừng Tiến Trình</button>
+            ` : `
+              ${hasFailedAny ? `<button class="btn btn-xs btn-amber" onclick="retryProjectScene('${proj.id}', '', 0, '', true)">🔄 Retry Cảnh Lỗi</button>` : ''}
+              ${hasPartial ? `<button class="btn btn-xs btn-success" onclick="runProjectBatch('${proj.id}', '')">▶️ Tiếp Tục Chạy Nốt (${totalVars - doneFinals} Video)</button>` : ''}
+            `}
             <button class="btn btn-xs btn-outline" style="border-color:rgba(56,189,248,0.5); color:#7dd3fc;" onclick="switchTab('settings', document.getElementById('navBtn-settings'))" title="Mở Cấu hình Góc máy Medium-Full 35mm, B-Roll 3 Nhịp & Hiệu ứng Hậu kỳ">
               🎥 Góc Máy B-Roll & FX
             </button>
@@ -8869,6 +8973,65 @@
       }
     }
 
+    async function retryProjectScene(projectId, vkey = "", sceneNumber = 0, sceneId = "", retryAllFailed = false) {
+      const label = sceneNumber
+        ? `Cảnh ${sceneNumber}${vkey ? " (" + vkey.toUpperCase() + ")" : ""}`
+        : (vkey ? `các cảnh lỗi/chưa xong của ${vkey.toUpperCase()}` : "toàn bộ các cảnh lỗi");
+      if (typeof toast === "function") toast(`🔄 Đang xếp hàng chạy lại ${label}...`, "info");
+      const res = await apiPost("/api/projects/retry-scene", {
+        project_id: projectId,
+        vkey: vkey || "",
+        scene_number: Number(sceneNumber) || 0,
+        scene_id: sceneId || "",
+        retry_all_failed: !!retryAllFailed,
+      });
+      if (res && res.ok) {
+        if (typeof toast === "function") toast(res.message || `🔄 Đã chạy lại ${label}!`, "ok");
+        delete STATE.projectDetailsCache[projectId];
+        STATE.renderedProjectSig = "";
+        await refreshAll(false);
+        if (STATE.currentProjectId === projectId) {
+          await loadProjectDetail(projectId, false);
+        }
+      } else {
+        const errMsg = (res && res.error) || "Không thể chạy lại cảnh lỗi.";
+        if (typeof toast === "function") toast(errMsg, "err");
+        else alert(errMsg);
+      }
+    }
+
+    async function deleteUnfinishedVariant(projectId, vkey = "", isSingleFinal = false, label = "") {
+      const msg = isSingleFinal
+        ? `Xoá hẳn dự án video đang làm dở '${projectId}' này? (Bao gồm tiến trình đang chạy và toàn bộ clip/ảnh dở dang)`
+        : `Xoá toàn bộ clip, ảnh ref và trạng thái đang làm dở của video ${label || vkey.toUpperCase()} trong dự án ${projectId}?`;
+      if (!confirm(msg)) return;
+      const res = await apiPost("/api/videos/delete-variant", {
+        project_id: projectId,
+        vkey: vkey || "",
+        remove_variant: false,
+        delete_project_if_single: !!isSingleFinal,
+      });
+      if (res && res.ok) {
+        if (typeof toast === "function") toast(res.message || `🗑️ Đã xoá video đang làm dở ${label || vkey}!`, "ok");
+        delete STATE.projectDetailsCache[projectId];
+        STATE.renderedProjectSig = "";
+        if (res.deleted_project && STATE.currentProjectId === projectId) {
+          STATE.currentProjectId = "";
+        }
+        await refreshAll(false);
+        if (!res.deleted_project && STATE.currentProjectId === projectId) {
+          await loadProjectDetail(projectId, false);
+        }
+        if (document.getElementById("tab-matrix")?.classList.contains("active")) {
+          await renderMatrixOverview(true);
+        }
+      } else {
+        const errMsg = (res && res.error) || "Không thể xoá video đang làm dở.";
+        if (typeof toast === "function") toast(errMsg, "err");
+        else alert(errMsg);
+      }
+    }
+
     async function cleanProjectRender(projectId, alsoDeleteFinals = false) {
       const msg = alsoDeleteFinals
         ? "Sản phẩm này vẫn còn Video Final. Bạn có muốn XOÁ CẢ VIDEO FINAL lẫn toàn bộ ảnh/video render để đưa về như sản phẩm mới không?"
@@ -9197,7 +9360,8 @@
     }
   </script>
   <link rel="stylesheet" href="/static/workflow_studio.css?v=20261105_1800" />
-  <script src="/static/studio_app_part2.js?v=20261112_multitask_v6"></script>
+  <script src="/static/studio_app_part2.js?v=20261120_2"></script>
+  <script src="/static/mcp_settings_ui.js?v=20261120_1"></script>
   <script src="/static/cooking_studio.js?v=20261115_2"></script>
   <script src="/static/transform_studio.js?v=20261115_2"></script>
   <link rel="stylesheet" href="/static/template_explorer.css?v=20261110_1" />

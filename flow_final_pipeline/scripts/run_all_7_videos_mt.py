@@ -151,6 +151,8 @@ def find_img_url(obj):
 
 _EXT_BRIDGE_BOX = [None]
 _EXT_RCAP_TMT_STREAK = [0]
+_EXT_CAPTCHA_STREAK = [0]
+_EXT_CAPTCHA_COOL_UNTIL = [0.0]
 _EXT_LAST_RESET_TS = [0.0]
 _ACC_TMT_STREAK = {}
 _ACC_LAST_RPC_TS = {}
@@ -212,8 +214,14 @@ def _post_flow_rpc(page, wiz, project_id, rpcid, payload_builder_fn, recaptcha_a
     with _ACC_LOCKS_GUARD:
         _ACC_LAST_RPC_TS[acc_key] = time.time()
 
-    # When an account hits >=2 consecutive [8]s, alternate transports across attempts instead of double-hitting Flow twice in 1s.
-    try_ext_first = (br is not None and bool(eff_ck)) and not (cur_tmt_st >= 2 and (cur_tmt_st % 2 == 1) and page is not None)
+    # When Extension reCAPTCHA score is cooling down after UNUSUAL_ACTIVITY, route directly to Stealth Playwright
+    # so accounts keep producing with fresh per-account sessions while Extension resets tabs.
+    ext_in_captcha_cool = (time.time() < float(_EXT_CAPTCHA_COOL_UNTIL[0] or 0.0)) and (page is not None)
+    try_ext_first = (
+        (br is not None and bool(eff_ck))
+        and not ext_in_captcha_cool
+        and not (cur_tmt_st >= 2 and (cur_tmt_st % 2 == 1) and page is not None)
+    )
     if try_ext_first:
         try:
             tok_ext = br.request_recaptcha_for_account(action=recaptcha_action, timeout=18, account_key=prof_name or "")
@@ -227,12 +235,15 @@ def _post_flow_rpc(page, wiz, project_id, rpcid, payload_builder_fn, recaptcha_a
                     except Exception:
                         pass
                     _EXT_RCAP_TMT_STREAK[0] = 0
+                    _EXT_CAPTCHA_STREAK[0] = 0
+                    _EXT_CAPTCHA_COOL_UNTIL[0] = 0.0
                     with _ACC_LOCKS_GUARD:
                         _ACC_TMT_STREAK[acc_key] = 0
                     return True, inner_ext, None
                 err_up = str(err_ext or "").upper()
-                is_rcap_or_tmt = any(
-                    k in err_up for k in ("TOO_MUCH_TRAFFIC", "UNUSUAL_ACTIVITY", "HIGH_TRAFFIC", "RECAPTCHA", "THROTTLED", "HTTP 429", "EXC_")
+                is_unusual_captcha = any(k in err_up for k in ("UNUSUAL_ACTIVITY", "RECAPTCHA"))
+                is_rcap_or_tmt = is_unusual_captcha or any(
+                    k in err_up for k in ("TOO_MUCH_TRAFFIC", "HIGH_TRAFFIC", "THROTTLED", "HTTP 429", "EXC_")
                 )
                 fmt_ext_err = f"{rpcid} {err_ext}" if rpcid in ("SPrCad", "p0UkFb", "maseQ") else str(err_ext)
                 err_ext_up = str(err_ext or "").upper()
@@ -255,23 +266,42 @@ def _post_flow_rpc(page, wiz, project_id, rpcid, payload_builder_fn, recaptcha_a
                             _ACC_TMT_STREAK[acc_key] = int(_ACC_TMT_STREAK.get(acc_key, 0) or 0) + 1
                     # Do NOT fall through to Playwright page.evaluate when Flow already returned [8] / quota / policy!
                     return False, None, fmt_ext_err
-                _EXT_RCAP_TMT_STREAK[0] += 1
-                do_ext_reset = False
-                with _ACC_LOCKS_GUARD:
-                    if _EXT_RCAP_TMT_STREAK[0] >= 6 and (time.time() - _EXT_LAST_RESET_TS[0]) >= 120.0:
-                        _EXT_RCAP_TMT_STREAK[0] = 0
-                        _EXT_LAST_RESET_TS[0] = time.time()
-                        do_ext_reset = True
-                if do_ext_reset:
-                    try:
-                        br.notify_recaptcha_score_dead()
-                    except Exception:
-                        pass
-                with _ACC_LOCKS_GUARD:
-                    _ACC_TMT_STREAK[acc_key] = int(_ACC_TMT_STREAK.get(acc_key, 0) or 0) + 1
-                    new_st = _ACC_TMT_STREAK[acc_key]
-                if new_st >= 2:
-                    return False, None, fmt_ext_err
+                if is_unusual_captcha:
+                    do_ext_reset = False
+                    with _ACC_LOCKS_GUARD:
+                        _EXT_CAPTCHA_STREAK[0] += 1
+                        if _EXT_CAPTCHA_STREAK[0] >= 2:
+                            # Put burnt Extension pool on 45s cooldown & force Stealth Playwright per-account session
+                            _EXT_CAPTCHA_COOL_UNTIL[0] = max(_EXT_CAPTCHA_COOL_UNTIL[0], time.time() + 45.0)
+                            if (time.time() - _EXT_LAST_RESET_TS[0]) >= 35.0:
+                                _EXT_CAPTCHA_STREAK[0] = 0
+                                _EXT_LAST_RESET_TS[0] = time.time()
+                                do_ext_reset = True
+                    if do_ext_reset:
+                        print("🔄 [Captcha-Fallback] Extension tụt điểm reCAPTCHA ([7]) -> reset tab Extension & chuyển tạm sang Playwright Stealth 45s!", flush=True)
+                        try:
+                            br.notify_recaptcha_score_dead()
+                        except Exception:
+                            pass
+                    # Always fall through to Stealth Playwright on UNUSUAL_ACTIVITY instead of deadlocking!
+                else:
+                    _EXT_RCAP_TMT_STREAK[0] += 1
+                    do_ext_reset = False
+                    with _ACC_LOCKS_GUARD:
+                        if _EXT_RCAP_TMT_STREAK[0] >= 6 and (time.time() - _EXT_LAST_RESET_TS[0]) >= 60.0:
+                            _EXT_RCAP_TMT_STREAK[0] = 0
+                            _EXT_LAST_RESET_TS[0] = time.time()
+                            do_ext_reset = True
+                    if do_ext_reset:
+                        try:
+                            br.notify_recaptcha_score_dead()
+                        except Exception:
+                            pass
+                    with _ACC_LOCKS_GUARD:
+                        _ACC_TMT_STREAK[acc_key] = int(_ACC_TMT_STREAK.get(acc_key, 0) or 0) + 1
+                        new_st = _ACC_TMT_STREAK[acc_key]
+                    if new_st >= 2:
+                        return False, None, fmt_ext_err
         except Exception as exc_ext_rpc:
             print(f"   [RPC-EXT WARN {acc_key} | {rpcid}] {exc_ext_rpc}", flush=True)
 
@@ -625,7 +655,7 @@ def submit_scene_in_page(page, wiz, task):
     project_id = task["project_id"]
     ref_uuid = task["ref_uuid"]
     prod_uuid = task.get("prod_uuid")
-    voice_id = task["voice_id"]
+    voice_id = "" if task.get("_drop_voice_id") else task["voice_id"]
     worker_prof = task.get("worker_profile") or ""
     if voice_id and worker_prof:
         try:
@@ -1229,7 +1259,7 @@ def main():
 
     ffmpeg_pool = concurrent.futures.ThreadPoolExecutor(max_workers=FFMPEG_WORKERS)
     poll_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(48, MAX_INFLIGHT + UPSCALE_DL_WORKERS + 8))
-    thumb_pool = concurrent.futures.ThreadPoolExecutor(max_workers=1)
+    thumb_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(2, min(4, len(active_flow_accs))))
     vids_pool = concurrent.futures.ThreadPoolExecutor(max_workers=max(4, min(24, MAX_INFLIGHT)))
     vids_rr_box = [0]
     thumb_rr_box = [0]
@@ -1621,14 +1651,28 @@ def main():
             acc_prof = acc_item.get("profile_name") or PROF_NAME
             acc_sh_dir = gvt._resolve_flow_shared_dir(acc_prof)
             acc_p_dir, acc_c_file = profile_paths(acc_sh_dir, acc_prof)
+            cand_c_files = []
+            for cf_try in (
+                str(acc_c_file) if acc_c_file else "",
+                os.path.join(WS_DIR, "data", "google_flow_grok", "cookies", f"{acc_prof}.json"),
+                os.path.join(WS_DIR, "cookies", f"{acc_prof}.json"),
+            ):
+                if cf_try and os.path.isfile(cf_try) and cf_try not in cand_c_files:
+                    cand_c_files.append(cf_try)
+            # Ưu tiên file cookie mới nhất có chứa SID / __Secure-1PSID / OSID
+            cand_c_files.sort(key=lambda fp_c: os.path.getmtime(fp_c), reverse=True)
             acc_saved = []
-            if acc_c_file and os.path.exists(str(acc_c_file)):
+            chosen_c_file = ""
+            for cf_pick in cand_c_files:
                 try:
-                    c_json = json.load(open(str(acc_c_file), "r", encoding="utf-8"))
-                    if isinstance(c_json, dict) and isinstance(c_json.get("cookies"), list):
-                        acc_saved = [c for c in c_json["cookies"] if "GRECAPTCHA" not in c.get("name", "").upper()]
-                    elif isinstance(c_json, list):
-                        acc_saved = [c for c in c_json if "GRECAPTCHA" not in c.get("name", "").upper()]
+                    with open(cf_pick, "r", encoding="utf-8") as _f_ckp:
+                        c_json = json.load(_f_ckp)
+                    raw_lst = c_json.get("cookies", []) if isinstance(c_json, dict) else (c_json if isinstance(c_json, list) else [])
+                    clean_lst = [c for c in raw_lst if isinstance(c, dict) and "GRECAPTCHA" not in str(c.get("name", "")).upper()]
+                    if any(c.get("name") in ("SID", "__Secure-1PSID", "OSID") and c.get("value") for c in clean_lst):
+                        acc_saved = clean_lst
+                        chosen_c_file = cf_pick
+                        break
                 except Exception:
                     pass
             has_auth_sid = any(c.get("name") in ("SID", "__Secure-1PSID", "OSID") and c.get("value") for c in acc_saved)
@@ -1638,6 +1682,7 @@ def main():
                     "name": acc_item.get("name") or acc_prof,
                     "profile_name": acc_prof,
                     "profile_dir": acc_p_dir,
+                    "cookie_file": chosen_c_file,
                     "project_id": str(acc_item.get("project_id") or "").strip(),
                     "clean_cookies": list(merged_acc.values()),
                 })
@@ -1753,6 +1798,8 @@ def main():
                 except Exception:
                     pass
 
+        auth_fail_counts = {}
+
         def _mark_unhealthy(p_name: str, reason: str = "", cooldown_sec=None):
             if not p_name:
                 return 0.0
@@ -1760,7 +1807,12 @@ def main():
             if kind == "content_policy":
                 return 0.0
             with QUEUE_LOCK:
-                if cooldown_sec is not None:
+                if kind == "account_auth":
+                    af_cnt = int(auth_fail_counts.get(p_name, 0)) + 1
+                    auth_fail_counts[p_name] = af_cnt
+                    # Nếu 1 tài khoản hỏng phiên (thiếu SNlM0e / 401) >= 2 lần -> cách ly 30 phút để không làm nghẽn luồng!
+                    dur = float(cooldown_sec) if (cooldown_sec is not None and af_cnt < 2) else (1800.0 if af_cnt >= 2 else 180.0)
+                elif cooldown_sec is not None:
                     dur = float(cooldown_sec)
                 elif kind == "rate_limit":
                     st_cnt = int(rate_limit_streak.get(p_name, 0)) + 1
@@ -1879,12 +1931,25 @@ def main():
                 def _load_fresh_disk_cookies_acc(pname: str) -> list:
                     sh_d = gvt._resolve_flow_shared_dir(pname)
                     _, c_fp = profile_paths(sh_d, pname)
-                    if c_fp and os.path.exists(str(c_fp)):
+                    cand_fs = []
+                    for fp_try in (
+                        acc_entry.get("cookie_file") or "",
+                        str(c_fp) if c_fp else "",
+                        os.path.join(WS_DIR, "data", "google_flow_grok", "cookies", f"{pname}.json"),
+                        os.path.join(WS_DIR, "cookies", f"{pname}.json"),
+                    ):
+                        if fp_try and os.path.isfile(fp_try) and fp_try not in cand_fs:
+                            cand_fs.append(fp_try)
+                    cand_fs.sort(key=lambda fp_x: os.path.getmtime(fp_x), reverse=True)
+                    for fp_pick in cand_fs:
                         try:
-                            raw_c = json.load(open(str(c_fp), "r", encoding="utf-8"))
+                            with open(fp_pick, "r", encoding="utf-8") as _f_rf:
+                                raw_c = json.load(_f_rf)
                             clist_r = raw_c.get("cookies", raw_c) if isinstance(raw_c, dict) else raw_c
                             if isinstance(clist_r, list):
-                                return [c for c in clist_r if isinstance(c, dict) and "GRECAPTCHA" not in str(c.get("name", "")).upper()]
+                                clean_r = [c for c in clist_r if isinstance(c, dict) and "GRECAPTCHA" not in str(c.get("name", "")).upper()]
+                                if any(c.get("name") in ("SID", "__Secure-1PSID", "OSID") and c.get("value") for c in clean_r):
+                                    return clean_r
                         except Exception:
                             pass
                     return []
@@ -2232,17 +2297,25 @@ def main():
                 eff_cap = max(int(max_retries_cap), 12)
             else:
                 eff_cap = int(max_retries_cap)
-            task_dict["retries"] = int(task_dict.get("retries", 0)) + 1
+            with QUEUE_LOCK:
+                avail_live = [a["profile_name"] for a in account_cookie_pool if a["profile_name"] not in quota_exhausted_accounts]
+            is_dead_auth_reroute = (kind == "account_auth" and len(avail_live) > 1)
+            if not is_dead_auth_reroute:
+                task_dict["retries"] = int(task_dict.get("retries", 0)) + 1
             if task_dict["retries"] > eff_cap:
                 _record_task_scene_error(task_dict, str(err_msg or ""), terminal=True)
                 safe_sync_ui()
                 print(f"❌ [{task_dict.get('pid')} | {task_dict.get('key')}] Đã hết {eff_cap} lần thử ({short_e}).", flush=True)
                 return False
-            _record_task_scene_error(task_dict, str(err_msg or ""), terminal=False)
+            if not is_dead_auth_reroute:
+                _record_task_scene_error(task_dict, str(err_msg or ""), terminal=False)
             if any(k in err_low_r for k in ("not_found", "invalid", "upload", "media_uuid")):
                 task_dict["_need_ref_reupload"] = True
-            with QUEUE_LOCK:
-                avail_live = [a["profile_name"] for a in account_cookie_pool if a["profile_name"] not in quota_exhausted_accounts]
+            if task_dict.get("type") == "vid_scene" and task_dict.get("voice_id") and task_dict.get("retries", 0) >= 2:
+                if kind in ("captcha_score",) or any(k in err_low_r for k in ("not_found", "unusual_activity", "[5]", "[7]")):
+                    if not task_dict.get("_drop_voice_id"):
+                        task_dict["_drop_voice_id"] = True
+                        print(f"🎙️ [{task_dict.get('pid')} | {task_dict.get('key')}] Bỏ voice_id UUID cũ khi retry để tránh lỗi tài khoản khác (giữ nguyên giọng từ Prompt).", flush=True)
             has_alt_acct = (
                 len(avail_live) > 1
                 and task_dict.get("type") not in ("upsample_ref_2k", "upsample_1080p")
@@ -2402,7 +2475,7 @@ def main():
             pg = pg or page_box[0]
             wiz = wiz or wiz_box[0]
             prod_abs = os.path.abspath(primary_prod_img) if primary_prod_img else ""
-            dedup_k = (pid, prod_abs or base_char)
+            dedup_k = (pid, eff_project_id, prod_abs or base_char)
             lk = _get_upload_lock(("prod", cur_acc, dedup_k))
             with lk:
                 with STATE_LOCK:
@@ -2410,26 +2483,14 @@ def main():
                     if not force_reupload or (cur_acc, dedup_k) in fresh_prod_uploads:
                         if dedup_k in acc_map:
                             return acc_map[dedup_k]
-                        if (pid, base_char) in acc_map:
-                            return acc_map[(pid, base_char)]
+                        if (pid, eff_project_id, base_char) in acc_map:
+                            return acc_map[(pid, eff_project_id, base_char)]
                         by_acc_disk = refs_state.get("uploaded_prod_refs_by_account", {}).get(cur_acc, {})
-                        acc_disk_uuids = by_acc_disk.get(base_char) or []
+                        acc_disk_uuids = by_acc_disk.get(f"{eff_project_id}:{base_char}") or []
                         if acc_disk_uuids:
                             acc_map[dedup_k] = acc_disk_uuids[0]
-                            acc_map[(pid, base_char)] = acc_disk_uuids[0]
+                            acc_map[(pid, eff_project_id, base_char)] = acc_disk_uuids[0]
                             return acc_disk_uuids[0]
-                        if cur_acc == primary_prof_name:
-                            refs_state.setdefault("uploaded_prod_refs", {})
-                            cur_prod_uuids = refs_state["uploaded_prod_refs"].get(base_char) or []
-                            if not cur_prod_uuids and prod_abs:
-                                for _existing_lst in refs_state["uploaded_prod_refs"].values():
-                                    if _existing_lst:
-                                        cur_prod_uuids = _existing_lst
-                                        break
-                            if cur_prod_uuids:
-                                acc_map[dedup_k] = cur_prod_uuids[0]
-                                acc_map[(pid, base_char)] = cur_prod_uuids[0]
-                                return cur_prod_uuids[0]
                 print(f"📤 [{pid} | {base_char.upper()} | {cur_acc}] Uploading product image {os.path.basename(primary_prod_img)}...", flush=True)
                 ok_u, u_id, err_u = upload_single_product_ref_in_page(
                     pg, wiz, eff_project_id, primary_prod_img, cookie_hdr=_ACC_COOKIE_MAP.get(cur_acc, ""), prof_name=cur_acc
@@ -2441,8 +2502,8 @@ def main():
                     fresh_prod_uploads.add((cur_acc, dedup_k))
                     acc_map = uploaded_prod_by_acc.setdefault(cur_acc, {})
                     acc_map[dedup_k] = u_id
-                    acc_map[(pid, base_char)] = u_id
-                    refs_state.setdefault("uploaded_prod_refs_by_account", {}).setdefault(cur_acc, {})[base_char] = [u_id]
+                    acc_map[(pid, eff_project_id, base_char)] = u_id
+                    refs_state.setdefault("uploaded_prod_refs_by_account", {}).setdefault(cur_acc, {})[f"{eff_project_id}:{base_char}"] = [u_id]
                     if cur_acc == primary_prof_name:
                         refs_state.setdefault("uploaded_prod_refs", {})[base_char] = [u_id]
                 save_prod_state(pdir, state, refs_state)
@@ -2891,6 +2952,7 @@ def main():
                                 if eff_ref_uuid and u_id_ref:
                                     acc_variant_uploads[(prof_name, pid, v_key)] = (eff_ref_uuid, u_id_ref)
                                 pending_queue[:0] = new_scene_tasks
+                        _clear_task_scene_error(t)
                         _mark_acc_healthy(prof_name)
                         print(f"✨ [{pid} | {v_key.upper()}] Ref Image 2K (1536x2752) & re-uploaded ({nbytes_2k//1024} KB) -> media_uuid={eff_ref_uuid}!", flush=True)
                         safe_sync_ui()
@@ -2903,8 +2965,10 @@ def main():
                 elif t_type == "ref_img":
                     v_key = t["v_key"]
                     base_char = t["base_char"]
+                    need_reup_ref = bool(t.pop("_need_ref_reupload", False))
                     u_id = ensure_single_prod_uuid(
-                        pid, pdir, state, refs_state, base_char, eff_proj_id, t["primary_prod_img"], pg=pg, wiz=wiz, cur_acc=prof_name
+                        pid, pdir, state, refs_state, base_char, eff_proj_id, t["primary_prod_img"],
+                        pg=pg, wiz=wiz, cur_acc=prof_name, force_reupload=need_reup_ref,
                     )
                     if not u_id:
                         _schedule_mt_retry(t, "upload_prod_ref_failed", max_retries_cap=10, front=True)
@@ -2945,6 +3009,7 @@ def main():
                         t["preferred_account"] = prof_name
                         with QUEUE_LOCK:
                             inflight_tasks[t["key"]] = t
+                        _clear_task_scene_error(t)
                         _mark_acc_healthy(prof_name)
                         write_pipeline_heartbeat(f"🖼️ [{pid} | {v_key.upper()}] Đang tạo ảnh Ref Nano Banana 2.1 ({prof_name})...", is_running=True)
                     else:
@@ -2981,6 +3046,7 @@ def main():
                         save_prod_state(pdir, state)
                         with QUEUE_LOCK:
                             inflight_tasks[t["key"]] = t
+                        _clear_task_scene_error(t)
                         _mark_acc_healthy(prof_name)
                         write_pipeline_heartbeat(f"✨ [{pid} | {sc_id}] Đang Upsample 1080p ({prof_name})...", is_running=True)
                     else:
@@ -3129,6 +3195,7 @@ def main():
                                 if not avail_rem:
                                     quota_all_exhausted[0] = True
                                     pending_queue[:] = [q for q in pending_queue if q.get("type") in ("upsample_1080p", "upsample_ref_2k")]
+                        _clear_task_scene_error(t)
                         _mark_acc_healthy(prof_name)
                         write_pipeline_heartbeat(f"🚀 [{pid} | {sc_id}] Đã gửi render cảnh 10s ({prof_name})", is_running=True)
                     else:
@@ -3337,6 +3404,7 @@ def main():
                         pending_queue.insert(0, t)
 
                 elif res_state == "ready_for_1080p":
+                    _clear_task_scene_error(t)
                     print(f"🎬 [{pid} | {sc_id}] Base 720p ready ({nbytes//1024} KB in {elapsed}s) -> queueing 1080p Upsample (p0UkFb)...", flush=True)
                     t["type"] = "upsample_1080p"
                     t["stage"] = "upsample_1080p"

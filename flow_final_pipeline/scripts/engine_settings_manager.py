@@ -68,23 +68,24 @@ DEFAULT_ENGINE_SETTINGS = {
     # 1. Đa luồng & Đa tài khoản Google Flow / Google Vids Web
     "video_provider": "google_flow",  # 'google_flow' (aisandbox-pa + Voice UUID) | 'google_vids' (docs.google.com/videos Omni 1080p • Zero reCAPTCHA)
     "google_vids_model": "omni",  # 'omni' (Model 12 • Lên tới 15s 1080p) | 'veo_3_1' (Model 9)
-    "flow_video_model": "",
+    "flow_video_model": "Omni 1.2 Flash",
     "multi_account_enabled": True,
     "selected_flow_profile": "",
+    "selected_flow_profiles": [],
     "auto_flow_concurrency": True,
     "flow_concurrency_mode": "optimal",
     "flow_api_workers": 6,
-    "max_inflight_per_account": 5,
-    "max_total_inflight": 10,
-    "submit_delay_sec": 4.5,
+    "max_inflight_per_account": 6,
+    "max_total_inflight": 20,
+    "submit_delay_sec": 7.0,
     "global_submit_stagger_sec": 0.7,
     "parallel_products": 4,
     "upscale_download_workers": 6,
     "extension_pool_tabs": 4,
     # 2. Đa luồng Render Video FFmpeg (Tự động theo phần cứng máy tính)
     "auto_hardware_tuning": True,
-    "ffmpeg_render_workers": 3,
-    "ffmpeg_threads_per_job": 4,
+    "ffmpeg_render_workers": 5,
+    "ffmpeg_threads_per_job": 2,
     "video_encoder": "auto",  # 'auto' | 'h264_nvenc' | 'libx264'
     "ffmpeg_preset": "fast",
     # 3. Cài đặt Tạo Ảnh Thumbnail AI, Kho Template Đa Ngành Hàng & Ghép 0.1s đầu Video
@@ -95,14 +96,28 @@ DEFAULT_ENGINE_SETTINGS = {
     "thumbnail_selection_mode": "auto_category",  # 'fixed' | 'auto_category' | 'custom_category'
     "rotate_templates_per_variant": True,
     "category_thumbnail_map": dict(DEFAULT_CATEGORY_THUMBNAIL_MAP),
-    "thumbnail_preset_id": "gia_dung_3grid_pro",
+    "thumbnail_preset_id": "kitchen_minimal",
     "thumbnail_master_prompt": THUMBNAIL_PRESETS[0]["master_prompt"],
-    "thumbnail_embed_product_insets": True,
+    "thumbnail_embed_product_insets": False,
     "thumbnail_add_text_badge": False,
     # 4. Hệ thống 1 (Độc lập): Góc Máy Uy Tín (Nhà Xưởng / Kho Hàng / Luxury) & Đạo Diễn B-Roll Cận Sản Phẩm (SHOT 1 -> SHOT 2 -> SHOT 3)
-    "camera_broll_settings": dict(DEFAULT_CAMERA_BROLL_SETTINGS),
+    "camera_broll_settings": {
+        **dict(DEFAULT_CAMERA_BROLL_SETTINGS),
+        "broll_angle_variety": False,
+        "broll_moderate_frequency": True,
+        "broll_dynamic_camera_motion": False,
+    },
     # 5. Hệ thống 2 (Độc lập): Hiệu Ứng Visual FX Trực Tiếp Trong Prompt Render AI Video (Không chèn chữ/subtitle)
-    "video_edit_fx_settings": dict(DEFAULT_VIDEO_EDIT_FX_SETTINGS),
+    "video_edit_fx_settings": {
+        **dict(DEFAULT_VIDEO_EDIT_FX_SETTINGS),
+        "enable_video_edit_fx": False,
+        "fx_floating_3d_icons_badges": False,
+        "fx_glass_hud_panels": False,
+        "fx_neon_swoosh_ticks": False,
+        "fx_glass_player_progress_card": False,
+        "fx_pip_broll_cutaway": False,
+        "fx_center_pop_keywords": False,
+    },
     # 6. Hệ thống 3 (Độc lập): Kho Template Subtitle & Studio Tùy Chỉnh Phụ Đề Chuyên Nghiệp
     "subtitle_settings": dict(DEFAULT_SUBTITLE_SETTINGS),
 }
@@ -613,7 +628,16 @@ def load_engine_settings() -> dict:
         cfg["ffmpeg_threads_per_job"] = hw["recommended"]["ffmpeg_threads_per_job"]
 
     flow_accs = [a for a in list_available_flow_accounts() if a.get("active", True)]
-    sel_multi = [str(p).strip() for p in (cfg.get("selected_flow_profiles") or []) if str(p).strip()]
+    avail_prof_names = {str(a.get("profile_name") or "").strip() for a in flow_accs if str(a.get("profile_name") or "").strip()}
+    sel_single_raw = str(cfg.get("selected_flow_profile") or "").strip()
+    if avail_prof_names and sel_single_raw and sel_single_raw not in avail_prof_names:
+        cfg["selected_flow_profile"] = ""
+    sel_multi_raw = [str(p).strip() for p in (cfg.get("selected_flow_profiles") or []) if str(p).strip()]
+    if avail_prof_names and sel_multi_raw:
+        sel_multi = [p for p in sel_multi_raw if p in avail_prof_names]
+        cfg["selected_flow_profiles"] = sel_multi
+    else:
+        sel_multi = sel_multi_raw
     conc_accs = flow_accs
     if bool(cfg.get("multi_account_enabled", True)) and sel_multi:
         filt_conc = [a for a in flow_accs if str(a.get("profile_name") or "").strip() in sel_multi]
@@ -2799,6 +2823,10 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
             exact = [acc for acc in pool_accs if _prof_of(acc) == want_prof]
             if exact:
                 return exact
+            # If the saved profile name does not exist on this machine at all, fall back to active local accounts
+            all_known_profs = {_prof_of(acc) for acc in flow_accs}
+            if want_prof not in all_known_profs:
+                return pool_accs
             return []
 
         def _acc_key(acc: dict) -> tuple:
@@ -2899,7 +2927,24 @@ def _render_thumbnails_via_google_flow_batch(items: list) -> dict:
                 require_all_reference_uploads=bool(ref_imgs),
             )
             if meta.get("char_uuid"):
-                job.character_id = str(meta.get("char_uuid") or "").strip()
+                raw_cid = str(meta.get("char_uuid") or "").strip()
+                resolved_cid = raw_cid
+                try:
+                    import character_library_manager as _clm_th
+                    if os.path.isfile(getattr(_clm_th, "VOICES_CHARS_PATH", "")):
+                        with open(_clm_th.VOICES_CHARS_PATH, "r", encoding="utf-8") as _f_vc:
+                            _vc_chars = (json.load(_f_vc) or {}).get("characters") or {}
+                        _known_cids = {
+                            str(_c.get("character_id") or "").strip().lower()
+                            for _c in _vc_chars.values()
+                            if isinstance(_c, dict) and str(_c.get("character_id") or "").strip()
+                        }
+                        if raw_cid.lower() in _known_cids or raw_cid.lower() in {k.lower() for k in _vc_chars.keys()}:
+                            resolved_cid = _clm_th.resolve_character_id_for_account(raw_cid, prof_name)
+                except Exception:
+                    resolved_cid = raw_cid
+                if resolved_cid:
+                    job.character_id = resolved_cid
 
             try:
                 ok_flow = bool(_run_async_sync(gvt.run_veo_flow(job, tok, acc_project_id, bridge, None, None)))
@@ -3190,11 +3235,18 @@ def generate_thumbnail_for_variant(
                    'references': meta['reference_images']}, receipt, ensure_ascii=False, indent=2)
     shutil.copy2(out_thumb_proj, out_thumb_central)
 
-    # Nếu Video Final đã có sẵn và bật inject_01s -> ghép ngay 0.1s vào đầu Video Final!
+    # Nếu Video Final đã có sẵn và bật inject_01s -> ghép ngay 0.1s vào đầu Video Final + lưu kèm ảnh bìa cùng thư mục output!
     final_mp4 = _resolve_final_video_candidate(pid, char_v, pdir, meta.get("final_video_path") or "")
     injected_info = None
-    if inject_01s and final_mp4 and os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 10000:
-        injected_info = inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=dur_01s)
+    if final_mp4 and os.path.isfile(final_mp4) and os.path.getsize(final_mp4) > 10000:
+        try:
+            sidecar_jpg = os.path.splitext(final_mp4)[0] + "_thumb.jpg"
+            if os.path.abspath(sidecar_jpg) != os.path.abspath(out_thumb_central):
+                shutil.copy2(out_thumb_central, sidecar_jpg)
+        except Exception:
+            pass
+        if inject_01s:
+            injected_info = inject_thumbnail_01s_into_video(final_mp4, out_thumb_central, duration_sec=dur_01s)
     injected_ok = bool(injected_info and injected_info.get("ok"))
     _persist_thumbnail_to_project_manifests(pid, pdir, out_thumb_central, dur_01s, injected_ok)
 
@@ -3489,6 +3541,14 @@ def ensure_project_variant_thumbnail_and_inject(
                 break
 
     target_video = _resolve_final_video_candidate(pid, vkey, pdir, final_video_path or res.get("final_video_path") or "")
+    if thumb_path and os.path.isfile(thumb_path) and target_video and os.path.isfile(target_video):
+        try:
+            sidecar_jpg = os.path.splitext(target_video)[0] + "_thumb.jpg"
+            if os.path.abspath(sidecar_jpg) != os.path.abspath(thumb_path):
+                shutil.copy2(thumb_path, sidecar_jpg)
+                res["sidecar_thumbnail_path"] = sidecar_jpg
+        except Exception:
+            pass
     if want_inject and thumb_path and os.path.isfile(thumb_path) and target_video and os.path.isfile(target_video):
         try:
             inj = inject_thumbnail_01s_into_video(target_video, thumb_path, duration_sec=dur_01s)
